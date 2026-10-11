@@ -18,7 +18,7 @@
 // 分层依赖方向（自上而下，不许反向）：
 //   qmlbridge  →  core / common/session / common/appearance  →  common/util / network
 //
-// 原 ShellController 的那段历史上下文（保留）：M3 切片刻意**不复用**旧的 DSHHub（QMainWindow），
+// 原 ShellController 的那段历史上下文（保留）：M3 切片刻意**不复用**旧的 ULinHub（QMainWindow），
 // 只用既有无控件依赖类把数据面重接一遍，M8 删旧壳时再合一。
 
 #include "qmlbridge/ExtensionManagerController.h"

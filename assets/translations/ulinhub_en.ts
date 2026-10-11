@@ -709,7 +709,7 @@
         <translation>Interface language changed.</translation>
     </message>
     <message id="settings_language_pack_missing_fmt">
-        <translation>No language pack found for %1; reverted to the default language. Put dshhub_%1.qm into the program's translations/ directory to enable it.</translation>
+        <translation>No language pack found for %1; reverted to the default language. Put ulinhub_%1.qm into the program's translations/ directory to enable it.</translation>
     </message>
     <message id="settings_language_system_name">
         <translation>System language</translation>

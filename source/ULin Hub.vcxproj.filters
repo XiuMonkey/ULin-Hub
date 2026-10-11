@@ -372,7 +372,7 @@
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="..\assets\resources\DSHHub.qrc">
+    <QtRcc Include="..\assets\resources\ulinhub.qrc">
       <Filter>..\assets\resources</Filter>
     </QtRcc>
     <QtRcc Include="qml\qml.qrc">
@@ -380,29 +380,29 @@
     </QtRcc>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\assets\resources\ULin Hub.rc">
+    <ResourceCompile Include="..\assets\resources\ulin-hub.rc">
       <Filter>..\assets\resources</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <QtTranslation Include="..\assets\translations\dshhub_en.ts">
+    <QtTranslation Include="..\assets\translations\ulinhub_en.ts">
       <Filter>..\assets\translations</Filter>
     </QtTranslation>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\assets\resources\highlight_rules.json">
+    <None Include="..\assets\resources\highlight-rules.json">
       <Filter>..\assets\resources</Filter>
     </None>
-    <None Include="..\assets\resources\DSH-Hub-Logo-Tiny@2x.png">
+    <None Include="..\assets\resources\ulin-hub-logo-tiny@2x.png">
       <Filter>..\assets\resources</Filter>
     </None>
-    <None Include="..\assets\resources\DSH-Hub-Logo-Tiny-Dark@2x.png">
+    <None Include="..\assets\resources\ulin-hub-logo-tiny-dark@2x.png">
       <Filter>..\assets\resources</Filter>
     </None>
-    <None Include="..\assets\resources\DSH-Hub-Icon.png">
+    <None Include="..\assets\resources\ulin-hub-icon.png">
       <Filter>..\assets\resources</Filter>
     </None>
-    <None Include="..\assets\resources\ULin Hub.ico">
+    <None Include="..\assets\resources\ulin-hub.ico">
       <Filter>..\assets\resources</Filter>
     </None>
   </ItemGroup>

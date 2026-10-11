@@ -36,11 +36,11 @@ namespace
 		return usableServerUrl(SettingsStore::serverUrl());
 	}
 
-	// 内置插件台账 .dsh-hub-builtin.json：revision 是插件源 SHA1 前缀，内容变了下次启动重装；
+	// 内置插件台账 .ulin-hub-builtin.json：revision 是插件源 SHA1 前缀，内容变了下次启动重装；
 	// 台账里有记录但被手工删掉的插件不重装
 	QString builtinMarkerPath(const QString& profileDir)
 	{
-		return profileDir + QStringLiteral("/.dsh-hub-builtin.json");
+		return profileDir + QStringLiteral("/.ulin-hub-builtin.json");
 	}
 
 	QString builtinSourceRevision(const QString& sourceDir)
@@ -571,7 +571,7 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 
 	const QString nodeModulesPath = profileDir + QStringLiteral("/node_modules");
 	for (const QString& pluginName : kBuiltinPlugins) {
-		const QString sourceDir = QStringLiteral(":/DSHHub/") + pluginName;
+		const QString sourceDir = QStringLiteral(":/ULinHub/") + pluginName;
 		if (!QDir(sourceDir).exists()) {
 			qWarning().noquote() << QStringLiteral(
 				"[ServerManager] 内置插件资源缺失（qrc 未包含？）: %1").arg(sourceDir);
@@ -609,7 +609,7 @@ bool ServerManager::installBuiltinPlugin(const QString& profileDir, const QStrin
 {
 	// 就地安装：qrc 插件目录进 node_modules 并补 patch 行（patch 统一走 ensurePatchEntry，它是行格式与判重的
 	// 唯一所有者）。不走 ExtensionLoader —— 那是用户装 .ext 的通路（解归档 + 必须带 main.dll）
-	const QString sourceDir = QStringLiteral(":/DSHHub/") + pluginName;
+	const QString sourceDir = QStringLiteral(":/ULinHub/") + pluginName;
 	const QString destDir = profileDir + QStringLiteral("/node_modules/") + pluginName;
 	if (!materializePluginFiles(sourceDir, destDir, error))
 		return false;

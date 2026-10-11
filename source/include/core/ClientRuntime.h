@@ -50,7 +50,7 @@ public:
 	void createSession(const QString& workspaceId);
 	// 清空会话（侧栏那颗 danger 按钮）：抹掉本地会话数据（sessions 目录 + storages/workspace.json）与本地
 	// 目录，再把服务端注册表里的每个工作区逐个 workspace/delete 删掉，删完建一个新的默认会话。与旧壳
-	// DSHHub::onClearConversationClicked 同路（Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）。
+	// ULinHub::onClearConversationClicked 同路（Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）。
 	void clearAllSessions();
 	void archiveSession(const QString& sessionId);
 	void deleteWorkspace(const QString& workspaceId);

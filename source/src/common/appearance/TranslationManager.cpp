@@ -15,8 +15,8 @@
 
 namespace
 {
-	const char* const kFileBase = "dshhub";  // 翻译文件基名：dshhub_en.qm / dshhub_ja.qm
-	const char* const kResourcePrefix = ":/DSHHub/translations/";  // 内置包前缀：resources/translations/*.qm 打进 qrc 后在这
+	const char* const kFileBase = "ulinhub";  // 翻译文件基名：ulinhub_en.qm / ulinhub_ja.qm
+	const char* const kResourcePrefix = ":/ULinHub/translations/";  // 内置包前缀：resources/translations/*.qm 打进 qrc 后在这
 
 	QTranslator* g_translator = nullptr;  // 已安装的 translator（切换时先卸旧的）
 	QString g_activeCode;  // 生效中的语言代码（已解析过“跟随系统”）
@@ -87,7 +87,7 @@ namespace
 		}
 	}
 
-	const char* const kBuiltinPacks[] = { "dshhub_zh_CN", "dshhub_en" };  // 随程序内置的语言包基名（必须与 resources/DSHHub.qrc 里的条目一致）
+	const char* const kBuiltinPacks[] = { "ulinhub_zh_CN", "ulinhub_en" };  // 随程序内置的语言包基名（必须与 resources/ulinhub.qrc 里的条目一致）
 
 	// 释放全部内置语言包：内置保底，外部可覆盖（已存在的文件不动）
 	void releaseBuiltinPacks(const QString& dir)

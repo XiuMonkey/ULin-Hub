@@ -1,7 +1,7 @@
 #pragma once
 
 // server/url 的本地持久化统一入口：落在 <exe>/ClientSetting/ServerSetting.json，
-// 经 ClientSettings 读写（QSaveFile 原子替换；DSHHUB_CLIENT_SETTING_DIR 可覆盖目录，单测靠它指临时目录）。
+// 经 ClientSettings 读写（QSaveFile 原子替换；ULINHUB_CLIENT_SETTING_DIR 可覆盖目录，单测靠它指临时目录）。
 // 文件名与键名只允许出现在这里，避免在 UI / core 各处散落字符串字面量。
 // 界面语言与主题在 AppearanceSetting.json（见 ClientSettings.h）；默认 Agent 预设归服务端设置，
 // 客户端刻意不留副本。

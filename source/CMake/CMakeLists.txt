@@ -98,7 +98,7 @@ endif()
 # ------------------------------------------------------------------
 qt_add_executable(ulinhub WIN32
 	${ULINHUB_SOURCES}
-	"${ULINHUB_ROOT}/../assets/resources/DSHHub.qrc"
+	"${ULINHUB_ROOT}/../assets/resources/ulinhub.qrc"
 	# QML 壳的资源（source/qml/）：单独一份 qrc，与 .vcxproj 的 <QtRcc Include="qml\qml.qrc" /> 对应
 	"${ULINHUB_ROOT}/qml/qml.qrc")
 
@@ -113,7 +113,7 @@ set_target_properties(ulinhub PROPERTIES
 
 target_include_directories(ulinhub PRIVATE
 	"${ULINHUB_ROOT}/include"
-	# resources/ 只为下面 rc.exe 解析 "ULin Hub.ico" 的相对路径用：
+	# resources/ 只为下面 rc.exe 解析 "ulin-hub.ico" 的相对路径用：
 	# CMake 会把 include 目录翻成 /I 传给 rc.exe（<INCLUDES> 占位符）。
 	"${ULINHUB_ROOT}/../assets/resources")
 
@@ -147,7 +147,7 @@ target_link_libraries(ulinhub PRIVATE Qt6::CorePrivate)
 
  # 图标资源脚本：非 Windows 平台没有这个文件（.ico/.rc 是 Windows 专用）
 if(WIN32)
-	target_sources(ulinhub PRIVATE "${ULINHUB_ROOT}/../assets/resources/ULin Hub.rc")
+	target_sources(ulinhub PRIVATE "${ULINHUB_ROOT}/../assets/resources/ulin-hub.rc")
 
 # 让 exe 从 dependence\ 子目录解析 Qt / MSVC 运行库（私有程序集）：Windows 的加载器
 # 默认**不搜索 exe 的子目录**，靠这段 manifest 声明才会去找。DLL 清单在 source/dependence.manifest，
@@ -238,7 +238,7 @@ if(ULINHUB_BUILD_TESTS)
 	# 自动推断 —— 漏掉它们 moc 不会生成，链接期报一串 metaObject / qt_metacast /
 	# staticMetaObject 无法解析。.vcxproj 侧由 Qt VS Tools 处理，所以那边一直是好的。
 	#
-	# 注意别图省事写成 include/*.h：那会把 DSHHub / ChatInputWidget 等**没有编进
+	# 注意别图省事写成 include/*.h：那会把 ULinHub / ChatInputWidget 等**没有编进
 	# 测试目标**的类的 moc 也生成出来，反而引入新的未解析符号（moc 会引用它们的
 	# 构造函数与槽）。清单必须与上面 ULINHUB_TEST_SOURCES 里那几个带 Q_OBJECT 的
 	# 类一一对应。

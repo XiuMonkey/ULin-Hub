@@ -56,7 +56,7 @@ Item {
     // 侧栏只负责内部排布的留白。
 
     // ---- 顶部：Logo（居中）----
-    // 原版 SidebarLogo 是**横版标识**：DSH-Hub-Logo-Tiny@2x.png 400×138、dpr=2 → 逻辑 200×69，
+    // 原版 SidebarLogo 是**横版标识**：ulin-hub-logo-tiny@2x.png 400×138、dpr=2 → 逻辑 200×69，
     // 且用 addWidget(..., Qt::AlignHCenter) **居中**（Sidebar.cpp:42-48 / 516）。
     Item {
         id: topRow
@@ -74,8 +74,8 @@ Item {
             width: 200
             height: 69
             source: Theme.isDark
-                ? "qrc:/DSHHub/DSH-Hub-Logo-Tiny-Dark@2x.png"
-                : "qrc:/DSHHub/DSH-Hub-Logo-Tiny@2x.png"
+                ? "qrc:/ULinHub/ulin-hub-logo-tiny-dark@2x.png"
+                : "qrc:/ULinHub/ulin-hub-logo-tiny@2x.png"
             sourceSize.width: 400
             sourceSize.height: 138
             fillMode: Image.PreserveAspectFit
@@ -127,20 +127,20 @@ Item {
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/DSHHub/Setting-Icon.png"
+            iconSource: "qrc:/ULinHub/setting-icon.png"
             tooltip: qsTrId("settings_title")
             onClicked: sidebar.openSettingsRequested()
         }
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/DSHHub/Plugin-Icon.png"
+            iconSource: "qrc:/ULinHub/plugin-icon.png"
             tooltip: qsTrId("sidebar_plugins")
             onClicked: sidebar.openPluginMarketRequested()
         }
         // 插件转译器（客户端扩展 PluginTranspiler 的入口）
         // 图标用来回箭头字形而不是 PNG：assets\resources 里没有转译器专用图标，复用
-        // Extension-Icon.png 会跟旁边那颗「扩展管理」撞图（实测两颗 Ext 并排分不清）。
+        // extension-icon.png 会跟旁边那颗「扩展管理」撞图（实测两颗 Ext 并排分不清）。
         // 字形走 IconButton 的 glyph 通道（与 TopBar 的 "☰" 同一条路）。文案暂不加进 .ts，等 M6 统一补 id。
         // ⚠️ 它必须**显式对齐**那排 PNG 的口径：原版图标是"键 32×32、图 20×20、主色 #6B7280"
         //    （颜色烘在 PNG 里，两档主题都是同一个值），而 IconButton 的默认字形口径是
@@ -166,18 +166,18 @@ Item {
             tooltip: "插件转译器"
             onClicked: sidebar.openTranspilerRequested()
         }
-        // 主题：原版 Sidebar::themeToggleRequested -> DSHHub::toggleTheme（切模式 + 过渡卡片）
+        // 主题：原版 Sidebar::themeToggleRequested -> ULinHub::toggleTheme（切模式 + 过渡卡片）
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/DSHHub/Theme-Icon.png"
+            iconSource: "qrc:/ULinHub/theme-icon.png"
             tooltip: qsTrId("sidebar_switch_theme")
             onClicked: Hub.toggleTheme()
         }
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/DSHHub/Extension-Icon.png"
+            iconSource: "qrc:/ULinHub/extension-icon.png"
             tooltip: qsTrId("ext_manager_title")
             onClicked: Hub.extensions.openPage()
         }

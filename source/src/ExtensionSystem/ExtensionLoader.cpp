@@ -249,7 +249,7 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 	}
 
 	const QString rootDir = QDir::temp().filePath(
-		QStringLiteral("DSHHubExtensions/") + extInfo.completeBaseName());
+		QStringLiteral("ULinHubExtensions/") + extInfo.completeBaseName());
 
 	if (QDir(rootDir).exists() && !removeRecursively(rootDir)) {
 		m_errorString = QStringLiteral("cannot clear old extension directory: %1").arg(rootDir);

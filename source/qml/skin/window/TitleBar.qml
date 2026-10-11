@@ -30,8 +30,8 @@ Item {
         height: Theme.size.logoHeight
         // 深色底用反色版（同目录 PNG 逐像素取反），与旧壳 TitleBar.cpp 一致
         source: Theme.isDark
-            ? "qrc:/DSHHub/DSH-Hub-Icon-Dark.png"
-            : "qrc:/DSHHub/DSH-Hub-Icon.png"
+            ? "qrc:/ULinHub/ulin-hub-icon-dark.png"
+            : "qrc:/ULinHub/ulin-hub-icon.png"
         fillMode: Image.PreserveAspectFit
         smooth: true
     }

@@ -230,7 +230,7 @@ AttachedPlugin/
 
 扩展 DLL 跑在 **Qt 客户端进程**里；DSH 插件跑在 **Node 服务端进程**里。两者之间用命名管道：
 
-- 管道名：`\\.\pipe\dshhub-bridge`；
+- 管道名：`\\.\pipe\ulinhub-bridge`；
 - 协议：**每行一个 JSON**；
   - 请求：`{"id":1,"tool":"my_tool","args":{...}}`
   - 响应：`{"id":1,"ok":true,"result":{...}}` 或 `{"id":1,"ok":false,"error":"..."}`；

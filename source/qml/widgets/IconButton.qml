@@ -9,7 +9,7 @@ Item {
 
     property string glyph: ""          // 字形（符号字体）；与 label 二选一或并用
     property string label: ""          // 可选文字
-    // 原版图标资源（qrc:/DSHHub/*.png）：给了就画图片，不再画字形/文字 —— 旧壳用 QIcon 的地方
+    // 原版图标资源（qrc:/ULinHub/*.png）：给了就画图片，不再画字形/文字 —— 旧壳用 QIcon 的地方
     // 都走这里（发送/中止、侧栏四个入口…），保证和原版同一套图
     property string iconSource: ""
     property int iconSize: Math.round(boxSize * 0.72)

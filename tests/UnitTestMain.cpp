@@ -5,7 +5,7 @@
 //
 // 注意：本程序是 WIN32 子系统（没有控制台），而且所有测试类共用一次 argv，
 // 所以命令行的 `-o file,txt` 会被后面的类覆盖，stdout 也抓不到。需要留证据时
-// 设置环境变量 DSHHUB_TEST_REPORT_DIR，每个类会各写一份 report-<类名>.txt；
+// 设置环境变量 ULINHUB_TEST_REPORT_DIR，每个类会各写一份 report-<类名>.txt；
 // 不设该变量时行为与以前完全一致（原样把 argv 传给每个 qExec）。
 // ------------------------------------------------------------------
 
@@ -31,10 +31,10 @@
 
 namespace
 {
-	// 每个类的报告路径；未设置 DSHHUB_TEST_REPORT_DIR 时返回空 = 保持原行为。
+	// 每个类的报告路径；未设置 ULINHUB_TEST_REPORT_DIR 时返回空 = 保持原行为。
 	QString reportPathFor(const char* className)
 	{
-		const QByteArray dir = qgetenv("DSHHUB_TEST_REPORT_DIR");
+		const QByteArray dir = qgetenv("ULINHUB_TEST_REPORT_DIR");
 		if (dir.isEmpty())
 			return QString();
 		return QDir(QString::fromLocal8Bit(dir))

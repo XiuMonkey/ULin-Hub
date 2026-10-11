@@ -13,7 +13,7 @@
 
 namespace MarkdownSegmenter
 {
-	// 启动期调一次：装载语法高亮规则（qrc 里的 highlight_rules.json）。
+	// 启动期调一次：装载语法高亮规则（qrc 里的 highlight-rules.json）。
 	// 规则缺失不报错，只是 code 单元的 html 退化为转义纯文本。
 	void ensureHighlightRulesLoaded();
 

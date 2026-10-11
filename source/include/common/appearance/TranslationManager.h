@@ -60,13 +60,13 @@ namespace Translation
 	QString savedLanguageCode();
 	void setSavedLanguageCode(const QString& code);
 
-	// 语言代码 -> 翻译文件基名（"en" -> "dshhub_en"）；空代码返回空串
+	// 语言代码 -> 翻译文件基名（"en" -> "ulinhub_en"）；空代码返回空串
 	QString translationFileBase(const QString& languageCode);
 
 	// 该代码是否属于默认语言（中文的任意变体都算：zh、zh_CN、zh_TW）；只用于语言列表去重，不代表"无需翻译"。
 	bool isDefaultLanguage(const QString& languageCode);
 
-	// 从文件名列表里解析出可用语言（纯函数，便于单测）：只认 dshhub_<code>.qm 这一种命名，同名去重、按名称排序。
+	// 从文件名列表里解析出可用语言（纯函数，便于单测）：只认 ulinhub_<code>.qm 这一种命名，同名去重、按名称排序。
 	QVector<LanguageInfo> parseAvailableLanguages(const QStringList& fileNames);
 
 	// 可选语言：源语言（中文）在最前，其余按 .qm 出现情况列出

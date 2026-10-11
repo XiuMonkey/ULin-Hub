@@ -16,7 +16,7 @@ void TestTranslationManager::cleanupTestCase()
 void TestTranslationManager::translationFileBase()
 {
 	QString base = Translation::translationFileBase(QStringLiteral("en"));
-	QCOMPARE(base, QStringLiteral("dshhub_en"));
+	QCOMPARE(base, QStringLiteral("ulinhub_en"));
 }
 
 void TestTranslationManager::translationFileBaseEmpty()
@@ -68,7 +68,7 @@ void TestTranslationManager::parseAvailableLanguagesNoMatch()
 void TestTranslationManager::parseAvailableLanguagesSingle()
 {
 	QStringList files;
-	files << QStringLiteral("dshhub_en.qm");
+	files << QStringLiteral("ulinhub_en.qm");
 	auto languages = Translation::parseAvailableLanguages(files);
 	QCOMPARE(languages.size(), 1);
 	QCOMPARE(languages[0].code, QStringLiteral("en"));
@@ -77,9 +77,9 @@ void TestTranslationManager::parseAvailableLanguagesSingle()
 void TestTranslationManager::parseAvailableLanguagesMultiple()
 {
 	QStringList files;
-	files << QStringLiteral("dshhub_en.qm")
-		<< QStringLiteral("dshhub_ja.qm")
-		<< QStringLiteral("dshhub_fr.qm");
+	files << QStringLiteral("ulinhub_en.qm")
+		<< QStringLiteral("ulinhub_ja.qm")
+		<< QStringLiteral("ulinhub_fr.qm");
 	auto languages = Translation::parseAvailableLanguages(files);
 	QCOMPARE(languages.size(), 3);
 	// 按名称排序，顺序取决于 QLocale 的本地化名称
@@ -95,7 +95,7 @@ void TestTranslationManager::parseAvailableLanguagesMultiple()
 void TestTranslationManager::parseAvailableLanguagesDuplicate()
 {
 	QStringList files;
-	files << QStringLiteral("dshhub_en.qm") << QStringLiteral("dshhub_en.qm");
+	files << QStringLiteral("ulinhub_en.qm") << QStringLiteral("ulinhub_en.qm");
 	auto languages = Translation::parseAvailableLanguages(files);
 	QCOMPARE(languages.size(), 1);
 }
@@ -103,7 +103,7 @@ void TestTranslationManager::parseAvailableLanguagesDuplicate()
 void TestTranslationManager::parseAvailableLanguagesInvalidExtension()
 {
 	QStringList files;
-	files << QStringLiteral("dshhub_en.txt") << QStringLiteral("dshhub_en.json");
+	files << QStringLiteral("ulinhub_en.txt") << QStringLiteral("ulinhub_en.json");
 	auto languages = Translation::parseAvailableLanguages(files);
 	QVERIFY(languages.isEmpty());
 }

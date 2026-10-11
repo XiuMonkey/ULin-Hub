@@ -48,7 +48,7 @@ void ClientRuntime::start()
 			m_api->closeStreams();
 		});
 
-	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流（与旧壳 DSHHub::installServer 同一条路）
+	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流（与旧壳 ULinHub::installServer 同一条路）
 	connect(m_server, &ServerManager::baseUrlReady, this, [this](const QUrl& url) {
 		TimingLogger::mark(QStringLiteral("qml shell: server baseUrl ready"));
 		setStatus(QStringLiteral("已连上服务端，正在加载会话…"));
@@ -292,7 +292,7 @@ void ClientRuntime::resolveSessionWorkspace(const std::function<void(const QStri
 		});
 }
 
-// 清空会话 = 旧壳那颗「清空会话」按钮的全部语义（DSHHub::onClearConversationClicked）：
+// 清空会话 = 旧壳那颗「清空会话」按钮的全部语义（ULinHub::onClearConversationClicked）：
 //   ① 抹掉磁盘上的会话数据（sessions 目录 + storages/workspace.json）；
 //   ② 本地目录当场清空（会话 + 分组），侧栏立刻空掉；
 //   ③ 服务端注册表逐个 workspace/delete 删干净，删完再建一个新的默认会话。
@@ -366,7 +366,7 @@ void ClientRuntime::archiveSession(const QString& sessionId)
 	m_api->callMethod(QStringLiteral("workspace/archiveSession"), SessionCommands::sessionArchive(sessionId),
 		[this, sessionId](const QJsonObject& value) {
 			// ⚠️ 关键：回包里是**完整的归档集合**，必须立刻写进 SessionCatalog —— 侧栏就是靠 catalog 的
-			// archivedSessionIds 把这条滤掉的（旧壳同路：DSHHub.cpp:814-818）；只刷新列表而不更新归档集合
+			// archivedSessionIds 把这条滤掉的（旧壳同路：ULinHub.cpp:814-818）；只刷新列表而不更新归档集合
 			// = 会话看上去"删不掉"。
 			m_catalog.setArchivedSessionIds(SessionCatalog::parseArchivedSessionIds(value));
 			emit catalogChanged();

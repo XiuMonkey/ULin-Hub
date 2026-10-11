@@ -138,7 +138,7 @@ namespace ClientExtension
 
 	QString extensionDirectory()
 	{
-		const QString override = qEnvironmentVariable("DSHHUB_CLIENT_EXTENSION_DIR");
+		const QString override = qEnvironmentVariable("ULINHUB_CLIENT_EXTENSION_DIR");
 		if (!override.isEmpty())
 			return override;
 

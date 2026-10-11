@@ -685,7 +685,7 @@ void SettingsController::addModel(const QString& provider, const QString& modelI
 		[this, provider, modelId](const SettingsNamespace&) {
 			setBusy(false);
 			setStatus(QStringLiteral("已添加模型 %1。").arg(modelId));
-			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器（旧壳 DSHHub.043）
+			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器（旧壳 ULinHub.043）
 			refresh();
 		},
 		[this](const DshApiClient::RpcError& error) {

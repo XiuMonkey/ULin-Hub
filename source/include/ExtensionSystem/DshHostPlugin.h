@@ -21,4 +21,4 @@ public:
 	// 接管了后端的扩展必须在这里复位 Takenover(false)，否则界面永久停在加载中
 };
 
-Q_DECLARE_INTERFACE(DshHostPlugin, "com.dshhub.DshHostPlugin/1.0")
+Q_DECLARE_INTERFACE(DshHostPlugin, "com.ulinhub.DshHostPlugin/1.0")

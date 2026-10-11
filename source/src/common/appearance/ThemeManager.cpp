@@ -4,7 +4,7 @@
 #include "common/appearance/CardShadow.h"
 #include "common/settings/ClientSettings.h"
 #include "common/util/CommonRegistry.h"
-// (M8) removed: #include "core/DSHHub.h"
+// (M8) removed: #include "core/ULinHub.h"
 #include "common/util/HostIndex.h"
 // (M8) removed: #include "ui/ShadowPanel.h"
 // (M8) removed: #include "ui/SpinnerWidget.h"
@@ -227,8 +227,8 @@ void ThemeManager::ensureStylePack()
 		const QString source = it.next();
 		sources.append({ source, source.mid(prefixLength + 1) });
 	}
-	for (const QString& palette : { QStringLiteral(":/DSHHub/styles/theme-light.json"),
-									QStringLiteral(":/DSHHub/styles/theme-dark.json") }) {
+	for (const QString& palette : { QStringLiteral(":/ULinHub/styles/theme-light.json"),
+									QStringLiteral(":/ULinHub/styles/theme-dark.json") }) {
 		if (QFile::exists(palette))
 			sources.append({ palette, QFileInfo(palette).fileName() });
 	}

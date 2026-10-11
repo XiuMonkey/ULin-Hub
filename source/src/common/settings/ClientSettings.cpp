@@ -13,7 +13,7 @@
 namespace
 {
 	const char* const kDirName = "ClientSetting";
-	const char* const kDirEnvVar = "DSHHUB_CLIENT_SETTING_DIR";
+	const char* const kDirEnvVar = "ULINHUB_CLIENT_SETTING_DIR";
 
 	const char* const kAppearanceFile = "AppearanceSetting.json";
 

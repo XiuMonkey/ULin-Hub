@@ -140,7 +140,7 @@ ListView {
         }
     }
 
-    // ---- 顶部「加载更多」：照原版 DSH Hub 的形态（**不自动翻页**）----
+    // ---- 顶部「加载更多」：照原版 ULin Hub 的形态（**不自动翻页**）----
     // 原版只显示最近一页（约 20 个气泡），更早的由用户点这个按钮显式拉。
     // 不做"滚到顶自动拉"的理由见文件头第 5 条：自动翻页会在用户往回看时不断插入历史，
     // 消息数越堆越多、锚点补偿反复触发、滚动条长度跟着变。
@@ -161,7 +161,7 @@ ListView {
 
             Text {
                 anchors.centerIn: parent
-                // 用原版就有的翻译 id（dshhub_*.ts 里的 common_load_more / common_loading），
+                // 用原版就有的翻译 id（ulinhub_*.ts 里的 common_load_more / common_loading），
                 // 别硬编码中文 —— 否则切语言时这个按钮不会跟着变。
                 text: Hub.loadingOlder ? qsTrId("common_loading") : qsTrId("common_load_more")
                 color: Theme.color.textSecondary

@@ -34,7 +34,7 @@ class QWebSocket;
 // 2026-10-01（工单 B-1）追加：本类**同时实现 VirtualMain**，并以索引 kMainWindow 登记。为什么是它：
 // VirtualMain 那 13 个入站注入方法是本类既有信号的**翻转入口**（下面 HandleXxx 逐个对应），而
 // ShellController::init() 已把这些信号接到真处理器（ChatController / SessionCatalog / …）⇒ 实现 = 原样重新 emit，真逻辑一行不用重写。
-// M8 删旧控件壳时 VirtualMain 的实现类（DSHHub）一起没了、kMainWindow 再没登记过 ⇒ 后端接管类扩展（CodexBackend）
+// M8 删旧控件壳时 VirtualMain 的实现类（ULinHub）一起没了、kMainWindow 再没登记过 ⇒ 后端接管类扩展（CodexBackend）
 // 的入站注入恒拿 null（findObject("mainWindow") = 空），主功能一直是死的 —— 这个类就是把那条路补回来。
 class DshApiClient : public QObject, public VirtualApiHost, public VirtualMain
 {
@@ -70,7 +70,7 @@ public:
 	void unfollowSession();
 	// mux 已打开且 $events 收到 ready 帧；接管态下恒为 true（传输已归扩展）
 	bool isConnected() const;
-	// 后端是否处于接管态（原始上报/提问应答的分流、DSHHub 的旁路开关都看它）
+	// 后端是否处于接管态（原始上报/提问应答的分流、ULinHub 的旁路开关都看它）
 	bool isTakenover() const { return m_takenover; }
 
 	// VirtualApiHost 接口（插件调用宿主，插件 → 宿主）：方法实现全内联在本头文件
@@ -258,7 +258,7 @@ public:
 		emit workspaceArchiveChanged(archivedSessionIds);
 	}
 
-	// 侧栏会话标题刷新：旧壳是 DSHHub::refreshSessionTitles（重拉标题、不重选会话）。本宿主**刻意不接**（只记一次日志）：
+	// 侧栏会话标题刷新：旧壳是 ULinHub::refreshSessionTitles（重拉标题、不重选会话）。本宿主**刻意不接**（只记一次日志）：
 	// 这条线上根本没有"只刷标题"的端点 —— 唯一接近的 session/list 由 ShellController::refreshSessions() 拉，
 	// 它拿到列表后会把 SessionCatalog 整个重建（当前选中会话可能被换掉）；扩展调这条的动机是"标题变了、侧栏该更新"，
 	// 而侧栏本就是会话列表驱动的、稳态下已是新的 ⇒ 不接不会显示错内容，接错反而会把用户正看的会话切走（旧壳记的就是这个坑）。
@@ -282,7 +282,7 @@ public:
 	void respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
 
 signals:
-	// 宿主内部信号：DSHHub 靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
+	// 宿主内部信号：ULinHub 靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
 	void takeoverChanged(bool takenover);
 	void connected();
 	// 兼容旧消费者：把 0.1.5 的新帧翻译成旧形状再发出

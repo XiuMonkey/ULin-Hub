@@ -16,7 +16,7 @@
 //                  .pending-removal 标记，remove() 返回 false 且 error 里带说明；
 //   · 下次启动   → loadAll() 开头的清扫把带标记（或"没判据却还有 dll"）的目录删掉。
 //
-// 测试全程只碰自己的临时目录（DSHHUB_CLIENT_EXTENSION_DIR 被指过去），
+// 测试全程只碰自己的临时目录（ULINHUB_CLIENT_EXTENSION_DIR 被指过去），
 // 绝不碰真的 <exe>/clientExtensions。
 // ------------------------------------------------------------------
 

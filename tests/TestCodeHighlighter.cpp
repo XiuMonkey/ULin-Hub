@@ -12,7 +12,7 @@ void TestCodeHighlighter::initTestCase()
 {
 	QVERIFY(m_tempDir.isValid());
 
-	m_rulesPath = m_tempDir.filePath(QStringLiteral("highlight_rules.json"));
+	m_rulesPath = m_tempDir.filePath(QStringLiteral("highlight-rules.json"));
 	QFile file(m_rulesPath);
 	QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
 	file.write(R"json({

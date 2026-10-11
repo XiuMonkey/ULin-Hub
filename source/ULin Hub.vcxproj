@@ -133,7 +133,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\common\util\ConnectionManager.cpp" />
-    <QtRcc Include="..\assets\resources\DSHHub.qrc" />
+    <QtRcc Include="..\assets\resources\ulinhub.qrc" />
     <!-- QML 壳的资源（source/qml/）。单独一份 qrc：一份 QML 目录 = 一个自洽的界面子树 -->
     <QtRcc Include="qml\qml.qrc" />
     <ClCompile Include="src\common\platform\win\NativeWindowFilter.cpp" />
@@ -185,12 +185,12 @@
     <ClCompile Include="src\ExtensionSystem\ClientExtension.cpp" />
     <ClCompile Include="src\ExtensionSystem\ExtensionRegistry.cpp" />
     <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp" />
-    <None Include="..\assets\resources\highlight_rules.json" />
-    <None Include="..\assets\resources\DSH-Hub-Logo-Tiny@2x.png" />
-    <None Include="..\assets\resources\DSH-Hub-Logo-Tiny-Dark@2x.png" />
-    <None Include="..\assets\resources\DSH-Hub-Icon.png" />
-    <None Include="..\assets\resources\ULin Hub.ico" />
-    <ResourceCompile Include="..\assets\resources\ULin Hub.rc" />
+    <None Include="..\assets\resources\highlight-rules.json" />
+    <None Include="..\assets\resources\ulin-hub-logo-tiny@2x.png" />
+    <None Include="..\assets\resources\ulin-hub-logo-tiny-dark@2x.png" />
+    <None Include="..\assets\resources\ulin-hub-icon.png" />
+    <None Include="..\assets\resources\ulin-hub.ico" />
+    <ResourceCompile Include="..\assets\resources\ulin-hub.rc" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="include\common\util\CommonRegistry.h" />
@@ -245,7 +245,7 @@
     <QtMoc Include="include\qmlbridge\ExtensionManagerController.h" />
     <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
     <ClInclude Include="include\common\util\MarkdownSegmenter.h" />
-    <QtTranslation Include="..\assets\translations\dshhub_en.ts" />
+    <QtTranslation Include="..\assets\translations\ulinhub_en.ts" />
   </ItemGroup>
   <!-- QtTranslation 的 BuildAction **必须保持 false**（即不参与构建）。
        合法取值只有 lupdate / lrelease / lupdate_lrelease / false

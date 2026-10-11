@@ -13,7 +13,7 @@ class QWidget;
 
 // ⚠️ 所有虚方法只许在**末尾追加**：vtable 槽位 = 声明顺序，插件 DLL 独立编译，插中间会让旧插件调错位置。
 // (2026-10-01) 已删的接口：VirtualTopBar / VirtualSidebar（实现类随 M8 删 src/ui 一起没了，kTopBar / kSidebar
-// 从未 AddToRegistry ⇒ 插件 findObject 必得空）、VirtualShell（架空原 UI，实现类 DSHHub 与 UiStage 都随 M8 删除，
+// 从未 AddToRegistry ⇒ 插件 findObject 必得空）、VirtualShell（架空原 UI，实现类 ULinHub 与 UiStage 都随 M8 删除，
 // 且它全程按 QWidget / QMainWindow 设计，现在的宿主是 QQmlApplicationEngine + QML Window，结构上不可能再成立）、
 // VirtualMessageHost（收放"正在载入会话"提示，实现类 MessageHost 已随 M8 删除，kMessageHost 也从没登记）。
 // 要往侧栏 / 顶栏挂 UI，走 QML 时代的 VirtualUiHost（见 docs/style-pack.md）。
@@ -143,8 +143,8 @@ public:
 	virtual int UnmountOwner(const char* owner) = 0;
 };
 
-Q_DECLARE_INTERFACE(VirtualMain, "com.DSH_HUB.VirtualWindow/1.0")
-Q_DECLARE_INTERFACE(VirtualConnectionManager, "com.DSH_HUB.VirtualConnectionManager/1.0")
-Q_DECLARE_INTERFACE(VirtualTheme, "com.DSH_HUB.VirtualTheme/1.0")
-Q_DECLARE_INTERFACE(VirtualTranslation, "com.DSH_HUB.VirtualTranslation/1.0")
-Q_DECLARE_INTERFACE(VirtualUiHost, "com.DSH_HUB.VirtualUiHost/1.0")
+Q_DECLARE_INTERFACE(VirtualMain, "com.ulinhub.VirtualWindow/1.0")
+Q_DECLARE_INTERFACE(VirtualConnectionManager, "com.ulinhub.VirtualConnectionManager/1.0")
+Q_DECLARE_INTERFACE(VirtualTheme, "com.ulinhub.VirtualTheme/1.0")
+Q_DECLARE_INTERFACE(VirtualTranslation, "com.ulinhub.VirtualTranslation/1.0")
+Q_DECLARE_INTERFACE(VirtualUiHost, "com.ulinhub.VirtualUiHost/1.0")

@@ -1,6 +1,6 @@
 #pragma once
 
-// 按 highlight_rules.json 的规则给代码块做语法高亮；初始化时一次性加载规则并缓存结果。
+// 按 highlight-rules.json 的规则给代码块做语法高亮；初始化时一次性加载规则并缓存结果。
 
 #include <QHash>
 #include <QMutex>

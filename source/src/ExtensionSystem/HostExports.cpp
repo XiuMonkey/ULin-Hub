@@ -7,9 +7,9 @@
 #include <QThread>
 
 #if defined(Q_OS_WIN)
-#  define DSHHUB_HOST_EXPORT extern "C" __declspec(dllexport)
+#  define ULINHUB_HOST_EXPORT extern "C" __declspec(dllexport)
 #else
-#  define DSHHUB_HOST_EXPORT extern "C" __attribute__((visibility("default")))
+#  define ULINHUB_HOST_EXPORT extern "C" __attribute__((visibility("default")))
 #endif
 
 namespace
@@ -31,7 +31,7 @@ namespace
 		if (warned)
 			return;
 		warned = true;
-		qWarning("DshHubHost: %s called from a non-GUI thread, refused. "
+		qWarning("ULinHubHost: %s called from a non-GUI thread, refused. "
 			"The registry is main-thread only (UI objects); marshal the call "
 			"to the GUI thread yourself, e.g. QMetaObject::invokeMethod with "
 			"Qt::QueuedConnection.",
@@ -40,19 +40,19 @@ namespace
 }
 
 // ABI 版本：常量，线程无关，插件启动时用它握手。
-DSHHUB_HOST_EXPORT unsigned int DshHubHostAbiVersion(void)
+ULINHUB_HOST_EXPORT unsigned int ULinHubHostAbiVersion(void)
 {
-	return DSHHUB_HOST_ABI_VERSION;
+	return ULINHUB_HOST_ABI_VERSION;
 }
 
 // 按 index 查宿主对象（void* 实际是 QObject*）；index 为空 / 未登记 / 对象已销毁 / 非主线程 → nullptr。
-DSHHUB_HOST_EXPORT void* DshHubHostRegistryFind(const char* index)
+ULINHUB_HOST_EXPORT void* ULinHubHostRegistryFind(const char* index)
 {
 	if (!index || !*index)
 		return nullptr;
 	if (!onGuiThread())
 	{
-		warnOffGuiThreadOnce(DSHHUB_HOST_SYM_REGISTRY_FIND);
+		warnOffGuiThreadOnce(ULINHUB_HOST_SYM_REGISTRY_FIND);
 		return nullptr;
 	}
 
@@ -61,12 +61,12 @@ DSHHUB_HOST_EXPORT void* DshHubHostRegistryFind(const char* index)
 	return CommonRegistry::instance().FindFromRegistry(QString::fromUtf8(index)).data();
 }
 
-#undef DSHHUB_HOST_EXPORT
+#undef ULINHUB_HOST_EXPORT
 
 // 编译期签名校验：定义必须与头文件里的 typedef 一致，否则插件会按错误签名去调（栈上直接出事）。
 // 只是取地址做类型绑定，不产生代码。
 namespace
 {
-	[[maybe_unused]] const DshHostAbiVersionFn kAbiVersionCheck = &DshHubHostAbiVersion;
-	[[maybe_unused]] const DshHostRegistryFindFn kRegistryFindCheck = &DshHubHostRegistryFind;
+	[[maybe_unused]] const DshHostAbiVersionFn kAbiVersionCheck = &ULinHubHostAbiVersion;
+	[[maybe_unused]] const DshHostRegistryFindFn kRegistryFindCheck = &ULinHubHostRegistryFind;
 }

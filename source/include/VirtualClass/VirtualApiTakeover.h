@@ -42,7 +42,7 @@ public:
 
 	// 以后只许在末尾追加。
 };
-Q_DECLARE_INTERFACE(VirtualApiHost, "com.DSH_HUB.VirtualApiHost/1.0")
+Q_DECLARE_INTERFACE(VirtualApiHost, "com.ulinhub.VirtualApiHost/1.0")
 
 // 接口二：插件实现（挂在插件的根对象上，与 DshHostPlugin 同一个对象），宿主调用 —— 宿主 → 插件。
 // 插件类里必须写 `Q_INTERFACES(DshHostPlugin VirtualApiSink)`（多个 IID 空格分隔）：宿主的
@@ -60,4 +60,4 @@ public:
 
 	// 以后只许在末尾追加。
 };
-Q_DECLARE_INTERFACE(VirtualApiSink, "com.DSH_HUB.VirtualApiSink/1.0")
+Q_DECLARE_INTERFACE(VirtualApiSink, "com.ulinhub.VirtualApiSink/1.0")

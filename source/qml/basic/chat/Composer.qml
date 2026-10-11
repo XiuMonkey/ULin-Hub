@@ -174,10 +174,10 @@ Item {
                         id: sendButton
                         anchors.verticalCenter: parent.verticalCenter
                         boxSize: Theme.size.sendButton   // 32×32
-                        // 原版：EnterBtn.png / StopBtn.png（ChatInputWidget.cpp:334/418）
+                        // 原版：enter-btn.png / stop-btn.png（ChatInputWidget.cpp:334/418）
                         iconSource: root.streaming
-                            ? "qrc:/DSHHub/StopBtn.png"
-                            : "qrc:/DSHHub/EnterBtn.png"
+                            ? "qrc:/ULinHub/stop-btn.png"
+                            : "qrc:/ULinHub/enter-btn.png"
                         iconSize: Theme.size.sendButton
                         // 原版悬停：叠在图标之上的圆形白色蒙版（hover 35% / pressed 55%）
                         circleHoverOverlay: true

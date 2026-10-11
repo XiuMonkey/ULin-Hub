@@ -58,7 +58,7 @@ void QmlBridge::init()
 	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
 	m_extensions = new ExtensionManagerController(m_runtime->server(), this);
 
-	// 旧壳 DSHHub.042：用户保存服务器地址后重启内置服务端
+	// 旧壳 ULinHub.042：用户保存服务器地址后重启内置服务端
 	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {
 		m_runtime->restartServer();
 		});

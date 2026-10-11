@@ -72,11 +72,11 @@ void TestClientExtension::initTestCase()
 {
 	// 指到临时目录：测试绝不能碰真正的 <exe>/clientExtensions
 	m_root = QDir(QDir::tempPath()).filePath(
-		QStringLiteral("dshhub-clientext-test-%1").arg(QCoreApplication::applicationPid()));
+		QStringLiteral("ulinhub-clientext-test-%1").arg(QCoreApplication::applicationPid()));
 	QDir(m_root).removeRecursively();
 	QVERIFY(QDir().mkpath(m_root));
 
-	qputenv("DSHHUB_CLIENT_EXTENSION_DIR", m_root.toLocal8Bit());
+	qputenv("ULINHUB_CLIENT_EXTENSION_DIR", m_root.toLocal8Bit());
 	QCOMPARE(ClientExtension::extensionDirectory(), m_root);
 }
 
@@ -84,7 +84,7 @@ void TestClientExtension::cleanupTestCase()
 {
 	unlockMainDll();
 	QDir(m_root).removeRecursively();
-	qunsetenv("DSHHUB_CLIENT_EXTENSION_DIR");
+	qunsetenv("ULINHUB_CLIENT_EXTENSION_DIR");
 }
 
 void TestClientExtension::installedNamesReflectsRegulation()

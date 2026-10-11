@@ -1,4 +1,4 @@
-# DSH Hub factory settings.
+# ULin Hub factory settings.
 #
 # The empty model list below is deliberate: it suppresses the adapter's
 # built-in default catalog, so every model in the list is one you added.

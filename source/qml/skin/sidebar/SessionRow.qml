@@ -70,7 +70,7 @@ Item {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
         onClicked: (mouse) => {
-            // 右键 = 删除会话（M3b；旧壳是 SessionButton 的右键菜单 → DSHHub::onDeleteSessionRequested）
+            // 右键 = 删除会话（M3b；旧壳是 SessionButton 的右键菜单 → ULinHub::onDeleteSessionRequested）
             if (mouse.button === Qt.RightButton)
                 root.deleteRequested()
             else

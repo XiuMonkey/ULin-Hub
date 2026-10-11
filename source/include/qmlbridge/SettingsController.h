@@ -100,7 +100,7 @@ public:
 	Q_INVOKABLE void removeModel(const QString& provider, const QString& modelId);
 	// Agent 预设：设为默认（settings/update）
 	Q_INVOKABLE void selectDefaultPreset(const QString& presetId);
-	// 服务端地址：写入本地 SettingsStore 后请宿主重启内置服务端（与旧壳 DSHHub.042 一致）
+	// 服务端地址：写入本地 SettingsStore 后请宿主重启内置服务端（与旧壳 ULinHub.042 一致）
 	Q_INVOKABLE void saveServerUrl(const QString& url);
 	// 外观：切语言（立即生效，无需重启）与重置风格包
 	Q_INVOKABLE void setLanguage(const QString& code);
@@ -120,7 +120,7 @@ signals:
 	void noticeChanged();
 	// 宿主据此重启内置服务端（旧壳：Settings::serverSettingsSaved -> ServerManager::restart）
 	void serverRestartRequested();
-	// 新增模型后宿主可以刷新输入区的模型选择器（M5b 用；旧壳 DSHHub.043）
+	// 新增模型后宿主可以刷新输入区的模型选择器（M5b 用；旧壳 ULinHub.043）
 	void modelAdded(const QString& provider, const QString& modelId);
 
 private:

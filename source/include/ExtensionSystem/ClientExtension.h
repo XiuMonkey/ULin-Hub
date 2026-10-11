@@ -9,7 +9,7 @@
 
 namespace ClientExtension
 {
-	// 目录：默认 <exe>/clientExtensions，环境变量 DSHHUB_CLIENT_EXTENSION_DIR 可覆盖。
+	// 目录：默认 <exe>/clientExtensions，环境变量 ULINHUB_CLIENT_EXTENSION_DIR 可覆盖。
 	QString extensionDirectory();
 
 	// 已装载的扩展名（取自 regulation 的 Name）。同时是防重复装载的依据。
@@ -30,7 +30,7 @@ namespace ClientExtension
 	// 装载指定的一个 DLL；名字已在 loadedNames() 里则不重复装载 dll，只重新 attach。必须在 GUI 线程调用，失败原因写进 error（可选）。
 	bool loadOne(const QString& dllPath, const QString& name, QString* error = nullptr);
 
-	// 退出收尾（幂等）：DSHHub::closeEvent 与 aboutToQuit 各调一次，后者兜住不经窗口的退出（扩展自己 quit、系统关机）。做三件事：
+	// 退出收尾（幂等）：ULinHub::closeEvent 与 aboutToQuit 各调一次，后者兜住不经窗口的退出（扩展自己 quit、系统关机）。做三件事：
 	// (1) 同步（DirectConnection）调每个插件的 detachHost() 复位接管、停子进程 —— 队列连接退出时随时停摆，不能当唯一自救路；(2) 兜底收回插件占的架空台；
 	// (3) loader 用 setParent(nullptr) 摘出 qApp 且故意不析构：留着它 ~QApplication 会卸 DLL、析构插件根对象，其 QProcess 析构卡死在已停的事件循环 + loader lock 上（实测僵尸进程根因）；退出阶段不需要插件析构，DLL 交 OS 回收。
 	void shutdownForExit();

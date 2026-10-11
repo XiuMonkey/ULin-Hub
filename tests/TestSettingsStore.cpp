@@ -7,7 +7,7 @@
 #include <QTest>
 
 // server/url 现存在 ClientSetting/ServerSetting.json（经 ClientSettings 读写）；
-// 目录由 DSHHUB_CLIENT_SETTING_DIR 指到临时目录（见 TestClientSettings 同款做法）。
+// 目录由 ULINHUB_CLIENT_SETTING_DIR 指到临时目录（见 TestClientSettings 同款做法）。
 
 namespace
 {
@@ -22,12 +22,12 @@ void TestSettingsStore::initTestCase()
 	QVERIFY(m_dir.isValid());
 
 	// 把设置根指到临时目录：必须在任何 ClientSettings 调用之前生效
-	qputenv("DSHHUB_CLIENT_SETTING_DIR", m_dir.path().toLocal8Bit());
+	qputenv("ULINHUB_CLIENT_SETTING_DIR", m_dir.path().toLocal8Bit());
 }
 
 void TestSettingsStore::cleanupTestCase()
 {
-	qunsetenv("DSHHUB_CLIENT_SETTING_DIR");
+	qunsetenv("ULINHUB_CLIENT_SETTING_DIR");
 }
 
 void TestSettingsStore::init()

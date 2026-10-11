@@ -46,14 +46,14 @@ void TestClientSettings::initTestCase()
 	QVERIFY(m_dir.isValid());
 
 	// 把设置根指到临时目录：必须在任何 ClientSettings 调用之前生效
-	qputenv("DSHHUB_CLIENT_SETTING_DIR", m_dir.path().toLocal8Bit());
+	qputenv("ULINHUB_CLIENT_SETTING_DIR", m_dir.path().toLocal8Bit());
 
 	QCOMPARE(QDir::cleanPath(ClientSettings::dir()), QDir::cleanPath(m_dir.path()));
 }
 
 void TestClientSettings::cleanupTestCase()
 {
-	qunsetenv("DSHHUB_CLIENT_SETTING_DIR");
+	qunsetenv("ULINHUB_CLIENT_SETTING_DIR");
 }
 
 void TestClientSettings::init()

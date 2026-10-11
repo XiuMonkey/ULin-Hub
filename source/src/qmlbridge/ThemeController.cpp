@@ -26,7 +26,7 @@ ThemeController::ThemeController(QObject* parent)
 
 void ThemeController::toggle()
 {
-	// 原版路径：Sidebar::themeToggleRequested -> DSHHub::toggleTheme -> ThemeManager::switchTheme
+	// 原版路径：Sidebar::themeToggleRequested -> ULinHub::toggleTheme -> ThemeManager::switchTheme
 	//   switchTheme = 过渡卡片 + 写文件 + 切模式 + **重建主窗口**（复用旧的服务端进程）。
 	// QML 壳不重建窗口：token 是绑定读取的，切模式后 reload 一次就让整棵树换肤。
 	using Mode = ThemeManager::Mode;

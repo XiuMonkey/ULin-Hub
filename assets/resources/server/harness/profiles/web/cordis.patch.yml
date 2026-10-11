@@ -1,4 +1,4 @@
-# Minimal API-only profile for the DSH Hub Qt client.
+# Minimal API-only profile for the ULin Hub Qt client.
 - id: hmr
   disabled: true
 
