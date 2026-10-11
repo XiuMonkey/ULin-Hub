@@ -1,0 +1,81 @@
+# Minimal API-only profile for the DSH Hub Qt client.
+- id: hmr
+  disabled: true
+
+- insert:
+    - id: workspace
+      name: '@deepseek-ai/dsh-workspace'
+
+    - id: plugin-inventory
+      name: '@deepseek-ai/dsh-host-plugin-inventory'
+
+    - id: api-session-controller
+      name: '@deepseek-ai/dsh-api-session-controller'
+
+    - id: api-workspace-controller
+      name: '@deepseek-ai/dsh-api-workspace-controller'
+
+    - id: api-settings-controller
+      name: '@deepseek-ai/dsh-api-settings-controller'
+
+    - id: api-workspace-files
+      name: '@deepseek-ai/dsh-api-workspace-files'
+
+    - id: cordis-host-runner
+      name: '@deepseek-ai/dsh-cordis-host-runner'
+
+    - id: subagent-model-selection-settings
+      name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
+
+    - id: web-startup
+      name: '@deepseek-ai/dsh-web-app/startup'
+
+    - id: webserver
+      name: '@deepseek-ai/dsh-host-webserver'
+      inject: [webStartup]
+      config:
+        host: !!js ctx.webStartup.host ?? '127.0.0.1'
+        port: !!js ctx.webStartup.port ?? 3080
+
+    - id: web-runtime
+      name: '@deepseek-ai/dsh-web-app'
+      inject: [webStartup]
+      config:
+        openBrowser: false
+        printUrl: true
+        surfaceContext: false
+        trustedHosts: []
+
+    - id: directory-picker-auto
+      name: '@deepseek-ai/dsh-host-directory-picker-auto'
+      inject: [webServer, loader]
+
+    - id: url-printer
+      name: 'dsh-url-printer'
+      inject: [webServer]
+
+    - id: connection
+      name: '@deepseek-ai/dsh-client-connection'
+      inject: []
+      config:
+        trustedHosts: []
+
+    - id: file-upload
+      name: '@deepseek-ai/dsh-client-file-upload'
+
+    - id: api-remotes
+      name: '@deepseek-ai/dsh-api-remotes'
+
+    - id: agent-presets
+      name: '@deepseek-ai/dsh-agent-presets'
+      config:
+        default: standard
+
+# composer stats line: sessionStats projection (turns/steps + LLM/tool/ttft/decode times)
+- insert:
+    - id: session-stats
+      name: '@deepseek-ai/dsh-session-stats'
+
+- insert:
+    - id: ToolsFilterPlugin
+      name: 'ToolsFilterPlugin'

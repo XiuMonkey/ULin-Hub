@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  私有程序集清单：让 exe 从 dependence\ 子目录解析这些 DLL。
+
+  Windows 的加载器**默认不搜索 exe 的子目录**，所以"把 dll 挪进 dependence\" 这种做法
+  单靠移动文件是不成立的（启动即 0xc0000135）。真正的机制是这一份清单：
+
+    <exe 目录>\dependence\dependence.manifest      <- 本文件（目录名必须 == 程序集 name）
+    <exe 目录>\dependence\<上面 <file> 列出的 dll>  <- 实际 DLL
+    <exe 自身 manifest 里的 <dependency> 声明>      <- 见 dependence.deps.manifest
+
+  ⚠️ 维护约定：**加/换 DLL 必须同步改下面的 <file> 列表**，漏一个就是启动失败。
+     两边要一起改的还有 source/dependence.deps.manifest 里的 version（两处必须一致）。
+
+  私有程序集刻意**不写 publicKeyToken**（那是有签名共享程序集才需要的）。
+  本工程只出 x64，所以 processorArchitecture 固定 amd64。
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="dependence" version="1.0.0.0" processorArchitecture="amd64" />
+
+  <!-- Qt 运行库 -->
+  <file name="Qt6Core.dll" />
+  <file name="Qt6Gui.dll" />
+  <file name="Qt6Widgets.dll" />
+  <file name="Qt6Network.dll" />
+  <file name="Qt6WebSockets.dll" />
+
+  <!-- Qt QML / Quick（QML 壳，见 docs/ui-qml-migration-plan.md）。
+       ⚠️ 这里只列 C++ 侧链接得到的库；QtQuick.Controls 之类的 **QML 模块**在 <Qt>\qml\ 下，
+       由插件按路径加载、不在本清单管辖范围内 —— 发行版需要把那份 qml/ 目录部署到 exe 同目录
+       （用 windeployqt 的 qmldir 参数，或手工拷贝），开发机可用 QML_IMPORT_PATH 指过去。
+       ⚠️ 本文件是 XML：注释里不能出现两个连续的连字符（写 windeployqt 的参数时要拆开）。 -->
+  <file name="Qt6Qml.dll" />
+  <file name="Qt6QmlModels.dll" />
+  <file name="Qt6QmlMeta.dll" />
+  <file name="Qt6QmlWorkerScript.dll" />
+  <file name="Qt6Quick.dll" />
+  <!-- Qt6Quick.dll 的直接依赖（dumpbin /dependents 实测），漏了就是启动即 0xC0000135 -->
+  <file name="Qt6OpenGL.dll" />
+  <file name="Qt6QuickLayouts.dll" />
+  <!-- QML 组件库用到的模块：QtQuick.Controls.Basic（ToolTip/Popup/ScrollBar/TextField）与
+       QtQuick.Effects（MultiEffect 阴影）。同样只列 C++ 侧链接得到的库；它们各自的 QML 模块
+       由 <exe>\qml\ 下的插件按路径加载。 -->
+  <file name="Qt6QuickControls2.dll" />
+  <file name="Qt6QuickControls2Impl.dll" />
+  <file name="Qt6QuickControls2Basic.dll" />
+  <file name="Qt6QuickControls2BasicStyleImpl.dll" />
+  <file name="Qt6QuickTemplates2.dll" />
+  <file name="Qt6QuickEffects.dll" />
+
+  <!-- MSVC 运行库（app-local 部署，exe 自身的 manifest 里没有 Microsoft.VC*.CRT 依赖） -->
+  <file name="concrt140.dll" />
+  <file name="msvcp140.dll" />
+  <file name="msvcp140_1.dll" />
+  <file name="msvcp140_2.dll" />
+  <file name="vcruntime140.dll" />
+  <file name="vcruntime140_1.dll" />
+</assembly>
