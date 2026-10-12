@@ -21,6 +21,7 @@
 // 原 ShellController 的那段历史上下文（保留）：M3 切片刻意**不复用**旧的 ULinHub（QMainWindow），
 // 只用既有无控件依赖类把数据面重接一遍，M8 删旧壳时再合一。
 
+#include "qmlbridge/CommandController.h"
 #include "qmlbridge/ExtensionManagerController.h"
 #include "qmlbridge/PluginMarketController.h"
 #include "qmlbridge/SessionListModel.h"
@@ -48,6 +49,7 @@ class QmlBridge : public QObject
 	Q_PROPERTY(SettingsController* settings READ settings CONSTANT)  // 设置页数据面（模型 / API key）：QML 走 Hub.settings.*
 	Q_PROPERTY(PluginMarketController* plugins READ plugins CONSTANT)  // 插件市场数据面：QML 走 Hub.plugins.*
 	Q_PROPERTY(ExtensionManagerController* extensions READ extensions CONSTANT)  // 扩展管理数据面：QML 走 Hub.extensions.*
+	Q_PROPERTY(CommandController* commands READ commands CONSTANT)  // 斜杠命令（发现/过滤/执行）：QML 走 Hub.commands.*
 	// ---- 交互面板（M4b）：状态在 ChatController，这里只转发 ----
 	Q_PROPERTY(bool questionActive READ questionActive NOTIFY interactionChanged)
 	Q_PROPERTY(QVariantList questions READ questions NOTIFY interactionChanged)
@@ -92,6 +94,7 @@ public:
 	SettingsController* settings() const { return m_settings; }
 	PluginMarketController* plugins() const { return m_plugins; }
 	ExtensionManagerController* extensions() const { return m_extensions; }
+	CommandController* commands() const { return m_commands; }
 
 	// ---- 交互面板（转发 ChatController）----
 	bool questionActive() const;
@@ -192,6 +195,7 @@ private:
 	SettingsController* m_settings = nullptr;
 	PluginMarketController* m_plugins = nullptr;
 	ExtensionManagerController* m_extensions = nullptr;
+	CommandController* m_commands = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	bool m_toolsFilterOpen = false;   // 纯界面状态：工具过滤面板是否打开
 };

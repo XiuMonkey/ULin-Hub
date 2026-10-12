@@ -135,6 +135,9 @@ signals:
 	// 翻页状态变化 / 更早的历史已插入头部（QML 收到后者时补偿 contentY，保证锚点不跳）
 	void olderChanged();
 	void olderPrepended();
+	// 命令注册表变了（会话流里的 `commands/change` 通知）：宿主据此重拉一次命令表。
+	// 本类不持有命令表（那是 CommandController 的事），只负责把这个事实翻出来。
+	void commandRegistryChanged();
 
 private:
 	// question/requested：payload.questions 翻成 QML 好用的列表并记住 rpcId/sessionId

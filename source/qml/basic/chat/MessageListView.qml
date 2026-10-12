@@ -152,6 +152,12 @@ ListView {
 
         Rectangle {
             anchors.centerIn: parent
+            // ⚠️ 高度为 0（没有更早的页、也没在加载）时必须显式藏起来：
+            //    header 的 height 归零**不会**裁剪子项，这颗胶囊照旧渲染，
+            //    而 anchors.centerIn 让它的中心落在 content y=0 —— 正好扣在第一条消息头上。
+            //    会话短（尤其只有一条系统提示）时就会看到"提示行和「加载更多」挤在同一条基线上"。
+            //    离屏 A/B 复现见 build/temp/messagelist-harness/check.py。
+            visible: olderHeader.height > 0
             width: 132
             height: 30
             radius: Theme.radius.panel

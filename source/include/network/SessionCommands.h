@@ -314,4 +314,28 @@ namespace SessionCommands
 		args.insert(QStringLiteral("value"), value);
 		return args;
 	}
+
+	// ---- 斜杠命令（commands）----
+	// 两个端点的 scope 是 { context: 'agent', wire: 'agentId' } ⇒ args 顶层就是 `agentId`，
+	// **不套 `request`**（与上面的 agentPresets/select 同形）。依据：引擎生成的远程客户端桩
+	// `@deepseek-ai/dsh-commands/lib/typert.remote-client.js`（0.1.7 与 0.2.0 逐字段一致）。
+	// commands/list -> args { agentId }
+	inline QJsonObject commandsList(const QString& sessionId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		return args;
+	}
+
+	// commands/execute -> args { agentId, line, submittedAttachments }
+	// `line` 是**整条斜杠命令行**（含前导斜杠与参数原文），解析在服务端；attachments 目前恒为空数组
+	// （本客户端还没有附件上传；该键必填，省略会被严格 codec 拒掉）。
+	inline QJsonObject commandsExecute(const QString& sessionId, const QString& line)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("line"), line);
+		args.insert(QStringLiteral("submittedAttachments"), QJsonArray());
+		return args;
+	}
 }

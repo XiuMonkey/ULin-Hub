@@ -429,6 +429,17 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 			m_messages->appendToolResult(targetAgentRow(), result.message);
 		return;
 	}
+
+	// 斜杠命令的结果。命令**不进模型历史**：引擎只在会话日志里追加 command/run + command/done，
+	// 这里把它渲染成一条系统提示行（与官方 Web UI "渲染在模型历史之外"同一语义）。
+	if (type == QStringLiteral("command/done")) {
+		const QJsonObject data = event.value(QStringLiteral("data")).toObject();
+		const QString text = data.value(QStringLiteral("text")).toString();
+		const bool error = data.value(QStringLiteral("kind")).toString() == QLatin1String("error");
+		if (!text.isEmpty())
+			m_messages->appendSystem(error ? QStringLiteral("命令失败：%1").arg(text) : text);
+		return;
+	}
 }
 
 void ChatController::onMuxFrame(const QJsonObject& frame)
@@ -670,6 +681,25 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			m_turnHadOutput = true;
 			setStreaming(true);
 		}
+		return;
+	}
+
+	// 斜杠命令的结果（新追加的那条）：实时渲染成系统提示行，理由同 applyHistoryEvent 里的同款分支
+	if (type == QStringLiteral("command/done")) {
+		const QJsonObject data = event.value(QStringLiteral("data")).toObject();
+		const QString text = data.value(QStringLiteral("text")).toString();
+		const bool error = data.value(QStringLiteral("kind")).toString() == QLatin1String("error");
+		if (!text.isEmpty()) {
+			flushPending();   // 系统行是整段落的，先落盘保证顺序
+			m_messages->appendSystem(error ? QStringLiteral("命令失败：%1").arg(text) : text);
+		}
+		return;
+	}
+
+	// 命令注册表变了（插件运行期注册/注销命令）⇒ 让宿主重拉一次命令表。
+	// 这是**通知**不是事件：不渲染、也不刷屏，只翻一个 signal。
+	if (type == QStringLiteral("commands/change")) {
+		emit commandRegistryChanged();
 		return;
 	}
 

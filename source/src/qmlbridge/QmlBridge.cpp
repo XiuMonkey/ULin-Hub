@@ -57,6 +57,8 @@ void QmlBridge::init()
 	m_plugins = new PluginMarketController(api, m_runtime->server(), this);
 	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
 	m_extensions = new ExtensionManagerController(m_runtime->server(), this);
+	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
+	m_commands = new CommandController(api, this);
 
 	// 旧壳 ULinHub.042：用户保存服务器地址后重启内置服务端
 	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {
@@ -65,6 +67,11 @@ void QmlBridge::init()
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----
 	m_chat = new ChatController(api, this);
+	// 命令注册表变了（插件运行期注册/注销命令）⇒ 重拉当前会话的命令表
+	connect(m_chat, &ChatController::commandRegistryChanged, this, [this]() {
+		if (!m_currentSessionId.isEmpty())
+			m_commands->refresh(m_currentSessionId);
+	});
 	// ---- 主题切换编排 ----
 	m_theme = new ThemeController(this);
 	// ---- 工具过滤器：数据层与形状（含摊平的行模型）都在它自己身上，桥只负责开关面板 ----
@@ -213,6 +220,8 @@ void QmlBridge::selectSession(const QString& sessionId)
 	m_chat->setSession(sessionId);
 	m_chat->refreshModelCatalog();  // 输入区的模型/思考 chip 按会话重拉
 	m_runtime->followSession(sessionId);
+	// 命令是**按 agent（会话）注册**的：换会话必须重拉一份，否则会拿上一个会话的命令表
+	m_commands->refresh(sessionId);
 
 	m_sessions->setSelectedSession(sessionId);
 	emit currentSessionChanged();
@@ -236,6 +245,15 @@ void QmlBridge::sendPrompt(const QString& text)
 {
 	if (!m_chat)
 		return;
+
+	// 斜杠命令**不进模型**：形如 `/name …` 的行交给命令处理器（解析/执行/报结果全在它那边）。
+	// 判定用引擎同一条文法（`^/[a-z][a-z0-9_-]*(\s|$)`）；不满足就当普通提示发出去 ——
+	// 用户写 "/ 你好" 这种不会被吞掉。命令名认不认识由引擎裁定（execute 回 undefined）。
+	if (m_commands && !m_currentSessionId.isEmpty() && CommandController::looksLikeCommand(text)) {
+		m_commands->execute(m_currentSessionId, text);
+		return;
+	}
+
 	m_chat->sendPrompt(m_currentSessionId, text,
 		[this]() { m_runtime->restartServer(); },
 		[this](const QString& line) {
