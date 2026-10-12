@@ -14,22 +14,15 @@ import "../../widgets"
 Item {
     id: page
 
-    // 遮罩（原版 #windowScrim = overlayBg）
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.overlayBg
-        MouseArea { anchors.fill: parent }
-    }
+    // 卡片目标尺寸（= 原来那个 Card 的宽高）：PageOverlay 按它算"长到多大、停在哪儿"
+    implicitWidth: 632
+    implicitHeight: 432
 
-    Card {
+    // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
+    // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
+    Item {
         id: popup
-
-        anchors.centerIn: parent
-        width: 632
-        height: 432
-        radius: Theme.radius.popup
-        padding: 0
-        shadowEnabled: true
+        anchors.fill: parent
 
         // ---- 标题行（原版 #popupBody 的标题行：spacing 8、关闭按钮 28×28）----
         Item {

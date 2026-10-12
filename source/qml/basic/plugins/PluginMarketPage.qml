@@ -6,6 +6,8 @@
 //   市场页：卡片（名称 14/600 + 分类徽章 tagBg + 描述 12px + 安装按钮 primary 样式）+ 分页（每页 20）
 //   已安装页：卡片（名称 + 版本，更新 hoverBg / 卸载 danger）
 //   底部状态行（三种加载态 + 操作反馈，全部用既有 id）
+//
+// 列表用 ListView（惰性建委托），不是 Flickable+Column+Repeater —— 理由见"列表区"那段注释。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -15,20 +17,19 @@ import "../../widgets"
 Item {
     id: page
 
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.overlayBg
-        MouseArea { anchors.fill: parent }
-    }
+    // 卡片目标尺寸（= 原来那个 Card 的宽高）：PageOverlay 按它算"长到多大、停在哪儿"
+    implicitWidth: 820
+    implicitHeight: 600
 
-    Card {
+    // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停，
+    // 理由与实测见 widgets/PageOverlay.qml 里 overlayAnimating 的注释。
+    property bool overlayAnimating: false
+
+    // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
+    // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
+    Item {
         id: popup
-        anchors.centerIn: parent
-        width: 820
-        height: 600
-        radius: Theme.radius.popup
-        padding: 0
-        shadowEnabled: true
+        anchors.fill: parent
 
         // ---- 标题行 ----
         Item {
@@ -59,8 +60,10 @@ Item {
                     width: 16
                     height: 16
                     lineWidth: 2
-                    running: Hub.plugins.busy
-                    visible: Hub.plugins.busy
+                    // 卡片正在展开/收回时先停：转圈会让整窗每帧重绘（实测 +10ms/帧），
+                    // 叠在动画上就是"加载中的打开动画明显更卡"。由 PageOverlay 绑过来。
+                    running: Hub.plugins.busy && !page.overlayAnimating
+                    visible: Hub.plugins.busy && !page.overlayAnimating
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -152,7 +155,13 @@ Item {
         }
 
         // ---- 列表区 ----
-        Flickable {
+        // ⚠️ 刻意**不用** Flickable + Column + Repeater：那套会在数据到达的那一帧把当页
+        //    **所有**卡片（最多 20 张，每张卡片又是几十个 item）一次建出来 —— 市场数据走快照 /
+        //    缓存时正好落在展开动画里（离屏试装台实测：那一帧 48ms，正常 16ms）⇒ 首开明显掉帧。
+        //    ListView 只建"可见的 + cacheBuffer 那点"，其余滚到了才建。
+        // 两个 Tab 各一个 ListView：非当前 Tab 那个把 model 置空 ⇒ 委托数为 0。
+        // ⚠️ 必须靠"空 model"而不是只靠 visible —— 不可见的 ListView 照样会为视口建委托。
+        Item {
             id: listArea
             anchors.left: parent.left
             anchors.right: parent.right
@@ -160,156 +169,161 @@ Item {
             anchors.bottom: installBox.top
             anchors.margins: 20
             anchors.topMargin: 12
-            contentHeight: contentColumn.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: AppScrollBar { }
 
-            Column {
-                id: contentColumn
-                width: listArea.width
+            ListView {
+                id: marketList
+                anchors.fill: parent
+                visible: Hub.plugins.tab === 0
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: AppScrollBar { }
                 spacing: 8
+                // 只比一屏多留一张卡的余量：再大等于把"以后才要建的"提前到现在建
+                cacheBuffer: 160
+                model: Hub.plugins.tab === 0 ? Hub.plugins.marketItems : []
 
-                // ===== 市场页 =====
-                Repeater {
-                    model: Hub.plugins.tab === 0 ? Hub.plugins.marketItems : []
+                delegate: Rectangle {
+                    id: card
+                    required property var modelData
 
-                    delegate: Rectangle {
-                        id: card
-                        required property var modelData
+                    width: ListView.view.width
+                    implicitHeight: cardBody.implicitHeight + 24
+                    radius: Theme.radius.card
+                    color: Theme.color.panelBg
+                    border.width: 1
+                    border.color: cardMouse.containsMouse ? Theme.color.accent : Theme.color.border
 
-                        width: contentColumn.width
-                        implicitHeight: cardBody.implicitHeight + 24
-                        radius: Theme.radius.card
-                        color: Theme.color.panelBg
-                        border.width: 1
-                        border.color: cardMouse.containsMouse ? Theme.color.accent : Theme.color.border
+                    MouseArea {
+                        id: cardMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                    }
 
-                        MouseArea {
-                            id: cardMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
-                        }
+                    Column {
+                        id: cardBody
+                        anchors.left: parent.left
+                        // 原版 createMarketCard：QHBoxLayout(contentsMargins 14,12,14,12; spacing 12)，
+                        // 左侧 infoLayout 是 stretch=1、中间 12px 间隔、右侧安装按钮 stretch=0。
+                        // 所以文字栏的右边必须停在按钮左侧，否则描述文字会跑到按钮底下（重合）。
+                        anchors.right: installButton.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 12
+                        spacing: 4
 
-                        Column {
-                            id: cardBody
-                            anchors.left: parent.left
-                            // 原版 createMarketCard：QHBoxLayout(contentsMargins 14,12,14,12; spacing 12)，
-                            // 左侧 infoLayout 是 stretch=1、中间 12px 间隔、右侧安装按钮 stretch=0。
-                            // 所以文字栏的右边必须停在按钮左侧，否则描述文字会跑到按钮底下（重合）。
-                            anchors.right: installButton.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 12
-                            spacing: 4
-
-                            Row {
-                                width: parent.width
-                                spacing: 8
-
-                                Text {
-                                    id: nameText
-                                    text: card.modelData.name
-                                    color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
-                                    font.pixelSize: Theme.font.title
-                                    font.weight: Theme.font.weightBold
-                                }
-
-                                Rectangle {
-                                    visible: card.modelData.category.length > 0
-                                    implicitWidth: categoryText.implicitWidth + 16
-                                    implicitHeight: categoryText.implicitHeight + 4
-                                    radius: 6
-                                    color: Theme.color.tagBg
-                                    anchors.verticalCenter: parent.verticalCenter
-
-                                    Text {
-                                        id: categoryText
-                                        anchors.centerIn: parent
-                                        text: card.modelData.category
-                                        color: Theme.color.accent
-                                        font.family: "Microsoft YaHei UI"
-                                        font.pixelSize: Theme.font.small
-                                    }
-                                }
-                            }
+                        Row {
+                            width: parent.width
+                            spacing: 8
 
                             Text {
-                                width: parent.width
-                                visible: card.modelData.description.length > 0
-                                text: card.modelData.description
-                                wrapMode: Text.WordWrap
-                                color: Theme.color.textSecondary
+                                id: nameText
+                                text: card.modelData.name
+                                color: Theme.color.textPrimary
                                 font.family: "Microsoft YaHei UI"
-                                font.pixelSize: Theme.font.caption
+                                font.pixelSize: Theme.font.title
+                                font.weight: Theme.font.weightBold
                             }
+
+                            Rectangle {
+                                visible: card.modelData.category.length > 0
+                                implicitWidth: categoryText.implicitWidth + 16
+                                implicitHeight: categoryText.implicitHeight + 4
+                                radius: 6
+                                color: Theme.color.tagBg
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                Text {
+                                    id: categoryText
+                                    anchors.centerIn: parent
+                                    text: card.modelData.category
+                                    color: Theme.color.accent
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.small
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: card.modelData.description.length > 0
+                            text: card.modelData.description
+                            wrapMode: Text.WordWrap
+                            color: Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                        }
+                    }
+
+                    IconButton {
+                        id: installButton
+                        anchors.right: parent.right
+                        anchors.rightMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        label: qsTrId("plugin_install_action")
+                        onClicked: Hub.plugins.install(card.modelData.url)
+                    }
+                }
+            }
+
+            ListView {
+                id: installedList
+                anchors.fill: parent
+                visible: Hub.plugins.tab === 1
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: AppScrollBar { }
+                spacing: 8
+                cacheBuffer: 160
+                model: Hub.plugins.tab === 1 ? Hub.plugins.installedItems : []
+
+                delegate: Rectangle {
+                    id: installedCard
+                    required property var modelData
+
+                    width: ListView.view.width
+                    implicitHeight: 56
+                    radius: Theme.radius.card
+                    color: Theme.color.panelBg
+                    border.width: 1
+                    border.color: Theme.color.border
+
+                    Text {
+                        anchors.left: parent.left
+                        // 原版 createInstalledCard：名字 label 是 stretch=1，右侧两个按钮 stretch=0。
+                        // 所以名字要给按钮让位并省略号收尾，不能盖到按钮上。
+                        anchors.right: buttonRow.left
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                        text: installedCard.modelData.version.length > 0
+                            ? installedCard.modelData.name + "  " + installedCard.modelData.version
+                            : installedCard.modelData.name
+                        color: Theme.color.textPrimary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.title
+                    }
+
+                    Row {
+                        id: buttonRow
+                        anchors.right: parent.right
+                        anchors.rightMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 12
+
+                        IconButton {
+                            label: qsTrId("plugin_update_action")
+                            onClicked: Hub.plugins.update(installedCard.modelData.name)
                         }
 
                         IconButton {
-                            id: installButton
-                            anchors.right: parent.right
-                            anchors.rightMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            label: qsTrId("plugin_install_action")
-                            onClicked: Hub.plugins.install(card.modelData.url)
-                        }
-                    }
-                }
-
-                // ===== 已安装页 =====
-                Repeater {
-                    model: Hub.plugins.tab === 1 ? Hub.plugins.installedItems : []
-
-                    delegate: Rectangle {
-                        id: installedCard
-                        required property var modelData
-
-                        width: contentColumn.width
-                        implicitHeight: 56
-                        radius: Theme.radius.card
-                        color: Theme.color.panelBg
-                        border.width: 1
-                        border.color: Theme.color.border
-
-                        Text {
-                            anchors.left: parent.left
-                            // 原版 createInstalledCard：名字 label 是 stretch=1，右侧两个按钮 stretch=0。
-                            // 所以名字要给按钮让位并省略号收尾，不能盖到按钮上。
-                            anchors.right: buttonRow.left
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                            text: installedCard.modelData.version.length > 0
-                                ? installedCard.modelData.name + "  " + installedCard.modelData.version
-                                : installedCard.modelData.name
-                            color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
-                            font.pixelSize: Theme.font.title
-                        }
-
-                        Row {
-                            id: buttonRow
-                            anchors.right: parent.right
-                            anchors.rightMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 12
-
-                            IconButton {
-                                label: qsTrId("plugin_update_action")
-                                onClicked: Hub.plugins.update(installedCard.modelData.name)
-                            }
-
-                            IconButton {
-                                label: qsTrId("plugin_uninstall_action")
-                                // 色板里没有 dangerText 这个键（叫 danger）——写错的键名只会打 warning、
-                                // 颜色静默取默认值，所以这里按色板实际键名取。
-                                glyphColor: Theme.color.danger
-                                glyphColorHover: Theme.color.danger
-                                onClicked: Hub.plugins.uninstall(installedCard.modelData.name)
-                            }
+                            label: qsTrId("plugin_uninstall_action")
+                            // 色板里没有 dangerText 这个键（叫 danger）——写错的键名只会打 warning、
+                            // 颜色静默取默认值，所以这里按色板实际键名取。
+                            glyphColor: Theme.color.danger
+                            glyphColorHover: Theme.color.danger
+                            onClicked: Hub.plugins.uninstall(installedCard.modelData.name)
                         }
                     }
                 }

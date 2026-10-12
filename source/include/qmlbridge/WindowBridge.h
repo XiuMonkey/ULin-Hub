@@ -4,10 +4,19 @@
 // NativeWindowFilter 里；本类只是"能被 QML 调到的那一面" + 可绑定属性。
 //
 // 与旧控件壳的分工一致（TitleBar 只发信号、落地逻辑在后面；旧壳那份 WindowFrame 已删除），只是跨了 QML/C++ 边界。
+//
+// 例外的一处"观察"：最近一次鼠标点击的位置（recentPointerPos）。它既不是意图也不是可绑定状态，
+// 而是**弹窗需要的上下文** —— 弹窗没有"触发控件"可言（open() 可能是键盘 / 定时器 / 任何代码调的），
+// 要走"从点击处长出来"的动画就只能由窗口层记住那个点。做法是事件过滤器**旁观**鼠标事件：
+// 不改写、不拦截、不参与命中测试，所以对现有交互零影响（这也是它必须在这里、而不能在 QML 里做
+// 一个铺满窗口的 HoverHandler 的原因：后者会成为最上层接受 hover 的项，把下面所有控件的悬停吃掉）。
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QPointer>
+#include <QPointF>
 #include <QString>
+#include <QVariant>
 
 class QQuickWindow;
 
@@ -50,6 +59,12 @@ public:
 	// 主题/外观被外部改过（扩展换风格包、系统深色切换）后由宿主调一次
 	Q_INVOKABLE void notifyThemeChanged();
 
+	// 最近 maxAgeMs 毫秒内发生过鼠标按下 / 抬起 ⇒ 返回那次点击的位置（窗口内容坐标 = QML 场景坐标，
+	// 逻辑像素，与 Overlay.overlay 同源）；否则返回**无效 QVariant**（QML 侧拿到 undefined）。
+	// 判"够不够近"是为了区分"这次弹出就是这次点击触发的"与"纯键盘 / 程序触发的弹出"：
+	// 后者若还拿几分钟前那次点击当起点，卡片会从屏幕上一处毫不相干的地方飞出来。
+	Q_INVOKABLE QVariant recentPointerPos(int maxAgeMs) const;
+
 	bool isMaximized() const;
 	bool isFullScreen() const;
 	int contentInset() const;
@@ -69,6 +84,13 @@ private:
 
 	void refreshFrameState();
 
+	// 旁观鼠标按下 / 抬起，只记位置（见文件头）。永远是"不处理"，事件照原样走下去。
+	bool eventFilter(QObject* watched, QEvent* event) override;
+
 	QPointer<QQuickWindow> m_window;
 	QString m_hoveredControl;
+
+	// 最近一次点击的位置与它距今多久（isValid() == false = 窗口起来之后还没见过点击）
+	QPointF m_pointerPos;
+	QElapsedTimer m_pointerAge;
 };

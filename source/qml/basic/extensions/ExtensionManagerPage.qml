@@ -20,21 +20,19 @@ import "../../widgets"
 Item {
     id: page
 
-    // 背景遮罩：吃掉点击，别让底下的壳还能点到
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.overlayBg
-        MouseArea { anchors.fill: parent }
-    }
+    // 卡片目标尺寸（= 原来那个 Card 的宽高）：PageOverlay 按它算"长到多大、停在哪儿"
+    implicitWidth: 760
+    implicitHeight: 540
 
-    Card {
+    // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停，
+    // 理由与实测见 widgets/PageOverlay.qml 里 overlayAnimating 的注释。
+    property bool overlayAnimating: false
+
+    // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
+    // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
+    Item {
         id: popup
-        anchors.centerIn: parent
-        width: 760
-        height: 540
-        radius: Theme.radius.popup
-        padding: 0
-        shadowEnabled: true
+        anchors.fill: parent
 
         // ---- 标题行 ----
         Item {
@@ -65,8 +63,9 @@ Item {
                     width: 16
                     height: 16
                     lineWidth: 2
-                    running: Hub.extensions.busy
-                    visible: Hub.extensions.busy
+                    // 卡片正在展开/收回时先停（理由同市场页：转圈让整窗每帧重绘，动画会掉帧）
+                    running: Hub.extensions.busy && !page.overlayAnimating
+                    visible: Hub.extensions.busy && !page.overlayAnimating
                     anchors.verticalCenter: parent.verticalCenter
                 }
 

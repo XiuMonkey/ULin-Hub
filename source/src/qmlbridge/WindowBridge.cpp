@@ -6,6 +6,9 @@
 #include "common/appearance/ThemeManager.h"
 
 #include <QDebug>
+#include <QEvent>
+#include <QGuiApplication>
+#include <QMouseEvent>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScreen>
@@ -81,7 +84,50 @@ void WindowBridge::attachWindow(QObject* window)
 	connect(quickWindow, &QWindow::screenChanged, this,
 		[this](QScreen*) { refreshFrameState(); });
 
+	// 指针位置只在"有窗口"之后才有意义，所以过滤器挂在这里而不是构造函数里
+	// （构造函数可能在 QGuiApplication 之前跑）。app 级过滤器是**旁观**的，见头文件。
+	if (auto* app = QGuiApplication::instance())
+		app->installEventFilter(this);
+
 	refreshFrameState();
+}
+
+bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
+{
+	// 只记"按下了 / 松开了"，不看位置变化：弹窗的起点要的是**这次点击落在哪**，
+	// 而按下与抬起之间指针可能已经挪动过（拖拽选择之类），记按下那一刻更贴近"点哪儿了"。
+	switch (event->type()) {
+	case QEvent::MouseButtonPress:
+	case QEvent::MouseButtonRelease: {
+		// 过滤器挂在 QGuiApplication 上 ⇒ watched 是**接收者**。Qt Quick 的鼠标事件投给
+		// QQuickWindow（QML 控件那一层是场景图内部的命中测试，不走 QObject 事件），但也可能
+		// 投给某个 QQuickItem；两种都认，别的一律不算（将来多窗 / 原生弹层不该被记进来）。
+		const bool fromUs = m_window
+			&& (watched == m_window.data()
+				|| (qobject_cast<QQuickItem*>(watched) && qobject_cast<QQuickItem*>(watched)->window() == m_window.data()));
+		if (!fromUs)
+			break;
+
+		// position() 就是 QML 的**场景坐标**（窗口内容坐标、逻辑像素），与本窗口的
+		// Overlay.overlay 同源 —— 到了 QML 侧不必再换算任何父链。
+		auto* mouse = static_cast<QMouseEvent*>(event);
+		m_pointerPos = mouse->position();
+		m_pointerAge.start();   // QElapsedTimer::start() 就是"重启"，重复调用取最近一次
+		break;
+	}
+	default:
+		break;
+	}
+	return QObject::eventFilter(watched, event);
+}
+
+QVariant WindowBridge::recentPointerPos(int maxAgeMs) const
+{
+	if (!m_pointerAge.isValid())
+		return QVariant();   // 窗口起来之后还没见过鼠标点击（纯键盘操作）
+	if (maxAgeMs > 0 && m_pointerAge.elapsed() > maxAgeMs)
+		return QVariant();   // 上一次点击太久了，跟这次弹出没关系
+	return m_pointerPos;
 }
 
 void WindowBridge::setCaptionItem(QObject* item)

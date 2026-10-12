@@ -180,22 +180,22 @@ Item {
         z: 20
     }
 
-    // 插件市场（M6）：覆盖整壳，侧栏 ◧ 打开
-    Loader {
+    // 插件市场（M6）：覆盖整壳，侧栏 ◧ 打开。
+    // 三块整壳覆盖页统一走 PageOverlay —— 遮罩 + 从**点击处**长出来的卡片 + 收回播完才卸载，
+    // 于是"点侧栏那颗图标"与"卡片从哪儿长出来"天然对得上（页面自己不用接线）。
+    PageOverlay {
         anchors.fill: parent
-        active: Hub.plugins.open
-        visible: Hub.plugins.open
-        source: Style.url("basic/plugins/PluginMarketPage.qml")
         z: 35
+        shown: Hub.plugins.open
+        source: Style.url("basic/plugins/PluginMarketPage.qml")
     }
 
     // 扩展管理：覆盖整壳，侧栏扩展按钮打开（工具 / 客户端 / Qt Quick 运行时三种来源）
-    Loader {
+    PageOverlay {
         anchors.fill: parent
-        active: Hub.extensions.open
-        visible: Hub.extensions.open
-        source: Style.url("basic/extensions/ExtensionManagerPage.qml")
         z: 35
+        shown: Hub.extensions.open
+        source: Style.url("basic/extensions/ExtensionManagerPage.qml")
     }
 
     // 主题切换过渡卡片（原版 #themeSwitchBody）
@@ -208,12 +208,11 @@ Item {
     }
 
     // 设置页（模型 / API key）：覆盖整壳，侧栏 ⚙ 打开
-    Loader {
+    PageOverlay {
         anchors.fill: parent
-        active: Hub.settings.open
-        visible: Hub.settings.open
-        source: Style.url("basic/settings/SettingsPage.qml")
         z: 30
+        shown: Hub.settings.open
+        source: Style.url("basic/settings/SettingsPage.qml")
     }
 
     // 工具过滤面板：顶栏 ☰ 打开，覆盖整壳。

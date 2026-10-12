@@ -43,6 +43,7 @@
         <file>widgets/Card.qml</file>
         <file>widgets/Collapsible.qml</file>
         <file>widgets/IconButton.qml</file>
+        <file>widgets/PageOverlay.qml</file>
         <file>widgets/SearchField.qml</file>
         <file>widgets/Toast.qml</file>
     </qresource>

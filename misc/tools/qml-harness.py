@@ -174,6 +174,10 @@ import QtQuick
 QtObject {
     property bool maximized: false
     property bool fullScreen: false
+
+    // 与宿主 WindowBridge::recentPointerPos 同形：试装台里没有真鼠标事件，返回无效值，
+    // 于是弹窗退回"从居中长出来"那条路（widgets/AppPopup.qml 会调它）。
+    function recentPointerPos(maxAgeMs) { return undefined }
 }
 '''
 
