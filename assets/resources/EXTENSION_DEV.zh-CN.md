@@ -313,7 +313,7 @@ AttachedPlugin/
 **客户端扩展** —— 装进宿主进程 `<exe>/clientExtensions/<Name>/`，可以带原生 DLL、也可以带 QML。
 
 > ⚠️ **本节分"现状"与"目标形态"**。QML 那一半（扩展 QML 的装载与注入：
-> `HostUi` / `VirtualUiHost`）**已于 2026-10-01 实现**（§11.3 就是实现后的形态）。11.1 表里"扩展能拿到的宿主对象"那句仍是旧的：现在可挂对象是 `shell` / `titleBar` / `topBar` / `sidebar` / `composer`。
+> `HostUi` / `VirtualUiHost`）**已于 2026-10-01 实现**（§11.3 就是实现后的形态）。11.1 表里"扩展能拿到的宿主对象"那句仍是旧的：现在可挂对象是 `shell` / `titleBar` / `topBar` / `sidebar` / `sidebar.extDock` / `composer`。
 
 ### 11.1 现状（已实现，可直接用）
 
@@ -323,7 +323,7 @@ AttachedPlugin/
 | DLL 装载 | `ClientExtension::loadAll()` / `loadOne()` | 启动时（`engine.load()` 之后）扫目录：没有 `regulation.json5` 的跳过；`main.dll` 优先，否则取目录里第一个 `*.dll`；`QPluginLoader` → `qobject_cast<DshHostPlugin*>` → `setHostIdentity(目录名)` → `attachHost()`。全程 **GUI 线程** |
 | 卸载 | `ClientExtension::remove()` | 先删判据（`regulation.json5`）⇒ 不再算已安装；dll 被占用则留残留，下次启动 `sweepPendingRemovals()` 清 |
 | 管理界面 | `Hub.extensions`（`ExtensionManagerController` + `basic/extensions/ExtensionManagerPage.qml`） | 两种来源：工具扩展（`profiles/web/extensions.json`）、客户端扩展（`<exe>/clientExtensions`） |
-| 扩展能拿到的宿主对象 | `DshHost::findObject` | `themeManager` / `translationNotifier` / `connectionManager` / `apiSink` 四个。旧控件壳时代的 `sidebar` / `topbar` / `mainWindow` 已于 M8 删除，取到 **null** |
+| 扩展能拿到的宿主对象 | `DshHost::findObject` | `themeManager` / `translationNotifier` / `connectionManager` / `apiSink` 四个（旧控件壳时代的 `sidebar` / `topbar` / `mainWindow` 随 M8 删除，取到 **null**）。**界面注入点另走一套名字**（`VirtualUiHost::HostItem(...)`，非 `findObject`）：`shell` / `titleBar` / `topBar` / `sidebar` / `sidebar.extDock` / `composer`，2026-10-01 起已恢复登记，见 §11.3 的表 |
 
 ### 11.2 目标形态：包结构
 
@@ -379,6 +379,7 @@ QML 里可以**一比一对应**，因为 QML item 本身就是 `QObject`：
 // 宿主：QML 根对象在 Component.onCompleted 里登记（HostUi 是 C++ 支撑的 QML 单例）
 HostUi.registerItem("topBar", this)     // TopBar.qml 的根
 HostUi.registerItem("sidebar", this)    // Sidebar.qml 的根
+HostUi.registerItem("sidebar.extDock", extDock)   // 侧栏底部图标行里的"扩展停靠位"（一个 Row）
 HostUi.registerItem("shell", this)      // Shell.qml 的根
 HostUi.registerItem("titleBar", this); HostUi.registerItem("composer", this); …
 // 扩展（DLL）：QObject* obj = DshHost::findObject("topBar");
@@ -392,6 +393,7 @@ HostUi.registerItem("titleBar", this); HostUi.registerItem("composer", this); �
 | `titleBar` | `skin/window/TitleBar.qml` | 自由 `Item` | 同上 |
 | `topBar` | `basic/topbar/TopBar.qml` | `Row`（位置器） | **自动排在末尾**（= `addWidget` 的手感） |
 | `sidebar` | `basic/sidebar/Sidebar.qml` | 自由 `Item` | 自己写 `anchors`（贴底那排就是 `anchors.bottom`） |
+| `sidebar.extDock` | 同上（底部图标行里的一个 `Row`） | `Row`（位置器） | **自动排在末尾** —— 扩展的入口按钮走这里；**按钮与图标都归扩展**，宿主不画没装的扩展的入口。没有扩展注入时它是空的（宽度 0） |
 | `composer` | `basic/chat/Composer.qml` | 自由 `Item` | 同上 |
 
 **② 注入（DLL 侧）** —— 宿主只给两个原语，怎么挂由扩展自己决定：
@@ -469,6 +471,7 @@ extensions/PluginTranspiler/
 ├── main.cpp              attachHost()：
 │                           auto* ui = qobject_cast<VirtualUiHost*>(DshHost::findObject(DshHostIndex::kUiHost));
 │                           ui->MountInto("PluginTranspiler", "shell", "<自己的>/ui/PluginTranspiler.qml", this);
+├── ui/EntryButton.qml     入口按钮（自绘，注入 sidebar.extDock；required property var context）
 ├── ui/PluginTranspiler.qml  required property var context（required 属性由宿主 createWithInitialProperties 注入）；
 │                           面板只读宿主 Theme token（`import ULinHub 1.0`），不写死配色
 └── PluginTranspiler.vcxproj  MSBuild 构建 main.dll（POST_BUILD 把 regulation.json5 + ui/ 拷到部署目录）
@@ -476,22 +479,30 @@ extensions/PluginTranspiler/
 
 > 样例扩展 `extensions/QuickOrbit/` 于 2026-10-10 删除：它走的是"自己 `new QQuickView` 开独立窗口"的
 > 旧路，依赖的 `QQuickSupport` 运行时包与 `Subtype` 门控都已退役，且从没部署过 —— 要看真样例就看
-> `extensions/PluginTranspiler`（侧栏入口接管）与 `extensions/CodexBackend`（后端接管 + 注入面板）。
+> `extensions/PluginTranspiler`（侧栏入口：扩展自绘按钮注入 `sidebar.extDock`）与 `extensions/CodexBackend`（后端接管 + 注入面板）。
 
-**侧栏入口怎么接（比挂面板更常用）**：宿主 QML 用一句话登记一个入口，
+**侧栏入口怎么接**：**按钮归扩展自己** —— 扩展自绘一颗入口按钮，注入宿主的侧栏停靠位
+`sidebar.extDock`（`Row`，位置器自动排布；所以扩展 QML **不写 x / y / anchors**，只给宽高）：
 
 ```qml
-// source/qml/basic/sidebar/Sidebar.qml 的 Component.onCompleted
-HostConnections.RegisterConnection("qml.sidebar.openPluginTranspiler", sidebar,
-                                   "openTranspilerRequested()", sidebar, "handleOpenTranspiler()")
+// <扩展>/ui/EntryButton.qml —— 入口连图标一起归扩展，宿主不画
+Item {
+    required property var context          // = DLL 传进来的桥，见 §11.4
+    width: 32; height: 32
+    Text { anchors.centerIn: parent; text: "⇄" }
+    MouseArea { anchors.fill: parent; onClicked: context.togglePanel() }
+}
 ```
-
-DLL 扩展在 `attachHost()` 里**接管**它（拿 `kConnectionManager` → `VirtualConnectionManager`）：
 
 ```cpp
-manager->TakeoverConnection(QStringLiteral("qml.sidebar.openPluginTranspiler"),
-                            this, QByteArrayLiteral("1onTranspilerEntryClicked()"));  // '1' = 槽
+// attachHost() 里（⚠️ 用 0ms 定时器延后，理由见 §11.3 的登记时机）
+ui->MountInto("PluginTranspiler", "sidebar.extDock", "<自己的>/ui/EntryButton.qml", bridge);
 ```
 
-接管成功后那颗按钮的信号直接进扩展的槽；退场时 `ReleaseTakeover(index)` 交还。
-失败模式：**接管没有回执** —— index 拼错 / 宿主没登记时，宿主只写一行 warn，扩展侧看不出来。
+> **宿主不摆"未装扩展"的哑按钮**：插件转译器不是宿主的功能，停靠位在没有扩展注入时是空的。
+> 旧做法（宿主 `Sidebar.qml` 画一颗按钮 + 登记 `qml.sidebar.openPluginTranspiler`，扩展用
+> `TakeoverConnection` 接管、`ReleaseTakeover` 交还）**已于 2026-10-12 退役** —— 它会让宿主在
+> 扩展没装时露出一颗点了没反应的按钮。要接管宿主**既有**按钮 / 信号，机制本身仍在
+> （`VirtualConnectionManager`），`extensions/CodexBackend` 是活样例。
+> 副作用提醒：给扩展按钮**另起 owner**（PanelAnimDemo 用 `<扩展名>/panel` 给面板）——
+> `UnmountOwner` 是按 owner 整批删的，入口按钮与面板共用一个 owner 会把按钮一起摘掉。

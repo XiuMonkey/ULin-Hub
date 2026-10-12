@@ -11,18 +11,18 @@ import "../../skin/sidebar"
 Item {
     id: sidebar
 
-    // 扩展注入点（见 HostExports.h 的名字契约）；五条连接交给宿主建：有真实 handle ⇒ 可挂起/恢复/接管/交还。
+    // 扩展注入点（名字契约见 assets/resources/EXTENSION_DEV.zh-CN.md §11.3）；四条连接交给宿主建：
+    // 有真实 handle ⇒ 可挂起/恢复/接管/交还。
     // 签名手写：带回参的信号要写全类型；接收端必须具名且**参数带类型标注**（未标注在元对象里是 QVariant，接不上）。
     Component.onCompleted: {
         HostUi.registerItem("sidebar", this)
         HostConnections.RegisterConnection("qml.sidebar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sidebar, "handleSessionCreateFailed(QString)")
         HostConnections.RegisterConnection("qml.sidebar.openSettings", sidebar, "openSettingsRequested()", sidebar, "handleOpenSettings()")
         HostConnections.RegisterConnection("qml.sidebar.openPluginMarket", sidebar, "openPluginMarketRequested()", sidebar, "handleOpenPluginMarket()")
-        HostConnections.RegisterConnection("qml.sidebar.openPluginTranspiler", sidebar, "openTranspilerRequested()", sidebar, "handleOpenTranspiler()")
-        // 清空会话与上面三条同一条路：默认处理器在本组件里，扩展可接管这条 index 换成自己的实现
+        // 清空会话与上面两条同一条路：默认处理器在本组件里，扩展可接管这条 index 换成自己的实现
         HostConnections.RegisterConnection("qml.sidebar.clearSessions", sidebar, "clearSessionsRequested()", sidebar, "handleClearSessions()")
     }
-    // 五条连接的默认处理器（没人接管时 = 宿主原本行为）
+    // 四条连接的默认处理器（没人接管时 = 宿主原本行为）
     function handleSessionCreateFailed(message: string) {
         sidebar.notify(message)
     }
@@ -32,11 +32,6 @@ Item {
     function handleOpenPluginMarket() {
         Hub.plugins.openPage()
     }
-    // 插件转译器面板由客户端扩展 PluginTranspiler 提供（它接管 qml.sidebar.openPluginTranspiler）；
-    // 扩展没装 / 没接上时这里给一句提示，别放一颗点了没反应的哑按钮。
-    function handleOpenTranspiler() {
-        sidebar.notify("插件转译器扩展未安装")
-    }
     // 清空会话：业务全在 core（ClientRuntime::clearAllSessions），这里只转调
     function handleClearSessions() {
         Hub.clearAllSessions()
@@ -45,10 +40,9 @@ Item {
     // 侧栏自己不弹 Toast：只把文案抛给壳层（Shell.qml 里统一放一个 Toast）
     signal notify(string text)
 
-    // 三个入口的请求信号：按钮不直接开页面，谁响应由连接表决定（扩展接管后就换成扩展自己的面板）
+    // 两个入口的请求信号：按钮不直接开页面，谁响应由连接表决定（扩展接管后就换成扩展自己的面板）
     signal openSettingsRequested()
     signal openPluginMarketRequested()
-    signal openTranspilerRequested()
     // 清空会话（危险动作）：同样不直连，谁响应由连接表决定
     signal clearSessionsRequested()
 
@@ -138,34 +132,9 @@ Item {
             tooltip: qsTrId("sidebar_plugins")
             onClicked: sidebar.openPluginMarketRequested()
         }
-        // 插件转译器（客户端扩展 PluginTranspiler 的入口）
-        // 图标用来回箭头字形而不是 PNG：assets\resources 里没有转译器专用图标，复用
-        // extension-icon.png 会跟旁边那颗「扩展管理」撞图（实测两颗 Ext 并排分不清）。
-        // 字形走 IconButton 的 glyph 通道（与 TopBar 的 "☰" 同一条路）。文案暂不加进 .ts，等 M6 统一补 id。
-        // ⚠️ 它必须**显式对齐**那排 PNG 的口径：原版图标是"键 32×32、图 20×20、主色 #6B7280"
-        //    （颜色烘在 PNG 里，两档主题都是同一个值），而 IconButton 的默认字形口径是
-        //    glyphSize = Theme.font.lead = 16px、glyphColor = Theme.color.iconButtonText
-        //    （浅色 #666666 / 深色 #9CA3AF）。U+21C4 在 Segoe UI Symbol 里只有约 0.70 em 宽，
-        //    16px 时墨迹实测仅 11×10，夹在一排 15~20px 墨迹的图标里就显得又小又细、色也偏中性
-        //    —— 这就是这颗按钮"和原版有细微差别"的原因。24px 让墨迹到 17×16，与邻座齐平。
-        //    颜色写字面量而不是 Theme.color.textSecondary：只有浅色主题它恰好等于 #6B7280，
-        //    深色主题是 #9CA3AF，而 PNG 两档都不变 ⇒ 只有字面量能在两档都对上。
-        //    glyphColorHover 一并钉住：PNG 图标悬停只变底色、图标本身不变色（字形默认会变深/变亮）。
-        // ⚠️ 垂直方向也得钉：`anchors.centerIn` 居中的是 Text 的**行盒**，而行盒是字体级的，
-        //    U+21C4 的墨迹落在盒中线**下方 2.9px**。旁边四个 PNG 图标是精确居中的（实测偏差
-        //    ≤0.53px），所以这颗的字形看着明显偏下。专门渲染出来数像素量过（16× 超采样）：
-        //    偏移 −2 → 残差 +0.94、−2.5 → +0.44、−3 → −0.06、−3.5 → −0.56，取 −3。
-        //    这个值只跟"字形 + glyphSize=24"绑定，换字形或换字号要重新量。
-        IconButton {
-            boxSize: 32
-            glyph: "⇄"
-            glyphSize: 24
-            glyphColor: "#6B7280"
-            glyphColorHover: "#6B7280"
-            contentYOffset: -3
-            tooltip: "插件转译器"
-            onClicked: sidebar.openTranspilerRequested()
-        }
+        // 插件转译器的入口按钮**不在这里** —— 它归扩展自己（PluginTranspiler 自绘
+        // ui/EntryButton.qml，运行时注入下方的 extDock）。插件转译器不是宿主的功能，
+        // 宿主不该在扩展没装的时候就摆一颗点了没反应的哑按钮。
         // 主题：原版 Sidebar::themeToggleRequested -> ULinHub::toggleTheme（切模式 + 过渡卡片）
         IconButton {
             boxSize: 32
@@ -181,8 +150,30 @@ Item {
             tooltip: qsTrId("ext_manager_title")
             onClicked: Hub.extensions.openPage()
         }
+    }
 
-        // addSpacing(15)：给扩展按钮留的位置
+    // 扩展按钮停靠位：宿主只给"一排空位"，**按钮与图标都归扩展自己**
+    //（PanelAnimDemo 的 ▤、PluginTranspiler 的 ⇄ 都注入到这里）。
+    // 它是 Row（位置器）⇒ 注入项自动左起排，扩展因此不用算 x/y，也不会跟宿主那几颗抢位。
+    // ⚠️ 与 navColumn 拆成两个 Row 是有意的：注入项只会**追加**到宿主 Row 的末尾，
+    //    混在一起的话扩展按钮会排到 spinner 后面去。
+    // ⚠️ 没有扩展装进来时这里宽度为 0，底排与"只有四个键"时一模一样。
+    Row {
+        id: extDock
+        anchors.left: navColumn.right
+        anchors.verticalCenter: navColumn.verticalCenter
+        spacing: 0
+        // 扩展注入点（名字契约见 assets/resources/EXTENSION_DEV.zh-CN.md §11.3）
+        Component.onCompleted: HostUi.registerItem("sidebar.extDock", extDock)
+    }
+
+    // 尾排：原版 addSpacing(15)（给扩展按钮留位）+ 初始化转圈
+    Row {
+        id: navTrailing
+        anchors.left: extDock.right
+        anchors.verticalCenter: navColumn.verticalCenter
+        spacing: 0
+
         Item { width: 15; height: 1 }
 
         BusySpinner {
