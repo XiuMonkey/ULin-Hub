@@ -198,7 +198,7 @@ ListView {
         width: Math.max(120, list.width - list.leftMargin - list.rightMargin)
         implicitHeight: (rowRoot.kind === "user")
             ? userBubble.implicitHeight
-            : ((rowRoot.kind === "system") ? systemNotice.implicitHeight : agentBubble.implicitHeight)
+            : ((rowRoot.kind === "system") ? systemNotice.contentHeight : agentBubble.implicitHeight)
 
         UserBubble {
             id: userBubble

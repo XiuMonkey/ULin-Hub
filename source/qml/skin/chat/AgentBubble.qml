@@ -76,12 +76,21 @@ Item {
                         // 而它内部点击是 `root.expanded = !root.expanded`；若在父层写死绑定，
                         // 第一次点击会被那个赋值打断绑定（能work但很脆），不如根本不绑。
 
-                        Text {
+                        // 只读但可选中/复制；高度必须显式给 contentHeight（TextEdit 没有可用的 implicit*）
+                        TextEdit {
+                            objectName: "bubbleText"
                             width: parent.width
+                            height: contentHeight
                             text: segment.modelData.text
-                            textFormat: Text.MarkdownText
-                            wrapMode: Text.Wrap
+                            textFormat: TextEdit.MarkdownText
+                            wrapMode: TextEdit.Wrap
+                            readOnly: true
+                            selectByMouse: true
+                            persistentSelection: true
+                            activeFocusOnPress: false
                             color: Theme.color.textSecondary
+                            selectionColor: Theme.color.selectionBg
+                            selectedTextColor: Theme.color.textPrimary
                             font.family: segment.segmentType === "thinking" ? "Microsoft YaHei UI" : "Consolas"
                             font.pixelSize: Theme.font.caption
                         }
@@ -101,19 +110,30 @@ Item {
                             width: segment.width
                             implicitHeight: (modelData.kind === "code")
                                 ? codeUnit.implicitHeight
-                                : proseText.implicitHeight
+                                : proseText.contentHeight
 
-                            Text {
+                            // 只读但可选中/复制
+                            TextEdit {
                                 id: proseText
+                                objectName: "bubbleText"
                                 visible: part.modelData.kind !== "code"
                                 width: parent.width
+                                height: contentHeight
                                 text: visible ? part.modelData.text : ""
-                                textFormat: Text.MarkdownText
-                                wrapMode: Text.Wrap
+                                textFormat: TextEdit.MarkdownText
+                                wrapMode: TextEdit.Wrap
+                                readOnly: true
+                                selectByMouse: true
+                                persistentSelection: true
+                                activeFocusOnPress: false
                                 color: Theme.color.textPrimary
+                                selectionColor: Theme.color.selectionBg
+                                selectedTextColor: Theme.color.textPrimary
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
-                                lineHeight: 1.35
+                                // ⚠️ 这里不能写 lineHeight —— 那是 Text 专有属性，TextEdit 没有；
+                                //    写上会让整个 AgentBubble 变成 "Type AgentBubble unavailable"，
+                                //    外面表现就是**消息列表整片空白**（踩过一次，qmllint 不报）。
                             }
 
                             CodeBlock {
