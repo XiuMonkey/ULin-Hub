@@ -60,14 +60,8 @@
     <message id="toolfilter_server_not_ready">
         <translation>服务端地址还没就绪</translation>
     </message>
-    <message id="toolfilter_plugin_no_response_http_fmt">
-        <translation>工具过滤插件没有响应（HTTP %1）</translation>
-    </message>
-    <message id="toolfilter_plugin_no_response_fmt">
-        <translation>工具过滤插件没有响应（%1）</translation>
-    </message>
     <message id="toolfilter_plugin_unavailable">
-        <translation>工具过滤插件未安装或未启用（/api/tools-filter 不是本插件的响应）</translation>
+        <translation>工具过滤插件未安装或未启用。</translation>
     </message>
     <message id="toolfilter_save_failed_http_fmt">
         <translation>保存失败（HTTP %1）</translation>
@@ -106,13 +100,10 @@
         <translation>本轮没有收到任何回复，请检查模型配置或服务端日志</translation>
     </message>
     <message id="server_auth_token_missing">
-        <translation>服务端未提供认证令牌，无法通过 /api 认证</translation>
+        <translation>无法通过服务端认证，请确认服务端是否正常运行。</translation>
     </message>
     <message id="server_bundled_server_missing">
-        <translation>捆绑的内置服务端不完整，无法启动（缺少 node / server 文件，请检查安装目录）</translation>
-    </message>
-    <message id="server_proc_start_failed_fmt">
-        <translation>内置服务端进程启动失败：%1</translation>
+        <translation>安装不完整，无法启动内置服务端。请重新安装。</translation>
     </message>
     <message id="com_member_not_found_fmt">
         <translation>COM 成员不存在: %1 (hr=%2)</translation>
@@ -167,14 +158,8 @@
     <message id="com_function_requires_tool">
         <translation>每个 Function 需要 'Tool'；default 接口还需要 'Func'</translation>
     </message>
-    <message id="server_auth_failed_fmt">
-        <translation>DSH 认证失败：服务端未返回 Set-Cookie（HTTP %1）</translation>
-    </message>
     <message id="server_stream_not_ready">
-        <translation>事件流尚未就绪，无法回执审批/提问</translation>
-    </message>
-    <message id="server_auth_queue_full_fmt">
-        <translation>认证未就绪，等待中的请求过多（%1）</translation>
+        <translation>服务端尚未就绪，暂时无法提交，请稍后重试。</translation>
     </message>
     <message id="chat_turn_step_fmt">
         <translation>%1 轮 · %2 步</translation>
@@ -255,10 +240,10 @@
         <translation>已清理扩展配置，但部分文件删除失败: %1</translation>
     </message>
     <message id="ext_patch_update_failed_fmt">
-        <translation>扩展目录已删除，但更新 cordis.patch.yml 失败: %1</translation>
+        <translation>扩展已删除，但配置更新失败：%1</translation>
     </message>
     <message id="ext_patch_read_failed">
-        <translation>无法读取 cordis.patch.yml</translation>
+        <translation>扩展配置读取失败，已跳过残留清理。</translation>
     </message>
     <message id="ext_no_residue">
         <translation>未发现残留扩展配置</translation>
@@ -268,15 +253,7 @@
     </message>
     <message id="ext_build_config_mismatch_hint">
         <comment>作为 QPluginLoader::errorString() 的补充片段追加在末尾，前置分隔符 " —— " 必须保留；本身是完整句，不是拼接残片。</comment>
-        <translation> —— 插件必须与宿主同一档编译（宿主是 Debug 就用 -DCMAKE_BUILD_TYPE=Debug 重编插件）</translation>
-    </message>
-    <message id="ext_delete_locked_fmt">
-        <comment>%3 是插件可选槽的名字（如 detachHost()）。</comment>
-        <translation>%1 仍被本进程占用，当次删不掉（残留在 %2）；扩展已卸载，残留会在下次启动客户端时自动清掉。（插件若声明 %3 槽，移除时就能当场卸载并删干净）</translation>
-    </message>
-    <message id="ext_delete_locked_some_files">
-        <comment>作为上一条 %1 的兜底值，仅当残留清单为空时使用，故不用整句。</comment>
-        <translation>部分文件</translation>
+        <translation> —— 该插件与当前版本不匹配，请重新编译或更换插件。</translation>
     </message>
     <message id="ext_copy_file_failed_fmt">
         <comment>原文是英中混排（英文前缀 + 中文提示），key 化时合并成一条，否则译文里只剩半句。</comment>
@@ -319,19 +296,19 @@
         <translation>配置来源</translation>
     </message>
     <message id="model_source_settings_user">
-        <translation>settings 用户层</translation>
+        <translation>你在设置里添加的</translation>
     </message>
     <message id="model_source_settings_bundled">
-        <translation>settings 随附配置</translation>
+        <translation>随应用附带的配置</translation>
     </message>
     <message id="model_source_adapter_only">
-        <translation>适配器公布，未在 settings 中声明</translation>
+        <translation>由服务端提供</translation>
     </message>
     <message id="model_settings_readonly_suffix">
         <translation>（设置只读）</translation>
     </message>
     <message id="model_writeback_target">
-        <translation>写回地址</translation>
+        <translation>写入位置</translation>
     </message>
     <message id="common_delete">
         <translation>删除</translation>
@@ -360,11 +337,8 @@
     <message id="model_add_readonly">
         <translation>服务端设置只读，无法新增模型。</translation>
     </message>
-    <message id="model_provider_load_failed_fmt">
-        <translation>提供方 %1 的目录加载失败：%2</translation>
-    </message>
     <message id="model_add_requires_api">
-        <translation>需要 llm/listConfigurableProviders 与可写的设置文档才能新增模型</translation>
+        <translation>当前连接不支持新增模型（模型配置不可写）。</translation>
     </message>
     <message id="model_add_title">
         <translation>新增模型</translation>
@@ -421,7 +395,7 @@
         <translation>删除模型 %1 失败：%2 %3</translation>
     </message>
     <message id="model_namespace_missing_fmt">
-        <translation>读不到 settings 命名空间 %1，暂时无法写入。</translation>
+        <translation>读不到 %1 的配置，暂时无法写入。</translation>
     </message>
     <message id="model_write_progress_fmt">
         <translation>写入 %1.%2（当前 %3 个条目）。</translation>
@@ -430,7 +404,7 @@
         <translation>注意：该路由目前沿用适配器随附目录，写入后本路由只公布这份列表，其余模型将不再出现在模型列表中。</translation>
     </message>
     <message id="model_write_deepseek_warning">
-        <translation>deepseek 适配器：整份 models 列表会被本次写入替换。</translation>
+        <translation>注意：本次写入会替换该提供方的整份模型列表。</translation>
     </message>
     <message id="model_write_readonly">
         <translation>服务端设置只读，写入会被拒绝。</translation>
@@ -445,10 +419,10 @@
         <translation>服务端没有提供可配置的提供方路由，无法新增模型。</translation>
     </message>
     <message id="model_credential_derived_fmt">
-        <translation>凭据引用 %1（profile 未点名 apiKeyEnv，按约定派生并记入配置）</translation>
+        <translation>凭据 %1（自动推导）</translation>
     </message>
     <message id="model_credential_from_profile_fmt">
-        <translation>凭据引用 %1（由该路由 profile 的 apiKeyEnv 指定）</translation>
+        <translation>凭据 %1（由服务端配置指定）</translation>
     </message>
     <message id="model_credential_unknown_suffix">
         <translation>；状态未知，可直接填写</translation>
@@ -598,13 +572,13 @@
         <translation>保存并重启服务</translation>
     </message>
     <message id="settings_appearance_desc">
-        <translation>界面来自内置 QML（首次启动释放到 styles/ 供改）。点击下面的按钮可把它们恢复成内置版本。</translation>
+        <translation>界面来自内置资源（首次启动会释放到 styles/ 目录，可自行修改）。点击下面的按钮可把它们恢复成内置版本。</translation>
     </message>
     <message id="settings_reset_styles">
         <translation>重置 QML 为默认</translation>
     </message>
     <message id="settings_styles_reset_done">
-        <translation>已恢复默认 QML：styles/ 里的 QML 已按内置资源重新释放，界面已刷新。</translation>
+        <translation>已恢复默认外观，界面已刷新。</translation>
     </message>
     <message id="settings_language_label">
         <translation>界面语言：</translation>
@@ -646,7 +620,7 @@
         <translation>未分组</translation>
     </message>
     <message id="toolfilter_group_toggle_tip">
-        <translation>勾选会使对应目录被折叠（模型不可见），调用gettools可针对性展开</translation>
+        <translation>勾选后该目录会被折叠（对应工具不可见）；需要时可再展开。</translation>
     </message>
     <message id="toolfilter_params_label">
         <translation>参数：</translation>
@@ -670,7 +644,7 @@
         <translation>全部隐藏</translation>
     </message>
     <message id="toolfilter_help_desc">
-        <translation>取消勾选使该工具隐藏，经gettools可调用</translation>
+        <translation>取消勾选可隐藏对应工具；需要时可在对话中重新调用。</translation>
     </message>
     <message id="toolfilter_loading">
         <translation>正在读取该会话的工具目录…</translation>
@@ -696,15 +670,12 @@
     <message id="placeholder_session_hint">
         <translation>在左侧列表里选一个，或点 ＋ 新建</translation>
     </message>
-    <message id="placeholder_milestone_fmt">
-        <translation>消息列表与输入区在 M4–M5 迁入。服务端状态：%1</translation>
-    </message>
     <message id="right_sidebar_title">
         <translation>面板</translation>
     </message>
     <message id="right_sidebar_empty_hint">
-        <translation>还没有接入内容
-终端 / 文件 / 预览将挂在这里</translation>
+        <translation>右侧栏还没有内容。
+终端、文件与预览会显示在这里。</translation>
     </message>
     <message id="sidebar_no_sessions">
         <translation>还没有会话
@@ -732,16 +703,13 @@
         <translation>右侧栏</translation>
     </message>
     <message id="chat_session_busy_restarting">
-        <translation>该会话仍被上一个已退出的进程占用，正在重启服务端并重发…</translation>
+        <translation>上一个进程还没退出，正在重启服务并重试…</translation>
     </message>
     <message id="chat_session_busy_status">
-        <translation>会话被占用，正在重启服务端…</translation>
+        <translation>正在重启服务…</translation>
     </message>
     <message id="chat_command_failed_fmt">
         <translation>命令失败：%1</translation>
-    </message>
-    <message id="server_start_failed_fmt">
-        <translation>内置服务端未能启动（退出码 %1）。发行版需要把 resources/server 部署到 exe 同目录。</translation>
     </message>
     <message id="server_starting">
         <translation>正在启动内置服务端…</translation>
@@ -753,7 +721,7 @@
         <translation>删除工作区失败: %1 %2</translation>
     </message>
     <message id="ext_abi_mismatch_hint">
-        <translation>扩展声明的 ABIVersion 与本宿主不一致 —— 只装了 DLL，QML 部分未装载</translation>
+        <translation>该扩展与当前版本不兼容，只加载了一部分功能。请更新扩展或应用。</translation>
     </message>
     <message id="ext_installed_restart_hint">
         <translation>工具扩展已装好 —— 重启内置服务端后才会加载</translation>
@@ -768,7 +736,7 @@
         <translation>已清理残留条目 —— 重启内置服务端后生效</translation>
     </message>
     <message id="plugin_installing_market">
-        <translation>正在安装插件市场（pnpm add dshmarket）…</translation>
+        <translation>正在准备插件市场，请稍候…</translation>
     </message>
     <message id="session_none_click_new">
         <translation>还没有会话，点左上角 + 新建一个。</translation>
@@ -777,7 +745,7 @@
         <translation>服务端还没就绪</translation>
     </message>
     <message id="settings_provider_namespace_missing_fmt">
-        <translation>找不到提供方 %1 的设置命名空间。</translation>
+        <translation>找不到 %1 的配置，请检查服务端设置。</translation>
     </message>
     <message id="model_provider_none_reported">
         <translation>服务端没有报告可配置的模型提供方。</translation>
@@ -801,16 +769,37 @@
         <translation>发现 %1 个候选模型，点「添加」写入配置。</translation>
     </message>
     <message id="style_pack_unreadable">
-        <translation>pack.json 打不开</translation>
+        <translation>风格包配置无法读取，已回退到默认外观。</translation>
     </message>
     <message id="style_pack_invalid_json">
-        <translation>pack.json 不是合法 JSON</translation>
-    </message>
-    <message id="style_pack_abi_mismatch_fmt">
-        <translation>风格包 uiAbi=%1，本版本需要 %2</translation>
+        <translation>风格包配置格式有误，已回退到默认外观。</translation>
     </message>
     <message id="command_unknown_fmt">
         <translation>不认识的命令：/%1</translation>
+    </message>
+    <message id="ext_delete_locked">
+        <translation>部分文件仍在使用中，本次未能删除；扩展已卸载，残留会在下次启动时自动清理。</translation>
+    </message>
+    <message id="style_pack_abi_mismatch">
+        <translation>该风格包与当前版本不兼容，已回退到默认外观。</translation>
+    </message>
+    <message id="server_start_failed">
+        <translation>内置服务端启动失败，请重启应用；若反复出现，请重新安装。</translation>
+    </message>
+    <message id="server_proc_start_failed">
+        <translation>无法启动内置服务端，请重启应用。</translation>
+    </message>
+    <message id="server_auth_failed">
+        <translation>无法通过服务端认证，请重启应用后再试。</translation>
+    </message>
+    <message id="server_auth_queue_full">
+        <translation>服务端尚未就绪，请稍后重试。</translation>
+    </message>
+    <message id="toolfilter_plugin_no_response">
+        <translation>工具过滤插件无响应，请稍后重试。</translation>
+    </message>
+    <message id="model_provider_load_failed_fmt">
+        <translation>加载 %1 的模型列表失败：%2</translation>
     </message>
 </context>
 </TS>

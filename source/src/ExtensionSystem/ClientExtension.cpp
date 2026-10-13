@@ -237,11 +237,8 @@ namespace ClientExtension
 		const QString leftovers = QDir(dir).entryList(QDir::Files, QDir::Name).join(QLatin1String(", "));
 		qInfo("[ClientExtension] removed (files still locked): %s leftovers=[%s] dir=%s",
 			qPrintable(name), qPrintable(leftovers), qPrintable(dir));
-		if (error) {
-			*error = qtTrId("ext_delete_locked_fmt")
-				.arg(leftovers.isEmpty() ? qtTrId("ext_delete_locked_some_files") : leftovers, dir,
-					QLatin1String(kDetachSlot));
-		}
+		if (error)
+			*error = qtTrId("ext_delete_locked");   // 残留清单与目录已在上一条 qInfo 里
 		return false;
 	}
 

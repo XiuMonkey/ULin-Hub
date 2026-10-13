@@ -66,7 +66,8 @@ void ClientRuntime::start()
 			return;
 		if (m_api && !m_api->isConnected()) {
 			setServerState(QStringLiteral("failed"));  // 服务端起不来：如实报状态，别让界面一直转圈
-			setStatus(qtTrId("server_start_failed_fmt").arg(exitCode));
+			qWarning().noquote() << "[ClientRuntime] 内置服务端启动失败 exitCode=" << exitCode;   // 退出码只进日志，界面上用户看不懂
+			setStatus(qtTrId("server_start_failed"));
 			setInitializing(false);
 		}
 		});

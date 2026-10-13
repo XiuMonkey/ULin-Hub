@@ -37,16 +37,5 @@ Item {
             font.pixelSize: Theme.font.caption
         }
 
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: qsTrId("placeholder_milestone_fmt").arg(Hub.serverState)
-            wrapMode: Text.WordWrap
-            color: Theme.color.textCaption
-            font.family: "Microsoft YaHei UI"
-            font.pixelSize: Theme.font.caption
-        }
-
     }
 }

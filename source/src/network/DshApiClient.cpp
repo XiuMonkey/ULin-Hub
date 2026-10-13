@@ -203,8 +203,9 @@ void DshApiClient::startAuthHandshake()
 				return;
 			}
 
-			failAuthQueue(QStringLiteral("auth"), qtTrId("server_auth_failed_fmt").arg(status));
-			emit transportError(QStringLiteral("auth"), qtTrId("server_auth_failed_fmt").arg(status));
+			qWarning().noquote() << "[DshApiClient] 认证失败 HTTP status=" << status;   // 状态码只进日志
+			failAuthQueue(QStringLiteral("auth"), qtTrId("server_auth_failed"));
+			emit transportError(QStringLiteral("auth"), qtTrId("server_auth_failed"));
 			return;
 		}
 
@@ -507,9 +508,9 @@ void DshApiClient::post(const QString& path, const QJsonObject& body, std::funct
 	if (!m_authenticated && !m_launchToken.isEmpty()) {  // 认证没就绪时直发必然 401，先挂起等握手完成后补发
 		static constexpr int kMaxQueuedCalls = 256;
 		if (m_authQueue.size() >= kMaxQueuedCalls) {
+			qWarning().noquote() << "[DshApi] 认证未就绪、挂起队列已满，上限=" << kMaxQueuedCalls;   // 上限只进日志
 			if (onError)
-				onError(RpcError{ QStringLiteral("auth"),
-					qtTrId("server_auth_queue_full_fmt").arg(kMaxQueuedCalls) });
+				onError(RpcError{ QStringLiteral("auth"), qtTrId("server_auth_queue_full") });
 			return;
 		}
 

@@ -681,7 +681,7 @@ void ServerManager::launchBundledServer(const QString& nodePath, const QString& 
 				return;
 			qWarning().noquote() << QStringLiteral("[ServerManager] 服务端进程启动失败:")
 				<< m_serverProcess->errorString();
-			emit errorLine(qtTrId("server_proc_start_failed_fmt").arg(m_serverProcess->errorString()));
+			emit errorLine(qtTrId("server_proc_start_failed"));   // errorString 已在上一条 qWarning 里
 		});
 	dshRegister("ServerManager.004", m_serverProcess, &QProcess::readyReadStandardError,
 		this, &ServerManager::handleServerErrorOutput);

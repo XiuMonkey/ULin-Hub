@@ -66,6 +66,7 @@ void StyleResolver::inspectPack()
 	QFile file(packPath);
 	if (!file.open(QIODevice::ReadOnly)) {
 		m_packAccepted = false;
+		qWarning().noquote() << "[Style] 风格包 pack.json 打不开:" << packPath << file.errorString();
 		m_rejectReason = qtTrId("style_pack_unreadable");
 		return;
 	}
@@ -74,6 +75,8 @@ void StyleResolver::inspectPack()
 	const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
 	if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
 		m_packAccepted = false;
+		qWarning().noquote() << "[Style] 风格包 pack.json 不是合法 JSON:" << parseError.errorString()
+			<< "offset=" << parseError.offset;
 		m_rejectReason = qtTrId("style_pack_invalid_json");
 		return;
 	}
@@ -84,11 +87,12 @@ void StyleResolver::inspectPack()
 	const int abi = object.value(QStringLiteral("uiAbi")).toInt(-1);
 	if (abi != kStylePackUiAbi) {
 		m_packAccepted = false;
-		m_rejectReason = qtTrId("style_pack_abi_mismatch_fmt").arg(abi).arg(kStylePackUiAbi);
+		qWarning().noquote() << "[Style] 风格包 uiAbi 不匹配，包内=" << abi << " 本版本需要=" << kStylePackUiAbi;
+		m_rejectReason = qtTrId("style_pack_abi_mismatch");
 	}
 
 	if (!m_packAccepted)
-		qWarning().noquote() << "[Style] 风格包被拒载，整包回退内置：" << m_rejectReason;
+		qWarning().noquote() << "[Style] 风格包被拒载，整包回退内置（细节见上）";
 }
 
 QString StyleResolver::url(const QString& logicalPath) const

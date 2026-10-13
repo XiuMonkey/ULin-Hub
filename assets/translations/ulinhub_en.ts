@@ -60,14 +60,8 @@
     <message id="toolfilter_server_not_ready">
         <translation>The server address is not ready yet</translation>
     </message>
-    <message id="toolfilter_plugin_no_response_http_fmt">
-        <translation>The tools-filter plugin did not respond (HTTP %1)</translation>
-    </message>
-    <message id="toolfilter_plugin_no_response_fmt">
-        <translation>The tools-filter plugin did not respond (%1)</translation>
-    </message>
     <message id="toolfilter_plugin_unavailable">
-        <translation>The tools-filter plugin is not installed or not enabled (/api/tools-filter is not served by this plugin)</translation>
+        <translation>The tool-filter plugin is not installed or not enabled.</translation>
     </message>
     <message id="toolfilter_save_failed_http_fmt">
         <translation>Save failed (HTTP %1)</translation>
@@ -106,13 +100,10 @@
         <translation>No reply was produced this turn. Check the model configuration or the server logs.</translation>
     </message>
     <message id="server_auth_token_missing">
-        <translation>The server did not provide an auth token, so /api authentication is not possible</translation>
+        <translation>Could not authenticate with the server. Please check that the server is running.</translation>
     </message>
     <message id="server_bundled_server_missing">
-        <translation>The bundled built-in server is incomplete and cannot start (missing node / server files; check the install directory)</translation>
-    </message>
-    <message id="server_proc_start_failed_fmt">
-        <translation>Failed to launch the bundled server process: %1</translation>
+        <translation>The installation is incomplete, so the built-in server cannot start. Please reinstall.</translation>
     </message>
     <message id="com_member_not_found_fmt">
         <translation>COM member not found: %1 (hr=%2)</translation>
@@ -167,14 +158,8 @@
     <message id="com_function_requires_tool">
         <translation>Every Function requires 'Tool'; the default interface also requires 'Func'</translation>
     </message>
-    <message id="server_auth_failed_fmt">
-        <translation>DSH authentication failed: the server did not return Set-Cookie (HTTP %1)</translation>
-    </message>
     <message id="server_stream_not_ready">
-        <translation>The event stream is not ready yet; cannot reply to approvals/questions</translation>
-    </message>
-    <message id="server_auth_queue_full_fmt">
-        <translation>Authentication is not ready; too many requests are pending (%1)</translation>
+        <translation>The server is not ready yet, so this cannot be submitted. Please try again shortly.</translation>
     </message>
     <message id="chat_turn_step_fmt">
         <translation>%1 turns · %2 steps</translation>
@@ -255,10 +240,10 @@
         <translation>Extension configuration cleared, but some files could not be deleted: %1</translation>
     </message>
     <message id="ext_patch_update_failed_fmt">
-        <translation>The extension directory was deleted, but updating cordis.patch.yml failed: %1</translation>
+        <translation>The extension was removed, but its configuration could not be updated: %1</translation>
     </message>
     <message id="ext_patch_read_failed">
-        <translation>Could not read cordis.patch.yml</translation>
+        <translation>Could not read the extension configuration, so cleanup was skipped.</translation>
     </message>
     <message id="ext_no_residue">
         <translation>No leftover extension configuration found</translation>
@@ -268,15 +253,7 @@
     </message>
     <message id="ext_build_config_mismatch_hint">
         <comment>作为 QPluginLoader::errorString() 的补充片段追加在末尾，前置分隔符 " — " 必须保留；本身是完整句，不是拼接残片。</comment>
-        <translation> — the plugin must be built in the same configuration as the host (if the host is Debug, rebuild the plugin with -DCMAKE_BUILD_TYPE=Debug)</translation>
-    </message>
-    <message id="ext_delete_locked_fmt">
-        <comment>%3 是插件可选槽的名字（如 detachHost()）。</comment>
-        <translation>%1 is still locked by this process and cannot be deleted now (leftovers in %2). The extension has been uninstalled; the leftovers are cleaned up automatically the next time the client starts. (If the plugin declares the %3 slot, it can unload and clean up on the spot when removed.)</translation>
-    </message>
-    <message id="ext_delete_locked_some_files">
-        <comment>作为上一条 %1 的兜底值，仅当残留清单为空时使用，故不用整句。</comment>
-        <translation>some files</translation>
+        <translation> — This plugin does not match the current version. Please rebuild it or use a compatible build.</translation>
     </message>
     <message id="ext_copy_file_failed_fmt">
         <comment>原文是英中混排（英文前缀 + 中文提示），key 化时合并成一条，否则译文里只剩半句。</comment>
@@ -319,19 +296,19 @@
         <translation>Config source</translation>
     </message>
     <message id="model_source_settings_user">
-        <translation>settings user layer</translation>
+        <translation>Added in settings</translation>
     </message>
     <message id="model_source_settings_bundled">
-        <translation>settings bundled config</translation>
+        <translation>Shipped with the app</translation>
     </message>
     <message id="model_source_adapter_only">
-        <translation>Published by the adapter, not declared in settings</translation>
+        <translation>Provided by the server</translation>
     </message>
     <message id="model_settings_readonly_suffix">
         <translation>(settings read-only)</translation>
     </message>
     <message id="model_writeback_target">
-        <translation>Write-back target</translation>
+        <translation>Saved to</translation>
     </message>
     <message id="common_delete">
         <translation>Delete</translation>
@@ -360,11 +337,8 @@
     <message id="model_add_readonly">
         <translation>Server settings are read-only; models cannot be added.</translation>
     </message>
-    <message id="model_provider_load_failed_fmt">
-        <translation>Could not load the catalog for provider %1: %2</translation>
-    </message>
     <message id="model_add_requires_api">
-        <translation>Adding models requires llm/listConfigurableProviders and a writable settings document</translation>
+        <translation>Adding models is not supported on the current connection (the model configuration is read-only).</translation>
     </message>
     <message id="model_add_title">
         <translation>Add model</translation>
@@ -421,7 +395,7 @@
         <translation>Could not delete model %1: %2 %3</translation>
     </message>
     <message id="model_namespace_missing_fmt">
-        <translation>Could not find the settings namespace %1; nothing can be written yet.</translation>
+        <translation>Could not read the configuration for %1, so this cannot be saved right now.</translation>
     </message>
     <message id="model_write_progress_fmt">
         <translation>Writing %1.%2 (%3 entries so far).</translation>
@@ -430,7 +404,7 @@
         <translation>Note: this route currently uses the adapter's bundled catalog. After writing, the route will publish only this list, and the remaining models will disappear from the model list.</translation>
     </message>
     <message id="model_write_deepseek_warning">
-        <translation>deepseek adapter: this write replaces the entire models list.</translation>
+        <translation>Note: this write will replace the provider's entire model list.</translation>
     </message>
     <message id="model_write_readonly">
         <translation>Server settings are read-only; the write will be rejected.</translation>
@@ -445,10 +419,10 @@
         <translation>The server offers no configurable provider route, so models cannot be added.</translation>
     </message>
     <message id="model_credential_derived_fmt">
-        <translation>Credential reference %1 (the profile does not name apiKeyEnv, so it is derived by convention and recorded in the config)</translation>
+        <translation>Credential %1 (auto-derived)</translation>
     </message>
     <message id="model_credential_from_profile_fmt">
-        <translation>Credential reference %1 (specified by the route profile's apiKeyEnv)</translation>
+        <translation>Credential %1 (specified by the server configuration)</translation>
     </message>
     <message id="model_credential_unknown_suffix">
         <translation>; status unknown, you can fill it in directly (the server validates on write)</translation>
@@ -598,13 +572,13 @@
         <translation>Save and restart server</translation>
     </message>
     <message id="settings_appearance_desc">
-        <translation>Theme colors and UI styling come from the templates in the program's styles/ directory (theme-*.json palettes and the *.qss rules). If you break them by hand, use the button below to restore the defaults.</translation>
+        <translation>The interface comes from built-in resources (released into the styles/ folder on first launch so you can customise them). Click the button below to restore the built-in versions.</translation>
     </message>
     <message id="settings_reset_styles">
         <translation>Reset QML to default</translation>
     </message>
     <message id="settings_styles_reset_done">
-        <translation>Default QML restored: styles/ was re-released from the built-in pack and the UI refreshed.</translation>
+        <translation>Default appearance restored. The interface has been refreshed.</translation>
     </message>
     <message id="settings_language_label">
         <translation>Interface language:</translation>
@@ -646,7 +620,7 @@
         <translation>Ungrouped</translation>
     </message>
     <message id="toolfilter_group_toggle_tip">
-        <translation>Checked = this whole directory is hidden from the model (IsExpanded = False for it in the config; the per-tool checkboxes below stop having any effect). Unchecked = the directory is visible and each tool row follows its own checkbox.</translation>
+        <translation>When checked, this group is collapsed (its tools are hidden). Expand it again whenever you need them.</translation>
     </message>
     <message id="toolfilter_params_label">
         <translation>Parameters:</translation>
@@ -670,7 +644,7 @@
         <translation>Hide all</translation>
     </message>
     <message id="toolfilter_help_desc">
-        <translation>Unchecking a tool removes it from the list sent to the model (saving tokens), but it can still be called. Click a directory name to expand or collapse its tools (display only). Tool descriptions and parameters are not written to the config file; they are only shown here as hints.</translation>
+        <translation>Uncheck to hide a tool; it can still be called in the conversation when needed.</translation>
     </message>
     <message id="toolfilter_loading">
         <translation>Reading this session's tool catalog...</translation>
@@ -696,15 +670,12 @@
     <message id="placeholder_session_hint">
         <translation>Pick one from the list on the left, or click ＋ to create one</translation>
     </message>
-    <message id="placeholder_milestone_fmt">
-        <translation>The message list and composer arrive in M4–M5. Server state: %1</translation>
-    </message>
     <message id="right_sidebar_title">
         <translation>Panel</translation>
     </message>
     <message id="right_sidebar_empty_hint">
-        <translation>Nothing mounted yet
-Terminal / Files / Preview will dock here</translation>
+        <translation>Nothing here yet.
+Terminal, files and preview will show up in this panel.</translation>
     </message>
     <message id="sidebar_no_sessions">
         <translation>No sessions yet
@@ -732,16 +703,13 @@ Click ＋ at the top right to create one</translation>
         <translation>Right sidebar</translation>
     </message>
     <message id="chat_session_busy_restarting">
-        <translation>This session is still held by a previous process that has exited; restarting the server and resending...</translation>
+        <translation>The previous process has not exited yet. Restarting the service and retrying…</translation>
     </message>
     <message id="chat_session_busy_status">
-        <translation>The session is busy; restarting the server...</translation>
+        <translation>Restarting the service…</translation>
     </message>
     <message id="chat_command_failed_fmt">
         <translation>Command failed: %1</translation>
-    </message>
-    <message id="server_start_failed_fmt">
-        <translation>The built-in server failed to start (exit code %1). A release build must deploy resources/server next to the exe.</translation>
     </message>
     <message id="server_starting">
         <translation>Starting the built-in server...</translation>
@@ -753,7 +721,7 @@ Click ＋ at the top right to create one</translation>
         <translation>Could not delete the workspace: %1 %2</translation>
     </message>
     <message id="ext_abi_mismatch_hint">
-        <translation>The extension declares an ABIVersion that does not match this host — only the DLL was installed; its QML part was not loaded</translation>
+        <translation>This extension is not compatible with the current version and was only partially loaded. Please update the extension or the app.</translation>
     </message>
     <message id="ext_installed_restart_hint">
         <translation>The tool extension is installed — it loads after the built-in server restarts</translation>
@@ -768,7 +736,7 @@ Click ＋ at the top right to create one</translation>
         <translation>Leftover entries cleaned up — restart the built-in server for it to take effect</translation>
     </message>
     <message id="plugin_installing_market">
-        <translation>Installing the plugin marketplace (pnpm add dshmarket)...</translation>
+        <translation>Preparing the plugin marketplace, please wait…</translation>
     </message>
     <message id="session_none_click_new">
         <translation>No session yet — click + at the top left to create one.</translation>
@@ -777,7 +745,7 @@ Click ＋ at the top right to create one</translation>
         <translation>The server is not ready yet</translation>
     </message>
     <message id="settings_provider_namespace_missing_fmt">
-        <translation>Could not find the settings namespace for provider %1.</translation>
+        <translation>Could not find the configuration for %1. Please check the server settings.</translation>
     </message>
     <message id="model_provider_none_reported">
         <translation>The server reported no configurable model provider.</translation>
@@ -801,16 +769,37 @@ Click ＋ at the top right to create one</translation>
         <translation>Found %1 candidate model(s); click "Add" to write one into the config.</translation>
     </message>
     <message id="style_pack_unreadable">
-        <translation>Could not open pack.json</translation>
+        <translation>The style pack configuration could not be read. Reverted to the default appearance.</translation>
     </message>
     <message id="style_pack_invalid_json">
-        <translation>pack.json is not valid JSON</translation>
-    </message>
-    <message id="style_pack_abi_mismatch_fmt">
-        <translation>Style pack uiAbi=%1, but this build requires %2</translation>
+        <translation>The style pack configuration is malformed. Reverted to the default appearance.</translation>
     </message>
     <message id="command_unknown_fmt">
         <translation>Unknown command: /%1</translation>
+    </message>
+    <message id="ext_delete_locked">
+        <translation>Some files were still in use and could not be deleted. The extension is unloaded; leftovers are cleaned up on the next launch.</translation>
+    </message>
+    <message id="style_pack_abi_mismatch">
+        <translation>This style pack is not compatible with the current version. Reverted to the default appearance.</translation>
+    </message>
+    <message id="server_start_failed">
+        <translation>The built-in server failed to start. Please restart the app; if it keeps happening, reinstall.</translation>
+    </message>
+    <message id="server_proc_start_failed">
+        <translation>Could not start the built-in server. Please restart the app.</translation>
+    </message>
+    <message id="server_auth_failed">
+        <translation>Could not authenticate with the server. Please restart the app and try again.</translation>
+    </message>
+    <message id="server_auth_queue_full">
+        <translation>The server is not ready yet. Please try again in a moment.</translation>
+    </message>
+    <message id="toolfilter_plugin_no_response">
+        <translation>The tool-filter plugin did not respond. Please try again shortly.</translation>
+    </message>
+    <message id="model_provider_load_failed_fmt">
+        <translation>Could not load the model list for %1: %2</translation>
     </message>
 </context>
 </TS>

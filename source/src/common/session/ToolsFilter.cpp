@@ -529,9 +529,7 @@ void ToolsFilter::refresh(const QString& sessionId)
 
 		if (failed) {
 			// 插件缺席时会落到 /api 前缀路由，拿回的不是我们的 JSON
-			setStatus(status > 0
-				? qtTrId("toolfilter_plugin_no_response_http_fmt").arg(status)
-				: qtTrId("toolfilter_plugin_no_response_fmt").arg(transportError));
+			setStatus(qtTrId("toolfilter_plugin_no_response"));
 			qWarning().noquote() << "[ToolsFilter] GET failed status=" << status << "error=" << transportError;
 			return;
 		}
