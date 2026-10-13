@@ -61,13 +61,13 @@ Item {
 
                         readonly property string segmentType: segment.modelData.type
 
-                        // 工具两处用既有 id；"思考过程"没有合适的既有 id，暂用字面量（TODO(M6)）
+                        // 三处标题都走既有 id（思考箱没有别的候选词，另起了 chat_thinking_title）
                         title: segmentType === "thinking"
-                            ? "思考过程"
+                            ? qsTrId("chat_thinking_title")
                             : (segmentType === "toolCall"
                                 ? qsTrId("chat_tool_call_fmt").arg(segment.modelData.toolName)
                                 : qsTrId("chat_tool_result_label"))
-                        meta: segmentType === "thinking" ? "" : (root.streaming ? "进行中…" : "")
+                        meta: segmentType === "thinking" ? "" : (root.streaming ? qsTrId("chat_streaming_meta") : "")
                         // 默认**全部收起**（2026-10-03 改）：原来这里写的是
                         //     expanded: segmentType !== "thinking"   // 思考收起、工具卡展开
                         // 展开工具卡的代价实测很实在：25 条消息里有三张长结果卡（1916 / 1301 / 3566px），

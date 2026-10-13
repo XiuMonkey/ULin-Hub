@@ -46,11 +46,10 @@ PluginMarketController::PluginMarketController(DshApiClient* api, ServerManager*
 		});
 
 	// ---- 市场包自动安装（pnpm add dshmarket）----
-	// 文案：没有对应的既有 id，先用字面量（TODO(M6)：等 .ts 补 plugin_installing_market 等三条）
 	connect(m_installer, &PluginMarketInstaller::installStarted, this, [this] {
 		m_installing = true;
 		m_installLog.clear();
-		m_installStatus = QStringLiteral("正在安装插件市场（pnpm add dshmarket）…");
+		m_installStatus = qtTrId("plugin_installing_market");
 		qInfo().noquote() << "[Plugins] 市场包缺失，开始自动安装";
 		emit installChanged();
 	});
@@ -66,7 +65,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, ServerManager*
 	connect(m_installer, &PluginMarketInstaller::installFinished, this, [this](bool ok) {
 		m_installing = false;
 		setBusy(false);
-		m_installStatus = ok ? QStringLiteral("插件市场已安装，正在重启服务端…") : QStringLiteral("插件市场安装失败，详见下方输出");
+		m_installStatus = ok ? qtTrId("plugin_install_done_restarting") : qtTrId("plugin_install_failed");
 		emit installChanged();
 
 		if (!ok)

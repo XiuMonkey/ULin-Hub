@@ -262,7 +262,7 @@ Item {
             visible: list.count === 0 && !Hub.initializing
             width: list.width - 2 * Theme.spacing.cardPadding
             horizontalAlignment: Text.AlignHCenter
-            text: "还没有会话\n点右上角 ＋ 新建"
+            text: qsTrId("sidebar_no_sessions")
             color: Theme.color.textCaption
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
@@ -312,8 +312,8 @@ Item {
 
         Text {
             anchors.centerIn: parent
-            // 会话用既有 id；工作区没有专门 id，先写字面量（TODO(M6)：等 .ts 补）
-            text: sidebar.pendingIsWorkspace ? "删除工作区" : qsTrId("session_delete_label")
+            // 会话与工作区各有一句删除确认（工作区是"只移出列表、不动它下面的会话"）
+            text: sidebar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
             color: deleteHover.containsMouse ? Theme.color.danger : Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
@@ -353,7 +353,7 @@ Item {
             Text {
                 width: parent.width
                 text: sidebar.pendingIsWorkspace
-                    ? "确定要删除这个工作区吗？只会把它从工作区列表移除，不删除它下面的会话。"
+                    ? qsTrId("workdir_delete_confirm")
                     : qsTrId("session_delete_confirm")
                 wrapMode: Text.WordWrap
                 color: Theme.color.textPrimary

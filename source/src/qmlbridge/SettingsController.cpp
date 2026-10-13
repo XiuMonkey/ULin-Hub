@@ -83,7 +83,7 @@ void SettingsController::removeModel(const QString& provider, const QString& mod
 	const ConfigurableProvider* entry = findProvider(provider);
 	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
 	if (!m_api || !entry || !ns) {
-		setStatus(QStringLiteral("找不到提供方 %1 的设置命名空间。").arg(provider));
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
 		return;
 	}
 
@@ -467,11 +467,11 @@ void SettingsController::refresh()
 			}
 
 			if (m_view.providers.isEmpty())
-				setStatus(QStringLiteral("服务端没有报告可配置的模型提供方。"));
+				setStatus(qtTrId("model_provider_none_reported"));
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);
-			setStatus(QStringLiteral("读取设置失败：%1 %2").arg(error.code, error.message));
+			setStatus(qtTrId("settings_read_failed_fmt").arg(error.code, error.message));
 		});
 }
 
@@ -591,14 +591,14 @@ void SettingsController::rebuildProviders()
 void SettingsController::saveApiKey(const QString& provider, const QString& apiKey)
 {
 	if (!m_api || apiKey.trimmed().isEmpty()) {
-		setStatus(QStringLiteral("请先填入 API key。"));
+		setStatus(qtTrId("model_api_key_required"));
 		return;
 	}
 
 	const ConfigurableProvider* entry = findProvider(provider);
 	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
 	if (!entry || !ns) {
-		setStatus(QStringLiteral("找不到提供方 %1 的设置命名空间。").arg(provider));
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
 		return;
 	}
 
@@ -607,12 +607,12 @@ void SettingsController::saveApiKey(const QString& provider, const QString& apiK
 	ModelSelectionService::saveCredential(m_api, ref, apiKey.trimmed(),
 		[this, ref]() {
 			setBusy(false);
-			setStatus(QStringLiteral("已写入凭据 %1。可以点「发现模型」拉取可用模型。").arg(ref));
+			setStatus(qtTrId("model_credential_written_fmt").arg(ref));
 			refresh();  // 重新查状态：界面上的"已配置"要立刻反映出来
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);
-			setStatus(QStringLiteral("写入凭据失败：%1 %2").arg(error.code, error.message));
+			setStatus(qtTrId("model_api_key_write_failed_fmt").arg(error.code, error.message));
 		});
 }
 
@@ -621,7 +621,7 @@ void SettingsController::discover(const QString& provider, const QString& apiKey
 	const ConfigurableProvider* entry = findProvider(provider);
 	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
 	if (!m_api || !entry || !ns) {
-		setStatus(QStringLiteral("找不到提供方 %1 的设置命名空间。").arg(provider));
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
 		return;
 	}
 
@@ -643,12 +643,12 @@ void SettingsController::discover(const QString& provider, const QString& apiKey
 			m_candidates = rows;
 			emit candidatesChanged();
 			setStatus(rows.isEmpty()
-				? QStringLiteral("没有发现可用模型（key 是否正确？）")
-				: QStringLiteral("发现 %1 个候选模型，点「添加」写入配置。").arg(rows.size()));
+				? qtTrId("model_fetch_none_found")
+				: qtTrId("model_fetch_found_fmt").arg(rows.size()));
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);
-			setStatus(QStringLiteral("发现模型失败：%1 %2").arg(error.code, error.message));
+			setStatus(qtTrId("model_fetch_failed_fmt").arg(error.code, error.message));
 		});
 }
 
@@ -657,11 +657,11 @@ void SettingsController::addModel(const QString& provider, const QString& modelI
 	const ConfigurableProvider* entry = findProvider(provider);
 	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
 	if (!m_api || !entry || !ns) {
-		setStatus(QStringLiteral("找不到提供方 %1 的设置命名空间。").arg(provider));
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
 		return;
 	}
 	if (modelId.trimmed().isEmpty()) {
-		setStatus(QStringLiteral("模型 id 不能为空。"));
+		setStatus(qtTrId("model_id_required"));
 		return;
 	}
 
@@ -684,12 +684,12 @@ void SettingsController::addModel(const QString& provider, const QString& modelI
 	ModelSelectionService::addModel(m_api, *entry, *ns, request,
 		[this, provider, modelId](const SettingsNamespace&) {
 			setBusy(false);
-			setStatus(QStringLiteral("已添加模型 %1。").arg(modelId));
+			setStatus(qtTrId("model_added_fmt").arg(modelId));
 			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器（旧壳 ULinHub.043）
 			refresh();
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);
-			setStatus(QStringLiteral("添加模型失败：%1 %2").arg(error.code, error.message));
+			setStatus(qtTrId("model_add_failed_fmt").arg(error.code, error.message));
 		});
 }

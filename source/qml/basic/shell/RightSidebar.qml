@@ -18,9 +18,9 @@ Item {
     // 内容注入点：外部子项落到 body 里（不是落到卡片根上）
     default property alias contentData: body.data
     // 头部标题
-    property string title: "面板"
-    // 没有注入内容时的占位（TODO(i18n)：新文案 id 还没进 .ts，先留字面量）
-    property string emptyHint: "还没有接入内容\n终端 / 文件 / 预览将挂在这里"
+    property string title: qsTrId("right_sidebar_title")
+    // 没有注入内容时的占位
+    property string emptyHint: qsTrId("right_sidebar_empty_hint")
     // 关闭请求：Shell 接到 Hub.closeRightSidebar()
     signal closeRequested()
 

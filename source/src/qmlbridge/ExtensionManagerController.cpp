@@ -212,7 +212,7 @@ void ExtensionManagerController::pollInstall()
 		}
 		// 扩展声明的界面 ABI 与本宿主不符 ⇒ 装载器只落了 DLL，没落 ui/（见 ExtensionLoader）
 		if (!ext.uiAbiMatched)
-			setRestartHint(QStringLiteral("扩展声明的 ABIVersion 与本宿主不一致 —— 只装了 DLL，QML 部分未装载"));
+			setRestartHint(qtTrId("ext_abi_mismatch_hint"));
 		populate();
 		return;
 	}
@@ -221,7 +221,7 @@ void ExtensionManagerController::pollInstall()
 	registry().registerInstalled(ext.pluginName);
 	populate();
 	setStatus(qtTrId("ext_install_success_fmt").arg(ext.pluginName));
-	setRestartHint(QStringLiteral("工具扩展已装好 —— 重启内置服务端后才会加载"));
+	setRestartHint(qtTrId("ext_installed_restart_hint"));
 }
 
 bool ExtensionManagerController::removeSelected()
@@ -239,7 +239,7 @@ bool ExtensionManagerController::removeSelected()
 		populate();
 		setStatus(removed ? qtTrId("ext_removed_fmt").arg(name) : qtTrId("ext_partial_delete_failed_fmt").arg(removeError));
 		if (removed)
-			setRestartHint(QStringLiteral("客户端扩展已移除 —— 重启 ULin Hub 后彻底卸载"));
+			setRestartHint(qtTrId("ext_removed_client_hint"));
 		setSelectedIndex(-1);
 		return true;
 	}
@@ -256,7 +256,7 @@ bool ExtensionManagerController::removeSelected()
 		setStatus(qtTrId("ext_partial_delete_failed_fmt").arg(dirError));
 	else
 		setStatus(qtTrId("ext_patch_update_failed_fmt").arg(name));
-	setRestartHint(QStringLiteral("工具扩展已移除 —— 重启内置服务端后彻底生效"));
+	setRestartHint(qtTrId("ext_removed_tool_hint"));
 	setSelectedIndex(-1);
 	return true;
 }
@@ -273,7 +273,7 @@ void ExtensionManagerController::cleanupResiduals()
 	setStatus(result.removed.isEmpty() ? qtTrId("ext_no_residue")
 		: qtTrId("ext_residue_cleaned_fmt").arg(result.removed.join(QStringLiteral(", "))));
 	if (!result.removed.isEmpty())
-		setRestartHint(QStringLiteral("已清理残留条目 —— 重启内置服务端后生效"));
+		setRestartHint(qtTrId("ext_residue_cleaned_restart_hint"));
 }
 
 void ExtensionManagerController::restartServer()

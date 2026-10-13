@@ -112,7 +112,7 @@ void CommandController::execute(const QString& sessionId, const QString& line)
 				// 引擎对"语法像命令、但命令名不认识"回 undefined（dsh-commands：语法不合法或名字未知
 				// 由适配器拒掉）。这正是原版那个 unknown command 分支，必须报出来，不能静默吞掉。
 				const QString name = commandLinePattern().match(line).captured(1);
-				emit executionFinished(false, QStringLiteral("不认识的命令：/%1").arg(name));
+				emit executionFinished(false, qtTrId("command_unknown_fmt").arg(name));
 				return;
 			}
 			const QJsonObject outcome = value.toObject().value(QStringLiteral("result")).toObject();

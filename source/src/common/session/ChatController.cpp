@@ -188,12 +188,10 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 				m_retryText = trimmed;
 				m_retrySessionId = sessionId;
 				if (m_messages) {
-					// TODO(M6)：这句文案要进 ID-based 翻译
-					m_messages->appendSystem(
-						QStringLiteral("该会话仍被上一个已退出的进程占用，正在重启服务端并重发…"));
+					m_messages->appendSystem(qtTrId("chat_session_busy_restarting"));
 				}
 				if (setStatusLine)
-					setStatusLine(QStringLiteral("会话被占用，正在重启服务端…"));
+					setStatusLine(qtTrId("chat_session_busy_status"));
 				restartServer();
 				return;
 			}
@@ -437,7 +435,7 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 		const QString text = data.value(QStringLiteral("text")).toString();
 		const bool error = data.value(QStringLiteral("kind")).toString() == QLatin1String("error");
 		if (!text.isEmpty())
-			m_messages->appendSystem(error ? QStringLiteral("命令失败：%1").arg(text) : text);
+			m_messages->appendSystem(error ? qtTrId("chat_command_failed_fmt").arg(text) : text);
 		return;
 	}
 }
@@ -691,7 +689,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		const bool error = data.value(QStringLiteral("kind")).toString() == QLatin1String("error");
 		if (!text.isEmpty()) {
 			flushPending();   // 系统行是整段落的，先落盘保证顺序
-			m_messages->appendSystem(error ? QStringLiteral("命令失败：%1").arg(text) : text);
+			m_messages->appendSystem(error ? qtTrId("chat_command_failed_fmt").arg(text) : text);
 		}
 		return;
 	}

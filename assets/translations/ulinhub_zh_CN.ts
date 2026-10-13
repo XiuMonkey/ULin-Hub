@@ -9,17 +9,8 @@
     <message id="chat_tool_result_label">
         <translation>工具结果</translation>
     </message>
-    <message id="chat_tool_label">
-        <translation>工具</translation>
-    </message>
-    <message id="chat_thought_header_fmt">
-        <translation>%2 思考：%3</translation>
-    </message>
     <message id="common_copy">
         <translation>复制</translation>
-    </message>
-    <message id="chat_history_timeout">
-        <translation>等待会话事件流超时，历史暂时无法加载</translation>
     </message>
     <message id="ext_delete_dir_failed_fmt">
         <translation>无法删除扩展目录: %1</translation>
@@ -78,35 +69,17 @@
     <message id="toolfilter_plugin_unavailable">
         <translation>工具过滤插件未安装或未启用（/api/tools-filter 不是本插件的响应）</translation>
     </message>
-    <message id="toolfilter_session_not_persisted">
-        <translation>该会话还没有落到存储里，过滤配置暂时存不下</translation>
-    </message>
     <message id="toolfilter_save_failed_http_fmt">
         <translation>保存失败（HTTP %1）</translation>
     </message>
     <message id="toolfilter_save_failed_reason_fmt">
         <translation>保存失败（%1）</translation>
     </message>
-    <message id="server_status_fmt">
-        <translation>DSH 服务端: %1</translation>
-    </message>
-    <message id="server_exited_fmt">
-        <translation>DSH 服务端已退出，代码: %1</translation>
-    </message>
-    <message id="common_default_suffix">
-        <translation>(默认)</translation>
-    </message>
-    <message id="workdir_choose_dir_title">
-        <translation>选择要加入工作区的目录</translation>
-    </message>
     <message id="workdir_create_failed_fmt">
         <translation>新建工作区失败: %1 %2</translation>
     </message>
     <message id="session_new_failed_fmt">
         <translation>新建会话失败: %1 %2</translation>
-    </message>
-    <message id="session_create_failed_fmt">
-        <translation>创建会话失败: %1 %2</translation>
     </message>
     <message id="session_delete_label">
         <translation>删除会话</translation>
@@ -117,32 +90,14 @@
     <message id="session_delete_failed_fmt">
         <translation>删除会话失败: %1 %2</translation>
     </message>
-    <message id="ask_panel_create_failed">
-        <translation>收到提问请求，但无法创建内联面板。</translation>
-    </message>
-    <message id="ask_approval_panel_create_failed">
-        <translation>收到审批请求，但无法创建内联面板。</translation>
-    </message>
-    <message id="chat_transport_error_fmt">
-        <translation>传输错误 [%1]: %2</translation>
-    </message>
     <message id="common_load_more">
         <translation>加载更多</translation>
     </message>
-    <message id="common_no_more_items">
-        <translation>啊哦，没有更多了</translation>
-    </message>
     <message id="session_loading">
-        <translation>正在载入会话...</translation>
-    </message>
-    <message id="chat_abort_failed_fmt">
-        <translation>中止失败: %1 %2</translation>
+        <translation>已连上服务端，正在加载会话…</translation>
     </message>
     <message id="chat_send_failed_fmt">
         <translation>发送失败: %1 %2</translation>
-    </message>
-    <message id="session_auto_creating">
-        <translation>还没有可用会话，正在自动创建...</translation>
     </message>
     <message id="chat_no_model_hint">
         <translation>还没有可用的模型配置，请先在设置中添加模型后再发送</translation>
@@ -327,9 +282,6 @@
         <comment>原文是英中混排（英文前缀 + 中文提示），key 化时合并成一条，否则译文里只剩半句。</comment>
         <translation>无法复制客户端扩展文件: %1（若该扩展正在运行，其 dll 被本进程占用，请重启客户端后再安装）</translation>
     </message>
-    <message id="app_initializing">
-        <translation>ULin Hub 正在启动...</translation>
-    </message>
     <message id="model_source_custom">
         <translation>已自定义</translation>
     </message>
@@ -359,9 +311,6 @@
     </message>
     <message id="model_think_not_offered">
         <translation>已声明不提供</translation>
-    </message>
-    <message id="model_default_value_fmt">
-        <translation>（默认 %1）</translation>
     </message>
     <message id="model_think_undeclared_fmt">
         <translation>该模型未公布（界面按通用档位提供：%1）</translation>
@@ -402,9 +351,6 @@
     <message id="model_loading_catalog">
         <translation>正在读取服务端模型目录…</translation>
     </message>
-    <message id="model_catalog_load_failed_fmt">
-        <translation>读取模型目录失败：%1 %2</translation>
-    </message>
     <message id="model_catalog_empty">
         <translation>暂无模型</translation>
     </message>
@@ -432,17 +378,8 @@
     <message id="model_fetch_hint">
         <translation>按当前路由向服务端询问它公布的模型，结果在下拉里点选</translation>
     </message>
-    <message id="model_fetch_running">
-        <translation>正在获取模型…</translation>
-    </message>
-    <message id="model_fetch_empty">
-        <translation>该路由没有公布任何模型，请手工填写模型 ID。</translation>
-    </message>
     <message id="model_fetch_failed_fmt">
         <translation>获取模型失败：%1 %2</translation>
-    </message>
-    <message id="model_fetch_unsupported">
-        <translation>该路由不支持自动获取模型，请手工填写模型 ID。</translation>
     </message>
     <message id="model_discovery_missing_namespace">
         <translation>缺少提供方命名空间，无法获取模型</translation>
@@ -476,9 +413,6 @@
     </message>
     <message id="model_delete_readonly">
         <translation>服务端设置只读，无法删除模型。</translation>
-    </message>
-    <message id="model_settings_path_missing_fmt">
-        <translation>读不到 %1 的 settings 位置，无法删除。</translation>
     </message>
     <message id="model_deleted_fmt">
         <translation>已删除模型 %1。</translation>
@@ -537,9 +471,6 @@
     <message id="model_select_provider_first">
         <translation>请先选择一个提供方路由。</translation>
     </message>
-    <message id="model_write_namespace_missing_fmt">
-        <translation>读不到 settings 命名空间 %1，无法写入。</translation>
-    </message>
     <message id="model_id_required">
         <translation>模型 ID 不能为空。</translation>
     </message>
@@ -567,23 +498,11 @@
     <message id="model_add_failed_fmt">
         <translation>新增失败：%1 %2</translation>
     </message>
-    <message id="common_accessible_pair_fmt">
-        <translation>%1：%2</translation>
-    </message>
     <message id="model_label">
         <translation>模型</translation>
     </message>
     <message id="model_think_depth">
         <translation>思考深度</translation>
-    </message>
-    <message id="model_select_title">
-        <translation>选择模型与思考深度</translation>
-    </message>
-    <message id="model_name_fmt">
-        <translation>模型 %1</translation>
-    </message>
-    <message id="model_name_think_fmt">
-        <translation>模型 %1 思考深度 %2</translation>
     </message>
     <message id="model_none_published">
         <translation>暂无模型</translation>
@@ -606,9 +525,6 @@
     <message id="common_next_page">
         <translation>下一页</translation>
     </message>
-    <message id="plugin_page_initial">
-        <translation>第 1 / 1 页</translation>
-    </message>
     <message id="plugin_installed">
         <translation>已安装</translation>
     </message>
@@ -627,17 +543,11 @@
     <message id="plugin_load_failed_fmt">
         <translation>加载插件市场失败: %1</translation>
     </message>
-    <message id="plugin_auto_installing">
-        <translation>未检测到插件市场，正在自动安装...</translation>
-    </message>
-    <message id="plugin_installing_fmt">
-        <translation>正在安装插件市场: %1</translation>
-    </message>
     <message id="plugin_install_failed">
-        <translation>插件市场安装失败，请检查网络或稍后重试</translation>
+        <translation>插件市场安装失败，详见下方输出</translation>
     </message>
     <message id="plugin_install_done_restarting">
-        <translation>插件市场安装完成，正在重启服务...</translation>
+        <translation>插件市场已安装，正在重启服务端…</translation>
     </message>
     <message id="plugin_action_submitted">
         <translation>操作已提交，正在刷新...</translation>
@@ -656,9 +566,6 @@
     </message>
     <message id="plugin_uninstall_action">
         <translation>卸载</translation>
-    </message>
-    <message id="popup_title">
-        <translation>弹窗</translation>
     </message>
     <message id="common_close">
         <translation>关闭</translation>
@@ -738,26 +645,8 @@
     <message id="sidebar_ungrouped">
         <translation>未分组</translation>
     </message>
-    <message id="titlebar_minimize">
-        <translation>最小化</translation>
-    </message>
-    <message id="titlebar_maximize">
-        <translation>最大化</translation>
-    </message>
-    <message id="titlebar_restore">
-        <translation>还原</translation>
-    </message>
-    <message id="toolfilter_group_state_collapsed">
-        <translation>已折叠</translation>
-    </message>
-    <message id="toolfilter_group_state_visible">
-        <translation>可见</translation>
-    </message>
     <message id="toolfilter_group_toggle_tip">
         <translation>勾选会使对应目录被折叠（模型不可见），调用gettools可针对性展开</translation>
-    </message>
-    <message id="toolfilter_dir_empty">
-        <translation>这个目录下没有工具</translation>
     </message>
     <message id="toolfilter_params_label">
         <translation>参数：</translation>
@@ -770,9 +659,6 @@
     </message>
     <message id="toolfilter_group_hidden_suffix">
         <translation> · 配置里整组隐藏</translation>
-    </message>
-    <message id="toolfilter_dir_toggle_tip">
-        <translation>点击展开或收起这个目录下的工具</translation>
     </message>
     <message id="toolfilter_title">
         <translation>工具过滤</translation>
@@ -789,23 +675,142 @@
     <message id="toolfilter_loading">
         <translation>正在读取该会话的工具目录…</translation>
     </message>
-    <message id="toolfilter_load_failed">
-        <translation>读取工具目录失败</translation>
-    </message>
     <message id="toolfilter_no_filterable_tools">
         <translation>该会话没有可过滤的工具</translation>
     </message>
     <message id="toolfilter_saving">
         <translation>正在保存…</translation>
     </message>
-    <message id="toolfilter_save_failed">
-        <translation>保存失败</translation>
-    </message>
     <message id="toolfilter_summary_full_fmt">
         <translation>共 %1 个工具（%2 个目录），已隐藏 %3 个 </translation>
     </message>
     <message id="toolfilter_global_layer_only_suffix">
         <translation> · 服务端只答出了全局层，目录可能不完整</translation>
+    </message>
+    <message id="placeholder_session_current">
+        <translation>当前会话</translation>
+    </message>
+    <message id="placeholder_session_none">
+        <translation>还没有选中会话</translation>
+    </message>
+    <message id="placeholder_session_hint">
+        <translation>在左侧列表里选一个，或点 ＋ 新建</translation>
+    </message>
+    <message id="placeholder_milestone_fmt">
+        <translation>消息列表与输入区在 M4–M5 迁入。服务端状态：%1</translation>
+    </message>
+    <message id="right_sidebar_title">
+        <translation>面板</translation>
+    </message>
+    <message id="right_sidebar_empty_hint">
+        <translation>还没有接入内容
+终端 / 文件 / 预览将挂在这里</translation>
+    </message>
+    <message id="sidebar_no_sessions">
+        <translation>还没有会话
+点右上角 ＋ 新建</translation>
+    </message>
+    <message id="workdir_delete_label">
+        <translation>删除工作区</translation>
+    </message>
+    <message id="workdir_delete_confirm">
+        <translation>确定要删除这个工作区吗？只会把它从工作区列表移除，不删除它下面的会话。</translation>
+    </message>
+    <message id="chat_thinking_title">
+        <translation>思考过程</translation>
+    </message>
+    <message id="chat_streaming_meta">
+        <translation>进行中…</translation>
+    </message>
+    <message id="workdir_new_session_tip">
+        <translation>在此工作区新建会话</translation>
+    </message>
+    <message id="common_clear">
+        <translation>清空</translation>
+    </message>
+    <message id="topbar_right_sidebar_tip">
+        <translation>右侧栏</translation>
+    </message>
+    <message id="chat_session_busy_restarting">
+        <translation>该会话仍被上一个已退出的进程占用，正在重启服务端并重发…</translation>
+    </message>
+    <message id="chat_session_busy_status">
+        <translation>会话被占用，正在重启服务端…</translation>
+    </message>
+    <message id="chat_command_failed_fmt">
+        <translation>命令失败：%1</translation>
+    </message>
+    <message id="server_start_failed_fmt">
+        <translation>内置服务端未能启动（退出码 %1）。发行版需要把 resources/server 部署到 exe 同目录。</translation>
+    </message>
+    <message id="server_starting">
+        <translation>正在启动内置服务端…</translation>
+    </message>
+    <message id="session_list_load_failed_fmt">
+        <translation>会话列表加载失败：%1</translation>
+    </message>
+    <message id="workdir_delete_failed_fmt">
+        <translation>删除工作区失败: %1 %2</translation>
+    </message>
+    <message id="ext_abi_mismatch_hint">
+        <translation>扩展声明的 ABIVersion 与本宿主不一致 —— 只装了 DLL，QML 部分未装载</translation>
+    </message>
+    <message id="ext_installed_restart_hint">
+        <translation>工具扩展已装好 —— 重启内置服务端后才会加载</translation>
+    </message>
+    <message id="ext_removed_client_hint">
+        <translation>客户端扩展已移除 —— 重启 ULin Hub 后彻底卸载</translation>
+    </message>
+    <message id="ext_removed_tool_hint">
+        <translation>工具扩展已移除 —— 重启内置服务端后彻底生效</translation>
+    </message>
+    <message id="ext_residue_cleaned_restart_hint">
+        <translation>已清理残留条目 —— 重启内置服务端后生效</translation>
+    </message>
+    <message id="plugin_installing_market">
+        <translation>正在安装插件市场（pnpm add dshmarket）…</translation>
+    </message>
+    <message id="session_none_click_new">
+        <translation>还没有会话，点左上角 + 新建一个。</translation>
+    </message>
+    <message id="server_not_ready_yet">
+        <translation>服务端还没就绪</translation>
+    </message>
+    <message id="settings_provider_namespace_missing_fmt">
+        <translation>找不到提供方 %1 的设置命名空间。</translation>
+    </message>
+    <message id="model_provider_none_reported">
+        <translation>服务端没有报告可配置的模型提供方。</translation>
+    </message>
+    <message id="settings_read_failed_fmt">
+        <translation>读取设置失败：%1 %2</translation>
+    </message>
+    <message id="model_api_key_required">
+        <translation>请先填入 API key。</translation>
+    </message>
+    <message id="model_credential_written_fmt">
+        <translation>已写入凭据 %1。可以点「发现模型」拉取可用模型。</translation>
+    </message>
+    <message id="model_api_key_write_failed_fmt">
+        <translation>写入凭据失败：%1 %2</translation>
+    </message>
+    <message id="model_fetch_none_found">
+        <translation>没有发现可用模型（key 是否正确？）</translation>
+    </message>
+    <message id="model_fetch_found_fmt">
+        <translation>发现 %1 个候选模型，点「添加」写入配置。</translation>
+    </message>
+    <message id="style_pack_unreadable">
+        <translation>pack.json 打不开</translation>
+    </message>
+    <message id="style_pack_invalid_json">
+        <translation>pack.json 不是合法 JSON</translation>
+    </message>
+    <message id="style_pack_abi_mismatch_fmt">
+        <translation>风格包 uiAbi=%1，本版本需要 %2</translation>
+    </message>
+    <message id="command_unknown_fmt">
+        <translation>不认识的命令：/%1</translation>
     </message>
 </context>
 </TS>

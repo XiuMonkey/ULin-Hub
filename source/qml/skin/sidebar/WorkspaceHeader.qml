@@ -64,7 +64,7 @@ Item {
         boxSize: 22
         glyphSize: Theme.font.title
         glyph: "＋"
-        tooltip: "在此工作区新建会话"
+        tooltip: qsTrId("workdir_new_session_tip")
         onClicked: root.addSessionRequested()
     }
 

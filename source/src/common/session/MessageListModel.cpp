@@ -91,7 +91,7 @@ void MessageListModel::appendToolResult(int row, const QString& text)
 			if (segment.text.contains(QLatin1String("\n\n--- 结果 ---\n")))
 				segment.text += QLatin1Char('\n') + text;   // 同一调用多段结果就继续接
 			else
-				segment.text += QStringLiteral("\n\n--- 结果 ---\n") + text;
+				segment.text += QStringLiteral("\n\n--- 结果 ---\n") + text;   // 数据分隔符、不是界面文案：故意不进 ID-based 翻译（改了接不上旧历史里已存的同一标记）
 			segment.partsReady = false;  // text 变了 ⇒ 缓存的 markdown 切分作废（见 Segment::parts）
 			touchRow(row);
 			return;

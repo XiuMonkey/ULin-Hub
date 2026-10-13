@@ -44,7 +44,7 @@ Item {
         anchors.rightMargin: Theme.spacing.buttonGap
         anchors.verticalCenter: parent.verticalCenter
         glyph: "◫"
-        tooltip: "右侧栏"      // TODO(i18n)：新文案 id 还没进 .ts，先留字面量
+        tooltip: qsTrId("topbar_right_sidebar_tip")
         selected: Hub.rightSidebarOpen
         onClicked: topBar.rightSidebarRequested()
     }

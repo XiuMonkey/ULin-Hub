@@ -15,7 +15,9 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: Hub.currentSessionId.length > 0 ? "当前会话" : "还没有选中会话"
+            text: Hub.currentSessionId.length > 0
+                ? qsTrId("placeholder_session_current")
+                : qsTrId("placeholder_session_none")
             color: Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.lead
@@ -26,7 +28,9 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: Hub.currentSessionId.length > 0 ? Hub.currentSessionId : "在左侧列表里选一个，或点 ＋ 新建"
+            text: Hub.currentSessionId.length > 0
+                ? Hub.currentSessionId
+                : qsTrId("placeholder_session_hint")
             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
             color: Theme.color.textSecondary
             font.family: "Consolas"
@@ -37,7 +41,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: "消息列表与输入区在 M4–M5 迁入。服务端状态：" + Hub.serverState
+            text: qsTrId("placeholder_milestone_fmt").arg(Hub.serverState)
             wrapMode: Text.WordWrap
             color: Theme.color.textCaption
             font.family: "Microsoft YaHei UI"

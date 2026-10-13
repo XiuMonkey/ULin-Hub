@@ -8,9 +8,7 @@ import ULinHub 1.0
 TextField {
     id: root
 
-    // TODO(M6)：文案要进 ID-based 翻译（.ts 里还没有 clear 相关的 id，先写字面量，
-    // 免得凭空造 qsTrId 破坏 tools\release-translations.ps1 -CheckOnly 的 key 一致性校验）
-    property string clearTooltip: "清空"
+    property string clearTooltip: qsTrId("common_clear")
 
     color: Theme.color.textPrimary
     placeholderTextColor: Theme.color.textCaption

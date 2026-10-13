@@ -113,7 +113,7 @@ void QmlBridge::wireRuntime()
 			m_sessions->setSelectedSession(keep);
 
 		if (m_sessions->rowCount() == 0)
-			m_runtime->setStatus(QStringLiteral("还没有会话，点左上角 + 新建一个。"));
+			m_runtime->setStatus(qtTrId("session_none_click_new"));
 	});
 
 	// 会话被归档：删的正是当前会话就清空消息区、回到占位页（目录由 runtime 更新，这里只管界面状态）
@@ -233,8 +233,7 @@ QString QmlBridge::currentSessionTitle() const
 		return QString();
 
 	const QString title = m_sessions->catalog()->titleFor(m_currentSessionId);
-	// TODO(M6)：同 createSession 的翻译说明
-	return title.isEmpty() ? QStringLiteral("未命名会话") : title;
+	return title.isEmpty() ? qtTrId("session_untitled") : title;
 }
 
 // ------------------------------------------------------------------
@@ -384,7 +383,7 @@ void QmlBridge::openModelSettings()
 {
 	DshApiClient* api = m_runtime ? m_runtime->apiClient() : nullptr;
 	if (!api) {
-		if (m_runtime && m_runtime->setStatus(QStringLiteral("服务端还没就绪")))
+		if (m_runtime && m_runtime->setStatus(qtTrId("server_not_ready_yet")))
 			emit statusTextChanged();
 		return;
 	}

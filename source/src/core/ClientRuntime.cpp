@@ -51,7 +51,7 @@ void ClientRuntime::start()
 	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流（与旧壳 ULinHub::installServer 同一条路）
 	connect(m_server, &ServerManager::baseUrlReady, this, [this](const QUrl& url) {
 		TimingLogger::mark(QStringLiteral("qml shell: server baseUrl ready"));
-		setStatus(QStringLiteral("已连上服务端，正在加载会话…"));
+		setStatus(qtTrId("session_loading"));
 		setServerState(QStringLiteral("running"));
 		m_api->setBaseUrl(url);
 		m_api->openStreams();
@@ -66,7 +66,7 @@ void ClientRuntime::start()
 			return;
 		if (m_api && !m_api->isConnected()) {
 			setServerState(QStringLiteral("failed"));  // 服务端起不来：如实报状态，别让界面一直转圈
-			setStatus(QStringLiteral("内置服务端未能启动（退出码 %1）。发行版需要把 resources/server 部署到 exe 同目录。").arg(exitCode));
+			setStatus(qtTrId("server_start_failed_fmt").arg(exitCode));
 			setInitializing(false);
 		}
 		});
@@ -122,7 +122,7 @@ void ClientRuntime::start()
 		emit catalogChanged();
 	});
 
-	setStatus(QStringLiteral("正在启动内置服务端…"));
+	setStatus(qtTrId("server_starting"));
 	setServerState(QStringLiteral("starting"));
 	m_server->start();
 }
@@ -183,7 +183,7 @@ void ClientRuntime::refreshSessions()
 			emit sessionsRefreshed(autoSelectSessionId);
 		},
 		[this](const DshApiClient::RpcError& error) {
-			const QString text = QStringLiteral("会话列表加载失败：%1").arg(error.message);
+			const QString text = qtTrId("session_list_load_failed_fmt").arg(error.message);
 			if (setStatus(text))
 				emit operationFailed(text);
 		});
@@ -225,15 +225,14 @@ void ClientRuntime::createSessionIn(const QString& workspaceId)
 {
 	SessionService::createSession(m_api, workspaceId,
 		[this, workspaceId](const QString& sessionId) {
-			// TODO(M6)：标题要进 ID-based 翻译（.ts 里有 session_untitled，但 QML 侧还没接翻译通道）。
 			// ⚠️ 归属必须带上：addSession 的 workspaceId 为空时侧栏就把这条挂到"未分组"下面
 			//    （见 SessionListModel::rebuild 的分桶），而服务端其实已经把它挂到 workspaceId 了。
-			m_catalog.addSession(sessionId, QStringLiteral("未命名会话"), workspaceId);
+			m_catalog.addSession(sessionId, qtTrId("session_untitled"), workspaceId);
 			emit catalogChanged();
 			emit sessionsRefreshed(sessionId);   // 建完直接选中它（宿主按这个建议切会话）
 		},
 		[this](const DshApiClient::RpcError& error) {
-			const QString text = QStringLiteral("新建会话失败：%1").arg(error.message);
+			const QString text = qtTrId("session_new_failed_fmt").arg(error.code, error.message);
 			if (setStatus(text))
 				emit operationFailed(text);
 			// 只有"服务端没连上"的遮罩会画 statusText，初始化完成后它看不见 —— 失败必须走 Toast，
@@ -389,8 +388,7 @@ void ClientRuntime::deleteWorkspace(const QString& workspaceId)
 			refreshSessions();
 		},
 		[this](const DshApiClient::RpcError& error) {
-			// 没有专门的"删除工作区失败" id，先用通用状态行文案（TODO(M6)：等 .ts 补 id）
-			const QString text = QStringLiteral("删除工作区失败: %1 %2").arg(error.code, error.message);
+			const QString text = qtTrId("workdir_delete_failed_fmt").arg(error.code, error.message);
 			if (setStatus(text))
 				emit operationFailed(text);
 		});

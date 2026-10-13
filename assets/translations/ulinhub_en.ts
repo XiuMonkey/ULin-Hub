@@ -9,17 +9,8 @@
     <message id="chat_tool_result_label">
         <translation>Tool result</translation>
     </message>
-    <message id="chat_tool_label">
-        <translation>Tool</translation>
-    </message>
-    <message id="chat_thought_header_fmt">
-        <translation>%2 Thought: %3</translation>
-    </message>
     <message id="common_copy">
         <translation>Copy</translation>
-    </message>
-    <message id="chat_history_timeout">
-        <translation>Timed out waiting for the session event stream; history is temporarily unavailable</translation>
     </message>
     <message id="ext_delete_dir_failed_fmt">
         <translation>Could not delete the extension directory: %1</translation>
@@ -78,35 +69,17 @@
     <message id="toolfilter_plugin_unavailable">
         <translation>The tools-filter plugin is not installed or not enabled (/api/tools-filter is not served by this plugin)</translation>
     </message>
-    <message id="toolfilter_session_not_persisted">
-        <translation>This session has not been persisted yet, so the filter configuration cannot be saved</translation>
-    </message>
     <message id="toolfilter_save_failed_http_fmt">
         <translation>Save failed (HTTP %1)</translation>
     </message>
     <message id="toolfilter_save_failed_reason_fmt">
         <translation>Save failed (%1)</translation>
     </message>
-    <message id="server_status_fmt">
-        <translation>DSH server: %1</translation>
-    </message>
-    <message id="server_exited_fmt">
-        <translation>The DSH server exited with code %1</translation>
-    </message>
-    <message id="common_default_suffix">
-        <translation>(default)</translation>
-    </message>
-    <message id="workdir_choose_dir_title">
-        <translation>Choose a directory to add to the workspace</translation>
-    </message>
     <message id="workdir_create_failed_fmt">
         <translation>Could not create the workspace: %1 %2</translation>
     </message>
     <message id="session_new_failed_fmt">
         <translation>Could not create a new session: %1 %2</translation>
-    </message>
-    <message id="session_create_failed_fmt">
-        <translation>Could not create the session: %1 %2</translation>
     </message>
     <message id="session_delete_label">
         <translation>Delete session</translation>
@@ -117,32 +90,14 @@
     <message id="session_delete_failed_fmt">
         <translation>Could not delete the session: %1 %2</translation>
     </message>
-    <message id="ask_panel_create_failed">
-        <translation>Received a question request, but could not create the inline panel.</translation>
-    </message>
-    <message id="ask_approval_panel_create_failed">
-        <translation>Received an approval request, but could not create the inline panel.</translation>
-    </message>
-    <message id="chat_transport_error_fmt">
-        <translation>Transport error [%1]: %2</translation>
-    </message>
     <message id="common_load_more">
         <translation>Load more</translation>
     </message>
-    <message id="common_no_more_items">
-        <translation>That's it, no more items</translation>
-    </message>
     <message id="session_loading">
-        <translation>Loading session...</translation>
-    </message>
-    <message id="chat_abort_failed_fmt">
-        <translation>Abort failed: %1 %2</translation>
+        <translation>Connected to the server; loading sessions...</translation>
     </message>
     <message id="chat_send_failed_fmt">
         <translation>Send failed: %1 %2</translation>
-    </message>
-    <message id="session_auto_creating">
-        <translation>No session is available; creating one automatically...</translation>
     </message>
     <message id="chat_no_model_hint">
         <translation>No model is configured yet. Add a model in Settings before sending.</translation>
@@ -327,9 +282,6 @@
         <comment>原文是英中混排（英文前缀 + 中文提示），key 化时合并成一条，否则译文里只剩半句。</comment>
         <translation>Could not copy the client extension file: %1 (if the extension is running, its DLL is held by this process; restart the client and install again)</translation>
     </message>
-    <message id="app_initializing">
-        <translation>ULin Hub is starting...</translation>
-    </message>
     <message id="model_source_custom">
         <translation>Customized</translation>
     </message>
@@ -359,9 +311,6 @@
     </message>
     <message id="model_think_not_offered">
         <translation>Declared as not offered</translation>
-    </message>
-    <message id="model_default_value_fmt">
-        <translation>(default %1)</translation>
     </message>
     <message id="model_think_undeclared_fmt">
         <translation>This model does not publish it (the UI offers generic levels: %1)</translation>
@@ -402,9 +351,6 @@
     <message id="model_loading_catalog">
         <translation>Reading the server model catalog...</translation>
     </message>
-    <message id="model_catalog_load_failed_fmt">
-        <translation>Could not read the model catalog: %1 %2</translation>
-    </message>
     <message id="model_catalog_empty">
         <translation>The server published no models. Use "Add model" below to write one into settings.</translation>
     </message>
@@ -432,17 +378,8 @@
     <message id="model_fetch_hint">
         <translation>Ask the server which models this route advertises, then pick one from the dropdown</translation>
     </message>
-    <message id="model_fetch_running">
-        <translation>Fetching models...</translation>
-    </message>
-    <message id="model_fetch_empty">
-        <translation>This route advertises no models; enter the model ID by hand.</translation>
-    </message>
     <message id="model_fetch_failed_fmt">
         <translation>Could not fetch models: %1 %2</translation>
-    </message>
-    <message id="model_fetch_unsupported">
-        <translation>This route offers no automatic model lookup; enter the model ID by hand.</translation>
     </message>
     <message id="model_discovery_missing_namespace">
         <translation>No provider namespace, so models cannot be fetched</translation>
@@ -476,9 +413,6 @@
     </message>
     <message id="model_delete_readonly">
         <translation>Server settings are read-only; models cannot be deleted.</translation>
-    </message>
-    <message id="model_settings_path_missing_fmt">
-        <translation>Could not locate the settings path for %1; nothing was deleted.</translation>
     </message>
     <message id="model_deleted_fmt">
         <translation>Deleted model %1.</translation>
@@ -537,9 +471,6 @@
     <message id="model_select_provider_first">
         <translation>Select a provider route first.</translation>
     </message>
-    <message id="model_write_namespace_missing_fmt">
-        <translation>Could not find the settings namespace %1; nothing can be written.</translation>
-    </message>
     <message id="model_id_required">
         <translation>Model ID cannot be empty.</translation>
     </message>
@@ -567,23 +498,11 @@
     <message id="model_add_failed_fmt">
         <translation>Add failed: %1 %2</translation>
     </message>
-    <message id="common_accessible_pair_fmt">
-        <translation>%1: %2</translation>
-    </message>
     <message id="model_label">
         <translation>Model</translation>
     </message>
     <message id="model_think_depth">
         <translation>Thinking depth</translation>
-    </message>
-    <message id="model_select_title">
-        <translation>Select model and thinking depth</translation>
-    </message>
-    <message id="model_name_fmt">
-        <translation>Model %1</translation>
-    </message>
-    <message id="model_name_think_fmt">
-        <translation>Model %1, thinking depth %2</translation>
     </message>
     <message id="model_none_published">
         <translation>The server published no models</translation>
@@ -606,9 +525,6 @@
     <message id="common_next_page">
         <translation>Next</translation>
     </message>
-    <message id="plugin_page_initial">
-        <translation>Page 1 / 1</translation>
-    </message>
     <message id="plugin_installed">
         <translation>Installed</translation>
     </message>
@@ -627,14 +543,8 @@
     <message id="plugin_load_failed_fmt">
         <translation>Could not load the plugin marketplace: %1</translation>
     </message>
-    <message id="plugin_auto_installing">
-        <translation>No plugin marketplace detected; installing automatically...</translation>
-    </message>
-    <message id="plugin_installing_fmt">
-        <translation>Installing the plugin marketplace: %1</translation>
-    </message>
     <message id="plugin_install_failed">
-        <translation>Plugin marketplace installation failed; check your network or try again later</translation>
+        <translation>Plugin marketplace installation failed; see the output below</translation>
     </message>
     <message id="plugin_install_done_restarting">
         <translation>Plugin marketplace installed; restarting the server...</translation>
@@ -656,9 +566,6 @@
     </message>
     <message id="plugin_uninstall_action">
         <translation>Uninstall</translation>
-    </message>
-    <message id="popup_title">
-        <translation>Popup</translation>
     </message>
     <message id="common_close">
         <translation>Close</translation>
@@ -738,26 +645,8 @@
     <message id="sidebar_ungrouped">
         <translation>Ungrouped</translation>
     </message>
-    <message id="titlebar_minimize">
-        <translation>Minimize</translation>
-    </message>
-    <message id="titlebar_maximize">
-        <translation>Maximize</translation>
-    </message>
-    <message id="titlebar_restore">
-        <translation>Restore</translation>
-    </message>
-    <message id="toolfilter_group_state_collapsed">
-        <translation>Collapsed: hidden from the model as a whole group</translation>
-    </message>
-    <message id="toolfilter_group_state_visible">
-        <translation>Visible: each tool follows its own checkbox</translation>
-    </message>
     <message id="toolfilter_group_toggle_tip">
         <translation>Checked = this whole directory is hidden from the model (IsExpanded = False for it in the config; the per-tool checkboxes below stop having any effect). Unchecked = the directory is visible and each tool row follows its own checkbox.</translation>
-    </message>
-    <message id="toolfilter_dir_empty">
-        <translation>No tools in this directory</translation>
     </message>
     <message id="toolfilter_params_label">
         <translation>Parameters:</translation>
@@ -770,9 +659,6 @@
     </message>
     <message id="toolfilter_group_hidden_suffix">
         <translation> · whole group hidden in config</translation>
-    </message>
-    <message id="toolfilter_dir_toggle_tip">
-        <translation>Click to expand or collapse the tools in this directory (display only; does not affect which tools are sent to the model)</translation>
     </message>
     <message id="toolfilter_title">
         <translation>Tool filter</translation>
@@ -789,23 +675,142 @@
     <message id="toolfilter_loading">
         <translation>Reading this session's tool catalog...</translation>
     </message>
-    <message id="toolfilter_load_failed">
-        <translation>Could not read the tool catalog</translation>
-    </message>
     <message id="toolfilter_no_filterable_tools">
         <translation>This session has no filterable tools</translation>
     </message>
     <message id="toolfilter_saving">
         <translation>Saving...</translation>
     </message>
-    <message id="toolfilter_save_failed">
-        <translation>Save failed</translation>
-    </message>
     <message id="toolfilter_summary_full_fmt">
         <translation>%1 tools in %2 directories, %3 hidden (hiding only affects the prompt)</translation>
     </message>
     <message id="toolfilter_global_layer_only_suffix">
         <translation> · the server returned only the global layer, so the catalog may be incomplete</translation>
+    </message>
+    <message id="placeholder_session_current">
+        <translation>Current session</translation>
+    </message>
+    <message id="placeholder_session_none">
+        <translation>No session selected</translation>
+    </message>
+    <message id="placeholder_session_hint">
+        <translation>Pick one from the list on the left, or click ＋ to create one</translation>
+    </message>
+    <message id="placeholder_milestone_fmt">
+        <translation>The message list and composer arrive in M4–M5. Server state: %1</translation>
+    </message>
+    <message id="right_sidebar_title">
+        <translation>Panel</translation>
+    </message>
+    <message id="right_sidebar_empty_hint">
+        <translation>Nothing mounted yet
+Terminal / Files / Preview will dock here</translation>
+    </message>
+    <message id="sidebar_no_sessions">
+        <translation>No sessions yet
+Click ＋ at the top right to create one</translation>
+    </message>
+    <message id="workdir_delete_label">
+        <translation>Delete workspace</translation>
+    </message>
+    <message id="workdir_delete_confirm">
+        <translation>Delete this workspace? It is only removed from the workspace list; its sessions are kept.</translation>
+    </message>
+    <message id="chat_thinking_title">
+        <translation>Thinking</translation>
+    </message>
+    <message id="chat_streaming_meta">
+        <translation>In progress...</translation>
+    </message>
+    <message id="workdir_new_session_tip">
+        <translation>New session in this workspace</translation>
+    </message>
+    <message id="common_clear">
+        <translation>Clear</translation>
+    </message>
+    <message id="topbar_right_sidebar_tip">
+        <translation>Right sidebar</translation>
+    </message>
+    <message id="chat_session_busy_restarting">
+        <translation>This session is still held by a previous process that has exited; restarting the server and resending...</translation>
+    </message>
+    <message id="chat_session_busy_status">
+        <translation>The session is busy; restarting the server...</translation>
+    </message>
+    <message id="chat_command_failed_fmt">
+        <translation>Command failed: %1</translation>
+    </message>
+    <message id="server_start_failed_fmt">
+        <translation>The built-in server failed to start (exit code %1). A release build must deploy resources/server next to the exe.</translation>
+    </message>
+    <message id="server_starting">
+        <translation>Starting the built-in server...</translation>
+    </message>
+    <message id="session_list_load_failed_fmt">
+        <translation>Could not load the session list: %1</translation>
+    </message>
+    <message id="workdir_delete_failed_fmt">
+        <translation>Could not delete the workspace: %1 %2</translation>
+    </message>
+    <message id="ext_abi_mismatch_hint">
+        <translation>The extension declares an ABIVersion that does not match this host — only the DLL was installed; its QML part was not loaded</translation>
+    </message>
+    <message id="ext_installed_restart_hint">
+        <translation>The tool extension is installed — it loads after the built-in server restarts</translation>
+    </message>
+    <message id="ext_removed_client_hint">
+        <translation>The client extension was removed — restart ULin Hub to finish uninstalling it</translation>
+    </message>
+    <message id="ext_removed_tool_hint">
+        <translation>The tool extension was removed — restart the built-in server for it to take effect</translation>
+    </message>
+    <message id="ext_residue_cleaned_restart_hint">
+        <translation>Leftover entries cleaned up — restart the built-in server for it to take effect</translation>
+    </message>
+    <message id="plugin_installing_market">
+        <translation>Installing the plugin marketplace (pnpm add dshmarket)...</translation>
+    </message>
+    <message id="session_none_click_new">
+        <translation>No session yet — click + at the top left to create one.</translation>
+    </message>
+    <message id="server_not_ready_yet">
+        <translation>The server is not ready yet</translation>
+    </message>
+    <message id="settings_provider_namespace_missing_fmt">
+        <translation>Could not find the settings namespace for provider %1.</translation>
+    </message>
+    <message id="model_provider_none_reported">
+        <translation>The server reported no configurable model provider.</translation>
+    </message>
+    <message id="settings_read_failed_fmt">
+        <translation>Could not read settings: %1 %2</translation>
+    </message>
+    <message id="model_api_key_required">
+        <translation>Enter an API key first.</translation>
+    </message>
+    <message id="model_credential_written_fmt">
+        <translation>Credential %1 written. You can now click "Fetch models" to list the available models.</translation>
+    </message>
+    <message id="model_api_key_write_failed_fmt">
+        <translation>Could not write the credential: %1 %2</translation>
+    </message>
+    <message id="model_fetch_none_found">
+        <translation>No model found (is the API key correct?)</translation>
+    </message>
+    <message id="model_fetch_found_fmt">
+        <translation>Found %1 candidate model(s); click "Add" to write one into the config.</translation>
+    </message>
+    <message id="style_pack_unreadable">
+        <translation>Could not open pack.json</translation>
+    </message>
+    <message id="style_pack_invalid_json">
+        <translation>pack.json is not valid JSON</translation>
+    </message>
+    <message id="style_pack_abi_mismatch_fmt">
+        <translation>Style pack uiAbi=%1, but this build requires %2</translation>
+    </message>
+    <message id="command_unknown_fmt">
+        <translation>Unknown command: /%1</translation>
     </message>
 </context>
 </TS>

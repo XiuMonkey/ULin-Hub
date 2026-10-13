@@ -68,7 +68,7 @@ void SessionListModel::rebuild()
 		Row header;
 		header.kind = QLatin1String(kWorkspaceKind);
 		header.workspaceId = key;
-		header.workspaceTitle = QStringLiteral("未分组");  // TODO(M6)：标题要进 ID-based 翻译（.ts 里没有对应 id，先写字面量）
+		header.workspaceTitle = qtTrId("sidebar_ungrouped");
 		header.sessionCount = ungrouped.size();
 		header.expanded = !m_collapsed.contains(key);
 		m_rows.append(header);
