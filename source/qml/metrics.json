@@ -48,6 +48,8 @@
   },
   "size": {
     "sidebarWidth": 240,
+    "rightSidebarWidth": 300,
+    "rightSidebarMinWidth": 260,
     "titleBarHeight": 42,
     "titleBarPadLeft": 14,
     "windowButtonWidth": 46,

@@ -85,6 +85,9 @@ class QmlBridge : public QObject
 	// 用 Hub.toolsFilterOpen 决定面板是否装载；面板里的关闭走 closeToolsFilter()。
 	Q_PROPERTY(ToolsFilter* toolsFilter READ toolsFilter CONSTANT)
 	Q_PROPERTY(bool toolsFilterOpen READ toolsFilterOpen NOTIFY toolsFilterOpenChanged)
+	// 右侧栏（面板坞）开合：纯界面状态，QML 用它决定面板是否装载 / 压窄多少；
+	// 顶栏那颗 ◫ 走 toggleRightSidebar()，面板自己的 ✕ 走 closeRightSidebar()。
+	Q_PROPERTY(bool rightSidebarOpen READ rightSidebarOpen NOTIFY rightSidebarOpenChanged)
 
 public:
 	static QmlBridge& instance();  // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
@@ -153,9 +156,14 @@ public:
 	// ---- 工具过滤器（面板开关在桥里，数据全在 ToolsFilter）----
 	ToolsFilter* toolsFilter() const { return m_toolsFilter; }
 	bool toolsFilterOpen() const { return m_toolsFilterOpen; }
+	bool rightSidebarOpen() const { return m_rightSidebarOpen; }
 	// 顶栏 ☰：开着就收起，否则打开并拉一次该会话的工具目录
 	Q_INVOKABLE void openToolsFilter();
 	Q_INVOKABLE void closeToolsFilter();
+	// 右侧栏：顶栏当开关用（toggle），面板自己的 ✕ 直接 close
+	Q_INVOKABLE void toggleRightSidebar();
+	Q_INVOKABLE void openRightSidebar();
+	Q_INVOKABLE void closeRightSidebar();
 	// 旧壳是 app 内设置窗口（Settings(m_api)）；QML 侧等 M6 再做等价页面，这条通路先解决"配不了模型"
 	Q_INVOKABLE void openModelSettings();
 	// QML 侧诊断出口：console.log 不落盘，诊断信息统一从这里走项目 Logger（qInfo → logs/general/info.log）
@@ -173,6 +181,8 @@ signals:
 	void modelCatalogChanged();
 	void themeSwitchingChanged();
 	void toolsFilterOpenChanged();
+	// 右侧栏开合（顶栏 ◫ / 面板 ✕）
+	void rightSidebarOpenChanged();
 	void interactionChanged();
 	void olderChanged();
 	void olderPrepended();
@@ -198,4 +208,5 @@ private:
 	CommandController* m_commands = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	bool m_toolsFilterOpen = false;   // 纯界面状态：工具过滤面板是否打开
+	bool m_rightSidebarOpen = false;  // 纯界面状态：右侧栏是否展开（不落盘，暂不跨会话记忆）
 };

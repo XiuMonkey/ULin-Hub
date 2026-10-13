@@ -23,6 +23,52 @@ Item {
         toast.show(text)
     }
 
+    // ---- 右侧栏：宽度可拖（拖左边缘），压窄量 = 宽度 + 间距 ----
+    // 这是本文件里唯一被动画驱动的量：它一变，顶栏卡片与会话卡片**同时**变窄，
+    // 消息列表也跟着重新换行 —— 也就是"顶栏和聊天区被压缩"的那段动态。
+    // 宽度归壳层所有（面板只管画卡片）：拖柄改的是 rightSidebarW，默认值来自 token。
+    // 正在拖：拖动期间必须**关掉**压窄动画，否则布局会追着光标慢慢爬
+    property bool resizing: false
+    readonly property real rightSidebarMinW: Theme.size.rightSidebarMinWidth
+    // 会话区保底宽度：**按窗口比例兜底**（取 token 与 25% 窗口宽里更小的那个）。
+    // 为什么不能死守 token 的 320：窗口不大时，固定 240 侧栏 + 320 之后留给右侧栏的额度
+    // 可能比默认宽度 360 还小 ⇒ 面板一开局就顶在上限、只能往右（变窄）拖，往左没反应。
+    readonly property real rightSidebarConvMin: Math.min(Theme.size.minConversationWidth, width * 0.25)
+    readonly property real rightSidebarMaxW: Math.max(rightSidebarMinW,
+        width - 2 * Theme.spacing.windowMargin - Theme.size.sidebarWidth - Theme.spacing.panelGap
+        - rightSidebarConvMin)
+    // 用户宽度（默认值也不能超过上限，否则同上）
+    property real rightSidebarW: Math.min(Theme.size.rightSidebarWidth, rightSidebarMaxW)
+    // 生效宽度：用户值先按上下限夹一次（窗口变小、或被拖到极端都不会越界）
+    readonly property real rightSidebarEffW: Math.max(rightSidebarMinW,
+        Math.min(rightSidebarW, rightSidebarMaxW))
+    readonly property real rightSidebarFull: rightSidebarEffW + Theme.spacing.panelGap
+    property real rightInset: Hub.rightSidebarOpen ? rightSidebarFull : 0
+    // 缓动取 OutCubic（不做过冲）：压窄是"腾地方"，回弹会让人以为界面抖了一下。
+    // ⚠️ 拖拽时 enabled=false：宽度是用户手指的位置，不能再去补间。
+    Behavior on rightInset {
+        enabled: !shell.resizing
+        NumberAnimation {
+            duration: Theme.motion.normal
+            easing.type: Easing.OutCubic
+        }
+    }
+    // 归一化进度（0 = 收起，1 = 完全展开）：面板的位移/淡入跟着它走
+    readonly property real rightSidebarT: rightSidebarFull > 0
+        ? Math.min(1, rightInset / rightSidebarFull) : 0
+
+    // 拖拽换算：按下时的光标窗口 x / 当时宽度 + 当前光标窗口 x ⇒ 新宽度。
+    // 抽成函数（拖柄只做事件转发）的理由和 Composer.handleKey 一样：算错方向/夹错范围时，
+    // 能在真机上用日志直接对着这组输入输出验，不必靠"拖一下看看"。
+    // 往左拖 ⇒ cursorX < pressX ⇒ 宽度变大。
+    function widthFromDrag(pressX, pressWidth, cursorX) {
+        return Math.max(rightSidebarMinW, Math.min(pressWidth - (cursorX - pressX), rightSidebarMaxW))
+    }
+    // 夹取入口（拖柄调它；QML 外部/扩展要设宽度也走它）
+    function setRightSidebarWidth(w) {
+        rightSidebarW = Math.max(rightSidebarMinW, Math.min(w, rightSidebarMaxW))
+    }
+
     // ---- 左侧：侧栏卡片 ----
     Card {
         id: sidebarCard
@@ -52,7 +98,8 @@ Item {
         anchors.left: sidebarCard.right
         anchors.leftMargin: Theme.spacing.panelGap
         anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing.windowMargin
+        // 右边距跟着右侧栏的展开量走 ⇒ 顶栏卡片与会话卡片一起被压窄（动画由 rightInset 的 Behavior 提供）
+        anchors.rightMargin: Theme.spacing.windowMargin + shell.rightInset
         anchors.top: parent.top
         anchors.topMargin: Theme.spacing.contentSideInset
         anchors.bottom: parent.bottom
@@ -72,6 +119,7 @@ Item {
                 id: topBar
                 anchors.fill: parent
                 onToolsFilterRequested: Hub.openToolsFilter()
+                onRightSidebarRequested: Hub.toggleRightSidebar()
             }
         }
 
@@ -134,6 +182,95 @@ Item {
                 anchors.fill: parent
                 visible: Hub.currentSessionId.length === 0
             }
+        }
+    }
+
+    // 右侧栏（面板坞）：顶栏 ◫ 开关。
+    // 从窗口右缘外滑进来 + 淡入，位置与透明度都跟 shell.rightSidebarT 走（同一条动画曲线，
+    // 所以"面板滑入"和"顶栏/会话区被压窄"是同一段动态，不会互相错拍）。
+    // 只改 x/opacity、不改 width：滑动期间面板内部不重排。
+    RightSidebar {
+        id: rightSidebar
+
+        visible: shell.rightSidebarT > 0.001
+        opacity: shell.rightSidebarT
+        width: shell.rightSidebarEffW
+        anchors.top: sidebarCard.top
+        anchors.bottom: sidebarCard.bottom
+        x: shell.width - Theme.spacing.windowMargin - width
+           + (1 - shell.rightSidebarT) * (width + Theme.spacing.windowMargin)
+        onCloseRequested: Hub.closeRightSidebar()
+    }
+
+    // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。
+    // 为什么放在 Shell 而不是面板里：宽度是壳层布局的一部分（压窄量 = 宽度 + 间距），
+    // 面板自己只管画卡片；拖柄改的是 shell.rightSidebarW。
+    //
+    // ⚠️ 两条踩过的坑（都在真机拖拽日志里实测到，症状都是"只能往右拖一点、往左没反应"）：
+    //   ① 可见性/可用性**绝对不能挂在 rightSidebarT 上**：宽度一变，rightSidebarFull 先更新、
+    //      rightInset 差一拍，T 会瞬时掉到 302/311≈0.97 ⇒ visible 抖成 false ⇒ MouseArea 抓取
+    //      被取消，后续 move 全丢（日志：[drag-ev] move … → [drag-ev] canceled）。
+    //      所以这里只认 Hub.rightSidebarOpen 这个稳定布尔量。
+    //   ② 拖动期间位置要**冻结**：拖柄跟着面板走 = 在光标底下位移，同样会打断抓取。
+    //      空闲时才贴面板左缘（frozenX 在按下那一刻算好）。
+    Item {
+        id: resizeHandle
+
+        anchors.top: rightSidebar.top
+        anchors.bottom: rightSidebar.bottom
+        width: 10
+        visible: Hub.rightSidebarOpen
+        enabled: visible
+        // 按下时冻结的那个 x（见 ②）
+        property real frozenX: 0
+        x: shell.resizing ? frozenX : rightSidebar.x - width / 2
+
+        // 灰边：⚠️ 画在**面板内侧**、上下各让开一个圆角半径 ——
+        // 贴左缘画满全高的话，两端会越过圆角弧线（被指出过）；颜色也只用灰色系（原来用蓝色被否了）。
+        // 拖动期间不画：拖柄是冻住的，画出来会停在旧位置误导人；此时"面板边自己在动"就是反馈。
+        Rectangle {
+            anchors.left: parent.left
+            anchors.leftMargin: parent.width / 2 + 1
+            width: 2
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.topMargin: Theme.radius.panel + 4
+            anchors.bottomMargin: Theme.radius.panel + 4
+            radius: 1
+            color: Theme.color.textTertiary
+            opacity: (shell.resizing || !resizeMouse.containsMouse) ? 0 : 0.55
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.motion.fast }
+            }
+        }
+
+        MouseArea {
+            id: resizeMouse
+
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.SplitHCursor
+
+            // 用**窗口坐标**记录按下点：拖柄自己会随宽度移动，用相对位移会自我参照
+            property real pressWindowX: 0
+            property real pressWidth: 0
+
+            onPressed: (mouse) => {
+                pressWindowX = resizeHandle.mapToItem(null, mouse.x, 0).x
+                pressWidth = shell.rightSidebarEffW
+                // 先冻结位置再置 resizing：顺序反了的话第一拍就会按"贴边"算一次 x
+                resizeHandle.frozenX = resizeHandle.x
+                shell.resizing = true
+            }
+            onPositionChanged: (mouse) => {
+                if (!pressed)
+                    return
+                // 换算全在 widthFromDrag 里（往左拖 = 变宽），这里只负责把光标位置喂进去
+                shell.setRightSidebarWidth(shell.widthFromDrag(
+                    pressWindowX, pressWidth, resizeHandle.mapToItem(null, mouse.x, 0).x))
+            }
+            onReleased: shell.resizing = false
+            onCanceled: shell.resizing = false
         }
     }
 

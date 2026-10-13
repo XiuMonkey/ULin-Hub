@@ -352,6 +352,34 @@ void QmlBridge::closeToolsFilter()
 	emit toolsFilterOpenChanged();
 }
 
+// ---- 右侧栏：纯界面开关（不涉及数据，也就不需要会话/服务端）----
+void QmlBridge::toggleRightSidebar()
+{
+	// 与 openToolsFilter 同理：**只允许被调一次**。顶栏那颗按钮只发信号，由 Shell 接到这里；
+	// 若哪天两处都调，表现就是"点了没反应"（开→立刻收），排查时先看这行日志出现几次。
+	if (m_rightSidebarOpen)
+		closeRightSidebar();
+	else
+		openRightSidebar();
+}
+
+void QmlBridge::openRightSidebar()
+{
+	if (m_rightSidebarOpen)
+		return;
+	qInfo().noquote() << "[Shell] openRightSidebar";
+	m_rightSidebarOpen = true;
+	emit rightSidebarOpenChanged();
+}
+
+void QmlBridge::closeRightSidebar()
+{
+	if (!m_rightSidebarOpen)
+		return;
+	m_rightSidebarOpen = false;
+	emit rightSidebarOpenChanged();
+}
+
 void QmlBridge::openModelSettings()
 {
 	DshApiClient* api = m_runtime ? m_runtime->apiClient() : nullptr;

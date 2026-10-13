@@ -15,6 +15,8 @@ Item {
     // ⚠️ 保留这个信号与 `qml.topbar.toolsFilter` 登记项：宿主侧栏/扩展里还有人用"请求打开工具过滤"
     //    这条通用入口（自己直接开面板就成了）；改名的代价大于收益。
     signal toolsFilterRequested()
+    // 右侧栏开合（面板本体在 basic/shell/RightSidebar.qml，由 Shell.qml 装载；这里只发"点了一下"）
+    signal rightSidebarRequested()
 
     implicitHeight: 44
 
@@ -24,7 +26,7 @@ Item {
         id: titleText
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.columnClearance
-        anchors.right: toolsButton.left
+        anchors.right: rightSidebarButton.left
         anchors.rightMargin: Theme.spacing.columnClearance
         anchors.verticalCenter: parent.verticalCenter
         text: Hub.currentSessionTitle.length > 0 ? Hub.currentSessionTitle : "ULin Hub"
@@ -33,6 +35,18 @@ Item {
         font.pixelSize: Theme.font.title
         font.weight: Theme.font.weightMedium
         elide: Text.ElideRight
+    }
+
+    // 右侧栏开关：开合状态直接读 Hub.rightSidebarOpen（面板开着时高亮，当开关的手感）
+    IconButton {
+        id: rightSidebarButton
+        anchors.right: toolsButton.left
+        anchors.rightMargin: Theme.spacing.buttonGap
+        anchors.verticalCenter: parent.verticalCenter
+        glyph: "◫"
+        tooltip: "右侧栏"      // TODO(i18n)：新文案 id 还没进 .ts，先留字面量
+        selected: Hub.rightSidebarOpen
+        onClicked: topBar.rightSidebarRequested()
     }
 
     IconButton {
