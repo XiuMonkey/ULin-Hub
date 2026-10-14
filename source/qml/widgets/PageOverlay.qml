@@ -90,9 +90,11 @@ Item {
 
     function beginExpand() {
         if (targetW <= 0 || targetH <= 0)
-            return;   // 页面还没装载：等 onLoaded 再起
+            return;   // 页面还没装载：等 onLoaded 再起（起点已在 onShownChanged 定好）
         t = 0;
-        startRect = resolveStartRect();
+        // ⚠️ 这里**不要**再 resolveStartRect()：第一次打开要等页面装载，重的页（设置/扩展/插件）
+        //    远超 recentPointerPos 的 600ms 时限 ⇒ 取不到就退回"窗口中心"，
+        //    表现就是"卡片不从鼠标点击处长出来"。起点必须在刚点完那一刻取。
         expandAnim.start();
     }
 
@@ -105,6 +107,12 @@ Item {
 
     onShownChanged: {
         if (shown) {
+            // 刚点完，指针位置最新鲜：先把起点定下来，再等装载完起动画
+            startRect = resolveStartRect();
+            // 起点错了就会"卡片不从点击处长出来"，这条日志专门用来对照（技术细节走日志，界面不提示）
+            console.log("[overlay] shown start=" + startRect.x + "," + startRect.y
+                        + " size=" + startRect.width + "x" + startRect.height
+                        + " center=" + Math.round(width / 2) + "," + Math.round(height / 2))
             if (pageItem)
                 beginExpand();      // 已经装载过（第二次打开）：直接起
             // 否则交给 Loader 的 onLoaded
