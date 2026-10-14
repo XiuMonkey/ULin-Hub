@@ -15,6 +15,7 @@
 #include "common/util/MarkdownSegmenter.h"
 #include "core/ClientRuntime.h"
 #include "network/DshApiClient.h"
+#include "qmlbridge/TerminalBridge.h"
 #include "qmlbridge/ThemeController.h"
 #include "qmlbridge/ThemeBridge.h"
 
@@ -62,6 +63,8 @@ void QmlBridge::init()
 	m_extensions = new ExtensionManagerController(m_runtime->server(), this);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
 	m_commands = new CommandController(api, this);
+	// 右栏「终端」块：会话对象由 TerminalBridge 按块 id 管，这里只把唯一的出站客户端交给它
+	TerminalBridge::instance().init(api);
 
 	// 旧壳 ULinHub.042：用户保存服务器地址后重启内置服务端
 	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {

@@ -68,6 +68,13 @@ public:
 	void followSession(const QString& sessionId);
 	// 关闭 session/follow 流；接管态下通知扩展
 	void unfollowSession();
+	// 终端附着流（terminal/follow）：一条终端 = 一条逻辑流，帧是 snapshot / output / state 三种之一。
+	// args 由 SessionCommands::terminalFollow(agentId, id, attachmentId) 给（别在这里拼 wire 名）。
+	// 同时只保留一条：重复调用先 cancel 旧的再开新的；mux 还没连上时只记下 args 并返回
+	// （调用方监听 connected()，连上后再调一次即可重开，重开必须换新的 attachmentId）。
+	void openTerminalStream(const QJsonObject& followArgs);
+	// 关掉终端附着流（不影响终端进程本身，那要一发 terminal/close）
+	void closeTerminalStream();
 	// mux 已打开且 $events 收到 ready 帧；接管态下恒为 true（传输已归扩展）
 	bool isConnected() const;
 	// 后端是否处于接管态（原始上报/提问应答的分流、ULinHub 的旁路开关都看它）
@@ -300,6 +307,16 @@ signals:
 	// 现算现推，不读缓存
 	void sessionProjectionChanged(const QString& sessionId, const QString& key, const QJsonValue& value, int seq);
 	void transportError(const QString& context, const QString& message);
+	// ---- 终端附着流（terminal/follow，第五条逻辑流）----
+	// 一帧原样上抛（帧里是 {type:"snapshot"|"output"|"state", …}）；分流靠 streamId —— 终端流会换
+	// （重连/换 attachment 都是新 id），所以调用方要按自己的 id 过滤，别只认"最后一条"。
+	void terminalFrame(const QString& streamId, const QJsonObject& frame);
+	// 流已开出（open 帧发出）；收到它就意味着"下一帧必须是 snapshot"
+	void terminalStreamOpened(const QString& streamId);
+	// 流结束：attachment 没了（mux 断开也算一次，之后 connected() 会到）
+	void terminalStreamEnded(const QString& streamId);
+	// 流级错误：code 来自服务端（terminal/unavailable / terminal/control-unavailable / gateway/* …）
+	void terminalStreamError(const QString& streamId, const QString& code, const QString& message);
 
 private:
 	struct PendingCall
@@ -378,6 +395,8 @@ private:
 	void handleWorkspaceItem(const QJsonValue& value);
 	void handleSessionItem(const QJsonValue& value);
 	void handleControlItem(const QJsonValue& value);
+	// 第五条：terminal/follow（一帧一个终端帧，原样上抛给 TerminalBridge）
+	void handleTerminalItem(const QJsonValue& value);
 
 	void emitSessionEventFrame(const QString& sessionId, const QJsonObject& event);
 	void scheduleReconnect();
@@ -405,6 +424,7 @@ private:
 	QString m_workspaceStreamId;
 	QString m_controlStreamId;
 	QString m_sessionStreamId;
+	QString m_terminalStreamId;
 	QString m_followedSessionId;
 	bool m_eventsReady = false;
 	bool m_streamConnected = false;

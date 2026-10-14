@@ -82,6 +82,12 @@ DshApiClient::DshApiClient(QObject* parent)
 		m_eventsReady = false;
 		qInfo().noquote() << "[DshApi] DSH stream disconnected closeCode=" << code
 			<< "reason=" << reason << "wasConnected=" << wasConnected;
+		// 终端附着流随 mux 一起没了：清账并告诉调用方（它会在 connected() 后用新 attachmentId 重开）
+		if (!m_terminalStreamId.isEmpty()) {
+			const QString ended = m_terminalStreamId;
+			m_terminalStreamId.clear();
+			emit terminalStreamEnded(ended);
+		}
 		if (wasConnected)  // 必须自愈：服务端遇重复 streamId 会 close(1008) 关掉整条 mux
 			scheduleReconnect();
 		});
@@ -318,6 +324,7 @@ void DshApiClient::closeStreams()
 	m_workspaceStreamId.clear();
 	m_controlStreamId.clear();
 	m_sessionStreamId.clear();
+	m_terminalStreamId.clear();
 	m_followedSessionId.clear();
 }
 
@@ -404,6 +411,43 @@ void DshApiClient::unfollowSession()
 		sendStreamCancel(m_sessionStreamId);
 	m_sessionStreamId.clear();
 	m_followedSessionId.clear();
+}
+
+// 终端附着流：args 由 SessionCommands::terminalFollow(agentId, id, attachmentId) 给。
+// 与 session/follow 的差别：这条流随"终端块"的开关走，不随会话切换自动跟着换，所以由调用方显式开关。
+void DshApiClient::openTerminalStream(const QJsonObject& followArgs)
+{
+	if (m_takenover) {  // 接管态的流归扩展，宿主不开（终端也不在接管协议里）
+		qInfo().noquote() << "[DshApi] openTerminalStream ignored (backend taken over)";
+		return;
+	}
+
+	if (followArgs.isEmpty()) {
+		qWarning().noquote() << "[DshApi] openTerminalStream ignored: empty args";
+		return;
+	}
+
+	if (!m_streamConnected) {  // 还没连上：不缓存请求，调用方在 connected() 后自己再来一次（要换新 attachmentId）
+		qInfo().noquote() << "[DshApi] openTerminalStream deferred: mux not connected";
+		return;
+	}
+
+	if (!m_terminalStreamId.isEmpty())  // 同时只留一条：旧的那条先 cancel
+		sendStreamCancel(m_terminalStreamId);
+
+	m_terminalStreamId = nextStreamId(QStringLiteral("terminal"));
+	sendStreamOpen(QStringLiteral("terminal/follow"), m_terminalStreamId, followArgs);
+	emit terminalStreamOpened(m_terminalStreamId);
+}
+
+void DshApiClient::closeTerminalStream()
+{
+	if (m_terminalStreamId.isEmpty())
+		return;
+
+	sendStreamCancel(m_terminalStreamId);
+	// 本端主动关：不发 terminalStreamEnded，调用方自己知道（发它会让"关块"流程再走一遍收尾）
+	m_terminalStreamId.clear();
 }
 
 // = mux 已打开且 $events 已收到 ready 帧
@@ -940,8 +984,18 @@ void DshApiClient::handleSessionItem(const QJsonValue& value)
 	}
 }
 
-void DshApiClient::emitSessionEventFrame(const QString& sessionId, const QJsonObject& event)
+// terminal/follow 的帧就是终端帧本体（{type:"snapshot"|"output"|"state", …}），
+// 这里不做任何解释：解析/渲染都在页面里（xterm.js），C++ 侧只负责搬。
+void DshApiClient::handleTerminalItem(const QJsonValue& value)
 {
+	const QJsonObject frame = value.toObject();
+	if (frame.isEmpty())
+		return;
+
+	emit terminalFrame(m_terminalStreamId, frame);
+}
+
+void DshApiClient::emitSessionEventFrame(const QString& sessionId, const QJsonObject& event){
 	QJsonArray record;
 	QJsonObject wrapped;
 	wrapped.insert(QStringLiteral("event"), event);
@@ -979,15 +1033,27 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 			handleControlItem(streamValue);
 		else if (streamId == m_sessionStreamId)
 			handleSessionItem(streamValue);
+		else if (!m_terminalStreamId.isEmpty() && streamId == m_terminalStreamId)
+			handleTerminalItem(streamValue);
 	}
 	else if (streamType == QStringLiteral("end")) {
 		qInfo().noquote() << "[DshApi] stream ended:" << streamId;
+		if (!m_terminalStreamId.isEmpty() && streamId == m_terminalStreamId) {
+			m_terminalStreamId.clear();
+			emit terminalStreamEnded(streamId);
+		}
 	}
 	else if (streamType == QStringLiteral("error")) {
 		const QJsonObject streamError = frame.value(QStringLiteral("error")).toObject();
 		const QString code = streamError.value(QStringLiteral("code")).toString();
 		const QString detail = streamError.value(QStringLiteral("message")).toString();
 		qWarning().noquote() << "[DshApi] stream error" << streamId << code << detail;
+		// 终端流的错误按流级上抛（terminal/unavailable、terminal/control-unavailable、gateway/* …），
+		// 别混进通用的 transportError：那些错误不该被当成"传输断了"去驱动重连。
+		if (!m_terminalStreamId.isEmpty() && streamId == m_terminalStreamId) {
+			m_terminalStreamId.clear();
+			emit terminalStreamError(streamId, code, detail);
+		}
 		emit transportError(QStringLiteral("stream"), QStringLiteral("%1: %2").arg(code, detail));
 	}
 	else {

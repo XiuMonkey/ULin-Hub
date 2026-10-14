@@ -155,6 +155,8 @@
     <ClCompile Include="src\qmlbridge\UrlInputBridge.cpp" />
     <ClCompile Include="src\common\shell\PanelDockModel.cpp" />
     <ClCompile Include="src\qmlbridge\SidebarLayout.cpp" />
+    <!-- 右栏「终端」块的接线层（QML 单例 Terminal）：唯一注册到 QWebChannel 的对象 -->
+    <ClCompile Include="src\qmlbridge\TerminalBridge.cpp" />
     <ClCompile Include="src\common\layout\SidebarMetrics.cpp" />
     <QtMoc Include="include\core\ServerManager.h" />
     <QtMoc Include="include\core\ClientRuntime.h" />
@@ -254,6 +256,7 @@
     <QtMoc Include="include\common\shell\PanelDockModel.h" />
     <QtMoc Include="include\qmlbridge\UrlInputBridge.h" />
     <QtMoc Include="include\qmlbridge\SidebarLayout.h" />
+    <QtMoc Include="include\qmlbridge\TerminalBridge.h" />
     <ClInclude Include="include\common\layout\SidebarMetrics.h" />
     <ClInclude Include="include\common\util\UrlInput.h" />
     <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />

@@ -3,7 +3,7 @@
 // DSH RPC 请求载荷的统一构造入口（纯 header + inline）：JSON payload 拼装收敛到这里，控制器只负责编排。
 // 约定：endpoint 是 `<namespace>/<method>`（斜杠，不是点号）；请求体恰好只有一个 `args` 对象，信封由 DshApiClient 包。
 // 因此这里返回的都是 **args 的内容**，键名必须是描述符里的 wire 名（多数是 `request`，session/list 是 `_request`，
-// 无参是空对象，agentPresets/select 是 `agentId` + `agentPreset`）。
+// 无参是空对象，agentPresets/select 是 `agentId` + `agentPreset`，commands/* 与 terminal/* 的 agent 作用域是平铺 `agentId`）。
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -336,6 +336,118 @@ namespace SessionCommands
 		args.insert(QStringLiteral("agentId"), sessionId);
 		args.insert(QStringLiteral("line"), line);
 		args.insert(QStringLiteral("submittedAttachments"), QJsonArray());
+		return args;
+	}
+
+	// ---- 交互式终端（api-terminal-controller）----
+	// 全部依据引擎生成的远程客户端桩
+	// `@deepseek-ai/dsh-api-terminal-controller/lib/typert.remote-client.d.ts`（0.1.7-rc.2）与
+	// `lib/typert.host.js` 的描述符 wire 名。三条形状规矩：
+	//   · agent 作用域的方法是**平铺** `agentId`（与 commands/* 同形，不套 `request`），值是 sessionId；
+	//   · `terminal/list` 的 scope 是 `{ context: 'session', wire: 'sessionId' }` ⇒ 顶层就是 `sessionId`
+	//     （没有 agent lookup，未附着 Agent 的会话也能列）；`terminal/create` 走 `request` 包装；
+	//   · `attachmentId` 由**客户端**铸（每次 attach 换新的），`id`（终端 id）也是客户端铸的幂等键；
+	//     `terminal/follow` 的 signal 参数不进 args，别写进来。
+
+	// terminal/environment -> args { agentId }（回 cwd/maxInputBytes/maxCols/maxRows/scrollback）
+	inline QJsonObject terminalEnvironment(const QString& sessionId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		return args;
+	}
+
+	// terminal/shells -> args { agentId }（回 [{ path, args, name }]，第一项是执行环境的默认 shell）
+	inline QJsonObject terminalShells(const QString& sessionId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		return args;
+	}
+
+	// terminal/list -> args { sessionId }（回 WebTerminalInfo[]）
+	inline QJsonObject terminalList(const QString& sessionId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("sessionId"), sessionId);
+		return args;
+	}
+
+	// terminal/create -> args { agentId, request: { id, cols, rows, shellPath? } }；同 id 再 create 是幂等的
+	// （回同一个终端），所以重连时可以拿同一个 id 去撞。省略 shellPath = 用执行环境的默认 shell。
+	inline QJsonObject terminalCreate(const QString& sessionId, const QString& terminalId, int cols, int rows,
+		const QString& shellPath = QString())
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("id"), terminalId);
+		request.insert(QStringLiteral("cols"), cols);
+		request.insert(QStringLiteral("rows"), rows);
+		if (!shellPath.isEmpty())
+			request.insert(QStringLiteral("shellPath"), shellPath);
+
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("request"), request);
+		return args;
+	}
+
+	// terminal/write -> args { agentId, id, attachmentId, data }
+	// ⚠️ data 里的**回车必须是 CR（\r）**：实测发 `"echo hi\n"` 只回显不执行，发 `"echo hi\r"` 才执行。
+	// xterm.js 的 onData 对 Enter 原生发 \r，所以这条路不用自己转；自绘键盘处理才需要。
+	inline QJsonObject terminalWrite(const QString& sessionId, const QString& terminalId,
+		const QString& attachmentId, const QString& data)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("id"), terminalId);
+		args.insert(QStringLiteral("attachmentId"), attachmentId);
+		args.insert(QStringLiteral("data"), data);
+		return args;
+	}
+
+	// terminal/resize -> args { agentId, id, attachmentId, cols, rows }；调用方负责按 environment 的
+	// maxCols/maxRows 限幅，并在尺寸没变时不发。
+	inline QJsonObject terminalResize(const QString& sessionId, const QString& terminalId,
+		const QString& attachmentId, int cols, int rows)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("id"), terminalId);
+		args.insert(QStringLiteral("attachmentId"), attachmentId);
+		args.insert(QStringLiteral("cols"), cols);
+		args.insert(QStringLiteral("rows"), rows);
+		return args;
+	}
+
+	// terminal/rename -> args { agentId, id, title }（会给所有 attachment 推一帧 state）
+	inline QJsonObject terminalRename(const QString& sessionId, const QString& terminalId, const QString& title)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("id"), terminalId);
+		args.insert(QStringLiteral("title"), title);
+		return args;
+	}
+
+	// terminal/close -> args { agentId, id }（关掉进程；之后 terminal/list 里就没有它了）
+	inline QJsonObject terminalClose(const QString& sessionId, const QString& terminalId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("id"), terminalId);
+		return args;
+	}
+
+	// terminal/follow（**流**，不是一元）-> open 帧的 args { agentId, id, attachmentId }。
+	// 必须走 mux（一元 HTTP 打它会被网关拒：gateway/signature-invalid，"stream Remote methods must be
+	// opened through the stream carrier"）。每次 attach 都要换新的 attachmentId。
+	inline QJsonObject terminalFollow(const QString& sessionId, const QString& terminalId,
+		const QString& attachmentId)
+	{
+		QJsonObject args;
+		args.insert(QStringLiteral("agentId"), sessionId);
+		args.insert(QStringLiteral("id"), terminalId);
+		args.insert(QStringLiteral("attachmentId"), attachmentId);
 		return args;
 	}
 }
