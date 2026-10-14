@@ -1,4 +1,4 @@
-﻿<RCC>
+<RCC>
     <qresource prefix="ULinHub">
         <file>enter-btn.png</file>
         <file>stop-btn.png</file>
@@ -31,5 +31,15 @@
         <file alias="ToolsFilterPlugin/package.json">ToolsFilterPlugin/package.json</file>
         <file alias="ToolsFilterPlugin/index.js">ToolsFilterPlugin/index.js</file>
         <file alias="ToolsFilterPlugin/example.ToolsFilterConfig.json">ToolsFilterPlugin/example.ToolsFilterConfig.json</file>
+        <!-- 右栏「终端」块的页面与它的渲染引擎（Qt WebEngine 里跑 xterm.js）。
+             这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
+             660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见
+             misc/tools/extract-xterm.README.txt（@xterm/xterm 6.0.0 + addon-fit 0.11.0，MIT）。
+             页面由 qrc:/ULinHub/Terminal/terminal.html 加载，页面自己**不发任何网络请求**，
+             帧与输入都走 QWebChannel ↔ qmlbridge/TerminalBridge。 -->
+        <file alias="Terminal/terminal.html">Terminal/terminal.html</file>
+        <file alias="Terminal/xterm.browser.js">Terminal/xterm.browser.js</file>
+        <file alias="Terminal/addon-fit.browser.js">Terminal/addon-fit.browser.js</file>
+        <file alias="Terminal/xterm.css">Terminal/xterm.css</file>
     </qresource>
 </RCC>

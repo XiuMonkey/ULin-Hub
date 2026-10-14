@@ -23,6 +23,7 @@
         <file>basic/shell/PanelDock.qml</file>
         <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>
+        <file>basic/terminal/TerminalPanel.qml</file>
         <file>basic/sidebar/Sidebar.qml</file>
         <file>basic/topbar/TopBar.qml</file>
         <file>Main.qml</file>

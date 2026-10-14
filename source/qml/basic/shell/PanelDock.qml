@@ -18,6 +18,7 @@ import QtQuick
 import ULinHub 1.0
 import "../../widgets"
 import "../browser"
+import "../terminal"
 
 Item {
     id: dock
@@ -97,6 +98,7 @@ Item {
                         delegate: Rectangle {
                             id: block
                             required property string title
+                            required property string blockId
                             required property int index
 
                             // ✕ 命中区宽度：右侧这一条点下去是"关块"，其余地方是"切到该块"
@@ -147,8 +149,12 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: block.closeHover ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: {
-                                    if (block.closeHover)
+                                    if (block.closeHover) {
+                                        // 关块：终端要真的收掉（terminal/close，之后 terminal/list 里没有它）。
+                                        // 切块/收右栏只是解绑，终端进程继续跑 —— 所以只在这一条路上调它。
+                                        Terminal.closeBlock(block.blockId)
                                         Dock.close(block.index)
+                                    }
                                     else
                                         Dock.activate(block.index)
                                 }
@@ -254,6 +260,8 @@ Item {
                         return null
                     if (Dock.activeKind === "browser")
                         return dock.webEngineAvailable ? browserComp : browserMissingComp
+                    if (Dock.activeKind === "terminal")
+                        return dock.webEngineAvailable ? terminalComp : terminalMissingComp
                     return placeholderComp
                 }
             }
@@ -261,6 +269,25 @@ Item {
             Component {
                 id: browserComp
                 WebBrowserPanel { anchors.fill: parent }
+            }
+
+            Component {
+                id: terminalComp
+                // ⚠️ 传的是**稳定 id** 而不是索引：关掉前面那块时索引会前移，拿索引当会话 key 会串台
+                TerminalPanel {
+                    anchors.fill: parent
+                    blockId: Dock.activeBlockId
+                }
+            }
+
+            Component {
+                id: terminalMissingComp
+                PanelPlaceholder {
+                    anchors.fill: parent
+                    title: "终端需要 Qt WebEngine"
+                    detail: "本构建未包含 Qt WebEngine：终端面板里的 xterm.js 跑在 WebEngine 里"
+                            + "（引擎只给原始字节与序列化 VT 串，没有网格接口，所以不能自绘）。"
+                }
             }
 
             Component {
@@ -279,9 +306,7 @@ Item {
                 PanelPlaceholder {
                     anchors.fill: parent
                     title: Dock.activeTitle
-                    detail: Dock.activeKind === "terminal"
-                            ? "终端还没接入：需要挂上 dsh 的 api-terminal-controller（terminal/*）再把输出接进一个字符网格。"
-                            : "文件浏览还没接入：需要挂上 api-workspace-files（workspaceFiles/*）做目录树与预览。"
+                    detail: "文件浏览还没接入：需要挂上 api-workspace-files（workspaceFiles/*）做目录树与预览。"
                 }
             }
         }

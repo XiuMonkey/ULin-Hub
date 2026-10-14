@@ -43,6 +43,9 @@ class PanelDockModel : public QAbstractListModel
 		//    QML 追踪不到"模型行变了"，关掉活动块前面那块时路由会停在旧块上（内容与页签不一致）。
 		Q_PROPERTY(QString activeKind READ activeKind NOTIFY activeChanged)
 		Q_PROPERTY(QString activeTitle READ activeTitle NOTIFY activeChanged)
+		// 活动块的**稳定 id**（块一旦开出来就不再变；索引会随关块前移，id 不会）。
+		// 终端块用它当会话 key（Terminal.session(blockId)）：索引当 key 会在关掉前面那块时串台。
+		Q_PROPERTY(QString activeBlockId READ activeBlockId NOTIFY activeChanged)
 		// 启动器目录（三种块的中文名与说明只有这一份，QML 不再拼）
 		Q_PROPERTY(QVariantList launcherItems READ launcherItems CONSTANT)
 
@@ -50,7 +53,8 @@ public:
 	enum Role
 	{
 		KindRole = Qt::UserRole + 1,   // "terminal" | "browser" | "files"
-		TitleRole
+		TitleRole,
+		BlockIdRole                    // 稳定 id（"blk-1"…）；见 activeBlockId
 	};
 
 	static PanelDockModel& instance();   // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
@@ -62,6 +66,7 @@ public:
 	bool homeVisible() const { return m_homeVisible; }
 	QString activeKind() const;
 	QString activeTitle() const;
+	QString activeBlockId() const;
 	QVariantList launcherItems() const;
 
 	// 开一个块：追加 + 激活 + 离开主界面
@@ -88,6 +93,7 @@ private:
 	{
 		QString kind;
 		QString title;
+		QString id;    // 稳定 id（见 activeBlockId）；只增不重用
 	};
 
 	explicit PanelDockModel(QObject* parent = nullptr);
@@ -98,4 +104,5 @@ private:
 	QVector<Block> m_blocks;
 	int m_activeIndex = -1;       // -1 = 没有活动块（与搬家前 `activeIndex: -1` 同义）
 	bool m_homeVisible = true;    // 开局是主界面（启动器）
+	int m_nextBlockSeq = 1;       // 稳定 id 的自增号
 };

@@ -1,0 +1,184 @@
+<!doctype html>
+<!--
+  右栏「终端」块的页面：只做渲染与输入，**一个网络请求都不发**。
+
+  为什么页面不自己收发：引擎的信任边界要求请求的 Origin 必须等于 Host，qrc: / null / localhost:port
+  一律 403（且没有 Access-Control-Allow-*），WS 握手也一样被拒（close 1006）—— 见调查报告 4.7。
+  所以传输留在 C++：DshApiClient 代发 terminal/*（认证 cookie、mux、rpcId 都是现成的），
+  本页经 QWebChannel 收帧（frameReady）写进 xterm，再把 xterm 的 onData 交回去（write）。
+
+  QWebChannel 上注册的是**宿主桥**（objectName=ulinterm，即 C++ 的 TerminalBridge），不是"每块一个对象"：
+  QQmlWebChannel 只在组件完成时注册一次，事后改 registeredObjects 不生效，而块是会增删的。
+  因此本页每个调用都带自己的 blockId（由宿主经 runJavaScript 调 window.__ulintermBind 推过来），
+  上行信号也按 blockId 过滤。
+
+  资产来源见 misc/tools/extract-xterm.README.txt：xterm.js 6.0.0 + @xterm/addon-fit 0.11.0
+  从引擎自带 bundle 里抽出（qrc:/ULinHub/Terminal/…），与官方客户端同版本。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ULin Hub 终端</title>
+<link rel="stylesheet" href="xterm.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d10; }
+  #screen { position: absolute; inset: 4px 2px 2px 6px; }
+  /* 提示层：只在终端没接上 / 出错 / 只读时显形，正常时完全不挡键盘与鼠标 */
+  #overlay {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 5;
+    padding: 6px 10px;
+    font: 12px "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    color: #9fb0c6; background: rgba(11, 13, 16, 0.94);
+    border-bottom: 1px solid #262b33;
+    display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #overlay.show { display: block; }
+  #overlay.bad { color: #ffb4a2; }
+</style>
+</head>
+<body>
+<div id="screen"></div>
+<div id="overlay"></div>
+
+<script src="xterm.browser.js"></script>
+<script src="addon-fit.browser.js"></script>
+<!-- QWebChannel 的 JS 端由 Qt 自己带着（Qt6WebChannel 的 qrc 资源），别另外 vendor 一份 -->
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var overlay = document.getElementById("overlay");
+  var bridge = null;                 // TerminalBridge（QWebChannel 注册对象 ulinterm）
+  var bound = null;                  // { blockId, sessionId }：本页当前绑定到哪个块
+  var applied = false;               // 绑定是否已经交给 C++（start + pageReady）
+
+  function say(text, bad) {
+    overlay.textContent = text || "";
+    overlay.className = (text ? "show" : "") + (bad ? " bad" : "");
+    if (bridge && bound && text) bridge.log(bound.blockId, text);   // 页面 console 不落盘，走宿主日志
+  }
+
+  if (typeof QWebChannel === "undefined" || typeof qt === "undefined" || !qt.webChannelTransport) {
+    say("QWebChannel 没接上（qwebchannel.js 或 webChannelTransport 缺失）", true);
+    return;
+  }
+  if (!window.__xterm || !window.__xterm.Terminal) {
+    say("xterm.js 没加载出来（qrc:/ULinHub/Terminal/xterm.browser.js）", true);
+    return;
+  }
+
+  var term = new window.__xterm.Terminal({
+    // 与官方客户端同款：喂进来的串就是 xterm 的输入格式（引擎给的 snapshot.screen 是
+    // @xterm/addon-serialize 的产物），所以这里**不做任何转义处理**。
+    scrollback: 1000,
+    cursorBlink: true,
+    fontSize: 13,
+    minimumContrastRatio: 4.5,
+    fontFamily: "Cascadia Mono, Consolas, ui-monospace, monospace",
+    theme: { background: "#0b0d10", foreground: "#dfe3ea", cursor: "#dfe3ea" }
+  });
+
+  var fit = new window.__fit.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById("screen"));
+
+  // 页面尺寸 → 网格尺寸（限幅与"同尺寸不发"在 C++ 侧做）
+  function refit() {
+    try {
+      fit.fit();
+    } catch (e) {
+      say("尺寸适配失败：" + e, true);
+    }
+    if (bridge && bound) bridge.resize(bound.blockId, term.cols, term.rows);
+  }
+
+  // 把绑定交给 C++（幂等：applied 一置位就不再重复）
+  function apply() {
+    if (!bridge || !bound || applied) return;
+    applied = true;
+    bridge.start(bound.blockId, bound.sessionId);
+    bridge.pageReady(bound.blockId);
+    refit();
+  }
+
+  var lastStatus = { state: "", text: "", readOnly: false, title: "" };
+
+  function paint() {
+    if (!bound) {
+      say("正在等待宿主绑定终端块…");
+      return;
+    }
+    if (lastStatus.readOnly) {
+      say("输入被另一个窗口接管：这里只读" + (lastStatus.text ? "（" + lastStatus.text + "）" : ""), true);
+      return;
+    }
+    if (lastStatus.state === "attached") say("");
+    else say(lastStatus.text, lastStatus.state === "error" || lastStatus.state === "closed");
+  }
+
+  // 宿主推绑定：块 id + 会话 id。同一对重复推是空操作（宿主会在页面就绪时补推一次）。
+  window.__ulintermBind = function (blockId, sessionId) {
+    if (!blockId) return;
+    if (bound && bound.blockId === blockId && bound.sessionId === sessionId) return;
+    if (bound && applied && bridge) bridge.pageGone(bound.blockId);   // 换绑：先和旧块解绑（不关终端）
+    bound = { blockId: blockId, sessionId: sessionId || "" };
+    applied = false;
+    term.reset();
+    paint();
+    apply();
+  };
+
+  new QWebChannel(qt.webChannelTransport, function (channel) {
+    var keys = Object.keys(channel.objects || {});
+    if (!keys.length) {
+      say("QWebChannel 上没有注册终端桥对象", true);
+      return;
+    }
+    bridge = channel.objects[keys[0]];
+
+    // Qt → 页面：一帧一段该写进 xterm 的串；写完后 ack，C++ 才放行下一帧（背压）
+    bridge.frameReady.connect(function (blockId, kind, sequence, text) {
+      if (!bound || blockId !== bound.blockId) return;
+      if (kind === "snapshot") {
+        term.reset();
+        term.write(text, function () {
+          // snapshot 里可能已含滚回区（引擎侧 scrollback=1000）：量一下，别让它悄悄翻倍
+          var buffer = term.buffer.active;
+          bridge.log(blockId, "snapshot 已写入：buffer 行数=" + buffer.length
+            + " 视口行数=" + term.rows + " baseY=" + buffer.baseY);
+          bridge.ack(blockId);
+        });
+        return;
+      }
+      term.write(text, function () { bridge.ack(blockId); });
+    });
+
+    bridge.statusChanged.connect(function (blockId, state, statusText, readOnly, title) {
+      if (!bound || blockId !== bound.blockId) return;
+      lastStatus = { state: state, text: statusText, readOnly: readOnly, title: title };
+      document.title = title || "ULin Hub 终端";
+      paint();
+    });
+
+    term.onData(function (data) {
+      if (bound) bridge.write(bound.blockId, data);
+    });
+    // 键盘焦点：点一下就聚焦到 xterm（QML 那边也把 WebEngineView 设成可聚焦）
+    document.addEventListener("mousedown", function () { term.focus(); });
+
+    if (window.ResizeObserver)
+      new ResizeObserver(function () { refit(); }).observe(document.getElementById("screen"));
+    window.addEventListener("resize", refit);
+
+    term.focus();
+    paint();
+    // 万一宿主在信道接好之前就推过绑定（runJavaScript 与信道建立是两条路），这里补一次
+    apply();
+    // 再叫宿主补推一次绑定：正常路径下 QML 在 LoadSucceeded 时已推过，这里是幂等的兜底
+    bridge.pageHello();
+  });
+})();
+</script>
+</body>
+</html>

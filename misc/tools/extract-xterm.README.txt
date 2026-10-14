@@ -1,0 +1,33 @@
+README — misc/tools/extract-xterm.mjs（xterm.js 资产抽取工具，非构建期脚本）
+================================================================================
+
+作用
+    从引擎自带包里的官方侧栏终端 bundle 中抽出浏览器版 xterm.js / @xterm/addon-fit /
+    xterm.css，生成右栏「终端」面板要用的三个 qrc 资产。
+
+为什么"抽"而不是 npm 装
+    @xterm/xterm 在本仓库的 assets/resources/server/node_modules 里**没有独立包**，但引擎自带的
+    @deepseek-ai/dsh-client-ui-sidebar-terminal/lib/client.terminal.js 已经把
+    @xterm/xterm@6.0.0 与 @xterm/addon-fit@0.11.0 打了进去（rolldown 的 CommonJS region，
+    region 注释里写着版本号）。从那里切出来与引擎实际使用的版本天然一致，且不新增三方依赖。
+    两条路都对得上官方客户端（它用的就是这两个版本；许可证 MIT）。
+
+来源与版本（复核时照这几条对账）
+    源文件   assets/resources/server/node_modules/@deepseek-ai/dsh-client-ui-sidebar-terminal/lib/client.terminal.js
+    xterm    @xterm/xterm 6.0.0
+    addon    @xterm/addon-fit 0.11.0
+    产物目录 assets/resources/Terminal/（qrc 前缀 ULinHub ⇒ 页面里 qrc:/ULinHub/Terminal/…）
+    产物清单 xterm.browser.js（window.__xterm；~645KB）
+             addon-fit.browser.js（window.__fit；~2KB）
+             xterm.css（~3.5KB）
+
+用法（省参就用上面的默认值）
+    node misc/tools/extract-xterm.mjs [--src <client.terminal.js>] [--out <目录>]
+
+幂等
+    同源同版本重复跑，三个文件逐字节一致。产物是**入库资产**（不是构建期生成的），
+    引擎版本升级后请重跑本工具并把三个文件一起提交；terminal.html 里引用的是它们。
+
+证据
+    build/temp/terminal-probe/TERMINAL-REPORT.md §4.8 记录了本抽取 + 真浏览器回放验证
+    （用抓到的真实帧回放，画面与官方一致；截图 replay.png）。

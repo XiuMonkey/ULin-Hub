@@ -55,12 +55,19 @@ QString PanelDockModel::activeTitle() const
 	return m_blocks.at(m_activeIndex).title;
 }
 
+QString PanelDockModel::activeBlockId() const
+{
+	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
+		return QString();
+	return m_blocks.at(m_activeIndex).id;
+}
+
 QVariantList PanelDockModel::launcherItems() const
 {
 	// 与搬家前 PanelDock.qml 里那张表逐字一致（顺序、文案都没动）
 	QVariantList items;
 	items.append(launcherRow(QStringLiteral("terminal"),
-		QStringLiteral("在右栏里跑命令（待接入 dsh 的 terminal 面）")));
+		QStringLiteral("在当前会话的工作目录里跑命令（引擎的 terminal 面）")));
 	items.append(launcherRow(QStringLiteral("browser"),
 		QStringLiteral("用 Qt WebEngine 在右栏看网页")));
 	items.append(launcherRow(QStringLiteral("files"),
@@ -79,7 +86,8 @@ void PanelDockModel::open(const QString& kind)
 
 	const int row = m_blocks.size();
 	beginInsertRows(QModelIndex(), row, row);
-	m_blocks.append(Block{ kind, kindLabel(kind) + QLatin1Char(' ') + QString::number(seq + 1) });
+	m_blocks.append(Block{ kind, kindLabel(kind) + QLatin1Char(' ') + QString::number(seq + 1),
+		QStringLiteral("blk-%1").arg(m_nextBlockSeq++) });
 	endInsertRows();
 	emit countChanged();
 
@@ -157,6 +165,8 @@ QVariant PanelDockModel::data(const QModelIndex& index, int role) const
 		return block.kind;
 	case TitleRole:
 		return block.title;
+	case BlockIdRole:
+		return block.id;
 	default:
 		return QVariant();
 	}
@@ -167,5 +177,6 @@ QHash<int, QByteArray> PanelDockModel::roleNames() const
 	QHash<int, QByteArray> names;
 	names.insert(KindRole, "kind");
 	names.insert(TitleRole, "title");
+	names.insert(BlockIdRole, "blockId");
 	return names;
 }
