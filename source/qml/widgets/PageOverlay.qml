@@ -44,6 +44,9 @@ Item {
     // ---------------- 动画状态 ----------------
     property real t: 0
     property rect startRect: Qt.rect(0, 0, 0, 0)
+    // 抓手拖动卡片用的偏移：卡片的 x/y 是展开动画算出来的，拖动只能叠在它上面
+    property real dragOffsetX: 0
+    property real dragOffsetY: 0
     // 与演示扩展那颗 32×32 入口按钮同值
     readonly property int originSide: 32
     readonly property real targetX: Math.round((width - targetW) / 2)
@@ -116,6 +119,9 @@ Item {
         if (shown) {
             // 刚点完，指针位置最新鲜：先把起点定下来，再等装载完起动画
             startRect = resolveStartRect();
+            // 每次打开都回到居中位置（抓手拖动留下的偏移不跨次残留）
+            dragOffsetX = 0;
+            dragOffsetY = 0;
             // 起点错了就会"卡片不从点击处长出来"，这条日志专门用来对照（技术细节走日志，界面不提示）
             console.log("[overlay] shown start=" + startRect.x + "," + startRect.y
                         + " size=" + startRect.width + "x" + startRect.height
@@ -144,8 +150,8 @@ Item {
     Item {
         id: card
 
-        x: root.startRect.x + (root.targetX - root.startRect.x) * root.t
-        y: root.startRect.y + (root.targetY - root.startRect.y) * root.t
+        x: root.startRect.x + (root.targetX - root.startRect.x) * root.t + root.dragOffsetX
+        y: root.startRect.y + (root.targetY - root.startRect.y) * root.t + root.dragOffsetY
         width: Math.max(1, root.startRect.width + (root.targetW - root.startRect.width) * root.t)
         height: Math.max(1, root.startRect.height + (root.targetH - root.startRect.height) * root.t)
         opacity: Math.min(1, root.t * 6)
@@ -199,45 +205,53 @@ Item {
             }
         }
 
-        // 三点抓手：浅灰小胶囊，按住它（含附近 8px）拖动 = 移动窗口。
-        // 为什么走原生：startSystemMove() 交给窗口管理器，贴边/多屏/DPI/最大化还原都对；
-        // 自己在 QML 里算位移会在这些情况下跑偏。悬停给一点反馈，别做成"看不见的暗门"。
-        Rectangle {
+        // 三点抓手：**只有三个浅灰点**（不要背景、不要悬浮/悬停效果），拖它 = 拖动这张卡片本身。
+        // 「它附近可交互」⇒ 命中区（MouseArea）往外各放 10px，视觉上仍是三个点。
+        // ⚠️ 不是拖窗口：那才是标题栏该干的事（WindowBridge.startSystemMove），这里是拖面板。
+        Row {
             id: grip
 
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 6
-            width: 46
-            height: 16
-            radius: height / 2
-            color: Theme.color.border
-            opacity: gripMouse.containsMouse ? 0.95 : 0.55
+            anchors.topMargin: 7
+            spacing: 3
             z: 10
 
-            Row {
-                anchors.centerIn: parent
-                spacing: 3
+            Repeater {
+                model: 3
 
-                Repeater {
-                    model: 3
-
-                    delegate: Rectangle {
-                        width: 3
-                        height: 3
-                        radius: 1.5
-                        color: Theme.color.textTertiary
-                    }
+                delegate: Rectangle {
+                    width: 3
+                    height: 3
+                    radius: 1.5
+                    color: Theme.color.textTertiary
                 }
             }
 
             MouseArea {
                 id: gripMouse
+
                 anchors.fill: parent
-                anchors.margins: -8          // "按住它附近也能拖"
-                hoverEnabled: true
+                anchors.margins: -10
                 cursorShape: Qt.SizeAllCursor
-                onPressed: WindowBridge.startSystemMove()
+
+                property real pressX: 0
+                property real pressY: 0
+                property real baseX: 0
+                property real baseY: 0
+
+                onPressed: (mouse) => {
+                    pressX = mouse.x;
+                    pressY = mouse.y;
+                    baseX = root.dragOffsetX;
+                    baseY = root.dragOffsetY;
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return;
+                    root.dragOffsetX = baseX + (mouse.x - pressX);
+                    root.dragOffsetY = baseY + (mouse.y - pressY);
+                }
             }
         }
     }
