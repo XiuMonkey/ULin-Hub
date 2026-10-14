@@ -207,23 +207,27 @@ Item {
 
         // 三点抓手：**只有三个浅灰点**（不要背景、不要悬浮/悬停效果），拖它 = 拖动这张卡片本身。
         // 「它附近可交互」⇒ 命中区（MouseArea）往外各放 10px，视觉上仍是三个点。
-        // ⚠️ 不是拖窗口：那才是标题栏该干的事（WindowBridge.startSystemMove），这里是拖面板。
+        // ⚠️ 两个坑：
+        //   ① 不是拖窗口：那是标题栏该干的事（WindowBridge.startSystemMove），这里是拖面板；
+        //   ② 位移要用**场景坐标差**：MouseArea 跟着卡片一起动，用它的局部坐标(mouse.x)算增量会
+        //      自己追自己 ⇒ 越拖越慢跟不上手。所以按下/移动都先 mapToItem(null, …) 换成场景坐标。
         Row {
             id: grip
 
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 7
-            spacing: 3
+            spacing: 5
             z: 10
 
             Repeater {
                 model: 3
 
                 delegate: Rectangle {
-                    width: 3
-                    height: 3
-                    radius: 1.5
+                    // 3×3 + radius 1.5 + 间距 3 在 DPR2 抗锯齿下会糊成一团（看着像一个点），所以放大一点
+                    width: 4
+                    height: 4
+                    radius: 2
                     color: Theme.color.textTertiary
                 }
             }
@@ -235,22 +239,24 @@ Item {
                 anchors.margins: -10
                 cursorShape: Qt.SizeAllCursor
 
-                property real pressX: 0
-                property real pressY: 0
+                property real pressSceneX: 0
+                property real pressSceneY: 0
                 property real baseX: 0
                 property real baseY: 0
 
                 onPressed: (mouse) => {
-                    pressX = mouse.x;
-                    pressY = mouse.y;
+                    const p = gripMouse.mapToItem(null, mouse.x, mouse.y);
+                    pressSceneX = p.x;
+                    pressSceneY = p.y;
                     baseX = root.dragOffsetX;
                     baseY = root.dragOffsetY;
                 }
                 onPositionChanged: (mouse) => {
                     if (!pressed)
                         return;
-                    root.dragOffsetX = baseX + (mouse.x - pressX);
-                    root.dragOffsetY = baseY + (mouse.y - pressY);
+                    const p = gripMouse.mapToItem(null, mouse.x, mouse.y);
+                    root.dragOffsetX = baseX + (p.x - pressSceneX);
+                    root.dragOffsetY = baseY + (p.y - pressSceneY);
                 }
             }
         }
