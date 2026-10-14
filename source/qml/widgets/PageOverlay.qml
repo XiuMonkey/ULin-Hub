@@ -270,6 +270,13 @@ Item {
                     root.dragOffsetY = baseY + (p.y - pressSceneY);
                 }
             }
+
+            // 把抓手登记进**原生**命中测试：标题栏那块在 WM_NCHITTEST 里默认判 HTCAPTION（拖窗口），
+            // 但原生在 caption 矩形内会**先问** windowControlAt() 有没有登记过的控件，命中就返回 HTCLIENT
+            // ⇒ 三个点的优先级因此高于标题栏，QML 才收得到按下事件。
+            // 这样两件事可以共存：拖标题栏空白处 = 拖窗口，拖三个点（含附近 10px）= 拖面板。
+            Component.onCompleted: WindowBridge.addWindowControl(gripMouse, "other")
+            Component.onDestruction: WindowBridge.removeWindowControl(gripMouse)
         }
     }
 }

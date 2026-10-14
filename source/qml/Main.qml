@@ -64,23 +64,16 @@ Window {
             anchors.fill: parent
 
             // 标题栏：可覆盖单元。整块在原生侧被登记为窗口拖动区（WM_NCHITTEST -> HTCAPTION）。
-            // ⚠️ 但原生命中测试**只认这块矩形**，不知道 QML 上层盖了谁：覆盖页（设置/扩展/插件市场/
-            //    工具筛选器）在前面时，拖到标题栏位置仍会被判成 HTCAPTION ⇒ 变成拖窗口。
-            //    所以有覆盖页在前台时**取消登记**（传 null），页面收起后再登记回来。
-            //    窗口按钮（最小化/最大化/关闭）走 addWindowControl，不受影响。
+            // 覆盖页的抓手（三个点）会把自己也登记进原生命中测试（WindowBridge.addWindowControl），
+            // 原生在 caption 矩形内会先问"这里有没有已登记控件" ⇒ 三个点优先，拖标题栏空白处仍是拖窗口。
+            // 所以这里**始终登记**，不需要因为"有覆盖页在前台"而取消。
             Loader {
                 id: titleBar
                 width: parent.width
                 source: Style.url("skin/window/TitleBar.qml")
-
-                readonly property bool anyOverlayOpen: Hub.settings.open || Hub.plugins.open
-                                                       || Hub.extensions.open || Hub.toolsFilterOpen
-
-                onAnyOverlayOpenChanged: syncCaption()
-                onLoaded: syncCaption()
-
-                function syncCaption() {
-                    WindowBridge.setCaptionItem(anyOverlayOpen ? null : item)
+                onLoaded: {
+                    if (item)
+                        WindowBridge.setCaptionItem(item)
                 }
             }
 
