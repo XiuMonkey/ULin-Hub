@@ -108,8 +108,12 @@ Item {
 
         Card {
             id: topBarCard
+            // 与输入区对齐：Composer 是 columnClearance 内缩的（见下面 composerLoader），
+            // 顶栏卡片不缩就会比输入框宽出一圈，看着和其它控件不协调。
             anchors.left: parent.left
             anchors.right: parent.right
+            anchors.leftMargin: Theme.spacing.columnClearance
+            anchors.rightMargin: Theme.spacing.columnClearance
             anchors.top: parent.top
             implicitHeight: topBar.implicitHeight
             radius: Theme.radius.panel
