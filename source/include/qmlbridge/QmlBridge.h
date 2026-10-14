@@ -2,6 +2,13 @@
 
 // QmlBridge —— **QML 唯一的门**（QML 单例名 `Hub`）。
 //
+// 分层规矩（领域归位 2026-10-15，全仓通用）：
+//   · common/**    = 领域与纯逻辑（解析、策略、状态机、模型本体）：不 import QML 概念，能脱离 QML 引擎单测。
+//   · qmlbridge/** = 只做接线：属性/信号、Q_INVOKABLE 转发、QAbstractListModel 的角色名映射，**不放算法**。
+//   留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge、SidebarLayout（只转发）；
+//   带逻辑的模型与控制器（SessionListModel / CommandController / SettingsController / PanelDockModel /
+//   PluginMarketController / StyleResolver）已搬去 common/**，算法在那边、QML 面在这里。
+//
 // ⚠️ 本类的职责被刻意收窄成**只有接线**（2026-10-10 拆分，之前叫 ShellController）：
 //   · 把核心层（core/ClientRuntime、core/ServerManager）与业务层（common/session/**、common/appearance/**）
 //     的对象与信号，接到 QML 能用的形态上：Q_PROPERTY / Q_INVOKABLE / 信号转发；
@@ -21,11 +28,11 @@
 // 原 ShellController 的那段历史上下文（保留）：M3 切片刻意**不复用**旧的 ULinHub（QMainWindow），
 // 只用既有无控件依赖类把数据面重接一遍，M8 删旧壳时再合一。
 
-#include "qmlbridge/CommandController.h"
+#include "common/PluginMarket/PluginMarketController.h"
+#include "common/session/CommandController.h"
+#include "common/session/SessionListModel.h"
+#include "common/settings/SettingsController.h"
 #include "qmlbridge/ExtensionManagerController.h"
-#include "qmlbridge/PluginMarketController.h"
-#include "qmlbridge/SessionListModel.h"
-#include "qmlbridge/SettingsController.h"
 
 #include <QObject>
 #include <QString>

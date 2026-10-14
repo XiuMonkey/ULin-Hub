@@ -1,5 +1,10 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件在 common/session/ —— **领域与纯逻辑层**（命令文法的判定与过滤、
+// 候选状态机、RPC 结果翻信号都在这里）。它不 import 任何 QML 概念，可以脱离 QML 引擎单测。
+// QML 面（`Hub.commands` 属性、类型注册、发送分支里"走命令还是走模型"的转调）在
+// qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
+//
 // 斜杠命令处理器（QML 面：`Hub.commands`）—— 发现 / 过滤 / 执行。
 //
 // 为什么单独一个类：命令**不进模型历史**。引擎侧 `execute()` 只往接收方会话日志追加
@@ -15,7 +20,7 @@
 //   · result = { kind: 'success', text?, sourceEventSeq? } | { kind: 'error', text }
 //   · 命令名文法同引擎 COMMAND_NAME：`^/[a-z][a-z0-9_-]*(\s|$)`
 //
-// ⚠️ sessionId 一律**入参**（与 ChatController 同一约定）：当前会话归 qmlbridge 所有，
+// ⚠️ sessionId 一律**入参**（与 ChatController 同一约定）：当前会话归 QmlBridge（qmlbridge/QmlBridge.h）所有，
 //    本类只记"上一次给哪个会话拉过列表"，用来丢弃换会话之后才回来的旧响应。
 
 #include <QObject>

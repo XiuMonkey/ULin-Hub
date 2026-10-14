@@ -30,8 +30,10 @@ Item {
     // 宽度归壳层所有（面板只管画卡片）：拖柄改的是 rightSidebarW，默认值来自 token。
     // 正在拖：拖动期间必须**关掉**压窄动画，否则布局会追着光标慢慢爬
     property bool resizing: false
-    // 钳制策略（会话区保底 / 上限 / 夹取 / 拖动换算）全在 C++：source/src/qmlbridge/SidebarLayout.cpp，
-    // QML 面是单例 `SidebarLayout`。这里只负责把 token 与窗口尺寸喂进去，不再自己算公式
+    // 钳制策略（会话区保底 / 上限 / 夹取 / 拖动换算）全在 C++：公式在
+    // source/src/common/layout/SidebarMetrics.cpp（自由函数、可脱离 QML 单测），
+    // QML 面是单例 `SidebarLayout`（source/src/qmlbridge/SidebarLayout.cpp，只转发）。
+    // 这里只负责把 token 与窗口尺寸喂进去，不再自己算公式
     // （那几条都是"纯数值规则"，放 C++ 才能脱离窗口验证；拖动仍是 1:1，公式逐位等价）。
     readonly property real rightSidebarMinW: Theme.size.rightSidebarMinWidth
     // 会话区保底宽度：**按窗口比例兜底**（取 token 与 25% 窗口宽里更小的那个）。

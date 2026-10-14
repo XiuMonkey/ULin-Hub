@@ -1,8 +1,6 @@
 // 见 SettingsController.h：设置页数据面。
 
-#include "qmlbridge/SettingsController.h"
-
-#include "qmlbridge/ThemeBridge.h"
+#include "common/settings/SettingsController.h"
 
 #include "common/appearance/ThemeManager.h"
 #include "common/appearance/TranslationManager.h"
@@ -222,8 +220,10 @@ void SettingsController::resetStyles()
 {
 	ThemeManager::instance().resetStylePack();
 
-	// 风格包重置后让 QML 侧热重载 token（同一模块，直接调；M8 前这条路由 ThemeManager 的信号触发）
-	ThemeBridge::instance().reload();
+	// 风格包重置后让 QML 侧热重载 token：本类在 common（领域层），**不许**直接调 qmlbridge 的
+	// ThemeBridge，于是发信号、由 qmlbridge/QmlBridge 接住落地（等价于搬家前在这里直接调
+	// ThemeBridge::reload()；M8 起 ThemeManager 不再发信号，这条通路只能由本类主动发）。
+	emit stylesReset();
 	m_appearanceFeedback = qtTrId("settings_styles_reset_done");
 	emit languageChanged();
 }

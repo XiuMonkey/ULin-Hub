@@ -78,14 +78,14 @@
     <ClCompile Include="src\qmlbridge\WindowBridge.cpp">
       <Filter>src\qmlbridge</Filter>
     </ClCompile>
-    <ClCompile Include="src\qmlbridge\StyleResolver.cpp">
-      <Filter>src\qmlbridge</Filter>
+    <ClCompile Include="src\common\appearance\StyleResolver.cpp">
+      <Filter>src\common\appearance</Filter>
     </ClCompile>
     <ClCompile Include="src\qmlbridge\ThemeBridge.cpp">
       <Filter>src\qmlbridge</Filter>
     </ClCompile>
-    <ClCompile Include="src\qmlbridge\SessionListModel.cpp">
-      <Filter>src\qmlbridge</Filter>
+    <ClCompile Include="src\common\session\SessionListModel.cpp">
+      <Filter>src\common\session</Filter>
     </ClCompile>
     <ClCompile Include="src\qmlbridge\QmlBridge.cpp">
       <Filter>src\qmlbridge</Filter>
@@ -105,11 +105,11 @@
     <ClCompile Include="src\common\util\MarkdownSegmenter.cpp">
       <Filter>src\common\util</Filter>
     </ClCompile>
-    <ClCompile Include="src\qmlbridge\SettingsController.cpp">
-      <Filter>src\qmlbridge</Filter>
+    <ClCompile Include="src\common\settings\SettingsController.cpp">
+      <Filter>src\common\settings</Filter>
     </ClCompile>
-    <ClCompile Include="src\qmlbridge\PluginMarketController.cpp">
-      <Filter>src\qmlbridge</Filter>
+    <ClCompile Include="src\common\PluginMarket\PluginMarketController.cpp">
+      <Filter>src\common\PluginMarket</Filter>
     </ClCompile>
     <ClCompile Include="src\qmlbridge\ExtensionManagerController.cpp">
       <Filter>src\qmlbridge</Filter>
@@ -340,11 +340,11 @@
     <QtMoc Include="include\qmlbridge\ThemeBridge.h">
       <Filter>include\qmlbridge</Filter>
     </QtMoc>
-    <QtMoc Include="include\qmlbridge\StyleResolver.h">
-      <Filter>include\qmlbridge</Filter>
+    <QtMoc Include="include\common\appearance\StyleResolver.h">
+      <Filter>include\common\appearance</Filter>
     </QtMoc>
-    <QtMoc Include="include\qmlbridge\SessionListModel.h">
-      <Filter>include\qmlbridge</Filter>
+    <QtMoc Include="include\common\session\SessionListModel.h">
+      <Filter>include\common\session</Filter>
     </QtMoc>
     <QtMoc Include="include\qmlbridge\QmlBridge.h">
       <Filter>include\qmlbridge</Filter>
@@ -361,11 +361,11 @@
     </QtMoc>
       <Filter>include\common\session</Filter>
     </QtMoc>
-    <QtMoc Include="include\qmlbridge\SettingsController.h">
-      <Filter>include\qmlbridge</Filter>
+    <QtMoc Include="include\common\settings\SettingsController.h">
+      <Filter>include\common\settings</Filter>
     </QtMoc>
-    <QtMoc Include="include\qmlbridge\PluginMarketController.h">
-      <Filter>include\qmlbridge</Filter>
+    <QtMoc Include="include\common\PluginMarket\PluginMarketController.h">
+      <Filter>include\common\PluginMarket</Filter>
     </QtMoc>
     <QtMoc Include="include\qmlbridge\ExtensionManagerController.h">
       <Filter>include\qmlbridge</Filter>

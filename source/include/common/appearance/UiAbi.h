@@ -5,7 +5,7 @@
 // 为什么单独放一个头：这个值有三个使用者，而它们分处不同层 ——
 //   · ThemeManager（common/appearance）：释放内置包时，磁盘上旧 ABI 的副本按"陈旧"处理；
 //   · ExtensionLoader（ExtensionSystem）：扩展 ui/ 的界面契约门控（扩展 regulation.json5 的 ABIVersion）；
-//   · StyleResolver（qmlbridge）：读 pack.json 的 uiAbi，不一致就整包拒载、全部回退内置。
+//   · StyleResolver（common/appearance）：读 pack.json 的 uiAbi，不一致就整包拒载、全部回退内置。
 // 原先它定义在 StyleResolver.h 里，于是**下层**（appearance / ExtensionSystem）要 include 上层的
 // QML 桥头文件 —— 方向是反的。抽到本文件后谁都能拿，且本文件只依赖 <QtGlobal>。
 //

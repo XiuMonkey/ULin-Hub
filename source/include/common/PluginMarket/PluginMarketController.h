@@ -1,5 +1,15 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件在 common/PluginMarket/ —— **领域层**，与它驱动的
+// PluginMarketModel / PluginMarketClient / PluginMarketInstaller 同层（过滤与分页等算法在
+// PluginMarketModel，HTTP 与解析在 PluginMarketClient，这里只是本域的数据面与视图状态机）。
+// 它不 import 任何 QML 概念（Q_PROPERTY / Q_INVOKABLE 只是元对象暴露方式，不依赖 QQml*），可单测。
+// QML 面（`Hub.plugins` 属性、类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线。
+//
+// ⚠️ 分层张力（如实记下）：本类构造要 ServerManager*（只用于"装完市场包重启内置服务端"），
+//    所以 .cpp 里 include 了 core/ServerManager.h —— 这是 common → core 的一处反向依赖（历史遗留，
+//    纯搬动不改行为故本次保留）。想彻底清掉，把重启做成 std::function 回调由 qmlbridge 注入即可。
+//
 // 插件市场数据面（M6）：把既有的 PluginMarketClient / PluginMarketModel 接到 QML。
 //
 // 逻辑一行不重写：HTTP 与解析在 PluginMarketClient（/dsh-market/*），

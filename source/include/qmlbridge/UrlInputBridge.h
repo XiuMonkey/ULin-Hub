@@ -1,5 +1,9 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件是**正确样板**，本次不动 —— 算法（normalizeUrlInput）在
+// common/util/UrlInput，这里只转发一行；qmlbridge 的规矩就是"只做接线：属性/信号、Q_INVOKABLE 转发、
+// QAbstractListModel 的角色名映射，不放算法"。
+//
 // QML 面：地址栏输入的规范化（QML 单例名 `UrlInput`，注册见 main.cpp）。
 // 真正的规则在 common/util/UrlInput.h 的 normalizeUrlInput() —— 这里**只做转调**。
 //

@@ -1,6 +1,6 @@
 // 见 StyleResolver.h：QML 风格包的解析与 ABI 门控。
 
-#include "qmlbridge/StyleResolver.h"
+#include "common/appearance/StyleResolver.h"
 
 #include "common/appearance/ThemeManager.h"
 

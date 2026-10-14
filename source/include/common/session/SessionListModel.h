@@ -1,6 +1,12 @@
 #pragma once
 
-// 侧栏列表的 QML 模型：把 SessionCatalog 的"工作区分组 + 会话"**摊平**成一行一行的列表。
+// 分层（领域归位 2026-10-15）：本文件在 common/session/ —— **领域与纯逻辑层**（模型本体：摊平算法、
+// 折叠状态机、行的角色名映射都在这里）。它不 import 任何 QML 概念（只用 QtCore 的 QAbstractListModel），
+// 可以脱离 QML 引擎单测（`new SessionListModel(catalog)` 之后断言行数/角色值即可）。
+// QML 面（`Hub.sessions` 属性、SessionListModel 类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，
+// 那边只接线、不放算法。
+//
+// 侧栏列表的行模型（QML 侧经 Hub.sessions 读）：把 SessionCatalog 的"工作区分组 + 会话"**摊平**成一行一行的列表。
 // 为什么摊平而不是嵌套 ListView（坑）：嵌套滚动会互相抢滚轮/惯性，是性能与手感的双重坑；
 // 摊平后一个 ListView 就够，行数规模是"几十行"，整份重建比增量补丁简单也不会错。
 // 行有两种：工作区表头（可折叠、带会话计数）与会话行。

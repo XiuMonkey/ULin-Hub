@@ -1,6 +1,6 @@
 // 见 CommandController.h：斜杠命令的发现 / 过滤 / 执行。
 
-#include "qmlbridge/CommandController.h"
+#include "common/session/CommandController.h"
 
 #include "network/DshApiClient.h"
 #include "network/SessionCommands.h"

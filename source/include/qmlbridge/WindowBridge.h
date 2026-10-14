@@ -1,5 +1,8 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本类**留在 qmlbridge/** —— 它是窗口意图的接线面（QML 只发意图，
+// 窗口级状态与原生判定全在 common/platform/win/NativeWindowFilter 里），正好符合"qmlbridge 只做接线"。
+//
 // QML 壳的窗口桥：QML 侧只发意图（拖动/最小化/最大化/关闭/缩放），窗口级状态与原生判定都落在
 // NativeWindowFilter 里；本类只是"能被 QML 调到的那一面" + 可绑定属性。
 //

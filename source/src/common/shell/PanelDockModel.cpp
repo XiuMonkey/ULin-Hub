@@ -1,6 +1,6 @@
 // 见 PanelDockModel.h：右栏面板坞的块（页签）列表。行为逐条对齐搬家前的 JS 数组。
 
-#include "qmlbridge/PanelDockModel.h"
+#include "common/shell/PanelDockModel.h"
 
 #include <QModelIndex>
 #include <QVariantMap>

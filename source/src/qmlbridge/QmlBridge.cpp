@@ -4,6 +4,9 @@
 //   发送策略与自愈状态机            → common/session/ChatController
 //   主题切换编排                    → qmlbridge/ThemeController
 // 留在这里的只有接线，以及"当前会话 id"这类纯界面状态。
+//
+// 2026-10-15 领域归位：带逻辑的模型/控制器（SessionListModel / CommandController / SettingsController /
+// PanelDockModel / PluginMarketController / StyleResolver）搬去 common/**，本文件只留下接线与转调。
 
 #include "qmlbridge/QmlBridge.h"
 
@@ -63,6 +66,11 @@ void QmlBridge::init()
 	// 旧壳 ULinHub.042：用户保存服务器地址后重启内置服务端
 	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {
 		m_runtime->restartServer();
+		});
+	// 风格包重置后热重载 QML 侧 token：SettingsController 在 common（领域层），不许反向 include qmlbridge，
+	// 于是由它发信号、这里落地（等价于搬家前 SettingsController 里直接调 ThemeBridge::reload()）。
+	connect(m_settings, &SettingsController::stylesReset, this, []() {
+		ThemeBridge::instance().reload();
 		});
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----

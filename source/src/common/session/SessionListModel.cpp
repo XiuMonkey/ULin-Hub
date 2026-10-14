@@ -1,6 +1,6 @@
 // 见 SessionListModel.h：把工作区与会话摊平成一行一行的列表。
 
-#include "qmlbridge/SessionListModel.h"
+#include "common/session/SessionListModel.h"
 
 namespace
 {

@@ -1,5 +1,12 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15 复核结论：**仍留 qmlbridge/**）：本类是扩展管理页的接线面 ——
+// 领域逻辑（解压安装 / 清单读写 / 目录清理 / 客户端扩展装载）早已在 ExtensionSystem/**，
+// 这里只剩页面视图状态、两种来源的行合成、100ms 轮询与一个 QFileDialog（都是界面侧的事）。
+// 而且成员里直接持有 ExtensionSystem 的 ExtensionInstallTask / ExtensionRegistry，而 ExtensionSystem
+// 反向 include 了 common/util/*、common/appearance/UiAbi.h —— 搬进 common 会做成 common ↔ ExtensionSystem
+// 的目录级环。规矩：common/** = 领域与纯逻辑；qmlbridge/** = 只做接线。
+//
 // 扩展管理（原版 src/ui/ExtensionManagerPopup.cpp 的 QML 版）
 //
 // 一个窗口把两条后端线接到一起：

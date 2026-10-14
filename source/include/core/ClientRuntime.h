@@ -41,7 +41,7 @@ public:
 	DshApiClient* apiClient() const { return m_api; }
 	ServerManager* server() const { return m_server; }
 	// ⚠️ SessionCatalog 是**值成员**（它不是 QObject、没有 parent 机制），但所有权在语义上属于本类：
-	//    qmlbridge/SessionListModel 只拿指针来读数（见那边的构造参数）。
+	//    common/session/SessionListModel 只拿指针来读数（见那边的构造参数）。
 	SessionCatalog* catalog() { return &m_catalog; }
 
 	// ---- 会话 / 工作区 RPC ----

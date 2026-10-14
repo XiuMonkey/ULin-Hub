@@ -7,7 +7,7 @@
 //   · 块可以关（页签上的 ✕），关光了自动回主界面。
 //
 // 本文件是**纯 delegate**：块列表（增删、同类编号、活动索引收敛、关光了回主界面、kind 的中文名）
-// 全在 C++ 模型 source/src/qmlbridge/PanelDockModel.cpp，QML 面是单例 `Dock`；
+// 全在 C++ 模型 source/src/common/shell/PanelDockModel.cpp，QML 面是单例 `Dock`；
 // 这里只剩布局/绘制与那几个交互细节（✕ 的命中区、内容重放动画、内容路由）。
 //
 // ⚠️ 网页块需要 Qt WebEngine：它是个**运行时** QML 模块依赖，所以这里用 webEngineAvailable 门控，

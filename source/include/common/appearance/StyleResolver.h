@@ -1,5 +1,10 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件在 common/appearance/ —— **领域层**（风格包目录的解析与
+// uiAbi 门控、磁盘包遮蔽/回退的判定、URL 缓存都在这里，与它下游的 ThemeManager 同层）。
+// 它不 import 任何 QML 概念（不 include QQmlEngine，只吐字符串 URL），可以脱离 QML 引擎单测。
+// QML 面（单例名 `Style`、类型注册、启动期 init）在 src/core/main.cpp，那边只接线、不放算法。
+//
 // QML 风格包（对应 docs/ui-qml-migration-plan.md §2.4 / 决策 D4 的三层覆盖）：
 //   A 层 token …… ThemeBridge（颜色来自 theme-*.json，尺寸/字号来自 metrics.json）
 //   B 层部件文件 … 本类：Style.url("chat/AgentBubble.qml") —— 磁盘包同名文件**遮蔽**内置文件，
@@ -15,8 +20,8 @@
 // 所以 pack.json 带 uiAbi，与本版本的 kStylePackUiAbi 不一致就**整包拒载、全部回退内置**，
 // 并把原因暴露给设置页（见 rejectReason）。
 
-// QML 壳与风格包之间的契约版本搬到了 common/appearance/UiAbi.h —— 它同时被下层的
-// ThemeManager / ExtensionLoader 使用，留在这里会让下层反向依赖 QML 桥层。
+// QML 壳与风格包之间的契约版本早就搬到了 common/appearance/UiAbi.h —— 它同时被下层的
+// ThemeManager / ExtensionLoader 使用，留在桥层会让下层反向依赖 QML 桥层。
 // 名字 kStylePackUiAbi 保留（旧代码都在用），值由那份头定义。
 #include "common/appearance/UiAbi.h"
 

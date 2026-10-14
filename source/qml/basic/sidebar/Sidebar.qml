@@ -1,5 +1,5 @@
 // 侧栏：Logo + 新建会话 + 工作区/会话列表 + 底部图标行。
-// 数据来自 Hub.sessions（摊平的工作区/会话行模型，见 include/qmlbridge/SessionListModel.h）。
+// 数据来自 Hub.sessions（摊平的工作区/会话行模型，见 include/common/session/SessionListModel.h）。
 // 布局用锚点而不是 Column：列表要吃掉剩余高度，锚点比"减一圈高度"可靠。
 
 import QtQuick

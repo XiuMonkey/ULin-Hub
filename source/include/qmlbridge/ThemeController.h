@@ -1,5 +1,11 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15 复核结论：**仍留 qmlbridge/**）：切主题确实**是编排逻辑、不算接线**，
+// 但一次"纯搬动"（只改位置与 include）会逼 common/appearance 反向依赖 qmlbridge —— 它要驱动
+// ThemeBridge::reload / WindowBridge::notifyThemeChanged 两个 QML 面单例，方向与
+// "qmlbridge → core/common，不许反向"冲突。要搬得先按下面那段思路改成"本类只发信号、由 qmlbridge 转发"，
+// 本次不做（避免把行为改动混进搬动）。规矩：common/** = 领域与纯逻辑；qmlbridge/** = 只做接线。
+//
 // ThemeController —— 主题切换的编排（拆自 qmlbridge/ShellController，2026-10-10）。
 //
 // 为什么单独一个类：切主题**不是接线**，它是一条跨越四个组件的流程 ——

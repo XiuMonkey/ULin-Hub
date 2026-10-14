@@ -1,5 +1,11 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件在 common/settings/ —— **领域层**（设置页的数据面与视图状态机：
+// provider/凭据/模型写回、Agent 预设、服务端地址、外观项的装配与反馈文案都在这里），
+// 与它读写的 ClientSettings / SettingsStore 同层（解析与派生引用仍在 common/session/ModelSelectionService）。
+// 它不 import 任何 QML 概念，可以脱离 QML 引擎单测。QML 面（`Hub.settings` 属性、类型注册）在
+// qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
+//
 // 设置页数据面（M6 前置）：把 ModelSelectionService 的既有能力接到 QML。
 //
 // 这一页要解决的就是"发消息没有任何输出（MISSING_CREDENTIAL）"：模型与 API key 都由 harness 的
@@ -122,6 +128,10 @@ signals:
 	void serverRestartRequested();
 	// 新增模型后宿主可以刷新输入区的模型选择器（M5b 用；旧壳 ULinHub.043）
 	void modelAdded(const QString& provider, const QString& modelId);
+	// 风格包已重置（`Style` 单例的磁盘包被清掉并重放），请宿主热重载 QML 侧 token。
+	// ⚠️ 本类在 common（领域层），**不许**直接调 qmlbridge 的 ThemeBridge / WindowBridge；
+	//    这条信号由 qmlbridge/QmlBridge 接住落地（搬家前它在这里直调 ThemeBridge::reload()）。
+	void stylesReset();
 
 private:
 	const ConfigurableProvider* findProvider(const QString& provider) const;

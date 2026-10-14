@@ -1,6 +1,6 @@
 // 见 PluginMarketController.h：插件市场数据面。
 
-#include "qmlbridge/PluginMarketController.h"
+#include "common/PluginMarket/PluginMarketController.h"
 
 #include "common/PluginMarket/PluginMarketClient.h"
 #include "common/PluginMarket/PluginMarketInstaller.h"

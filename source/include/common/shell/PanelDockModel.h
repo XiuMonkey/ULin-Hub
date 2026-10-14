@@ -1,5 +1,11 @@
 #pragma once
 
+// 分层（领域归位 2026-10-15）：本文件在 common/shell/ —— **领域与纯逻辑层**（块列表的状态机本体：
+// 增删、同类编号、活动索引收敛、"关光了回主界面"都在这里）。它不 import 任何 QML 概念
+// （只用 QtCore 的 QAbstractListModel），可以脱离 QML 引擎单测（见 misc/tools/cpp-selfcheck 的 ②）。
+// QML 面（单例名 `Dock`、类型注册、页签与会话内容的路由）在 src/core/main.cpp 与 qml/basic/shell/PanelDock.qml，
+// 那边只接线、不放算法。
+//
 // 面板坞（右栏顶部那些"块" = 页签）的模型 —— 从 basic/shell/PanelDock.qml 的 JS 数组搬来。
 //
 // 为什么进 C++（与仓库既有分层一致）：块的增删、同类编号、活动索引收敛、"关光了回主界面"
