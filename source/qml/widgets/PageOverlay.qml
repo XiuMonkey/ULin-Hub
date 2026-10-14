@@ -207,28 +207,39 @@ Item {
 
         // 三点抓手：**只有三个浅灰点**（不要背景、不要悬浮/悬停效果），拖它 = 拖动这张卡片本身。
         // 「它附近可交互」⇒ 命中区（MouseArea）往外各放 10px，视觉上仍是三个点。
-        // ⚠️ 两个坑：
+        // ⚠️ 三个坑，都踩过：
         //   ① 不是拖窗口：那是标题栏该干的事（WindowBridge.startSystemMove），这里是拖面板；
         //   ② 位移要用**场景坐标差**：MouseArea 跟着卡片一起动，用它的局部坐标(mouse.x)算增量会
-        //      自己追自己 ⇒ 越拖越慢跟不上手。所以按下/移动都先 mapToItem(null, …) 换成场景坐标。
-        Row {
+        //      自己追自己 ⇒ 越拖越慢跟不上手。所以按下/移动都先 mapToItem(null, …) 换成场景坐标；
+        //   ③ MouseArea **不能放进 Row 里**：positioner 遇到锚定子项会把它当"不参与排版"，
+        //      结果三个点被排到同一个 x 上 ⇒ 看着只剩一个点（就是这个 bug）。所以行里只放点，
+        //      MouseArea 做外层 Item 的兄弟。
+        Item {
             id: grip
 
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 7
-            spacing: 5
+            width: dotRow.implicitWidth
+            height: 4
             z: 10
 
-            Repeater {
-                model: 3
+            Row {
+                id: dotRow
 
-                delegate: Rectangle {
-                    // 3×3 + radius 1.5 + 间距 3 在 DPR2 抗锯齿下会糊成一团（看着像一个点），所以放大一点
-                    width: 4
-                    height: 4
-                    radius: 2
-                    color: Theme.color.textTertiary
+                anchors.fill: parent
+                spacing: 5
+
+                Repeater {
+                    model: 3
+
+                    delegate: Rectangle {
+                        // 3×3 + radius 1.5 + 间距 3 在 DPR2 抗锯齿下也会糊在一起，所以给到 4px/间距 5
+                        width: 4
+                        height: 4
+                        radius: 2
+                        color: Theme.color.textTertiary
+                    }
                 }
             }
 
