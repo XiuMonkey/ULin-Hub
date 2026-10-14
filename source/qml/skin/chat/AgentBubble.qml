@@ -68,6 +68,8 @@ Item {
                                 ? qsTrId("chat_tool_call_fmt").arg(segment.modelData.toolName)
                                 : qsTrId("chat_tool_result_label"))
                         meta: segmentType === "thinking" ? "" : (root.streaming ? qsTrId("chat_streaming_meta") : "")
+                        // 只有思考段给折叠摘要：工具卡的表头业已写着工具名与流式状态
+                        summary: segmentType === "thinking" ? segment.modelData.text : ""
                         // 默认**全部收起**（2026-10-03 改）：原来这里写的是
                         //     expanded: segmentType !== "thinking"   // 思考收起、工具卡展开
                         // 展开工具卡的代价实测很实在：25 条消息里有三张长结果卡（1916 / 1301 / 3566px），

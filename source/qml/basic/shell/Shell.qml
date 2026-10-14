@@ -11,6 +11,7 @@ import "../../widgets"
 // 所以跨目录用裸组件名（Sidebar / TopBar）必须显式 import
 import "../sidebar"
 import "../topbar"
+import "../browser"
 
 Item {
     id: shell
@@ -200,6 +201,11 @@ Item {
         x: shell.width - Theme.spacing.windowMargin - width
            + (1 - shell.rightSidebarT) * (width + Theme.spacing.windowMargin)
         onCloseRequested: Hub.closeRightSidebar()
+
+        // 右栏内容：面板坞（主界面 + 块/页签；网页块内部才用 WebEngine）
+        PanelDock {
+            anchors.fill: parent
+        }
     }
 
     // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。

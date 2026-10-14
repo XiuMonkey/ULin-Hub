@@ -18,7 +18,10 @@
         <file>basic/settings/ServerPage.qml</file>
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
+        <file>basic/browser/WebBrowserPanel.qml</file>
         <file>basic/shell/RightSidebar.qml</file>
+        <file>basic/shell/PanelDock.qml</file>
+        <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>
         <file>basic/sidebar/Sidebar.qml</file>
         <file>basic/topbar/TopBar.qml</file>

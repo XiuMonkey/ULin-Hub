@@ -28,10 +28,15 @@
 #include <QStyleHints>
 #include <QUrl>
 #include <QtQml/qqml.h>
+#include <QtWebEngineQuick/QtWebEngineQuick>
 #include <QtWidgets/QApplication>
 
 int main(int argc, char* argv[])
 {
+	// ⚠️ 必须在 QApplication **之前**：WebEngine 要在这里设置与主上下文共享的 OpenGL 上下文，
+	//    放到后面（或漏掉）会在运行期报 "WebEngineContext used before initialize" 并直接崩。
+	QtWebEngineQuick::initialize();
+
 	QApplication app(argc, argv);
 
 	Logger::init();
