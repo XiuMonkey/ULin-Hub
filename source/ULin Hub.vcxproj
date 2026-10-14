@@ -151,6 +151,10 @@
     <ClCompile Include="src\qmlbridge\PluginMarketController.cpp" />
     <ClCompile Include="src\qmlbridge\CommandController.cpp" />
     <ClCompile Include="src\qmlbridge\ExtensionManagerController.cpp" />
+    <ClCompile Include="src\common\util\UrlInput.cpp" />
+    <ClCompile Include="src\qmlbridge\UrlInputBridge.cpp" />
+    <ClCompile Include="src\qmlbridge\PanelDockModel.cpp" />
+    <ClCompile Include="src\qmlbridge\SidebarLayout.cpp" />
     <QtMoc Include="include\core\ServerManager.h" />
     <QtMoc Include="include\core\ClientRuntime.h" />
     <ClCompile Include="src\network\DshApiClient.cpp" />
@@ -245,6 +249,11 @@
     <QtMoc Include="include\qmlbridge\PluginMarketController.h" />
     <QtMoc Include="include\qmlbridge\CommandController.h" />
     <QtMoc Include="include\qmlbridge\ExtensionManagerController.h" />
+    <!-- 面板坞块列表 / 地址栏规范化 / 右栏宽度钳制：QML 单例注册都要 moc -->
+    <QtMoc Include="include\qmlbridge\PanelDockModel.h" />
+    <QtMoc Include="include\qmlbridge\UrlInputBridge.h" />
+    <QtMoc Include="include\qmlbridge\SidebarLayout.h" />
+    <ClInclude Include="include\common\util\UrlInput.h" />
     <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
     <ClInclude Include="include\common\util\MarkdownSegmenter.h" />
     <QtTranslation Include="..\assets\translations\ulinhub_en.ts" />

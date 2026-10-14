@@ -6,6 +6,10 @@
 //   · 顶部左侧的 ⌂ 主界面：回到启动器，**已开的块保留**，可以再开新块；
 //   · 块可以关（页签上的 ✕），关光了自动回主界面。
 //
+// 本文件是**纯 delegate**：块列表（增删、同类编号、活动索引收敛、关光了回主界面、kind 的中文名）
+// 全在 C++ 模型 source/src/qmlbridge/PanelDockModel.cpp，QML 面是单例 `Dock`；
+// 这里只剩布局/绘制与那几个交互细节（✕ 的命中区、内容重放动画、内容路由）。
+//
 // ⚠️ 网页块需要 Qt WebEngine：它是个**运行时** QML 模块依赖，所以这里用 webEngineAvailable 门控，
 //    未就绪时给出说明而不是去建 WebEngineView —— 在没调 QtWebEngineQuick::initialize() 的构建里
 //    直接建 WebEngineView 会崩（不是报错）。
@@ -18,11 +22,11 @@ import "../browser"
 Item {
     id: dock
 
-    // 已打开的块：[{ kind: "browser"|"terminal"|"files", title: "…" }]
-    property var tabs: []
-    property int activeIndex: -1
-    // 主界面（启动器）是否显示
-    property bool homeVisible: true
+    // 块列表 / 显示状态都在模型里；这两个只读镜像**只为接信号**：
+    // 值一变（开块、切块、回主界面）就重放一次内容动画。判定语义与搬家前一致 ——
+    // 模型侧"值没变不发通知"，所以点当前块不会白播一次动画。
+    readonly property int activeIndex: Dock.activeIndex
+    readonly property bool homeVisible: Dock.homeVisible
     // 本构建是否带 Qt WebEngine（装好后连同 vcxproj 的 webenginequick 与 main.cpp 的 initialize 一起打开）
     readonly property bool webEngineAvailable: true
 
@@ -47,38 +51,6 @@ Item {
     onActiveIndexChanged: replayContent()
     onHomeVisibleChanged: replayContent()
 
-    readonly property var activeTab: (activeIndex >= 0 && activeIndex < tabs.length) ? tabs[activeIndex] : null
-
-    function kindName(kind) {
-        if (kind === "browser")
-            return "网页浏览"
-        if (kind === "terminal")
-            return "终端"
-        return "文件浏览"
-    }
-
-    function openTab(kind) {
-        const list = tabs.slice()
-        let seq = 0
-        for (let i = 0; i < list.length; ++i)
-            if (list[i].kind === kind)
-                seq++
-        list.push({ kind: kind, title: kindName(kind) + " " + (seq + 1) })
-        tabs = list
-        activeIndex = list.length - 1
-        homeVisible = false
-    }
-
-    function closeTab(index) {
-        const list = tabs.slice()
-        list.splice(index, 1)
-        tabs = list
-        if (activeIndex >= list.length)
-            activeIndex = list.length - 1
-        if (list.length === 0)
-            homeVisible = true
-    }
-
     Column {
         anchors.fill: parent
         spacing: 0
@@ -97,7 +69,7 @@ Item {
                 glyph: "⌂"
                 tooltip: "主界面"
                 selected: dock.homeVisible
-                onClicked: dock.homeVisible = true
+                onClicked: Dock.showHome()   // ⌂ 只切显示，块保留
             }
 
             // 块：横向排，多了可滚动
@@ -118,12 +90,13 @@ Item {
                     height: parent.height
                     spacing: 4
 
+                    // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 Dock.activeKind）
                     Repeater {
-                        model: dock.tabs
+                        model: Dock
 
                         delegate: Rectangle {
                             id: block
-                            required property var modelData
+                            required property string title
                             required property int index
 
                             // ✕ 命中区宽度：右侧这一条点下去是"关块"，其余地方是"切到该块"
@@ -134,10 +107,10 @@ Item {
                             height: row.height
                             width: Math.min(150, blockLabel.implicitWidth + 34)
                             radius: Theme.radius.small
-                            color: (!dock.homeVisible && block.index === dock.activeIndex)
+                            color: (!dock.homeVisible && block.index === Dock.activeIndex)
                                    ? Theme.color.hoverBg : "transparent"
                             border.width: 1
-                            border.color: (!dock.homeVisible && block.index === dock.activeIndex)
+                            border.color: (!dock.homeVisible && block.index === Dock.activeIndex)
                                           ? Theme.color.border : "transparent"
 
                             Text {
@@ -147,7 +120,7 @@ Item {
                                 anchors.right: closeGlyph.left
                                 anchors.rightMargin: 4
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: block.modelData.title
+                                text: block.title
                                 elide: Text.ElideRight
                                 color: Theme.color.textSecondary
                                 font.family: "Microsoft YaHei UI"
@@ -175,11 +148,9 @@ Item {
                                 cursorShape: block.closeHover ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onClicked: {
                                     if (block.closeHover)
-                                        dock.closeTab(block.index)
-                                    else {
-                                        dock.activeIndex = block.index
-                                        dock.homeVisible = false
-                                    }
+                                        Dock.close(block.index)
+                                    else
+                                        Dock.activate(block.index)
                                 }
                             }
                         }
@@ -204,7 +175,7 @@ Item {
             opacity: dock.contentT
             scale: 0.985 + 0.015 * dock.contentT
 
-            // 启动器（主界面）
+            // 启动器（主界面）：目录也来自模型（三种块的中文名只有 C++ 那一份）
             Column {
                 anchors.top: parent.top
                 anchors.left: parent.left
@@ -222,11 +193,7 @@ Item {
                 }
 
                 Repeater {
-                    model: [
-                        { kind: "terminal", label: "终端", hint: "在右栏里跑命令（待接入 dsh 的 terminal 面）" },
-                        { kind: "browser", label: "网页浏览", hint: "用 Qt WebEngine 在右栏看网页" },
-                        { kind: "files", label: "文件浏览", hint: "浏览工作区文件（待接入 workspaceFiles）" }
-                    ]
+                    model: Dock.launcherItems
 
                     delegate: Rectangle {
                         id: launcherRow
@@ -268,7 +235,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: dock.openTab(launcherRow.modelData.kind)
+                            onClicked: Dock.open(launcherRow.modelData.kind)
                         }
                     }
                 }
@@ -280,10 +247,12 @@ Item {
                 anchors.fill: parent
                 visible: !dock.homeVisible
 
+                // 内容路由：活动块的 kind 也来自模型（绑定在带通知的属性上，
+                // 关掉活动块前面那块时这里会跟着重算，不会停在旧块上）
                 sourceComponent: {
-                    if (dock.homeVisible || dock.activeTab === null)
+                    if (dock.homeVisible || Dock.activeIndex < 0)
                         return null
-                    if (dock.activeTab.kind === "browser")
+                    if (Dock.activeKind === "browser")
                         return dock.webEngineAvailable ? browserComp : browserMissingComp
                     return placeholderComp
                 }
@@ -309,8 +278,8 @@ Item {
                 id: placeholderComp
                 PanelPlaceholder {
                     anchors.fill: parent
-                    title: dock.activeTab ? dock.activeTab.title : ""
-                    detail: dock.activeTab && dock.activeTab.kind === "terminal"
+                    title: Dock.activeTitle
+                    detail: Dock.activeKind === "terminal"
                             ? "终端还没接入：需要挂上 dsh 的 api-terminal-controller（terminal/*）再把输出接进一个字符网格。"
                             : "文件浏览还没接入：需要挂上 api-workspace-files（workspaceFiles/*）做目录树与预览。"
                 }

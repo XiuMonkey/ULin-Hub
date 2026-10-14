@@ -19,15 +19,12 @@ Item {
     property string startUrl: ""
 
     function navigate(text) {
-        const trimmed = text.trim()
-        if (trimmed.length === 0)
+        // 规范化（判 scheme / 补 https:// / 拼搜索词 / 百分号编码）全在 C++：
+        // source/src/common/util/UrlInput.cpp，QML 面是单例 `UrlInput`（见 main.cpp 的注册）。
+        // 返回空串 = "这行不该导航"（空输入/纯空白），直接不动，别去加载空 URL。
+        const target = UrlInput.normalize(text)
+        if (target.length === 0)
             return
-        // 不是 URL 就当搜索词（够用的启发式：带点且无空格视为域名，否则交给搜索引擎）
-        let target = trimmed
-        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(target)) {
-            target = (/^[^\s]+\.[^\s]+$/.test(trimmed) ? "https://" : "https://www.bing.com/search?q=")
-                     + encodeURIComponent(/^[^\s]+\.[^\s]+$/.test(trimmed) ? trimmed : trimmed)
-        }
         view.url = target
     }
 

@@ -30,19 +30,22 @@ Item {
     // 宽度归壳层所有（面板只管画卡片）：拖柄改的是 rightSidebarW，默认值来自 token。
     // 正在拖：拖动期间必须**关掉**压窄动画，否则布局会追着光标慢慢爬
     property bool resizing: false
+    // 钳制策略（会话区保底 / 上限 / 夹取 / 拖动换算）全在 C++：source/src/qmlbridge/SidebarLayout.cpp，
+    // QML 面是单例 `SidebarLayout`。这里只负责把 token 与窗口尺寸喂进去，不再自己算公式
+    // （那几条都是"纯数值规则"，放 C++ 才能脱离窗口验证；拖动仍是 1:1，公式逐位等价）。
     readonly property real rightSidebarMinW: Theme.size.rightSidebarMinWidth
     // 会话区保底宽度：**按窗口比例兜底**（取 token 与 25% 窗口宽里更小的那个）。
     // 为什么不能死守 token 的 320：窗口不大时，固定 240 侧栏 + 320 之后留给右侧栏的额度
     // 可能比默认宽度 360 还小 ⇒ 面板一开局就顶在上限、只能往右（变窄）拖，往左没反应。
-    readonly property real rightSidebarConvMin: Math.min(Theme.size.minConversationWidth, width * 0.25)
-    readonly property real rightSidebarMaxW: Math.max(rightSidebarMinW,
-        width - 2 * Theme.spacing.windowMargin - Theme.size.sidebarWidth - Theme.spacing.panelGap
-        - rightSidebarConvMin)
+    readonly property real rightSidebarConvMin: SidebarLayout.conversationMinWidth(
+        width, Theme.size.minConversationWidth)
+    readonly property real rightSidebarMaxW: SidebarLayout.maxWidth(width, rightSidebarMinW, rightSidebarConvMin,
+        Theme.spacing.windowMargin, Theme.size.sidebarWidth, Theme.spacing.panelGap)
     // 用户宽度（默认值也不能超过上限，否则同上）
     property real rightSidebarW: Math.min(Theme.size.rightSidebarWidth, rightSidebarMaxW)
     // 生效宽度：用户值先按上下限夹一次（窗口变小、或被拖到极端都不会越界）
-    readonly property real rightSidebarEffW: Math.max(rightSidebarMinW,
-        Math.min(rightSidebarW, rightSidebarMaxW))
+    readonly property real rightSidebarEffW: SidebarLayout.clampWidth(
+        rightSidebarW, rightSidebarMinW, rightSidebarMaxW)
     readonly property real rightSidebarFull: rightSidebarEffW + Theme.spacing.panelGap
     property real rightInset: Hub.rightSidebarOpen ? rightSidebarFull : 0
     // 缓动取 OutCubic（不做过冲）：压窄是"腾地方"，回弹会让人以为界面抖了一下。
@@ -59,15 +62,15 @@ Item {
         ? Math.min(1, rightInset / rightSidebarFull) : 0
 
     // 拖拽换算：按下时的光标窗口 x / 当时宽度 + 当前光标窗口 x ⇒ 新宽度。
-    // 抽成函数（拖柄只做事件转发）的理由和 Composer.handleKey 一样：算错方向/夹错范围时，
-    // 能在真机上用日志直接对着这组输入输出验，不必靠"拖一下看看"。
+    // 公式在 C++（SidebarLayout.widthFromDrag），这里只把壳层的上下限喂进去；保留这层包装是因为
+    // 上下限是壳层的属性，调用点（拖柄）不该自己知道它们。
     // 往左拖 ⇒ cursorX < pressX ⇒ 宽度变大。
     function widthFromDrag(pressX, pressWidth, cursorX) {
-        return Math.max(rightSidebarMinW, Math.min(pressWidth - (cursorX - pressX), rightSidebarMaxW))
+        return SidebarLayout.widthFromDrag(pressX, pressWidth, cursorX, rightSidebarMinW, rightSidebarMaxW)
     }
     // 夹取入口（拖柄调它；QML 外部/扩展要设宽度也走它）
     function setRightSidebarWidth(w) {
-        rightSidebarW = Math.max(rightSidebarMinW, Math.min(w, rightSidebarMaxW))
+        rightSidebarW = SidebarLayout.clampWidth(w, rightSidebarMinW, rightSidebarMaxW)
     }
 
     // ---- 左侧：侧栏卡片 ----

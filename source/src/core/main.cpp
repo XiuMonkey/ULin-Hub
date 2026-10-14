@@ -13,9 +13,12 @@
 #include "ExtensionSystem/ClientExtension.h"
 #include "common/appearance/TranslationManager.h"
 #include "common/platform/win/NativeWindowFilter.h"
+#include "qmlbridge/PanelDockModel.h"
 #include "qmlbridge/PluginMarketController.h"
 #include "qmlbridge/SessionListModel.h"
 #include "qmlbridge/SettingsController.h"
+#include "qmlbridge/SidebarLayout.h"
+#include "qmlbridge/UrlInputBridge.h"
 #include "common/session/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
 #include "qmlbridge/StyleResolver.h"
@@ -87,6 +90,12 @@ int main(int argc, char* argv[])
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostConnections", &ConnectionManager::instance());
 	// 扩展 UI 宿主（QML 面）：HostUi.registerItem / item / mountInto / unmountOwner
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostUi", &HostUi::instance());
+	// 地址栏输入规范化（纯字符串规则在 common/util/UrlInput）：QML 侧 UrlInput.normalize(text)
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "UrlInput", &UrlInputBridge::instance());
+	// 右栏面板坞的块（页签）列表：QML 侧 Dock.open/close/activate/showHome + Repeater { model: Dock }
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Dock", &PanelDockModel::instance());
+	// 右侧栏宽度的钳制策略（纯数值规则）：QML 侧 SidebarLayout.widthFromDrag(...) 等
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "SidebarLayout", &SidebarLayout::instance());
 	// 工具过滤器（data + 摊平的行模型）：QML 侧 Hub.toolsFilter 就是这个对象
 	qmlRegisterUncreatableType<ToolsFilter>("ULinHub", 1, 0, "ToolsFilter",
 		QStringLiteral("由 Hub.toolsFilter 提供，不要在 QML 里创建"));
