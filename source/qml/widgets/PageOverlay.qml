@@ -248,7 +248,7 @@ Item {
 
                 anchors.fill: parent
                 anchors.margins: -10
-                cursorShape: Qt.SizeAllCursor
+                // 不要光标变化（需求：只要三个点，附近可交互，其它反馈一概不要）
 
                 property real pressSceneX: 0
                 property real pressSceneY: 0
