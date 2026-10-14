@@ -57,7 +57,7 @@ void QmlBridge::init()
 	// 设置页（模型 / API key），侧栏 ⚙ 打开；必须在 api 之后（它要拿 api 发 RPC）
 	m_settings = new SettingsController(api, this);
 	// 插件市场（M6）：HTTP 与解析走既有 PluginMarketClient / PluginMarketModel
-	m_plugins = new PluginMarketController(api, m_runtime->server(), this);
+	m_plugins = new PluginMarketController(api, this);
 	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
 	m_extensions = new ExtensionManagerController(m_runtime->server(), this);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
@@ -71,6 +71,11 @@ void QmlBridge::init()
 	// 于是由它发信号、这里落地（等价于搬家前 SettingsController 里直接调 ThemeBridge::reload()）。
 	connect(m_settings, &SettingsController::stylesReset, this, []() {
 		ThemeBridge::instance().reload();
+		});
+	// 插件市场装完市场包也要重启内置服务端（新插件才会被加载）：PluginMarketController 在 common（领域层），
+	// 不许反向 include core，于是由它发信号、这里落地（等价于搬家前它在 installFinished 里直调 ServerManager::restart()）。
+	connect(m_plugins, &PluginMarketController::serverRestartRequested, this, [this]() {
+		m_runtime->restartServer();
 		});
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----

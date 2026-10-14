@@ -6,9 +6,12 @@
 // 它不 import 任何 QML 概念（Q_PROPERTY / Q_INVOKABLE 只是元对象暴露方式，不依赖 QQml*），可单测。
 // QML 面（`Hub.plugins` 属性、类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线。
 //
-// ⚠️ 分层张力（如实记下）：本类构造要 ServerManager*（只用于"装完市场包重启内置服务端"），
-//    所以 .cpp 里 include 了 core/ServerManager.h —— 这是 common → core 的一处反向依赖（历史遗留，
-//    纯搬动不改行为故本次保留）。想彻底清掉，把重启做成 std::function 回调由 qmlbridge 注入即可。
+// 分层（2026-10-15 清掉反向依赖）：本类**不直接依赖 core**。此前它的构造要 ServerManager*、.cpp 里
+//    include 了 core/ServerManager.h（只为"装完市场包重启内置服务端"），那是 common → core 唯一的一处
+//    反向依赖；现在改成**发信号** serverRestartRequested()，由接线层 qmlbridge/QmlBridge 接住并调
+//    ClientRuntime::restartServer()，与 SettingsController 的 serverRestartRequested / stylesReset 同一范式。
+//    原因：common/** 只放领域与纯逻辑，重启一个进程是宿主行为；领域层不认识 ServerManager，才谈得上
+//    脱离 QML 引擎与服务端单测。发出时机不变：仍在 installFinished(ok) 的同一位置（直接连接 ⇒ 同步落地）。
 //
 // 插件市场数据面（M6）：把既有的 PluginMarketClient / PluginMarketModel 接到 QML。
 //
@@ -31,7 +34,6 @@
 class DshApiClient;
 class PluginMarketClient;
 class PluginMarketInstaller;
-class ServerManager;
 
 class PluginMarketController : public QObject
 {
@@ -52,8 +54,8 @@ class PluginMarketController : public QObject
 	Q_PROPERTY(QStringList installLog READ installLog NOTIFY installChanged)
 
 public:
-	// server：装完市场包后要重启内置服务端，新插件才会被加载
-	explicit PluginMarketController(DshApiClient* api, ServerManager* server, QObject* parent = nullptr);
+	// api：出站客户端（市场数据走 /dsh-market/*）；服务端重启不在这里，见 serverRestartRequested()
+	explicit PluginMarketController(DshApiClient* api, QObject* parent = nullptr);
 
 	bool isOpen() const { return m_open; }
 	bool busy() const { return m_busy; }
@@ -87,6 +89,10 @@ signals:
 	void statusChanged();
 	void viewChanged();
 	void installChanged();
+	// 市场包装好了，请宿主重启内置服务端（新插件才会被加载）。
+	// ⚠️ 本类在 common（领域层），**不许**直接 include/调用 core/ServerManager；这条信号由
+	//    qmlbridge/QmlBridge 接住落地（搬家前它在 installFinished 里直调 m_server->restart()）。
+	void serverRestartRequested();
 
 private:
 	static constexpr int kPageSize = 20;   // 与旧壳 PluginsManager 同值
@@ -100,7 +106,6 @@ private:
 
 	DshApiClient* m_api = nullptr;
 	PluginMarketClient* m_client = nullptr;
-	ServerManager* m_server = nullptr;
 	PluginMarketInstaller* m_installer = nullptr;
 
 	bool m_installing = false;

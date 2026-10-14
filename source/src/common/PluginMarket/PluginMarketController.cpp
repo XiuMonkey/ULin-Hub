@@ -1,10 +1,11 @@
 // 见 PluginMarketController.h：插件市场数据面。
+// 本文件在 common/**（领域层）：**不 include core/**、不碰 qmlbridge/**。"装完市场包重启内置服务端"
+// 是宿主行为，只发 serverRestartRequested()，由 qmlbridge/QmlBridge 接住调 ClientRuntime::restartServer()。
 
 #include "common/PluginMarket/PluginMarketController.h"
 
 #include "common/PluginMarket/PluginMarketClient.h"
 #include "common/PluginMarket/PluginMarketInstaller.h"
-#include "core/ServerManager.h"
 #include "network/DshApiClient.h"
 
 #include <QCoreApplication>
@@ -13,10 +14,9 @@
 #include <QTimer>
 #include <QVariantMap>
 
-PluginMarketController::PluginMarketController(DshApiClient* api, ServerManager* server, QObject* parent)
+PluginMarketController::PluginMarketController(DshApiClient* api, QObject* parent)
 	: QObject(parent)
 	, m_api(api)
-	, m_server(server)
 	, m_client(new PluginMarketClient(this))
 	, m_installer(new PluginMarketInstaller(this))
 {
@@ -71,9 +71,9 @@ PluginMarketController::PluginMarketController(DshApiClient* api, ServerManager*
 		if (!ok)
 			return;   // 安装失败：不重启服务端、不重试拉数据
 
-		// 装完必须重启内置服务端，新插件才会被加载；稍后自动重试拉市场数据
-		if (m_server)
-			m_server->restart();
+		// 装完必须重启内置服务端，新插件才会被加载；稍后自动重试拉市场数据。
+		// 重启本身是宿主行为：这里只发信号（接线层同步接住 ⇒ 与原 m_server->restart() 同时机）。
+		emit serverRestartRequested();
 		QTimer::singleShot(1800, this, [this] { refresh(); });
 	});
 
