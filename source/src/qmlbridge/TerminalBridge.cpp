@@ -223,10 +223,18 @@ void TerminalSession::beginMount()
 		},
 		[this](const DshApiClient::RpcError& error) {
 			m_mounting = false;
+			// 引擎没挂控制器时 /api/terminal/* 直接 404，DshApiClient 把这种 HTTP 失败归到 transport
+			// （消息里是 "server replied: Not Found"），所以这里两种形状都要认 —— 这条提示是本机
+			// "resources 指向旧打包负载"时的第一现场，别让它退化成一句晦涩的 transport 错误。
+			const bool notMounted = error.code == QStringLiteral("gateway/not-found")
+				|| error.code == QStringLiteral("http-404")
+				|| error.message.contains(QStringLiteral("404"))
+				|| error.message.contains(QStringLiteral("Not Found"), Qt::CaseInsensitive);
 			if (error.code == QStringLiteral("session/not-found"))
 				fail(QStringLiteral("这个会话在引擎里找不到了（session/not-found）。"));
-			else if (error.code == QStringLiteral("gateway/not-found") || error.code == QStringLiteral("http-404"))
-				fail(QStringLiteral("引擎没挂终端控制器：/api/terminal/* 全是 404。"));
+			else if (notMounted)
+				fail(QStringLiteral("引擎没挂终端控制器：/api/terminal/* 全是 404。"
+					"profile 里缺 api-terminal-controller 那行，或引擎负载里没有这个包。"));
 			else
 				fail(QStringLiteral("终端环境查询失败：%1 %2").arg(error.code, error.message));
 		});
