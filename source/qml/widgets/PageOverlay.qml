@@ -83,6 +83,13 @@ Item {
         const p = WindowBridge.recentPointerPos(600)
         const scene = Qt.point(p ? p.x : width / 2, p ? p.y : height / 2)
         const local = mapFromItem(null, scene.x, scene.y)   // null = 场景根，父链交给 Qt 算
+        // 技术细节走日志：起点不对（例如卡片从左上层长出来）时，这四个数就能定位到底错在哪一步
+        const own = mapFromItem(null, 0, 0)
+        console.log("[overlay] raw=" + (p ? (Math.round(p.x) + "," + Math.round(p.y)) : "null")
+                    + " scene=" + Math.round(scene.x) + "," + Math.round(scene.y)
+                    + " local=" + Math.round(local.x) + "," + Math.round(local.y)
+                    + " ownScene=" + Math.round(own.x) + "," + Math.round(own.y)
+                    + " size=" + Math.round(width) + "x" + Math.round(height))
         return Qt.rect(Math.round(local.x - originSide / 2),
                        Math.round(local.y - originSide / 2),
                        originSide, originSide)

@@ -108,10 +108,14 @@ bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
 		if (!fromUs)
 			break;
 
-		// position() 就是 QML 的**场景坐标**（窗口内容坐标、逻辑像素），与本窗口的
-		// Overlay.overlay 同源 —— 到了 QML 侧不必再换算任何父链。
+		// ⚠️ 必须用 scenePosition()，不能用 position()：
+		//    Qt Quick 的鼠标事件可能投给 QQuickWindow，也可能投给某个 QQuickItem（QML 控件），
+		//    投给 item 时 position() 是**该 item 的局部坐标**（实测点侧栏 ⚙ 时得到 19,6，
+		//    正好落在那个 32×32 的按钮里），而 QML 侧按"场景坐标"去 mapFromItem ⇒
+		//    起点算到左上角，表现就是"覆盖页卡片从左上角长出来"。
+		//    scenePosition() 两种投递下都是同一套场景坐标（窗口内容坐标、逻辑像素）。
 		auto* mouse = static_cast<QMouseEvent*>(event);
-		m_pointerPos = mouse->position();
+		m_pointerPos = mouse->scenePosition();
 		m_pointerAge.start();   // QElapsedTimer::start() 就是"重启"，重复调用取最近一次
 		break;
 	}
