@@ -455,7 +455,9 @@ void ServerManager::startBundledServer()
 				patch.write("    - id: connection\n      name: '@deepseek-ai/dsh-client-connection'\n      inject: []\n      config:\n        trustedHosts: []\n\n");
 				patch.write("    - id: file-upload\n      name: '@deepseek-ai/dsh-client-file-upload'\n\n");
 				patch.write("    - id: api-remotes\n      name: '@deepseek-ai/dsh-api-remotes'\n\n");
-				patch.write("    - id: agent-presets\n      name: '@deepseek-ai/dsh-agent-presets'\n      config:\n        default: standard\n");
+				patch.write("    - id: agent-presets\n      name: '@deepseek-ai/dsh-agent-presets'\n      config:\n        default: standard\n\n");
+				// 右栏「终端」块的 Host 侧实现：不给它上这一行，/api/terminal/* 全是 404（见 ensurePatchEntry 那段）
+				patch.write("    - id: api-terminal-controller\n      name: '@deepseek-ai/dsh-api-terminal-controller'\n");
 				patch.close();
 			}
 
@@ -550,6 +552,37 @@ void ServerManager::startBundledServer()
 						"[ServerManager] profile patch 补不上 %1: %2").arg(statsName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(statsName);
+			}
+		}
+
+		// 右栏「终端」块：交互式终端控制器（terminal/*）。包在引擎自带 node_modules 里，
+		// 但 profile 里没有挂它的行 —— 缺这一行时 /api/terminal/* 一律 404 not found（实测）。
+		// 与 session-stats 同样幂等补行：首次生成的模板已经带上它，这里兜的是"profile 早就生成好"的安装。
+		{
+			const QString terminalName = QStringLiteral("@deepseek-ai/dsh-api-terminal-controller");
+			const bool terminalAvailable =
+				QFile::exists(profileDir + QStringLiteral("/node_modules/") + terminalName
+					+ QStringLiteral("/package.json"))
+				|| QFile::exists(appDir + QStringLiteral("/resources/server/node_modules/") + terminalName
+					+ QStringLiteral("/package.json"));
+
+			if (!terminalAvailable) {
+				qWarning().noquote() << QStringLiteral(
+					"[ServerManager] 找不到 %1：右栏的终端块会打不开（terminal/* 全 404）").arg(terminalName);
+			}
+			else {
+				QString error;
+				const ExtensionRegistry::PatchEntryResult row = ExtensionRegistry::ensurePatchEntry(profileDir,
+					QStringLiteral("api-terminal-controller"), terminalName,
+					QStringLiteral("right sidebar terminal panel: interactive terminals "
+						"(terminal/list|shells|create|follow|write|resize|close)"),
+					&error);
+
+				if (row == ExtensionRegistry::PatchEntryResult::Failed)
+					qWarning().noquote() << QStringLiteral(
+						"[ServerManager] profile patch 补不上 %1: %2").arg(terminalName, error);
+				else if (row == ExtensionRegistry::PatchEntryResult::Added)
+					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(terminalName);
 			}
 		}
 	}

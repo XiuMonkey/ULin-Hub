@@ -76,6 +76,12 @@
     - id: session-stats
       name: '@deepseek-ai/dsh-session-stats'
 
+# 右栏面板坞的「终端」块：交互式终端控制器（terminal/create|follow|write|resize|close…）。
+# 与 dsh-base 的既有行同构；缺这一行时 /api/terminal/* 一律 404 not found。
+- insert:
+    - id: api-terminal-controller
+      name: '@deepseek-ai/dsh-api-terminal-controller'
+
 - insert:
     - id: ToolsFilterPlugin
       name: 'ToolsFilterPlugin'
