@@ -187,14 +187,57 @@ Item {
                     onLoaded: {
                         root.pageLoaded(item)
                         // 页面声明了 overlayAnimating 就把它绑到本外壳的"卡片正在动"：
-                        // 展开 / 收回那两百多毫秒里，页面自己的转圈先停（见上面的说明）。
-                        // 「声明了才绑」是为了不强迫所有页面加这个属性。
+                        // 展开 / 收回那两百多毫秒里，页面自己的转圈先停（转圈会让窗口每帧整窗重绘，
+                        // 叠在展开动画上会把动画窗从 ~26ms/帧 拉到 ~50ms/帧）。
+                        // 「声明了才绑」是为了不强迫所有页面都加这个属性。
                         if (item.overlayAnimating !== undefined)
                             item.overlayAnimating = Qt.binding(function () { return root.overlayAnimating })
                         if (root.shown)
                             root.beginExpand();
                     }
                 }
+            }
+        }
+
+        // 三点抓手：浅灰小胶囊，按住它（含附近 8px）拖动 = 移动窗口。
+        // 为什么走原生：startSystemMove() 交给窗口管理器，贴边/多屏/DPI/最大化还原都对；
+        // 自己在 QML 里算位移会在这些情况下跑偏。悬停给一点反馈，别做成"看不见的暗门"。
+        Rectangle {
+            id: grip
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 6
+            width: 46
+            height: 16
+            radius: height / 2
+            color: Theme.color.border
+            opacity: gripMouse.containsMouse ? 0.95 : 0.55
+            z: 10
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 3
+
+                Repeater {
+                    model: 3
+
+                    delegate: Rectangle {
+                        width: 3
+                        height: 3
+                        radius: 1.5
+                        color: Theme.color.textTertiary
+                    }
+                }
+            }
+
+            MouseArea {
+                id: gripMouse
+                anchors.fill: parent
+                anchors.margins: -8          // "按住它附近也能拖"
+                hoverEnabled: true
+                cursorShape: Qt.SizeAllCursor
+                onPressed: WindowBridge.startSystemMove()
             }
         }
     }

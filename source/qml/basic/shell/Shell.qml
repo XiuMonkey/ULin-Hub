@@ -363,18 +363,74 @@ Item {
     }
 
     // 工具过滤面板：顶栏 ☰ 打开，覆盖整壳。
-    // 为什么用"整壳覆盖 + 居中卡片"而不是 Popup：与 PluginTranspiler 扩展面板同一套做法，
-    // 不吃 QtQuick.Controls 的 Overlay，行为可预测；数据/形状全在 C++（common/session/ToolsFilter）。
-    Loader {
-        id: toolsFilterLoader
+    // 为什么不用 PageOverlay：本面板是"整屏覆盖 + 自绘遮罩 + 居中卡片"（根节点 anchors.fill: parent），
+    // 而 PageOverlay 的卡片目标框来自页面的 implicitWidth/Height ⇒ 与 anchors.fill 互相依赖成环。
+    // 所以由宿主套一层等价动画：以**点击处**为原点缩放展开，收回时反向。
+    Item {
+        id: toolsFilterHost
 
         anchors.fill: parent
-        active: Hub.toolsFilterOpen
-        visible: Hub.toolsFilterOpen
-        source: Style.url("basic/chat/ToolsFilterPanel.qml")
         z: 36
+        visible: toolsFilterT > 0.001
 
-        // 面板自己读 Hub.toolsFilter（import ULinHub 1.0），这里只转它的关闭请求
-        onLoaded: item.closeRequested.connect(Hub.closeToolsFilter)
+        property real toolsFilterT: 0
+        property point appearOrigin: Qt.point(width / 2, height / 2)
+        readonly property bool toolsFilterOpen: Hub.toolsFilterOpen
+
+        // 起点同样必须在"刚点完那一刻"取（详见 PageOverlay 里那段说明：重页装载会超过 600ms）
+        function resolveOrigin() {
+            const p = WindowBridge.recentPointerPos(600)
+            const local = mapFromItem(null, p ? p.x : width / 2, p ? p.y : height / 2)
+            return Qt.point(local.x, local.y)
+        }
+
+        onToolsFilterOpenChanged: {
+            if (toolsFilterOpen) {
+                appearOrigin = resolveOrigin()
+                toolsFilterExpand.start()
+            } else if (toolsFilterT > 0.001) {
+                toolsFilterRetract.start()
+            }
+        }
+
+        NumberAnimation {
+            id: toolsFilterExpand
+            target: toolsFilterHost
+            property: "toolsFilterT"
+            from: 0
+            to: 1
+            duration: Theme.motion.slow
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.08
+        }
+
+        NumberAnimation {
+            id: toolsFilterRetract
+            target: toolsFilterHost
+            property: "toolsFilterT"
+            to: 0
+            duration: Theme.motion.normal
+            easing.type: Easing.InBack
+            easing.overshoot: 1.10
+        }
+
+        Loader {
+            id: toolsFilterLoader
+
+            anchors.fill: parent
+            // 装载到收回播完才卸（与 PageOverlay 同一策略：收回过程要看得见）
+            active: toolsFilterHost.toolsFilterT > 0.001
+            source: Style.url("basic/chat/ToolsFilterPanel.qml")
+
+            // 面板自己读 Hub.toolsFilter（import ULinHub 1.0），这里只转它的关闭请求
+            onLoaded: item.closeRequested.connect(Hub.closeToolsFilter)
+
+            opacity: Math.min(1, toolsFilterHost.toolsFilterT * 2)
+            scale: 0.25 + 0.75 * toolsFilterHost.toolsFilterT
+            transform: Scale {
+                origin.x: toolsFilterHost.appearOrigin.x
+                origin.y: toolsFilterHost.appearOrigin.y
+            }
+        }
     }
 }
