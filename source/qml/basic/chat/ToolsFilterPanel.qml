@@ -36,36 +36,30 @@ Item {
     anchors.fill: parent
     focus: true
 
+    // 交给 PageOverlay 的**卡片目标框**。原来是 min(窗口-边距, 560/620)，但那种写法依赖 parent.width，
+    // 而在 PageOverlay 里 parent 就是卡片框本身 ⇒ 会成环（这正是本面板当初没套 PageOverlay 的原因）。
+    // 窗口最小尺寸远大于这里，取固定值即可。
+    implicitWidth: 560
+    implicitHeight: 620
+
     readonly property bool busy: root.filter ? root.filter.busy : false
     readonly property string statusLine: root.filter ? root.filter.status : ""
     readonly property int totalCount: root.filter ? root.filter.totalCount : 0
     readonly property int visibleCount: root.filter ? root.filter.visibleCount : 0
 
+    // 声明了这个，PageOverlay 就会把"卡片正在展开/收回"绑上来 ⇒ 面板自己的转圈先停
+    property bool overlayAnimating: false
+
     // Esc 关面板（没有焦点的话按键会被宿主那边吃掉）
     Keys.onEscapePressed: root.closeRequested()
 
-    // 整屏半透明遮罩：宿主还看得见；点面板外面那圈 = 关面板
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.overlayBg
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.closeRequested()
-        }
-    }
-
-    // 可见卡片（居中）
-    Rectangle {
+    // ⚠️ 遮罩与卡片底**由 PageOverlay 统一提供**（与另外三个覆盖页同一套）：
+    //    这里曾自带一层整屏遮罩 + 不透明卡片，一缩放就会把遮罩也缩小（"遮罩跟着缩放"就是这么来的）。
+    //    现在这里只当内容容器，卡片外观（圆角/阴影/底）交给外壳 ⇒ 展开动画与那三个一致。
+    Item {
         id: card
 
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 2 * Theme.spacing.windowMargin, 560)
-        height: Math.min(parent.height - 2 * Theme.spacing.windowMargin, 620)
-        radius: Theme.radius.popup
-        color: Theme.color.panelBg
-        border.width: 1
-        border.color: Theme.color.border
+        anchors.fill: parent
 
         // ---------------- 页头：标题 + 刷新 + 关闭 ----------------
         Item {
