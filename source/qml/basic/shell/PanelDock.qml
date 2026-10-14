@@ -26,6 +26,27 @@ Item {
     // 本构建是否带 Qt WebEngine（装好后连同 vcxproj 的 webenginequick 与 main.cpp 的 initialize 一起打开）
     readonly property bool webEngineAvailable: true
 
+    // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
+    property real contentT: 1
+
+    NumberAnimation {
+        id: contentIn
+        target: dock
+        property: "contentT"
+        from: 0
+        to: 1
+        duration: Theme.motion.normal
+        easing.type: Easing.OutCubic
+    }
+
+    function replayContent() {
+        contentT = 0;
+        contentIn.start();
+    }
+
+    onActiveIndexChanged: replayContent()
+    onHomeVisibleChanged: replayContent()
+
     readonly property var activeTab: (activeIndex >= 0 && activeIndex < tabs.length) ? tabs[activeIndex] : null
 
     function kindName(kind) {
@@ -178,6 +199,10 @@ Item {
             id: body
             width: parent.width
             height: parent.height - tabStrip.height - 1
+
+            // 出现/切换时淡入 + 轻微放大（顶栏那条块不动，只动内容区）
+            opacity: dock.contentT
+            scale: 0.985 + 0.015 * dock.contentT
 
             // 启动器（主界面）
             Column {
