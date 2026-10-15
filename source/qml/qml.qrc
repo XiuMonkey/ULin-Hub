@@ -4,6 +4,7 @@
          widgets/（通用控件）；包根只留入口 Main.qml 与清单 pack.json / metrics.json。
          ⚠️ 这里列的文件会在首启被释放到 <exe>/ui/（ThemeManager::ensureStylePack）；
             释放规则是"增量同步"：用户改过的文件不动，内置更新过的会覆盖。 -->
+    <!-- 面板坞：块脱离成独立窗口（DetachedBlockWindow / DockDropHint / PanelGrip）-->
     <qresource prefix="/qml">
         <file>basic/chat/Composer.qml</file>
         <file>basic/chat/InteractionPanel.qml</file>
@@ -21,6 +22,8 @@
         <file>basic/browser/WebBrowserPanel.qml</file>
         <file>basic/shell/RightSidebar.qml</file>
         <file>basic/shell/PanelDock.qml</file>
+        <file>basic/shell/DetachedBlockWindow.qml</file>
+        <file>basic/shell/DockDropHint.qml</file>
         <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>
         <file>basic/terminal/TerminalPanel.qml</file>
@@ -49,6 +52,7 @@
         <file>widgets/Collapsible.qml</file>
         <file>widgets/IconButton.qml</file>
         <file>widgets/PageOverlay.qml</file>
+        <file>widgets/PanelGrip.qml</file>
         <file>widgets/SearchField.qml</file>
         <file>widgets/Toast.qml</file>
     </qresource>

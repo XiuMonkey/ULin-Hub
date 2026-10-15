@@ -5,6 +5,7 @@
 // 这一层只做装配与遮罩/Toast 宿主，具体内容都在被 Style.url() 装载的单元里（可被风格包覆盖）。
 
 import QtQuick
+import QtQuick.Window
 import ULinHub 1.0
 import "../../widgets"
 // ui/shell 与 ui/sidebar、ui/topbar 是并列目录：QML 只按同目录/已 import 的目录解析组件名，
@@ -22,6 +23,53 @@ Item {
     // 供子界面报一句轻提示（未落地的入口用它，别放哑按钮）
     function notify(text) {
         toast.show(text)
+    }
+
+    // ---------------- 块脱离 / 回附（独立窗口）----------------
+    // 状态在 common/shell/PanelDockModel（QML 面是单例 Dock），窗口对象在这里按 Dock.detachedBlocks
+    // 一扇一块地建；本层只做"把壳层的坐标与右栏几何喂给它"这种接线。
+    //
+    // 落点提示的矩形与开关：矩形在**拖动开始时**算一次（拖动期间右栏可能已经收起，每帧重算会指错地方）；
+    // 开关由正在拖的那个独立窗口推过来（拖动中主窗口收不到 hover，只能这样推）。
+    property rect dropZone: Qt.rect(0, 0, 0, 0)
+    property bool dropHintActive: false
+    // 坞里那个三点点手正在拖（此时落点就是右栏自己，提示要跟着亮起来当"松手也不会跑"的反馈）
+    property bool dockDragActive: false
+
+    // 右栏（面板坞）在**本窗口场景坐标**里的矩形 —— 脱离/回附两个方向都用它做判定基准
+    function dockSceneRect() {
+        const tl = rightSidebar.mapToItem(shell, 0, 0)
+        return Qt.rect(tl.x, tl.y, rightSidebar.width, rightSidebar.height)
+    }
+
+    // 坞里拖动 = 块**已经**在右栏原位：提示直接亮着，让用户看到"松手就留在这儿"
+    function beginDetachPreview(over) {
+        dockDragActive = true
+        dropZone = dockSceneRect()
+        dropHintActive = over
+    }
+    function endDetachPreview() {
+        dockDragActive = false
+        dropHintActive = false
+        dropZone = Qt.rect(0, 0, 0, 0)
+    }
+    // 坞里那个块被拖出了：在**光标处**建独立窗口（需求 ②）。
+    // 几何：宽取右栏宽度与 480 逻辑像素里更宽的那个、高与右栏等高（首次脱离的默认值；之后再脱离沿用上次的）。
+    function detachActiveBlock(atScenePos) {
+        const idx = Dock.activeIndex
+        if (idx < 0)
+            return
+        const r = dockSceneRect()
+        const w = Math.max(r.width, 480)
+        const h = Math.max(r.height, 240)
+        Dock.detach(idx)
+        Dock.setDetachedGeometry(idx, Math.round(atScenePos.x - w / 2 + Theme.spacing.windowMargin),
+                                 Math.round(atScenePos.y - 20), Math.round(w), Math.round(h))
+        // 脱离 = 这个块有自己的窗口了：右栏收起（留着的话同一块在两处画两份）。
+        // 块本身仍是"已附着 + 活动"（Dock 里没动它），所以拖回去就回到原位。
+        Hub.closeRightSidebar()
+        console.log("[detach] detach block idx=" + idx + " id=" + Dock.activeBlockId + " at "
+                    + Math.round(atScenePos.x) + "," + Math.round(atScenePos.y) + " " + w + "x" + h)
     }
 
     // ---- 右侧栏：宽度可拖（拖左边缘），压窄量 = 宽度 + 间距 ----
@@ -129,7 +177,17 @@ Item {
                 id: topBar
                 anchors.fill: parent
                 onToolsFilterRequested: Hub.openToolsFilter()
-                onRightSidebarRequested: Hub.toggleRightSidebar()
+                // ◫ 的三态状态机（需求 ⑤）：
+                //   ① 有"已独立且窗口还显示"的块 ⇒ 这一次点击是**关掉那些独立窗口**
+                //      （块回到"已附着但隐藏"：模型里 detached 状态与几何都留着，右栏不开）；
+                //   ② 否则走原来的开合（本轮刚关完独立窗口 ⇒ rightSidebarOpen 是 false ⇒
+                //      "默认以附着状态打开"，正是需求要的第三态）。
+                onRightSidebarRequested: {
+                    if (Dock.anyDetachedVisible)
+                        Dock.closeDetachedWindows()
+                    else
+                        Hub.toggleRightSidebar()
+                }
             }
         }
 
@@ -213,8 +271,43 @@ Item {
 
         // 右栏内容：面板坞（主界面 + 块/页签；网页块内部才用 WebEngine）
         PanelDock {
+            id: dock
             anchors.fill: parent
+
+            // 坞里拖出：拖过阈值后松手 ⇒ 在光标处建独立窗口（脱离）；拖动期间亮落点提示
+            onBlockDetachRequested: (atScenePos) => shell.detachActiveBlock(atScenePos)
+            onDetachDragPreview: (overTarget) => {
+                if (overTarget || shell.dockDragActive)
+                    shell.beginDetachPreview(overTarget)
+                else
+                    shell.endDetachPreview()
+            }
         }
+    }
+
+    // ---- 独立窗口：一块一扇窗（需求 ②③④）----
+    // 清单来自模型（Dock.detachedBlocks）：哪一项没了窗口就跟着销毁、visible=false 就只是隐藏
+    // （"已附着但隐藏"，需求 ⑤ 的第二态）。系统装饰窗口自带四边缩放与最小化/最大化按钮。
+    // geometry 由窗口自己回写模型，下一次脱离沿用它 ⇒ "拖回去再拖出来"不会跳回原位。
+    Repeater {
+        model: Dock.detachedBlocks
+
+        delegate: DetachedBlockWindow {
+            required property var modelData
+            entry: modelData
+            mainWindow: shell.Window.window
+            host: shell
+        }
+    }
+
+    // ---- 拖回时的落点提示：画在原右栏位置（需求：建议给落点提示）----
+    // z 抬到面板之上：拖动期间块还在独立窗口里，主窗口这边只有这块轮廓要露出来给人看。
+    DockDropHint {
+        id: dropHint
+        z: 30
+        zone: shell.dropZone
+        active: shell.dropHintActive
+        fromDock: shell.dockDragActive
     }
 
     // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。
