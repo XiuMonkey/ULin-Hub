@@ -119,13 +119,14 @@ Item {
     function liftSidebarForDrag() {
         if (sidebarInWindow)
             return
-        // 窗口比右栏**高一条自绘标题栏**、位置相应上移 ⇒ 右栏内容零跳变地落进窗口，
-        // 标题栏"接"在它上面（拿起来就看得见"这已经是一扇窗"，见 SidebarWindow.qml 的说明）。
+        // 窗口几何 = 右栏那块矩形**本身**（位置/尺寸逐像素一致）：不再为自绘标题栏多留一条高度、
+        // 也不再上移 —— 副窗口的"标题栏"就是面板自己的头部行（见 SidebarWindow.qml 的说明），
+        // 于是右栏内容零跳变地落进窗口，而"这已经是一扇窗"由头部里那两颗窗口按钮看得出来。
         const r = dockScreenRect()
         const w = Math.max(Math.round(r.width), Theme.size.rightSidebarMinWidth)
-        const h = Math.max(Math.round(r.height), 240) + Theme.size.titleBarHeight
+        const h = Math.max(Math.round(r.height), 240)
         const x = Math.round(r.x)
-        const y = Math.round(r.y) - Theme.size.titleBarHeight
+        const y = Math.round(r.y)
 
         sidebarWindow.prepareForLift(x, y, w, h)   // 记目标几何（窗口自己要用，见 normalizeForLift）
         // ⚠️ 必须在 reparent **之前**置位：reparent 换宿主会让抓手的 MouseArea 立刻丢掉抓取
@@ -216,6 +217,19 @@ Item {
         else
             Hub.closeRightSidebar()
         console.log("[sidebar-detach] attach open=" + open)
+    }
+
+    // 面板头部那两颗窗口按钮（− 最小化 / □❐ 最大化-还原）的转发口：按钮只在副窗口态可见
+    // （见 RightSidebar.qml），点它时副窗口必然在。实现**只有一份**（SidebarWindow 里的
+    // minimizeWindow / toggleMaximize），这里只转发 —— 面板够不着那扇窗（窗口对象归壳层所有），
+    // 千万别在 RightSidebar 里再抄一份窗口操作。
+    function minimizeSidebarWindow() {
+        if (sidebarDetached)
+            sidebarWindow.minimizeWindow()
+    }
+    function toggleMaximizeSidebarWindow() {
+        if (sidebarDetached)
+            sidebarWindow.toggleMaximize()
     }
 
     // 抓手正在拖（此时落点就是右栏自己）：提示跟着亮起来当"松手就不会跑"的反馈。
@@ -493,6 +507,9 @@ Item {
             onSidebarLiftRequested: shell.liftSidebarForDrag()
             onSidebarDropRequested: (screenX, screenY) => shell.finishSidebarDrag(screenX, screenY)
             onSidebarAttachRequested: shell.attachSidebar(true)
+            // 头部那两颗窗口按钮（− / □❐，只在副窗口态可见）：转发给 SidebarWindow 自己那两个入口
+            onMinimizeWindowRequested: shell.minimizeSidebarWindow()
+            onToggleMaximizeRequested: shell.toggleMaximizeSidebarWindow()
             onSidebarPreviewChanged: (over) => {
                 if (over)
                     shell.beginDetachPreview(true)

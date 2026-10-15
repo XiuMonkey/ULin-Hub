@@ -1,8 +1,12 @@
-// 「面板」右栏脱离出来的**独立窗口**（需求 ③）：无边框 + 自绘标题栏 + 自绘四边缩放。
+// 「面板」右栏脱离出来的**独立窗口**（需求 ③）：无边框 + 自绘四边缩放。
 //
 // 为什么从"系统装饰"改成自绘（上一版是 `flags: Qt.Window` 系统标题栏）：
-//   需求要的是"拖出去后是无边框窗口，最小化/最大化自己实现"，且尺寸/图标/悬停要跟主窗口
-//   `skin/window/TitleBar.qml` 那套一致 —— 系统装饰给不了这些。
+//   需求要的是"拖出去后是无边框窗口，最小化/最大化自己实现"。
+//
+// ⚠️ 本窗口**没有**自己的标题栏（用户否掉了那一版）：副窗口的标题栏就是**面板自己的头部行**
+//    —— 那一行里的「面板」+ 三点抓手 + − / □❐ / ✕（按钮在 RightSidebar.qml 里，✕ 左边两颗只在
+//    副窗口态可见）。所以窗口几何 = 右栏那块矩形**本身**（尺寸/位置逐像素一致、不上移、不多留高度，
+//    见 Shell.liftSidebarForDrag），内容"零跳变"落进窗口，也不会多出一条谁也不认的横杠。
 //
 // 取舍（写在 PROGRESS 里，也别来回改）：
 //   · 四边缩放**自己实现**（QML 侧 8 条热区改 x/y/width/height），**没有**动
@@ -16,15 +20,14 @@
 // ⚠️ 本文件**不装内容**：右栏那块 RightSidebar 是 reparent 进 `panelSlot` 的**同一份实例**
 //    （见 Shell.liftSidebarForDrag / attachSidebar）—— 两个宿主各放一份会让终端/网页各跑一个会话。
 //
-// ⚠️ 标题栏的按钮**不要**登记进 `WindowBridge.addWindowControl`：那是**主窗口**的原生命中测试
+// ⚠️ 头部那两颗窗口按钮**不要**登记进 `WindowBridge.addWindowControl`：那是**主窗口**的原生命中测试
 //    （`NativeWindowFilter` 里窗口控件表只有一份，矩形按各自窗口的场景坐标算），登记进来会让
 //    主窗口的某个位置莫名变成窗口按钮。本窗口是无边框但**没有**原生命中测试介入，QML 自己收点击。
 //
 // 状态都由 Shell 推（本文件不存"该不该显示"）：
 //   · `sidebarFloating` —— 三点刚"拿起来"，跟着光标走、结局未定；
-//   · `sidebarDetached` —— 确认脱离（松手在右栏原区域之外）后才为真。
-// 标题栏**一直**都在：窗口比右栏高一条标题栏、位置相应上移（见 Shell.liftSidebarForDrag），
-// 于是右栏内容"零跳变"地落进窗口，而"这已经是一扇窗"从拿起来那一刻就看得出来。
+//   · `sidebarDetached` —— 确认脱离（松手在右栏原区域之外）后才为真 —— 头部那两颗按钮也只在
+//     这一态才出现（跟手期间还没"成为"独立窗口）。
 
 import QtQuick
 import QtQuick.Window
@@ -36,23 +39,25 @@ Window {
     // 由 Shell 注入：状态与几何都在壳层（本文件只把窗摆出来 + 自己拖/自己缩放）
     required property var host
 
-    // 内容槽：Shell 把 RightSidebar reparent 到这里（自绘标题栏之下）
+    // 内容槽：Shell 把 RightSidebar reparent 到这里（填满整扇窗 —— 副窗口没有自己的标题栏）
     readonly property alias panelSlot: slot
 
+    // 任务栏/Alt+Tab 上显示的名字（窗口没有自绘标题栏，这是唯一的窗口名来源）
     title: qsTrId("right_sidebar_title")
     // 无边框：系统标题栏/边框/按钮全不要，最小化/最大化/关闭与四边缩放都在本文件里自己做
     flags: Qt.Window | Qt.FramelessWindowHint
     // 显示条件：跟着光标走（拿起来）或已确认脱离（独立）。两态都由 Shell 给
     visible: win.host ? win.host.sidebarInWindow : false
-    // 窗口底色（标题栏那条与卡片同色）：缩放/重绘的那一瞬间不闪白
+    // 窗口底色（缩放/重绘的那一瞬间不闪白；面板卡片自己铺满整扇窗）
     color: Theme.color.panelBg
     minimumWidth: Theme.size.rightSidebarMinWidth
-    minimumHeight: Theme.size.titleBarHeight + 200
+    // ⚠️ 这里**不再**加 `Theme.size.titleBarHeight`：自绘标题栏那条已删，窗口就是面板矩形那么大
+    minimumHeight: 200
 
     // 面板内容的下限（与 Window.minimumWidth 同源）：左/上边缩放时 Qt 一钳最小尺寸，x 就会与
     // 宽度脱钩（左边跟着鼠标走、右边不动）⇒ 这里先自己钳死，绝不让请求越界。
     readonly property int minTotalW: Theme.size.rightSidebarMinWidth
-    readonly property int minTotalH: Theme.size.titleBarHeight + 200
+    readonly property int minTotalH: 200
 
     // 最大化态（= 真窗口状态，图标与"能不能拖/缩放"都看它）
     readonly property bool maximized: win.visibility === Window.Maximized
@@ -61,7 +66,9 @@ Window {
     // 「拿起来」的目标几何：由 Shell 在 prepareForLift 里给（见 normalizeForLift 的说明）
     property rect liftGeometry: Qt.rect(0, 0, 0, 0)
 
-    // 唯一的几何写入口：标题栏拖动、八条缩放热区都走它。
+    // 唯一的几何写入口：八条缩放热区（以及"拿起来/跟手"）都走它。
+    // 面板头部那条拖动热区（RightSidebar.qml 的 headerDragArea）与三点抓手直接写 win.x/win.y
+    // ——拖动不碰宽高，与这里同一套"按下时位置 + 屏幕位移"的算法。
     // ⚠️ 这里**不**给自己写 x/y/width/height 的绑定（绑上去会被拖动摘掉，或反过来每帧盖回来）；
     //    几何由 Shell 在"拿起来/跟手"时推（applySidebarWindowGeometry），之后以窗口为准。
     function applyGeometry(x, y, w, h) {
@@ -170,148 +177,15 @@ Window {
         id: frame
         anchors.fill: parent
 
-        // ---- 自绘标题栏：标题「面板」+ 最小化 / 最大化-还原 / 关闭 ----
-        // 尺寸与配色照 skin/window/TitleBar.qml（同一个 metrics token / Theme token 家族）。
-        Item {
-            id: titleBar
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Theme.size.titleBarHeight
+        // ⚠️ 这里**没有**自绘标题栏（用户否掉了那一版："面板不是自带删除按钮吗？你给另外两个按钮
+        //    放在删除按钮旁边不就行了"）。副窗口的标题栏 = 面板自己的头部行（RightSidebar.qml 里
+        //    那行「面板」+ 三点抓手 + − / □❐ / ✕）：按钮在那边，拖动也在那边（头部空白处拖窗口）。
+        //    于是本窗口只需要一个"填满整扇窗"的内容槽。
 
-            // 空白处拖动窗口：位移一律用**屏幕**坐标差（窗口自己在动，用局部坐标会自己追自己 ——
-            // 与 PanelGrip 里那条踩坑注释同一个道理）。
-            MouseArea {
-                id: dragArea
-                anchors.fill: parent
-                enabled: !win.maximized     // 最大化态不拖（要拖先还原，与系统的行为对齐）
-                property real pressScreenX: 0
-                property real pressScreenY: 0
-                property real pressWinX: 0
-                property real pressWinY: 0
-
-                onPressed: (mouse) => {
-                    const g = dragArea.mapToGlobal(mouse.x, mouse.y)
-                    pressScreenX = g.x
-                    pressScreenY = g.y
-                    pressWinX = win.x
-                    pressWinY = win.y
-                }
-                onPositionChanged: (mouse) => {
-                    if (!pressed)
-                        return
-                    const g = dragArea.mapToGlobal(mouse.x, mouse.y)
-                    // 窗口自己搬自己：把**按下时**的位置 + 屏幕位移写回去（1:1 跟手）
-                    win.applyGeometry(pressWinX + (g.x - pressScreenX),
-                                      pressWinY + (g.y - pressScreenY),
-                                      win.width, win.height)
-                }
-            }
-
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.size.titleBarPadLeft
-                anchors.verticalCenter: parent.verticalCenter
-                text: qsTrId("right_sidebar_title")
-                color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
-                font.pixelSize: Theme.font.body
-                font.weight: Theme.font.weightBold
-            }
-
-            // 三个窗口按钮：字形/尺寸/悬停/按下配色逐条照 skin/window/TitleBar.qml
-            // （差别只有一处：这里点自己这一份窗口的槽，不走 WindowBridge —— 那是主窗口的单例）
-            Row {
-                id: buttons
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.size.windowButtonRightMargin
-                anchors.top: parent.top
-                anchors.topMargin: Theme.size.windowButtonTopMargin
-                spacing: 0
-
-                Repeater {
-                    model: ["min", "max", "close"]
-
-                    delegate: Item {
-                        id: button
-
-                        required property string modelData
-                        readonly property string kind: modelData
-                        readonly property bool hovered: mouseArea.containsMouse
-                        readonly property bool pressed: mouseArea.pressed
-
-                        implicitWidth: Theme.size.windowButtonWidth
-                        implicitHeight: Theme.size.windowButtonHeight
-
-                        // 字形与主窗口一致（Segoe UI Symbol：− / □ / ❐ / ✕）
-                        readonly property string glyph: kind === "min"
-                            ? "−"
-                            : (kind === "close" ? "✕" : (win.maximized ? "❐" : "□"))
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: Theme.radius.small
-                            color: {
-                                if (button.kind === "close") {
-                                    if (button.pressed)
-                                        return Theme.color.danger
-                                    if (button.hovered)
-                                        return Theme.color.dangerButtonBg
-                                    return "transparent"
-                                }
-                                if (button.pressed)
-                                    return Theme.color.primaryButtonPressed
-                                if (button.hovered)
-                                    return Theme.color.captionHoverBg
-                                return "transparent"
-                            }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: button.glyph
-                            font.family: "Segoe UI Symbol"
-                            font.pixelSize: Theme.font.glyph
-                            color: (button.kind === "close" && (button.hovered || button.pressed))
-                                ? Theme.color.textOnAccent
-                                : (button.hovered ? Theme.color.textPrimary : Theme.color.textSecondary)
-                        }
-
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.ArrowCursor
-                            onClicked: {
-                                if (button.kind === "min")
-                                    win.minimizeWindow()
-                                else if (button.kind === "max")
-                                    win.toggleMaximize()
-                                else
-                                    win.closeWindow()
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 标题栏与面板内容之间的一条分隔线（没有系统边框，靠它把两部分分开）
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 1
-                color: Theme.color.border
-            }
-        }
-
-        // 内容槽：RightSidebar reparent 到这里（`anchors.fill: parent` 于是自动填满槽）
+        // 内容槽：RightSidebar reparent 到这里（`anchors.fill: parent` 于是自动填满整扇窗）
         Item {
             id: slot
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: titleBar.bottom
-            anchors.bottom: parent.bottom
+            anchors.fill: parent
         }
 
         // ---- 四边 + 四角缩放热区（需求 ③，自己实现，见文件头）----

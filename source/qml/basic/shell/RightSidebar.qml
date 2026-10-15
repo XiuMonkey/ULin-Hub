@@ -35,6 +35,20 @@ Item {
     property bool sideDetached: false
     property var attachZoneProvider: null
 
+    // 副窗口态下头部那一行**就是**副窗口的标题栏（Shell 那边不再画标题栏）：所以窗口的
+    // 最小化 / 最大化-还原两颗按钮就并进这一行，放在既有的 ✕ **左边**（用户原话：
+    // "你给另外两个按钮放在删除按钮旁边不就行了，为什么要多加个标题栏呢"）。
+    // 实现不在这里 —— 窗口归 Shell 所有，这里只发请求，由 Shell 转发给 SidebarWindow 的
+    // minimizeWindow() / toggleMaximize()（绝不在这里复制一份窗口操作）。
+    signal minimizeWindowRequested()
+    signal toggleMaximizeRequested()
+
+    // 副窗口当前是不是最大化态：只用来选字形（□ / ❐），判定就是真窗口状态本身
+    readonly property bool windowMaximized: {
+        const w = root.Window.window
+        return w ? w.visibility === Window.Maximized : false
+    }
+
     // 抓手的四条请求，全部由 Shell 接住（它才知道窗口与壳层几何）：
     //   · sidebarLiftRequested —— 附着态下三点越过手感阈值：**现在**就把右栏"拿起来"
     //     （进无边框临时窗口跟手，需求 ①）。跟手期间主窗口布局一动不动（壳层保证）；
@@ -56,17 +70,57 @@ Item {
             anchors.fill: parent
             spacing: 0
 
-            // ---- 头部：标题 + 关闭 ----
+            // ---- 头部：标题 + 抓手 + 副窗口的 − / □❐ / ✕ ----
+            // 副窗口（无边框）**没有**自己的标题栏：这一行就是它的标题栏（拖动 + 三颗窗口按钮）。
             Item {
                 id: header
                 width: parent.width
                 height: 44          // 与 TopBar 同高，两条卡片看起来是一套
 
+                // 标题栏的那条"空白处拖动"：按住这一行的空白拖整扇副窗口。
+                // ⚠️ 只在副窗口态（root.sideDetached）可用：附着态这一行属于**主窗口**，
+                //    打开就会变成"拖主窗口"（罪状级 bug）。
+                // ⚠️ 必须声明在最前面：后声明的兄弟在上面 —— 三点抓手的拖拽、三颗按钮的点击
+                //    都在它之上，不会被这条整行热区截胡（与原先自绘标题栏里 Text 压在
+                //    拖动热区上、照样能拖是同一个道理：没有 MouseArea 的 Text 不吃鼠标事件）。
+                // 位移一律用**屏幕坐标差**：窗口自己在动，用局部坐标会自己追自己（同 PanelGrip 那条坑）。
+                MouseArea {
+                    id: headerDragArea
+                    anchors.fill: parent
+                    enabled: root.sideDetached && !root.windowMaximized
+                    property real pressScreenX: 0
+                    property real pressScreenY: 0
+                    property real pressWinX: 0
+                    property real pressWinY: 0
+
+                    onPressed: (mouse) => {
+                        const win = root.Window.window
+                        if (!win)
+                            return
+                        const g = headerDragArea.mapToGlobal(mouse.x, mouse.y)
+                        pressScreenX = g.x
+                        pressScreenY = g.y
+                        pressWinX = win.x
+                        pressWinY = win.y
+                    }
+                    onPositionChanged: (mouse) => {
+                        if (!pressed)
+                            return
+                        const win = root.Window.window
+                        if (!win)
+                            return
+                        const g = headerDragArea.mapToGlobal(mouse.x, mouse.y)
+                        // 窗口自己搬自己：把**按下时**的位置 + 屏幕位移写回去（1:1 跟手）
+                        win.x = Math.round(pressWinX + (g.x - pressScreenX))
+                        win.y = Math.round(pressWinY + (g.y - pressScreenY))
+                    }
+                }
+
                 Text {
                     id: titleText
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.spacing.columnClearance
-                    anchors.right: closeButton.left
+                    anchors.right: headerButtons.left
                     anchors.rightMargin: Theme.spacing.columnClearance
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.title
@@ -213,14 +267,45 @@ Item {
                     }
                 }
 
-                IconButton {
-                    id: closeButton
+                // 副窗口的三颗窗口按钮（− 最小化 / □❐ 最大化-还原 / ✕ 关闭）：**不另起一条标题栏**，
+                // 就并进这一行，两颗新按钮在既有的 ✕ **左边**（用户原话见 root 上的说明）。
+                // 外观逐条照同一个头里的 ✕ —— 同一个 IconButton、同样的缺省尺寸（28×28）与
+                // 悬停/按下配色，不自己写一份规格。
+                // ⚠️ 两颗新按钮**只在副窗口存在时可见**（root.sideDetached）：附着态显示它们既是
+                //    没用的按钮，也会让这一行凭空多出两颗图标。
+                //    Row 会把 visible:false 的子项整个排掉（不占位）⇒ 附着态这一行的宽度、
+                //    ✕ 的位置与标题的可用宽度与改动前逐像素一致（已用探针验证过）。
+                Row {
+                    id: headerButtons
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacing.columnClearance
                     anchors.verticalCenter: parent.verticalCenter
-                    glyph: "✕"
-                    tooltip: qsTrId("common_close")
-                    onClicked: root.closeRequested()
+                    spacing: 0
+
+                    // 最小化：走 Shell → SidebarWindow.minimizeWindow()（showMinimized）
+                    IconButton {
+                        id: minimizeButton
+                        visible: root.sideDetached
+                        glyph: "−"
+                        onClicked: root.minimizeWindowRequested()
+                    }
+
+                    // 最大化/还原：走 Shell → SidebarWindow.toggleMaximize()
+                    IconButton {
+                        id: maximizeButton
+                        visible: root.sideDetached
+                        glyph: root.windowMaximized ? "❐" : "□"
+                        onClicked: root.toggleMaximizeRequested()
+                    }
+
+                    // 面板自己的 ✕：语义**不变**（附着态 = 收起右栏；副窗口态 = 回附 + 关窗，
+                    // 走 Shell.onCloseRequested），这里只是从"单独一个"挪进 Row 里排队
+                    IconButton {
+                        id: closeButton
+                        glyph: "✕"
+                        tooltip: qsTrId("common_close")
+                        onClicked: root.closeRequested()
+                    }
                 }
             }
 
