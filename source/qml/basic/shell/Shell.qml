@@ -34,19 +34,107 @@ Item {
     property rect dropZone: Qt.rect(0, 0, 0, 0)
     property bool dropHintActive: false
 
-    // 右栏（面板坞）在**本窗口场景坐标**里的矩形 —— 回附方向（独立窗口拖回来）的判定基准，
-    // 也是落点提示要画的矩形。脱离方向的判定已搬进抓手自己（RightSidebar 里按屏幕坐标算），
-    // 这里只剩"要画在哪"这一个用点。
+    // ---------------- 右栏整体脱离成独立窗口（需求 ②③④）----------------
+    // 内容**不是副本**：脱离时把 RightSidebar 那个 Item reparent 到独立窗口的 contentItem，
+    // 回附时 reparent 回附着槽位 sidebarSlot —— 终端/网页只有一份会话（各放一份会各跑一个渲染进程）。
+    // 状态就下面这几条（窗口对象是文件末尾的 SidebarWindow 实例）。
+    property bool sidebarDetached: false
+    // 独立窗口几何：脱离时按右栏当前几何给初值，之后**以窗口为准**（窗口自己回写，见 SidebarWindow）；
+    // 再脱离时沿用它 ⇒ "拖回去再拖出来"不会跳回原位。
+    property real sidebarWinX: 0
+    property real sidebarWinY: 0
+    property real sidebarWinW: 0
+    property real sidebarWinH: 0
+    // 正在程序化摆窗口：这期间窗口的几何变化不回写状态（防回环：摆 → 通知 → 又摆）
+    property bool sidebarWinApplying: false
+
+    // 右栏（面板坞）在**本窗口场景坐标**里的矩形：落点提示要画的矩形（脱离方向的判定在抓手自己那里，
+    // 它按屏幕坐标算；回附方向由独立窗口里的抓手按屏幕坐标算）。
+    // 用**开着**的几何现算，不读 rightSidebar 的当前坐标：右栏收起时它在窗口右缘之外，
+    // 脱离时它已经不在本窗口里 —— 两种情况下都读不到"它该在的位置"。
     function dockSceneRect() {
-        const tl = rightSidebar.mapToGlobal(0, 0)
-        const win = rightSidebar.Window.window
-        const origin = win ? win.mapToGlobal(0, 0) : Qt.point(0, 0)
-        return Qt.rect(tl.x - origin.x, tl.y - origin.y, rightSidebar.width, rightSidebar.height)
+        return Qt.rect(shell.width - Theme.spacing.windowMargin - shell.rightSidebarEffW,
+                       sidebarSlot.y, shell.rightSidebarEffW, sidebarSlot.height)
+    }
+    // 同一块矩形在**屏幕坐标**里：跨窗口判断（脱离方向够不够、独立窗口拖回来落没落进来）只能用屏幕坐标
+    // —— 各自窗口的场景原点不是一个。抓手每次需要时**现算**（主窗口被搬动后属性绑定不会重算）。
+    function dockScreenRect() {
+        const xOpen = shell.width - Theme.spacing.windowMargin - shell.rightSidebarEffW
+        const p = shell.mapToGlobal(xOpen, sidebarSlot.y)
+        return Qt.rect(p.x, p.y, shell.rightSidebarEffW, sidebarSlot.height)
+    }
+
+    // 程序化摆独立窗口（只走这一条路；窗口自己改了几何走 setSidebarWindowGeometry 回写）
+    function applySidebarWindowGeometry(x, y, w, h) {
+        sidebarWinApplying = true
+        sidebarWinX = Math.round(x)
+        sidebarWinY = Math.round(y)
+        sidebarWinW = Math.round(w)
+        sidebarWinH = Math.round(h)
+        sidebarWindow.x = sidebarWinX
+        sidebarWindow.y = sidebarWinY
+        sidebarWindow.width = sidebarWinW
+        sidebarWindow.height = sidebarWinH
+        sidebarWinApplying = false
+    }
+    // 独立窗口 move/resize 的回写口（SidebarWindow 调）
+    function setSidebarWindowGeometry(x, y, w, h) {
+        if (sidebarWinApplying)
+            return
+        sidebarWinX = x
+        sidebarWinY = y
+        sidebarWinW = w
+        sidebarWinH = h
+    }
+
+    // 把**整个右栏**送进独立窗口（拖三点越过阈值松手时调）。
+    // atScreenX/Y 是**屏幕坐标**（抓手给的是屏幕坐标：窗口位置与跨窗口判断都只能用屏幕坐标）。
+    // 窗口摆在光标附近；初始尺寸取右栏当前几何（宽给一个 token 下限，太窄的卡片里页签/内容没法用）。
+    function detachSidebar(atScreenX, atScreenY) {
+        if (sidebarDetached)
+            return
+        const w = Math.max(Math.round(sidebarSlot.width), Theme.size.rightSidebarMinWidth)
+        const h = Math.max(Math.round(sidebarSlot.height), 240)
+        const scr = sidebarWindow.screen
+        const vx = (scr && scr.virtualX !== undefined) ? scr.virtualX : 0
+        const vy = (scr && scr.virtualY !== undefined) ? scr.virtualY : 0
+        const sw = scr ? scr.width : 1920
+        const sh = scr ? scr.height : 1080
+        const x = Math.max(vx, Math.min(Math.round(atScreenX - w / 2), vx + sw - w))
+        const y = Math.max(vy, Math.min(Math.round(atScreenY - 20), vy + sh - h))
+        applySidebarWindowGeometry(x, y, w, h)
+        // 顺序：先摆好几何 → reparent（同一份实例跟着搬）→ 再置 sidebarDetached（visible 绑定在它身上）。
+        // 这样窗口出现时内容与尺寸都已就位，不会先闪一帧空的 0x0 窗口。
+        rightSidebar.parent = sidebarWindow.contentItem
+        sidebarDetached = true
+        // 腾出来的地方还给顶栏/会话区：卡片已经搬走了，留着只是一块空白（右栏回到"已收起"）。
+        Hub.closeRightSidebar()
+        console.log("[sidebar-detach] detach at " + Math.round(atScreenX) + "," + Math.round(atScreenY)
+                    + " win " + w + "x" + h + " @" + x + "," + y)
+    }
+
+    // 回附（需求 ③⑤）：内容 reparent 回附着槽位、关掉独立窗口。
+    //   · 从独立窗口把三点拖回右栏位置松手 ⇒ open=true（用户就是想看它，落回来就展开）；
+    //   · 点顶栏 ◫ / 点独立窗口的系统 ✕ ⇒ open=false（"已附着但隐藏"，下次点 ◫ 默认以附着状态打开）。
+    function attachSidebar(open) {
+        if (!sidebarDetached)
+            return
+        // 副窗口被最小化时先还原再隐藏：否则下次脱离 show 出来的还是一扇最小化的窗
+        // （showNormal 是 QWindow 的公有槽，QML 侧可以直接调）
+        if (sidebarWindow.visibility === Window.Minimized)
+            sidebarWindow.showNormal()
+        sidebarDetached = false        // 独立窗口随之隐藏；系统 ✕ 那条路的 onClosing 已被它拦住
+        rightSidebar.parent = sidebarSlot
+        if (open)
+            Hub.openRightSidebar()
+        else
+            Hub.closeRightSidebar()
+        console.log("[sidebar-detach] attach open=" + open)
     }
 
     // 抓手正在拖（此时落点就是右栏自己）：提示跟着亮起来当"松手就不会跑"的反馈。
-    // 原来由坞里那只抓手的 `detachDragPreview` 推过来；抓手搬到右栏标题行后，这条由
-    // "抓手往单例 Dock 发的预览开关"推（见右栏下面那段 Connections）。
+    // 由右栏标题行那只抓手的 `sidebarPreviewChanged` 推过来（拖动中主窗口收不到 hover，只能这样推）；
+    // 落点矩形按右栏**附着时**的几何现算（收起/脱离时读不到它的坐标，见 dockSceneRect）。
     function beginDetachPreview(over) {
         dropZone = dockSceneRect()
         dropHintActive = over
@@ -185,14 +273,18 @@ Item {
                 id: topBar
                 anchors.fill: parent
                 onToolsFilterRequested: Hub.openToolsFilter()
-                // ◫ 的三态状态机（需求 ⑤）：
-                //   ① 有"已独立且窗口还显示"的块 ⇒ 这一次点击是**关掉那些独立窗口**
-                //      （块回到"已附着但隐藏"：模型里 detached 状态与几何都留着，右栏不开）；
-                //   ② 否则走原来的开合（本轮刚关完独立窗口 ⇒ rightSidebarOpen 是 false ⇒
-                //      "默认以附着状态打开"，正是需求要的第三态）。
+                // ◫ 的三态状态机（需求 ④，照用户原话）：
+                //   ① **副窗口存在且可见** ⇒ 这一次点击 = 关掉那个副窗口（右栏回"已附着但隐藏"：
+                //      内容 reparent 回壳层、窗口关掉，Hub.rightSidebarOpen 保持 false）；
+                //   ② 没有副窗口 ⇒ 走原来的开合（Hub.toggleRightSidebar()）；
+                //   ③ 刚关完副窗口再点 ⇒ rightSidebarOpen 还是 false ⇒ toggle 走"打开"，
+                //      而内容这时已经附着回槽位 ⇒ "关闭后再点开默认是附着状态"，正是需求要的。
+                // ⚠️ 上一轮的 `Dock.anyDetachedVisible / closeDetachedWindows()` 那两个接口没删，
+                //    但"按块脱离"现在没有任何调用方（抓手改拖整个右栏了，见 RightSidebar.qml），
+                //    所以这条分支不再经过它们。
                 onRightSidebarRequested: {
-                    if (Dock.anyDetachedVisible)
-                        Dock.closeDetachedWindows()
+                    if (shell.sidebarDetached)
+                        shell.attachSidebar(false)
                     else
                         Hub.toggleRightSidebar()
                 }
@@ -265,23 +357,55 @@ Item {
     // 从窗口右缘外滑进来 + 淡入，位置与透明度都跟 shell.rightSidebarT 走（同一条动画曲线，
     // 所以"面板滑入"和"顶栏/会话区被压窄"是同一段动态，不会互相错拍）。
     // 只改 x/opacity、不改 width：滑动期间面板内部不重排。
-    RightSidebar {
-        id: rightSidebar
+    //
+    // ⚠️ 位置/宽度/动画这段搬到了**附着槽位** sidebarSlot 上（语义逐条不变）：
+    //    RightSidebar 自己只用 `anchors.fill: parent`，于是 reparent 到独立窗口的 contentItem 时
+    //    自动填满那扇窗，不用为"两边各一套锚定"再写条件判断。槽位是空 Item，不画东西。
+    Item {
+        id: sidebarSlot
 
-        visible: shell.rightSidebarT > 0.001
-        opacity: shell.rightSidebarT
-        width: shell.rightSidebarEffW
         anchors.top: sidebarCard.top
         anchors.bottom: sidebarCard.bottom
+        width: shell.rightSidebarEffW
         x: shell.width - Theme.spacing.windowMargin - width
            + (1 - shell.rightSidebarT) * (width + Theme.spacing.windowMargin)
-        onCloseRequested: Hub.closeRightSidebar()
 
-        // 右栏内容：面板坞（主界面 + 块/页签；网页块内部才用 WebEngine）
-        PanelDock {
-            id: dock
+        RightSidebar {
+            id: rightSidebar
+
             anchors.fill: parent
+            // 附着态：可见性与淡入跟壳层的展开进度走（与搬家前逐字同一条）；
+            // 脱离态：它在独立窗口里，那扇窗显示它就显示。
+            visible: shell.sidebarDetached ? true : shell.rightSidebarT > 0.001
+            opacity: shell.sidebarDetached ? 1 : shell.rightSidebarT
+            // 独立态下三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
+            sideDetached: shell.sidebarDetached
+            attachZoneProvider: shell.dockScreenRect
+            onCloseRequested: Hub.closeRightSidebar()
+            // 抓手的三条请求：脱离 / 回附 / 拖动中的落点预览（提示仍由壳层画，见下面的 DockDropHint）
+            onSidebarDetachRequested: (screenX, screenY) => shell.detachSidebar(screenX, screenY)
+            onSidebarAttachRequested: shell.attachSidebar(true)
+            onSidebarPreviewChanged: (over) => {
+                if (over)
+                    shell.beginDetachPreview(true)
+                else
+                    shell.endDetachPreview()
+            }
+
+            // 右栏内容：面板坞（主界面 + 块/页签；网页块内部才用 WebEngine）
+            PanelDock {
+                id: dock
+                anchors.fill: parent
+            }
         }
+    }
+
+    // ---- 独立窗口：右栏整体脱离之后住在这儿（系统装饰，需求 ②）----
+    // 内容**不是副本**：RightSidebar 那个 Item 由上面的 detachSidebar/attachSidebar reparent 进来/出去。
+    // 窗口本身只做三件事：按 sidebarDetached 显示、几何按壳层给的值摆、自己的 move/resize 回写壳层。
+    SidebarWindow {
+        id: sidebarWindow
+        host: shell
     }
 
     // ---- 抓手的脱离接线：两条广播都落在壳层（见 PanelDockModel 的 requestDetach / setDetachPreview）----
@@ -323,17 +447,18 @@ Item {
         }
     }
 
-    // ---- 拖回时的落点提示：画在原右栏位置（需求：建议给落点提示）----
-    // z 抬到面板之上：拖动期间块还在独立窗口里，主窗口这边只有这块轮廓要露出来给人看。
-    // `fromDock: true` = 提示文案用"松手：块留在这里"那一档（坞里/右栏标题行的抓手往外拖）；
-    // 回附方向（独立窗口往主窗口拖）由 DetachedBlockWindow 直接推 dropHintActive，
-    // 它推的时候本项是 false ⇒ 文案是"松手：重新附着回右栏"。
+    // ---- 拖回时的落点提示：画在原右栏位置（需求 ③：建议给落点提示）----
+    // z 抬到面板之上：拖动期间右栏还在自己的位置（附着态）或在独立窗口里（脱离态），
+    // 主窗口这边只有这块轮廓要露出来给人看。
+    // 文案两个方向不同：附着态往外拖（"松手：面板变成独立窗口"）vs 独立窗口往里拖（"松手：重新附着回右栏"）；
+    // 两个方向都由正在拖的那个抓手推 `shell.dropHintActive`（拖动中主窗口收不到 hover，只能这样推），
+    // `fromDock` 就是"当前是不是附着态那一档"。
     DockDropHint {
         id: dropHint
         z: 30
         zone: shell.dropZone
         active: shell.dropHintActive
-        fromDock: true
+        fromDock: !shell.sidebarDetached
     }
 
     // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。
@@ -350,14 +475,16 @@ Item {
     Item {
         id: resizeHandle
 
-        anchors.top: rightSidebar.top
-        anchors.bottom: rightSidebar.bottom
+        anchors.top: sidebarSlot.top
+        anchors.bottom: sidebarSlot.bottom
         width: 10
         visible: Hub.rightSidebarOpen
         enabled: visible
         // 按下时冻结的那个 x（见 ②）
         property real frozenX: 0
-        x: shell.resizing ? frozenX : rightSidebar.x - width / 2
+        // ⚠️ 贴的是**附着槽位**的左缘：右栏自己现在是 `anchors.fill: parent`，
+        //    脱离时它的 x 是独立窗口里的 0，读它会在主窗口里画到左上角去。
+        x: shell.resizing ? frozenX : sidebarSlot.x - width / 2
 
         // 灰边：⚠️ 画在**面板内侧**、上下各让开一个圆角半径 ——
         // 贴左缘画满全高的话，两端会越过圆角弧线（被指出过）；颜色也只用灰色系（原来用蓝色被否了）。

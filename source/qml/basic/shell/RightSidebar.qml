@@ -9,6 +9,7 @@
 // 后续要挂的东西（见 build/temp/dsh-official/GAP-REPORT.md）：终端 / 工作区文件 / 文档预览 / 轨迹。
 
 import QtQuick
+import QtQuick.Window
 import ULinHub 1.0
 import "../../widgets"
 
@@ -24,16 +25,21 @@ Item {
     // 关闭请求：Shell 接到 Hub.closeRightSidebar()
     signal closeRequested()
 
-    // 当前活动块是否**已经脱离**成独立窗口：抓手的可见性要用（与 PanelDock.qml 里那条判定同一套，
-    // 读的是模型 Dock.detachedBlocks）。脱离中的块在坞里没有内容可拖 ⇒ 三个点藏起来。
-    readonly property bool activeDetached: {
-        const list = Dock.detachedBlocks
-        for (let i = 0; i < list.length; ++i) {
-            if (list[i].blockId === Dock.activeBlockId)
-                return true
-        }
-        return false
-    }
+    // ---------------- 整个右栏脱离成独立窗口（本次的驱动路径）----------------
+    // 状态在 Shell（它拥有独立窗口），这里只拿两条注入进来的事实：
+    //   · sideDetached —— 本 Item 此刻在**独立窗口**里（reparent 过去了，见 Shell.detachSidebar）。
+    //     三个点于是改成"搬那扇窗 + 落回右栏位置就回附"；
+    //   · attachZoneProvider —— 取"主窗口里右栏附着时所在的**屏幕矩形**"的函数。
+    //     跨窗口判断只能用屏幕坐标（各自窗口的场景原点不是一个）。
+    //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。
+    property bool sideDetached: false
+    property var attachZoneProvider: null
+
+    // 抓手的三条请求，全部由 Shell 接住（它才知道窗口与壳层几何）
+    signal sidebarDetachRequested(real screenX, real screenY)
+    signal sidebarAttachRequested()
+    // 拖动中的落点预览开关（拖动期间主窗口收不到 hover，只能由正在拖的抓手推过去）
+    signal sidebarPreviewChanged(bool over)
 
     Card {
         anchors.fill: parent
@@ -82,9 +88,11 @@ Item {
                     id: dockGrip
                     anchors.horizontalCenter: header.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    // 与搬家前**同一条**可见性语义：只在"有活动块且该块没脱离"时显示
-                    // （不在主界面 / 没有块时不留哑控件）
-                    visible: !Dock.homeVisible && Dock.activeIndex >= 0 && !activeDetached
+                    // 三点**常驻**（需求 ①）：只要右栏这张卡片在显示，三个点就在。
+                    // 上一版那条 `!Dock.homeVisible && Dock.activeIndex >= 0 && !activeDetached` 是
+                    // "按块脱离"时代的可见性（坞里没块就没得拖）—— 现在拖的是**整个右栏**，
+                    // 与坞里有没有活动块无关，所以整条去掉（`enabled: visible` 照旧）。
+                    visible: root.visible
                     enabled: visible
                     // 尺寸用 PanelGrip 自己的缺省（4 / 间距 5，与 PageOverlay 那颗一致），这里**不赋值**：
                     // 曾经在这里赋 readonly 属性 ⇒ 整张右栏实例化失败 ⇒ 壳层什么都画不出来（空白窗口）。
@@ -95,39 +103,100 @@ Item {
                     //    普通客户端事件（同一个 header 里的 ✕ 按钮一直就是这么收点击的）。
                     //    在无边框窗口里登记是为了抢在标题栏之前，这里没有要抢的东西。
 
-                    // 离开右栏区域 >48px，或水平位移 >60px ⇒ 够脱离（与搬家前逐字同一条阈值）
+                    // 阈值（沿用搬家前的数值）：附着态"离开右栏区域 >48px 或水平位移 >60px ⇒ 够脱离"；
+                    // 独立态"光标落回右栏原位置 ±24px ⇒ 够回附"（容差与按块脱离那版同一个手感）。
                     readonly property real detachSlack: 48
                     readonly property real detachShiftX: 60
-                    property bool detachArmed: false
+                    readonly property real attachSlack: 24
+                    // 已经越过脱离/回附阈值（拖动中实时算，松手时按它决定做什么）
+                    property bool armed: false
+                    // 这一次按下之后真的拖动过吗？⚠️ 不能看 PanelGrip.dragging ——
+                    // 它发 dragFinished 之前**先把 dragging 置 false**，这边读到的一定是 false。
+                    property bool dragged: false
+                    // 独立态搬窗口：按下那一刻窗口在哪（后面用"它 + 屏幕位移"1:1 跟手）
+                    property real pressWinX: 0
+                    property real pressWinY: 0
 
-                    // 右栏在**屏幕坐标**里的矩形：跨窗口判断只能用屏幕坐标（各自窗口的场景原点不是一个）
-                    // ⚠️ 这里必须用 root（本文件根 id）：这段是从 PanelDock.qml 搬过来的，那边写的是 `dock`，
-                    //    照抄过来 `dock` 就是未定义 ⇒ 整张 RightSidebar 编译失败 ⇒ Shell 报
-                    //    "Type RightSidebar unavailable"，表现是**整个窗口空白**（踩过一次）。
-                    function dockRectGlobal() {
-                        const tl = root.mapToGlobal(0, 0)
-                        return Qt.rect(tl.x, tl.y, root.width, root.height)
+                    // 「右栏附着时所在的屏幕矩形」：脱离方向的判定基准，也是回附方向的落点。
+                    // 由 Shell 注入（它才知道主窗口与壳层几何）；**现算**而不是缓存成属性 ——
+                    // 主窗口被搬动/改尺寸后属性绑定不会重算（那是 C++ 侧改的窗口坐标）。
+                    // ⚠️ 这里必须用 root（本文件根 id）：上一轮从 PanelDock.qml 抄过来时写的是 `dock`，
+                    //    未定义 ⇒ 整张 RightSidebar 编译失败 ⇒ Shell 报 "Type RightSidebar unavailable"，
+                    //    表现是**整个窗口空白**（踩过一次）。
+                    function attachZone() {
+                        if (!root.attachZoneProvider)
+                            return null
+                        return root.attachZoneProvider()
+                    }
+                    function insideAttachZone(gp) {
+                        const r = attachZone()
+                        if (!r)
+                            return false
+                        const s = attachSlack
+                        return gp.x >= r.x - s && gp.x <= r.x + r.width + s
+                               && gp.y >= r.y - s && gp.y <= r.y + r.height + s
+                    }
+
+                    onPressStarted: {
+                        armed = false
+                        dragged = false
+                        const win = root.Window.window
+                        pressWinX = win ? win.x : 0
+                        pressWinY = win ? win.y : 0
                     }
 
                     onDragMoved: (dx, dy, globalPos, scenePos) => {
-                        const r = dockRectGlobal()
+                        // 没过 PanelGrip 的手感阈值（6px）之前什么都不做：那只是"点了一下"
+                        if (!dockGrip.dragging)
+                            return
+                        dragged = true
+
+                        if (root.sideDetached) {
+                            // 独立态：三个点**照样能拖**（需求要保留）—— 拖的就是那扇独立窗口。
+                            // 位移用**屏幕坐标差**加在按下时的窗口位置上：窗口自己在动，
+                            // 拿局部坐标算会自己追自己。
+                            const win = root.Window.window
+                            if (!win)
+                                return
+                            win.x = Math.round(pressWinX + dx)
+                            win.y = Math.round(pressWinY + dy)
+                            // 光标落回右栏原位置附近 ⇒ 亮起落点提示（松手才真的回附）
+                            const over = insideAttachZone(globalPos)
+                            if (over !== armed) {
+                                armed = over
+                                root.sidebarPreviewChanged(over)
+                            }
+                            return
+                        }
+
+                        // 附着态：拖三点 = 把**整个右栏**拖出去（需求 ②）。判定只能用屏幕坐标。
+                        const r = attachZone()
+                        if (!r)
+                            return
                         const outside = globalPos.x < r.x - detachSlack
                                         || globalPos.x > r.x + r.width + detachSlack
                                         || globalPos.y < r.y - detachSlack
                                         || globalPos.y > r.y + r.height + detachSlack
-                        const armed = outside || Math.abs(dx) > detachShiftX
-                        if (armed !== detachArmed) {
-                            detachArmed = armed
-                            Dock.setDetachPreview(armed)
+                        const next = outside || Math.abs(dx) > detachShiftX
+                        if (next !== armed) {
+                            armed = next
+                            root.sidebarPreviewChanged(next)
                         }
                     }
                     onDragFinished: (dx, dy, globalPos) => {
-                        const armed = detachArmed
-                        detachArmed = false
-                        // 预览一律先收（与搬家前一致：预览开着的时候模型可能已经不认这个块了）
-                        Dock.setDetachPreview(false)
-                        if (armed)
-                            Dock.requestDetach(Dock.activeBlockId, globalPos.x, globalPos.y)
+                        const wasArmed = armed
+                        armed = false
+                        // 预览一律先收（松手之后就没有"正在拖"这件事了）
+                        root.sidebarPreviewChanged(false)
+                        if (!dragged)      // 只点击、没拖动：不动任何状态
+                            return
+                        dragged = false
+                        if (root.sideDetached) {
+                            if (wasArmed)
+                                root.sidebarAttachRequested()   // 落回右栏位置 ⇒ 重新附着
+                        } else if (wasArmed) {
+                            root.sidebarDetachRequested(globalPos.x, globalPos.y)
+                        }
                     }
                 }
 
