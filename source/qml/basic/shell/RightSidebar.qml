@@ -72,13 +72,16 @@ Item {
                 // **声明在后面 ⇒ 画在上层**，把只有 ~30px 宽的三点整个盖住了（用户看不见三点）。
                 // 标题目右边的空地**没有别的子项**，天然不会再被谁盖住。
                 //
-                // 位置取**标题右缘与 ✕ 左缘的中点**（用户反馈："还是在最右边而不是中间" ⇒ 要居中）：
-                // 用两者的中点而不是 `anchors.centerIn: header`，是因为左侧内缩（columnClearance）
-                // 与右侧按钮的占位不一定对称，中点才是那块空地的几何中心。
+                // 位置取**标题行正中间**（用户两次反馈的落点：
+                //   ① "还是在最右边而不是中间" ⇒ 先改成"标题右缘 ↔ ✕ 左缘"的中点；
+                //   ② "还是不够中间啊，要在正中间" ⇒ 就是整条 header 的水平中线，不再相对左右元素取中点）。
+                // 所以用 `anchors.horizontalCenter: header.horizontalCenter`（锚在头部 Item 自己身上，
+                // 不掺任何兄弟元素的宽度）；`x` 不再手算 —— 两套定位同时留会互相打架。
+                // ⚠️ 不要退回"贴着标题右边"：那正是用户否掉的位置（看着像贴着 ✕ 那一侧）。
                 PanelGrip {
                     id: dockGrip
+                    anchors.horizontalCenter: header.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    x: (titleText.x + titleText.width + closeButton.x) / 2 - width / 2
                     // 与搬家前**同一条**可见性语义：只在"有活动块且该块没脱离"时显示
                     // （不在主界面 / 没有块时不留哑控件）
                     visible: !Dock.homeVisible && Dock.activeIndex >= 0 && !activeDetached

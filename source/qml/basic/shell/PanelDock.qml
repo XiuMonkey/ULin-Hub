@@ -42,10 +42,11 @@ Item {
         return false
     }
 
-    // 三个点抓手拖出的判定（阈值按需求："离开右栏区域 >48px，或水平位移 >60px"）。
-    // 只在**活动块**上生效：坞里显示的就是活动块的内容。
-    signal blockDetachRequested(point atScenePos)
-    signal detachDragPreview(bool overTarget)
+    // 抓手拖出的判定（阈值按需求："离开右栏区域 >48px，或水平位移 >60px"）已随抓手一起
+    // 搬到 basic/shell/RightSidebar.qml 的标题行（那里不会再被页签条盖住），接线走**全局单例 Dock**：
+    // `Dock.setDetachPreview(bool)` 开落点预览、`Dock.requestDetach(blockId, screenX, screenY)`
+    // 请求脱离某个块，两条都由 Shell.qml 接住（它已经拥有 DockDropHint 与 DetachedBlockWindow）。
+    // 本文件不再有脱离相关的信号：坞只是"显示活动块内容"的那一层，抓手不在它里面了。
 
     // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
     property real contentT: 1
@@ -89,48 +90,11 @@ Item {
                 onClicked: Dock.showHome()   // ⌂ 只切显示，块保留
             }
 
-            // 面板的"三个点"：拖出去 ⇒ 这个块变成独立窗口（需求 ①②）。
-            // 视觉与命中区规则全在 widgets/PanelGrip.qml（逐条照 PageOverlay 那颗：只有三个浅灰点、
-            // 不要背景、不要悬浮/光标反馈，命中区外放 10px）。
-            // ⚠️ 只在"有活动块且没脱离"时可用：没块可拖时三个点还留着就是哑控件。
-            PanelGrip {
-                id: dockGrip
-                anchors.left: homeButton.right
-                anchors.leftMargin: 6
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !dock.homeVisible && Dock.activeIndex >= 0 && !dock.activeDetached
-                enabled: visible
-                // 主窗口是无边框窗口：抓手必须登记进原生命中测试，否则标题栏那条 HTCAPTION
-                // 会先把按下事件吃掉（PageOverlay 的抓手就是这个原因登记的）
-                nativeHost: true
-
-                // 离开右栏区域 >48px，或水平位移 >60px ⇒ 够脱离（需求给的阈值）
-                readonly property real detachSlack: 48
-                readonly property real detachShiftX: 60
-                property bool detachArmed: false
-
-                onDragMoved: (dx, dy, globalPos, scenePos) => {
-                    const r = dock.mapToGlobal(0, 0)
-                    const outside = globalPos.x < r.x - detachSlack
-                                    || globalPos.x > r.x + dock.width + detachSlack
-                                    || globalPos.y < r.y - detachSlack
-                                    || globalPos.y > r.y + dock.height + detachSlack
-                    const armed = outside || Math.abs(dx) > detachShiftX
-                    if (armed !== detachArmed) {
-                        detachArmed = armed
-                        dock.detachDragPreview(armed)
-                    }
-                }
-                onDragFinished: (dx, dy, globalPos) => {
-                    const armed = detachArmed
-                    detachArmed = false
-                    dock.detachDragPreview(false)
-                    if (armed)
-                        dock.blockDetachRequested(dock.mapFromItem(null, globalPos.x, globalPos.y))
-                }
-            }
-
             // 块：横向排，多了可滚动
+            // ⚠️ 这条 Flickable 锚在 `⌂` 右边 4px 且**声明在最后** —— 同 z 时后声明者在上层。
+            //    原来那只三个点抓手也锚在同一片区域（`⌂` 右边 6px）、声明在它前面，于是被它整个盖住
+            //    （"用户看不见三点"就是这个原因，不是尺寸/颜色问题）。抓手已搬到 RightSidebar.qml 的
+            //    标题行，页签条里不再有与它重叠的锚定兄弟。
             Flickable {
                 anchors.left: homeButton.right
                 anchors.leftMargin: 4
@@ -234,7 +198,12 @@ Item {
         Item {
             id: body
             width: parent.width
-            height: parent.height - tabStrip.height - 1
+            // ⚠️ 夹 0 下界：这行原本是 `parent.height - tabStrip.height - 1`，而**首帧/尺寸未定**时
+            //    父链（右栏卡片的 Column）还没有高度，算式会算出负数 —— 真机日志里出现过
+            //    `PanelDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
+            //    （启动器列、内容 Loader 都锚在它上面）会跟着变成负高；夹到 0 之后是"暂时没地方画
+            //    内容"，可见行为与负高一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
+            height: Math.max(0, parent.height - tabStrip.height - 1)
 
             // 出现/切换时淡入 + 轻微放大（顶栏那条块不动，只动内容区）
             opacity: dock.contentT

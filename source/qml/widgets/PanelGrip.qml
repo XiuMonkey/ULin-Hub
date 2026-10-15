@@ -37,14 +37,16 @@ Item {
     // 按下：调用方据此开始记"按下点"（QML 的 Window 没有 pressed 信号可接）
     signal pressStarted()
 
-    // 三个点：单个点 6×6、间距 6、半径 3（= 正圆）。
+    // 三个点：单个点 4×4、间距 5、半径 2（= 正圆）—— 与 widgets/PageOverlay.qml 那颗**完全一致**。
     //
-    // ⚠️ 这里比 PageOverlay 那颗（4px + 间距 5）**大一圈**：4px 在 200% 缩放下只有 8 物理像素、
-    //    颜色又是 textTertiary(#81858C)，画在白色卡片上"存在但看不见"（用户反馈"根本没有三点"）。
-    //    规格要的"只有三个浅灰点、不要背景、不要悬浮/光标反馈"三条都保持，只有尺寸为了**看得见**
-    //    放大到 6。要与 PageOverlay 完全等大时，把 dotSize/dotGap 改回 4/5 即可。
-    readonly property int dotSize: 6
-    readonly property int dotGap: 6
+    // 尺寸史（别来回改）：这里一度放大到 6/6，理由是"4px 在 200% 缩放下只有 8 物理像素、
+    // 颜色又是 textTertiary，画在白色卡片上存在但看不见"。后来查明那次的真正原因是**位置**：
+    // 抓手被页签条 Flickable 整个盖住（见 basic/shell/PanelDock.qml 的说明），不是尺寸。
+    // 抓手搬到右栏标题行后用户直接反馈"这三个点为什么这么大"⇒ 回到通用控件的 4/5。
+    // ⚠️ 这两个值刻意**不是 readonly**：调用方要更大/更小的点可以直接赋值覆盖
+    //    （曾经从 RightSidebar 赋 readonly 属性 ⇒ 整张右栏实例化失败、壳层全空，见那次教训）。
+    property int dotSize: 4
+    property int dotGap: 5
 
     implicitWidth: dotRow.implicitWidth
     implicitHeight: dotSize

@@ -33,43 +33,51 @@ Item {
     // 开关由正在拖的那个独立窗口推过来（拖动中主窗口收不到 hover，只能这样推）。
     property rect dropZone: Qt.rect(0, 0, 0, 0)
     property bool dropHintActive: false
-    // 坞里那个三点点手正在拖（此时落点就是右栏自己，提示要跟着亮起来当"松手也不会跑"的反馈）
-    property bool dockDragActive: false
 
-    // 右栏（面板坞）在**本窗口场景坐标**里的矩形 —— 脱离/回附两个方向都用它做判定基准
+    // 右栏（面板坞）在**本窗口场景坐标**里的矩形 —— 回附方向（独立窗口拖回来）的判定基准，
+    // 也是落点提示要画的矩形。脱离方向的判定已搬进抓手自己（RightSidebar 里按屏幕坐标算），
+    // 这里只剩"要画在哪"这一个用点。
     function dockSceneRect() {
-        const tl = rightSidebar.mapToItem(shell, 0, 0)
-        return Qt.rect(tl.x, tl.y, rightSidebar.width, rightSidebar.height)
+        const tl = rightSidebar.mapToGlobal(0, 0)
+        const win = rightSidebar.Window.window
+        const origin = win ? win.mapToGlobal(0, 0) : Qt.point(0, 0)
+        return Qt.rect(tl.x - origin.x, tl.y - origin.y, rightSidebar.width, rightSidebar.height)
     }
 
-    // 坞里拖动 = 块**已经**在右栏原位：提示直接亮着，让用户看到"松手就留在这儿"
+    // 抓手正在拖（此时落点就是右栏自己）：提示跟着亮起来当"松手就不会跑"的反馈。
+    // 原来由坞里那只抓手的 `detachDragPreview` 推过来；抓手搬到右栏标题行后，这条由
+    // "抓手往单例 Dock 发的预览开关"推（见右栏下面那段 Connections）。
     function beginDetachPreview(over) {
-        dockDragActive = true
         dropZone = dockSceneRect()
         dropHintActive = over
     }
     function endDetachPreview() {
-        dockDragActive = false
         dropHintActive = false
         dropZone = Qt.rect(0, 0, 0, 0)
     }
-    // 坞里那个块被拖出了：在**光标处**建独立窗口（需求 ②）。
+    // 右栏标题行那三个点抓手把块拖出去了：在**光标处**建独立窗口（需求 ②）。
+    // ⚠️ atScreenX/Y 是**屏幕坐标**（抓手在 RightSidebar 里算的：跨窗口判断只能用屏幕坐标）。
+    //    独立窗口的 x/y 本来就是屏幕坐标，所以这里不再做 scene/global 的来回换算 —— 搬家前那版
+    //    把屏幕坐标先 mapFromItem 成场景坐标再当窗口位置用，只在"窗口锚在场景原点"这一条上碰巧等价。
     // 几何：宽取右栏宽度与 480 逻辑像素里更宽的那个、高与右栏等高（首次脱离的默认值；之后再脱离沿用上次的）。
-    function detachActiveBlock(atScenePos) {
+    function detachActiveBlock(blockId, atScreenX, atScreenY) {
         const idx = Dock.activeIndex
         if (idx < 0)
+            return
+        // 拖动的这段时间里活动块可能已经换了（或块被关了）⇒ 只认抓的那个块
+        if (Dock.activeBlockId !== blockId)
             return
         const r = dockSceneRect()
         const w = Math.max(r.width, 480)
         const h = Math.max(r.height, 240)
         Dock.detach(idx)
-        Dock.setDetachedGeometry(idx, Math.round(atScenePos.x - w / 2 + Theme.spacing.windowMargin),
-                                 Math.round(atScenePos.y - 20), Math.round(w), Math.round(h))
+        Dock.setDetachedGeometry(blockId, Math.round(atScreenX - w / 2 + Theme.spacing.windowMargin),
+                                 Math.round(atScreenY - 20), Math.round(w), Math.round(h))
         // 脱离 = 这个块有自己的窗口了：右栏收起（留着的话同一块在两处画两份）。
         // 块本身仍是"已附着 + 活动"（Dock 里没动它），所以拖回去就回到原位。
         Hub.closeRightSidebar()
-        console.log("[detach] detach block idx=" + idx + " id=" + Dock.activeBlockId + " at "
-                    + Math.round(atScenePos.x) + "," + Math.round(atScenePos.y) + " " + w + "x" + h)
+        console.log("[detach] detach block idx=" + idx + " id=" + blockId + " at "
+                    + Math.round(atScreenX) + "," + Math.round(atScreenY) + " " + w + "x" + h)
     }
 
     // ---- 右侧栏：宽度可拖（拖左边缘），压窄量 = 宽度 + 间距 ----
@@ -273,15 +281,30 @@ Item {
         PanelDock {
             id: dock
             anchors.fill: parent
+        }
+    }
 
-            // 坞里拖出：拖过阈值后松手 ⇒ 在光标处建独立窗口（脱离）；拖动期间亮落点提示
-            onBlockDetachRequested: (atScenePos) => shell.detachActiveBlock(atScenePos)
-            onDetachDragPreview: (overTarget) => {
-                if (overTarget || shell.dockDragActive)
-                    shell.beginDetachPreview(overTarget)
-                else
-                    shell.endDetachPreview()
-            }
+    // ---- 抓手的脱离接线：两条广播都落在壳层（见 PanelDockModel 的 requestDetach / setDetachPreview）----
+    // 抓手在 RightSidebar 的标题行里，够不着 PanelDock 的内部信号 —— 所以它把请求发给单例 Dock，
+    // 这里接住：提示由壳层画（DockDropHint）、独立窗口也由壳层建（下面的 Repeater）。
+    // ⚠️ 两条都挂在 shell 上（不是挂在某个面板实例上）：抓手换了宿主，这段接线不该跟着换。
+    Connections {
+        target: Dock
+
+        // 拖动中：拖出右栏（>48px）或水平位移 >60px ⇒ 亮起落点提示。
+        // 开关就是抓手算出来的那个布尔量，这里不再由壳层叠一条"正在拖"的状态：
+        // 抓手在右栏里按下时本来就在落点矩形内，overTarget=false ⇒ 提示不亮，
+        // 与搬家前同一个观感（拖动前不亮、拖出去才亮）；叠一条反而会让提示一开始就亮着。
+        function onDetachPreviewChanged(overTarget) {
+            if (overTarget)
+                shell.beginDetachPreview(overTarget)
+            else
+                shell.endDetachPreview()
+        }
+
+        // 松手且够阈值：在光标处把活动块脱离成独立窗口
+        function onDetachRequested(blockId, atScreenX, atScreenY) {
+            shell.detachActiveBlock(blockId, atScreenX, atScreenY)
         }
     }
 
@@ -302,12 +325,15 @@ Item {
 
     // ---- 拖回时的落点提示：画在原右栏位置（需求：建议给落点提示）----
     // z 抬到面板之上：拖动期间块还在独立窗口里，主窗口这边只有这块轮廓要露出来给人看。
+    // `fromDock: true` = 提示文案用"松手：块留在这里"那一档（坞里/右栏标题行的抓手往外拖）；
+    // 回附方向（独立窗口往主窗口拖）由 DetachedBlockWindow 直接推 dropHintActive，
+    // 它推的时候本项是 false ⇒ 文案是"松手：重新附着回右栏"。
     DockDropHint {
         id: dropHint
         z: 30
         zone: shell.dropZone
         active: shell.dropHintActive
-        fromDock: shell.dockDragActive
+        fromDock: true
     }
 
     // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。

@@ -141,6 +141,19 @@ public:
 	// 独立窗口的几何回写（窗口 move/resize 时由 QML 调；模型不自己动窗口）
 	Q_INVOKABLE void setDetachedGeometry(const QString& blockId, int x, int y, int w, int h);
 
+	// ---- 抓手的"脱离"接线（QML 侧的广播口，不是模型状态）----
+	// 为什么放在这个单例上：三个点抓手从 PanelDock.qml 的页签条搬到了 RightSidebar.qml 的标题行，
+	// 而"落点预览开关"与"请求把某个块脱离出去"原本是 **PanelDock.qml 内部的信号** —— 搬过去就够不着了。
+	// 这两条都属于壳层级接线（提示由 Shell.qml 画、独立窗口由 Shell.qml 建），放模型单例上正是
+	// "任意面板都能发起脱离"的那个广播口；模型**不因此存任何状态**（预览开关是纯 UI 状态，
+	// 仍归画提示的壳层：Shell.dropHintActive）。
+	//
+	// 请求把 blockId 这个块脱离成独立窗口：atScreenX/Y 是**屏幕坐标**（跨窗口判断只能用屏幕坐标，
+	// 各自窗口的场景原点不是一个）。Shell.qml 接住它；块不存在/已经是脱离态时由壳层忽略。
+	Q_INVOKABLE void requestDetach(const QString& blockId, qreal atScreenX, qreal atScreenY);
+	// 拖动过程中的落点预览开关（拖动期间主窗口收不到 hover，只能由正在拖的抓手推过来）
+	Q_INVOKABLE void setDetachPreview(bool overTarget);
+
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;
 	QHash<int, QByteArray> roleNames() const override;
@@ -152,6 +165,11 @@ signals:
 	void activeChanged();
 	void activeViewChanged();
 	void detachedChanged();   // 脱离集合 / 独立窗口可见性 / 独立窗口几何（三者共用一条，QML 侧整表重读）
+	// 抓手的脱离请求（见 requestDetach）：**广播**，模型自己不处理 —— 接住它的是壳层
+	// （Shell.qml 建独立窗口 / 亮落点提示）。刻意不做成"模型里存一个待处理请求"：
+	// 那就把 QML 的窗口语义漏进 common/** 了（本文件的分层说明）。
+	void detachRequested(const QString& blockId, qreal atScreenX, qreal atScreenY);
+	void detachPreviewChanged(bool overTarget);
 
 private:
 	// 一块的"独立窗口"状态。挂在 Block 上而不是单独一张表：块被关掉时状态跟着一起没了
