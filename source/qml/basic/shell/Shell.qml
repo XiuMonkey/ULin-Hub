@@ -34,19 +34,37 @@ Item {
     property rect dropZone: Qt.rect(0, 0, 0, 0)
     property bool dropHintActive: false
 
-    // ---------------- 右栏整体脱离成独立窗口（需求 ②③④）----------------
-    // 内容**不是副本**：脱离时把 RightSidebar 那个 Item reparent 到独立窗口的 contentItem，
+    // ---------------- 右栏整体：拿起来跟手 → 回附 / 脱离（需求 ①②③④）----------------
+    // 内容**不是副本**：拿起来/脱离时把 RightSidebar 那个 Item reparent 到独立窗口的内容槽，
     // 回附时 reparent 回附着槽位 sidebarSlot —— 终端/网页只有一份会话（各放一份会各跑一个渲染进程）。
     // 状态就下面这几条（窗口对象是文件末尾的 SidebarWindow 实例）。
+    //
+    // 时序（本次改动的核心，别退回"到阈值就在松手时出窗"那版）：
+    //   ① 三点越过手感阈值 ⇒ liftSidebarForDrag：右栏进**无边框临时窗口**，从这一刻起 1:1 跟着光标；
+    //      ⚠️ 这时**不动**主窗口布局（不调 Hub.closeRightSidebar）⇒ 顶栏/会话区尺寸一动不动；
+    //   ② 松手 ⇒ finishSidebarDrag：落回右栏原区域（±24）就 reparent 回槽位；
+    //      落在区域外才**确认脱离**（sidebarDetached=true）+ 这时才腾出主窗口的空间。
     property bool sidebarDetached: false
-    // 独立窗口几何：脱离时按右栏当前几何给初值，之后**以窗口为准**（窗口自己回写，见 SidebarWindow）；
-    // 再脱离时沿用它 ⇒ "拖回去再拖出来"不会跳回原位。
+    // 独立窗口几何：跟手/自己摆的时候都走 applySidebarWindowGeometry 这一条路（见下）。
     property real sidebarWinX: 0
     property real sidebarWinY: 0
     property real sidebarWinW: 0
     property real sidebarWinH: 0
     // 正在程序化摆窗口：这期间窗口的几何变化不回写状态（防回环：摆 → 通知 → 又摆）
     property bool sidebarWinApplying: false
+
+    // ---- 需求 ①②：按下三点越过手感阈值就"拿起来"，跟着光标 1:1 走，松手才定结局 ----
+    // 与"确认脱离"（sidebarDetached）分开：拿起来只是**临时窗口**，结局未定。
+    property bool sidebarFloating: false
+    // 跟手基准：拿起来那一刻的光标屏幕坐标 + 窗口位置（1:1：窗口位置 = 基准 + 屏幕位移）
+    property real floatOriginX: 0
+    property real floatOriginY: 0
+    property real floatWinX: 0
+    property real floatWinY: 0
+    // 松手落点容差（与独立窗口往回拖用同一个 slack，手感一致）
+    readonly property int dropSlack: 24
+    // "右栏此刻在独立窗口里"（跟手 or 已确认脱离）：独立窗口的显示与右栏的可见性都看它
+    readonly property bool sidebarInWindow: sidebarDetached || sidebarFloating
 
     // 右栏（面板坞）在**本窗口场景坐标**里的矩形：落点提示要画的矩形（脱离方向的判定在抓手自己那里，
     // 它按屏幕坐标算；回附方向由独立窗口里的抓手按屏幕坐标算）。
@@ -62,6 +80,14 @@ Item {
         const xOpen = shell.width - Theme.spacing.windowMargin - shell.rightSidebarEffW
         const p = shell.mapToGlobal(xOpen, sidebarSlot.y)
         return Qt.rect(p.x, p.y, shell.rightSidebarEffW, sidebarSlot.height)
+    }
+
+    // 松手落点判定（屏幕坐标 + ±dropSlack 容差）：跟手期间右栏没在槽位里，只能按"光标回没回到
+    // 那块矩形"来判 —— 与独立窗口往回拖用的是同一条规则。
+    function insideDockZone(p) {
+        const r = dockScreenRect()
+        return p.x >= r.x - dropSlack && p.x <= r.x + r.width + dropSlack
+               && p.y >= r.y - dropSlack && p.y <= r.y + r.height + dropSlack
     }
 
     // 程序化摆独立窗口（只走这一条路；窗口自己改了几何走 setSidebarWindowGeometry 回写）
@@ -87,43 +113,103 @@ Item {
         sidebarWinH = h
     }
 
-    // 把**整个右栏**送进独立窗口（拖三点越过阈值松手时调）。
-    // atScreenX/Y 是**屏幕坐标**（抓手给的是屏幕坐标：窗口位置与跨窗口判断都只能用屏幕坐标）。
-    // 窗口摆在光标附近；初始尺寸取右栏当前几何（宽给一个 token 下限，太窄的卡片里页签/内容没法用）。
-    function detachSidebar(atScreenX, atScreenY) {
-        if (sidebarDetached)
+    // 「拿起来」（需求 ①）：三点越过手感阈值那一刻调。把右栏搬进**无边框临时窗口**，
+    // 从此这扇窗跟着光标 1:1 走 —— 不再是"到阈值时松手才突然出窗"。
+    // ⚠️ 跟手期间**绝不**碰主窗口布局（不调 Hub.closeRightSidebar）：顶栏/会话区尺寸一动不动。
+    function liftSidebarForDrag() {
+        if (sidebarInWindow)
             return
-        const w = Math.max(Math.round(sidebarSlot.width), Theme.size.rightSidebarMinWidth)
-        const h = Math.max(Math.round(sidebarSlot.height), 240)
-        const scr = sidebarWindow.screen
-        const vx = (scr && scr.virtualX !== undefined) ? scr.virtualX : 0
-        const vy = (scr && scr.virtualY !== undefined) ? scr.virtualY : 0
-        const sw = scr ? scr.width : 1920
-        const sh = scr ? scr.height : 1080
-        const x = Math.max(vx, Math.min(Math.round(atScreenX - w / 2), vx + sw - w))
-        const y = Math.max(vy, Math.min(Math.round(atScreenY - 20), vy + sh - h))
+        // 窗口比右栏**高一条自绘标题栏**、位置相应上移 ⇒ 右栏内容零跳变地落进窗口，
+        // 标题栏"接"在它上面（拿起来就看得见"这已经是一扇窗"，见 SidebarWindow.qml 的说明）。
+        const r = dockScreenRect()
+        const w = Math.max(Math.round(r.width), Theme.size.rightSidebarMinWidth)
+        const h = Math.max(Math.round(r.height), 240) + Theme.size.titleBarHeight
+        const x = Math.round(r.x)
+        const y = Math.round(r.y) - Theme.size.titleBarHeight
+
+        sidebarWindow.prepareForLift(x, y, w, h)   // 记目标几何（窗口自己要用，见 normalizeForLift）
+        // ⚠️ 必须在 reparent **之前**置位：reparent 换宿主会让抓手的 MouseArea 立刻丢掉抓取
+        //    （Qt 在 item 换窗口时会 un-grab），那次 cancel 不是松手（RightSidebar 里靠 handedOff 丢掉）。
+        sidebarFloating = true
+        sidebarWindow.normalizeForLift()           // 上一次可能留了最大化/最小化：显示后拉回普通态
         applySidebarWindowGeometry(x, y, w, h)
-        // 顺序：先摆好几何 → reparent（同一份实例跟着搬）→ 再置 sidebarDetached（visible 绑定在它身上）。
-        // 这样窗口出现时内容与尺寸都已就位，不会先闪一帧空的 0x0 窗口。
-        rightSidebar.parent = sidebarWindow.contentItem
-        sidebarDetached = true
-        // 腾出来的地方还给顶栏/会话区：卡片已经搬走了，留着只是一块空白（右栏回到"已收起"）。
-        Hub.closeRightSidebar()
-        console.log("[sidebar-detach] detach at " + Math.round(atScreenX) + "," + Math.round(atScreenY)
-                    + " win " + w + "x" + h + " @" + x + "," + y)
+
+        // 跟手基准：光标**此刻**在哪（用屏幕坐标差 1:1，见下方 Timer 的说明）
+        const p = WindowBridge.cursorScreenPos()
+        floatOriginX = p.x
+        floatOriginY = p.y
+        floatWinX = x
+        floatWinY = y
+        // 落点提示：跟手全程都画着（画的就是"松手回哪儿"），光标落进去时更实一点
+        beginDetachPreview(false)
+        // reparent：同一份实例搬过去（终端/网页不会重开会话）
+        rightSidebar.parent = sidebarWindow.panelSlot
+        console.log("[sidebar-drag] lift win " + w + "x" + h + " @" + x + "," + y
+                    + " cursor " + Math.round(p.x) + "," + Math.round(p.y))
+    }
+
+    // 跟手到某个光标**屏幕**位置（1:1）：窗口位置 = 拿起来那一刻的窗口位置 + 光标屏幕位移。
+    // 单独抽成函数是因为"跟手"就是这件事本身 —— 下面的 Timer 只是按光标喂它。
+    function sidebarFollowTo(screenX, screenY) {
+        if (!sidebarFloating)
+            return
+        applySidebarWindowGeometry(floatWinX + (screenX - floatOriginX),
+                                   floatWinY + (screenY - floatOriginY),
+                                   sidebarWinW, sidebarWinH)
+        // 落点提示：跟手全程都画着（画的就是"松手回哪儿"）。矩形只在空掉时重算一次
+        // —— 跟手期间布局是冻的，每帧重算没必要（抓手那次 cancel 会把矩形清掉，这里自愈）。
+        if (dropZone.width <= 0 || dropZone.height <= 0)
+            dropZone = dockSceneRect()
+        dropHintActive = insideDockZone(Qt.point(screenX, screenY))
+    }
+
+    // 跟手一帧：按光标跟一次，并按**物理**左键状态收尾（松手就定结局）。
+    // 为什么松手只能这样判 —— 见 WindowBridge.leftButtonDown 的说明（跟手期间鼠标消息投给握着
+    // 捕获的**主窗口**，搬出去的那扇窗一个鼠标事件都收不到）。
+    function sidebarFollowTick() {
+        if (!sidebarFloating)
+            return
+        const p = WindowBridge.cursorScreenPos()
+        sidebarFollowTo(p.x, p.y)
+        if (!WindowBridge.leftButtonDown())
+            finishSidebarDrag(p.x, p.y)
+    }
+
+    // 松手：按落点分两个分支（需求 ①②）。重复调用是安全的（跟手的 Timer 与抓手的 finished 都汇到这儿）。
+    function finishSidebarDrag(atScreenX, atScreenY) {
+        if (!sidebarFloating)
+            return
+        const over = insideDockZone(Qt.point(atScreenX, atScreenY))
+        if (over) {
+            // ① 落回右栏原区域 ⇒ 回附：内容 reparent 回槽位。
+            //    跟手期间没动过 rightInset ⇒ 布局从头到尾没变，这里只是把卡片放回原位。
+            rightSidebar.parent = sidebarSlot
+            sidebarFloating = false
+            console.log("[sidebar-drag] drop in zone → 回附（布局未动过）")
+        }
+        else {
+            // ② 落在区域外 ⇒ **此刻**才确认脱离：窗口留在光标处、接上自绘标题栏（它本来就在），
+            //    主窗口这时才腾出空间（需求 ② 要的时序：跟手期间不许重排）。
+            sidebarDetached = true
+            sidebarFloating = false
+            Hub.closeRightSidebar()
+            console.log("[sidebar-drag] drop outside → 独立窗口 @" + sidebarWindow.x + "," + sidebarWindow.y
+                        + " " + sidebarWindow.width + "x" + sidebarWindow.height)
+        }
+        endDetachPreview()
     }
 
     // 回附（需求 ③⑤）：内容 reparent 回附着槽位、关掉独立窗口。
     //   · 从独立窗口把三点拖回右栏位置松手 ⇒ open=true（用户就是想看它，落回来就展开）；
-    //   · 点顶栏 ◫ / 点独立窗口的系统 ✕ ⇒ open=false（"已附着但隐藏"，下次点 ◫ 默认以附着状态打开）。
+    //   · 点顶栏 ◫ / 点独立窗口自绘的 ✕ / 系统 ✕ ⇒ open=false（"已附着但隐藏"，下次点 ◫ 默认以附着状态打开）。
     function attachSidebar(open) {
         if (!sidebarDetached)
             return
-        // 副窗口被最小化时先还原再隐藏：否则下次脱离 show 出来的还是一扇最小化的窗
+        // 副窗口被最小化时先还原再隐藏：否则下次"拿起来"show 出来的还是一扇最小化的窗
         // （showNormal 是 QWindow 的公有槽，QML 侧可以直接调）
         if (sidebarWindow.visibility === Window.Minimized)
             sidebarWindow.showNormal()
-        sidebarDetached = false        // 独立窗口随之隐藏；系统 ✕ 那条路的 onClosing 已被它拦住
+        sidebarDetached = false        // 独立窗口随之隐藏；自绘 ✕ / 系统 ✕ 那条路都汇到这里
         rightSidebar.parent = sidebarSlot
         if (open)
             Hub.openRightSidebar()
@@ -143,11 +229,25 @@ Item {
         dropHintActive = false
         dropZone = Qt.rect(0, 0, 0, 0)
     }
-    // 右栏标题行那三个点抓手把块拖出去了：在**光标处**建独立窗口（需求 ②）。
+    // ---- 跟手驱动（需求 ①）----
+    // 为什么必须"问"而不是"听事件"：右栏一进临时窗口，鼠标消息就投给握着捕获的**主窗口**了
+    // （Windows 的鼠标捕获是线程级、消息只给捕获窗口），搬出去的那扇窗收不到任何鼠标事件 ⇒
+    // 位置与"松没松手"只能按 ~120Hz 直接问系统（WindowBridge.cursorScreenPos / leftButtonDown）。
+    // running 直接绑 sidebarFloating：不跟手时它不跑，代价为 0；停下时也不需要谁去 stop。
+    Timer {
+        id: sidebarFollowTimer
+        interval: 8
+        repeat: true
+        running: shell.sidebarFloating
+        onTriggered: shell.sidebarFollowTick()
+    }
+
+    // 右栏标题行那三个点抓手把**某个块**拖出去了（上一轮的"按块脱离"路径）：在光标处建独立窗口。
+    // ⚠️ 现在没有调用方（抓手改拖整个右栏了），保留是因为 DetachedBlockWindow 那条链仍在，
+    //    删掉会连带 Dock.detach/setDetachedGeometry 变成孤儿。
     // ⚠️ atScreenX/Y 是**屏幕坐标**（抓手在 RightSidebar 里算的：跨窗口判断只能用屏幕坐标）。
     //    独立窗口的 x/y 本来就是屏幕坐标，所以这里不再做 scene/global 的来回换算 —— 搬家前那版
     //    把屏幕坐标先 mapFromItem 成场景坐标再当窗口位置用，只在"窗口锚在场景原点"这一条上碰巧等价。
-    // 几何：宽取右栏宽度与 480 逻辑像素里更宽的那个、高与右栏等高（首次脱离的默认值；之后再脱离沿用上次的）。
     function detachActiveBlock(blockId, atScreenX, atScreenY) {
         const idx = Dock.activeIndex
         if (idx < 0)
@@ -375,15 +475,23 @@ Item {
 
             anchors.fill: parent
             // 附着态：可见性与淡入跟壳层的展开进度走（与搬家前逐字同一条）；
-            // 脱离态：它在独立窗口里，那扇窗显示它就显示。
-            visible: shell.sidebarDetached ? true : shell.rightSidebarT > 0.001
-            opacity: shell.sidebarDetached ? 1 : shell.rightSidebarT
-            // 独立态下三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
+            // 拿起来/脱离态：它在独立窗口里，那扇窗显示它就显示。
+            visible: shell.sidebarInWindow ? true : shell.rightSidebarT > 0.001
+            opacity: shell.sidebarInWindow ? 1 : shell.rightSidebarT
+            // 独立态（**确认脱离之后**）：三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
             sideDetached: shell.sidebarDetached
             attachZoneProvider: shell.dockScreenRect
-            onCloseRequested: Hub.closeRightSidebar()
-            // 抓手的三条请求：脱离 / 回附 / 拖动中的落点预览（提示仍由壳层画，见下面的 DockDropHint）
-            onSidebarDetachRequested: (screenX, screenY) => shell.detachSidebar(screenX, screenY)
+            // 面板自己标题行那颗 ✕：跟手/独立态下它也必须走"回附 + 关窗"（否就只收起主窗口那半边，
+            // 内容留在副窗口里 = 状态自相矛盾）；附着态照旧只收起右栏。
+            onCloseRequested: {
+                if (shell.sidebarInWindow)
+                    shell.attachSidebar(false)
+                else
+                    Hub.closeRightSidebar()
+            }
+            // 抓手的四条请求：拿起来（跟手开始）/ 松手（壳层按落点定结局）/ 回附 / 拖动中的落点预览
+            onSidebarLiftRequested: shell.liftSidebarForDrag()
+            onSidebarDropRequested: (screenX, screenY) => shell.finishSidebarDrag(screenX, screenY)
             onSidebarAttachRequested: shell.attachSidebar(true)
             onSidebarPreviewChanged: (over) => {
                 if (over)
@@ -400,9 +508,9 @@ Item {
         }
     }
 
-    // ---- 独立窗口：右栏整体脱离之后住在这儿（系统装饰，需求 ②）----
-    // 内容**不是副本**：RightSidebar 那个 Item 由上面的 detachSidebar/attachSidebar reparent 进来/出去。
-    // 窗口本身只做三件事：按 sidebarDetached 显示、几何按壳层给的值摆、自己的 move/resize 回写壳层。
+    // ---- 独立窗口：右栏整体"拿起来"之后住在这儿（无边框 + 自绘标题栏，需求 ③）----
+    // 内容**不是副本**：RightSidebar 那个 Item 由 liftSidebarForDrag/attachSidebar reparent
+    // 进/出 `panelSlot`。窗口本身只做：按 sidebarInWindow 显示、被 Shell 摆几何、自己的 move/resize 回写。
     SidebarWindow {
         id: sidebarWindow
         host: shell
@@ -451,14 +559,15 @@ Item {
     // z 抬到面板之上：拖动期间右栏还在自己的位置（附着态）或在独立窗口里（脱离态），
     // 主窗口这边只有这块轮廓要露出来给人看。
     // 文案两个方向不同：附着态往外拖（"松手：面板变成独立窗口"）vs 独立窗口往里拖（"松手：重新附着回右栏"）；
-    // 两个方向都由正在拖的那个抓手推 `shell.dropHintActive`（拖动中主窗口收不到 hover，只能这样推），
-    // `fromDock` 就是"当前是不是附着态那一档"。
+    // 两个方向都由正在拖的那个抓手（或跟手的 Timer）推 `shell.dropHintActive`
+    // （拖动中主窗口收不到 hover，只能这样推）；`floating` 就是"此刻正在跟手"那一档。
     DockDropHint {
         id: dropHint
         z: 30
         zone: shell.dropZone
         active: shell.dropHintActive
         fromDock: !shell.sidebarDetached
+        floating: shell.sidebarFloating
     }
 
     // 右侧栏宽度拖柄：贴在面板左缘的一条 10px 热区（平时完全透明，悬停才露一条灰边）。

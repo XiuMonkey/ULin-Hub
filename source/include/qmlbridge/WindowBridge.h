@@ -62,6 +62,12 @@ public:
 	// 主题/外观被外部改过（扩展换风格包、系统深色切换）后由宿主调一次
 	Q_INVOKABLE void notifyThemeChanged();
 
+	// ---- 拖动跟手用的两个**纯查询**（转发 NativeWindowFilter，见那边的说明）----
+	// 右栏"拿起来"之后内容在另一扇窗里、鼠标捕获还在主窗口 ⇒ 那扇窗收不到鼠标消息，
+	// "跟到哪儿了 / 松没松手"只能这样直接问系统。不碰窗口、不改状态，可以在拖动里高频调（~120Hz）。
+	Q_INVOKABLE QPoint cursorScreenPos() const;
+	Q_INVOKABLE bool leftButtonDown() const;
+
 	// 最近 maxAgeMs 毫秒内发生过鼠标按下 / 抬起 ⇒ 返回那次点击的位置（窗口内容坐标 = QML 场景坐标，
 	// 逻辑像素，与 Overlay.overlay 同源）；否则返回**无效 QVariant**（QML 侧拿到 undefined）。
 	// 判"够不够近"是为了区分"这次弹出就是这次点击触发的"与"纯键盘 / 程序触发的弹出"：

@@ -24,7 +24,8 @@
         <file>basic/shell/PanelDock.qml</file>
         <file>basic/shell/DetachedBlockWindow.qml</file>
         <file>basic/shell/DockDropHint.qml</file>
-        <!-- 右栏整体脱离成独立窗口（系统装饰；内容是 reparent 进去的同一份 RightSidebar）-->
+        <!-- 右栏整体"拿起来"跟着光标走 / 脱离成**无边框**独立窗口（自绘标题栏与四边缩放；
+             内容是 reparent 进去的同一份 RightSidebar）-->
         <file>basic/shell/SidebarWindow.qml</file>
         <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>

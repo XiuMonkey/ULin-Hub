@@ -27,16 +27,21 @@ Item {
 
     // ---------------- 整个右栏脱离成独立窗口（本次的驱动路径）----------------
     // 状态在 Shell（它拥有独立窗口），这里只拿两条注入进来的事实：
-    //   · sideDetached —— 本 Item 此刻在**独立窗口**里（reparent 过去了，见 Shell.detachSidebar）。
-    //     三个点于是改成"搬那扇窗 + 落回右栏位置就回附"；
+    //   · sideDetached —— **确认脱离之后**为真（本 Item 此刻在独立窗口里，reparent 过去了，
+    //     见 Shell.liftSidebarForDrag / finishSidebarDrag）。三个点于是改成"搬那扇窗 + 落回右栏位置就回附"；
     //   · attachZoneProvider —— 取"主窗口里右栏附着时所在的**屏幕矩形**"的函数。
     //     跨窗口判断只能用屏幕坐标（各自窗口的场景原点不是一个）。
     //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。
     property bool sideDetached: false
     property var attachZoneProvider: null
 
-    // 抓手的三条请求，全部由 Shell 接住（它才知道窗口与壳层几何）
-    signal sidebarDetachRequested(real screenX, real screenY)
+    // 抓手的四条请求，全部由 Shell 接住（它才知道窗口与壳层几何）：
+    //   · sidebarLiftRequested —— 附着态下三点越过手感阈值：**现在**就把右栏"拿起来"
+    //     （进无边框临时窗口跟手，需求 ①）。跟手期间主窗口布局一动不动（壳层保证）；
+    //   · sidebarDropRequested —— 松手（壳层按落点决定回附还是独立）；
+    //   · sidebarAttachRequested / sidebarPreviewChanged —— 独立态：拖回右栏 + 落点提示。
+    signal sidebarLiftRequested()
+    signal sidebarDropRequested(real screenX, real screenY)
     signal sidebarAttachRequested()
     // 拖动中的落点预览开关（拖动期间主窗口收不到 hover，只能由正在拖的抓手推过去）
     signal sidebarPreviewChanged(bool over)
@@ -103,21 +108,24 @@ Item {
                     //    普通客户端事件（同一个 header 里的 ✕ 按钮一直就是这么收点击的）。
                     //    在无边框窗口里登记是为了抢在标题栏之前，这里没有要抢的东西。
 
-                    // 阈值（沿用搬家前的数值）：附着态"离开右栏区域 >48px 或水平位移 >60px ⇒ 够脱离"；
-                    // 独立态"光标落回右栏原位置 ±24px ⇒ 够回附"（容差与按块脱离那版同一个手感）。
-                    readonly property real detachSlack: 48
-                    readonly property real detachShiftX: 60
+                    // 阈值（沿用搬家前的数值）：附着态只留"手感阈值"（PanelGrip 的 6px，越过就
+                    // **立刻拿起来**跟手，见下）；独立态"光标落回右栏原位置 ±24px ⇒ 够回附"。
                     readonly property real attachSlack: 24
-                    // 已经越过脱离/回附阈值（拖动中实时算，松手时按它决定做什么）
+                    // 已经越过回附阈值（独立态拖动中实时算，松手时按它决定做什么）
                     property bool armed: false
                     // 这一次按下之后真的拖动过吗？⚠️ 不能看 PanelGrip.dragging ——
                     // 它发 dragFinished 之前**先把 dragging 置 false**，这边读到的一定是 false。
                     property bool dragged: false
+                    // 这一次按压是否已经"交接"给壳层（附着态越过阈值 ⇒ 右栏进临时窗口跟手）。
+                    // ⚠️ 交接那一瞬间 reparent 会让本 MouseArea **立刻**收到 cancel（item 换窗口时
+                    //    Qt 必然 un-grab），那次 cancel 不是松手 —— 不能让它去定结局（否则松手前
+                    //    就把面板定成回附/独立了）。所以交接后把 finished/cancel 一律丢掉。
+                    property bool handedOff: false
                     // 独立态搬窗口：按下那一刻窗口在哪（后面用"它 + 屏幕位移"1:1 跟手）
                     property real pressWinX: 0
                     property real pressWinY: 0
 
-                    // 「右栏附着时所在的屏幕矩形」：脱离方向的判定基准，也是回附方向的落点。
+                    // 「右栏附着时所在的屏幕矩形」：回附方向的落点判定基准。
                     // 由 Shell 注入（它才知道主窗口与壳层几何）；**现算**而不是缓存成属性 ——
                     // 主窗口被搬动/改尺寸后属性绑定不会重算（那是 C++ 侧改的窗口坐标）。
                     // ⚠️ 这里必须用 root（本文件根 id）：上一轮从 PanelDock.qml 抄过来时写的是 `dock`，
@@ -140,6 +148,7 @@ Item {
                     onPressStarted: {
                         armed = false
                         dragged = false
+                        handedOff = false
                         const win = root.Window.window
                         pressWinX = win ? win.x : 0
                         pressWinY = win ? win.y : 0
@@ -169,18 +178,12 @@ Item {
                             return
                         }
 
-                        // 附着态：拖三点 = 把**整个右栏**拖出去（需求 ②）。判定只能用屏幕坐标。
-                        const r = attachZone()
-                        if (!r)
-                            return
-                        const outside = globalPos.x < r.x - detachSlack
-                                        || globalPos.x > r.x + r.width + detachSlack
-                                        || globalPos.y < r.y - detachSlack
-                                        || globalPos.y > r.y + r.height + detachSlack
-                        const next = outside || Math.abs(dx) > detachShiftX
-                        if (next !== armed) {
-                            armed = next
-                            root.sidebarPreviewChanged(next)
+                        // 附着态：越过手感阈值 ⇒ **立刻拿起来**（需求 ①）。
+                        // 之后这扇窗跟着光标 1:1 走、主窗口布局一动不动，松手才定结局；
+                        // 位置由壳层按"屏幕坐标差"跟（见 Shell.sidebarFollowTick）。
+                        if (!handedOff) {
+                            handedOff = true
+                            root.sidebarLiftRequested()
                         }
                     }
                     onDragFinished: (dx, dy, globalPos) => {
@@ -188,14 +191,24 @@ Item {
                         armed = false
                         // 预览一律先收（松手之后就没有"正在拖"这件事了）
                         root.sidebarPreviewChanged(false)
-                        if (!dragged)      // 只点击、没拖动：不动任何状态
-                            return
+                        const wasDragged = dragged
                         dragged = false
+                        if (handedOff) {
+                            // 已经交接给壳层：这次 finished/cancel（reparent 引起的那次）不作数，
+                            // 收尾由壳层的跟手 Timer（物理按键状态）负责。
+                            handedOff = false
+                            return
+                        }
+                        if (!wasDragged)      // 只点击、没拖动：不动任何状态
+                            return
                         if (root.sideDetached) {
                             if (wasArmed)
                                 root.sidebarAttachRequested()   // 落回右栏位置 ⇒ 重新附着
-                        } else if (wasArmed) {
-                            root.sidebarDetachRequested(globalPos.x, globalPos.y)
+                        } else {
+                            // 附着态没交接就松手 = 没过手感阈值（点了一下）⇒ 什么都不做。
+                            // 这里仍然报一次"松手"，壳层按落点决定（它自己会判"没在跟手"直接返回），
+                            // 免得日后有人把阈值调大后忘了这条线。
+                            root.sidebarDropRequested(globalPos.x, globalPos.y)
                         }
                     }
                 }

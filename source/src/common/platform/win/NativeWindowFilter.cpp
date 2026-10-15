@@ -3,7 +3,9 @@
 #include "common/platform/win/NativeWindowFilter.h"
 
 #include <QCoreApplication>
+#include <QCursor>
 #include <QDebug>
+#include <QGuiApplication>
 #include <QPoint>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -228,6 +230,26 @@ int NativeWindowFilter::maximizedContentInset(const QWindow* window) const
 #endif
 
 	return inset;
+}
+
+// ---- 拖动跟手用的两个纯查询（见头文件）----
+QPoint NativeWindowFilter::cursorScreenPos()
+{
+	// QCursor::pos() 直接问系统：不受 Qt Quick 的鼠标抓取、窗口激活、焦点影响。
+	// 返回的是逻辑像素的虚拟桌面坐标，与 QML 的 mapToGlobal / 窗口 x,y 同一套坐标系。
+	return QCursor::pos();
+}
+
+bool NativeWindowFilter::leftButtonDown()
+{
+#ifdef Q_OS_WIN
+	// 物理按键状态：跟手期间 WM_LBUTTONUP 很可能投给的是**主窗口**（它握着捕获），
+	// 而这次拖动要结束的是另一扇窗里的东西 —— 事件推不出来，只能问系统当前状态。
+	if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+		return true;
+#endif
+	// 非 Windows（或取不到物理状态时）的兜底：Qt 自己维护的按键状态
+	return QGuiApplication::mouseButtons().testFlag(Qt::LeftButton);
 }
 
 QWindow* NativeWindowFilter::findByHwnd(void* hwnd)

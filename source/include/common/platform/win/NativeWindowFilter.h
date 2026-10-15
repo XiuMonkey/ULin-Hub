@@ -53,6 +53,15 @@ public:
 	// 最大化时"系统多给的那一圈"（逻辑像素）：客户区要按它内缩，可见内容才落进工作区
 	int maximizedContentInset(const QWindow* window) const;
 
+	// ---- 拖动跟手用的两个**纯查询**（不碰任何窗口、不改任何状态）----
+	// 场景：拖右栏那三个点时，内容已经被 reparent 到另一扇窗里（"同一份实例"是硬要求），
+	// 而鼠标捕获留在按下时那扇窗（Windows 的捕获是线程级、消息只投给捕获窗口）⇒ 搬出去的那扇窗
+	// 收不到任何鼠标消息。于是"跟到哪儿了 / 松没松手"只能直接问系统，不能靠事件推。
+	// 光标屏幕坐标（逻辑像素，与 QML 的 mapToGlobal / 窗口 x,y 同一坐标系）
+	static QPoint cursorScreenPos();
+	// 左键是否**物理**按着（GetAsyncKeyState：与"谁收到 WM_LBUTTONUP"无关）
+	static bool leftButtonDown();
+
 	bool nativeEventFilter(const QByteArray& eventType, void* message, qintptr* result) override;
 
 	// WindowControlKind 的取值（QML 侧用字符串，见 WindowBridge::addWindowControl）

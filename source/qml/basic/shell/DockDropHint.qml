@@ -22,6 +22,9 @@ Item {
     property bool active: false
     // 两个方向的提示文案不一样：附着态往外拖（面板**已经在**这儿）vs 独立窗口往回拖（正要放回来）
     property bool fromDock: false
+    // 第三种情况（本次新增）：三点刚把面板"拿起来"、正跟着光标走 —— 这时它已经不在原位了，
+    // 文案要说的是"松手回哪儿"，而不是"把三个点拖离右栏"（那句已经不成立了）。
+    property bool floating: false
 
     readonly property bool anyZone: zone.width > 0 && zone.height > 0
 
@@ -45,14 +48,16 @@ Item {
         }
     }
 
-    // 一句说明，免得只有个框让人猜（文案说清"松手就回到这里"）
+    // 一句说明，免得只有个框让人猜（文案说清"松手会怎样"）
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 10
-        text: root.fromDock
-              ? (root.active ? "松手：面板变成独立窗口" : "把三个点拖离右栏，面板就变成独立窗口")
-              : (root.active ? "松手：重新附着回右栏" : "把面板拖到右栏位置即重新附着")
+        text: root.floating
+              ? (root.active ? "松手：回到右栏" : "松手：面板成为独立窗口")
+              : (root.fromDock
+                 ? (root.active ? "松手：面板变成独立窗口" : "把三个点拖离右栏，面板就变成独立窗口")
+                 : (root.active ? "松手：重新附着回右栏" : "把面板拖到右栏位置即重新附着"))
         color: Theme.color.textPrimary
         font.family: "Microsoft YaHei UI"
         font.pixelSize: Theme.font.caption

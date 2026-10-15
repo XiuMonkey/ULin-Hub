@@ -191,6 +191,17 @@ void WindowBridge::notifyThemeChanged()
 	emit themeChanged();
 }
 
+// ---- 拖动跟手用的两个纯查询：一律转发 NativeWindowFilter（原生判定归它，见那边的说明）----
+QPoint WindowBridge::cursorScreenPos() const
+{
+	return NativeWindowFilter::cursorScreenPos();
+}
+
+bool WindowBridge::leftButtonDown() const
+{
+	return NativeWindowFilter::leftButtonDown();
+}
+
 bool WindowBridge::isMaximized() const
 {
 	return m_window && m_window->windowStates().testFlag(Qt::WindowMaximized);
