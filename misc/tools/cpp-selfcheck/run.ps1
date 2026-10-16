@@ -48,8 +48,8 @@ $qtFwd = $QtDir -replace '\\', '/'
 Write-Host "== moc =="
 & $moc (Join-Path $inc 'common\shell\PanelDockModel.h') -o (Join-Path $work 'moc_PanelDockModel.cpp')
 if ($LASTEXITCODE -ne 0) { Write-Host "moc 失败：PanelDockModel.h（exit=$LASTEXITCODE）"; exit $LASTEXITCODE }
-& $moc (Join-Path $inc 'qmlbridge\SidebarLayout.h') -o (Join-Path $work 'moc_SidebarLayout.cpp')
-if ($LASTEXITCODE -ne 0) { Write-Host "moc 失败：SidebarLayout.h（exit=$LASTEXITCODE）"; exit $LASTEXITCODE }
+& $moc (Join-Path $inc 'qmlbridge\PanelBarLayout.h') -o (Join-Path $work 'moc_PanelBarLayout.cpp')
+if ($LASTEXITCODE -ne 0) { Write-Host "moc 失败：PanelBarLayout.h（exit=$LASTEXITCODE）"; exit $LASTEXITCODE }
 
 # ---- 3) cl：自检 + 被测 .cpp + 生成的 moc（/utf-8 必须留着：源文件里有中文注释且无 BOM）----
 Write-Host "== cl =="
@@ -59,10 +59,10 @@ Write-Host "== cl =="
 	(Join-Path $PSScriptRoot 'selfcheck.cpp') `
 	(Join-Path $repoRoot 'source\src\common\util\UrlInput.cpp') `
 	(Join-Path $repoRoot 'source\src\common\shell\PanelDockModel.cpp') `
-	(Join-Path $repoRoot 'source\src\common\layout\SidebarMetrics.cpp') `
-	(Join-Path $repoRoot 'source\src\qmlbridge\SidebarLayout.cpp') `
+	(Join-Path $repoRoot 'source\src\common\layout\PanelBarMetrics.cpp') `
+	(Join-Path $repoRoot 'source\src\qmlbridge\PanelBarLayout.cpp') `
 	(Join-Path $work 'moc_PanelDockModel.cpp') `
-	(Join-Path $work 'moc_SidebarLayout.cpp') `
+	(Join-Path $work 'moc_PanelBarLayout.cpp') `
 	/link "/LIBPATH:$qtFwd/lib" Qt6Core.lib
 if ($LASTEXITCODE -ne 0) { Write-Host "cl 编译/链接失败（exit=$LASTEXITCODE）"; exit $LASTEXITCODE }
 

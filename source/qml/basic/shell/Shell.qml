@@ -28,9 +28,10 @@ Item {
         toast.show(text)
     }
 
-    // ---------------- 块脱离 / 回附（独立窗口）----------------
-    // 状态在 common/shell/PanelDockModel（QML 面是单例 Dock），窗口对象在这里按 Dock.detachedBlocks
-    // 一扇一块地建；本层只做"把壳层的坐标与右栏几何喂给它"这种接线。
+    // ---------------- 落点提示（右栏整体拖出去 / 拖回来）----------------
+    // 右栏（整个面板栏）的脱离/回附状态是下面那组 panelBar* 属性（panelBarDetached /
+    // panelBarFloating / panelBarWin* …），本层只做"把壳层的坐标与右栏几何喂给窗口"这种接线。
+    // （"按块脱离"那条链已删除，状态也不再放在 common/shell/PanelDockModel 里。）
     //
     // 落点提示的矩形与开关：矩形在**拖动开始时**算一次（拖动期间右栏可能已经收起，每帧重算会指错地方）；
     // 开关由正在拖的那个独立窗口推过来（拖动中主窗口收不到 hover，只能这样推）。
@@ -372,9 +373,9 @@ Item {
                 //   ② 没有副窗口 ⇒ 走原来的开合（Hub.togglePanelBar()）；
                 //   ③ 刚关完副窗口再点 ⇒ panelBarOpen 还是 false ⇒ toggle 走"打开"，
                 //      而内容这时已经附着回槽位 ⇒ "关闭后再点开默认是附着状态"，正是需求要的。
-                // ⚠️ 上一轮的 `Dock.anyDetachedVisible / closeDetachedWindows()` 那两个接口没删，
-                //    但"按块脱离"现在没有任何调用方（抓手改拖整个右栏了，见 PanelBar.qml），
-                //    所以这条分支不再经过它们。
+                // ⚠️ "按块脱离"那一套（含 Dock.anyDetachedVisible / Dock.closeDetachedWindows()）
+                //    已随 PanelDockModel 的死代码清理一并删除（抓手改拖整个右栏了，见 PanelBar.qml），
+                //    所以这条分支只看 panelBarDetached，不再经过那两个接口。
                 onPanelBarRequested: {
                     if (shell.panelBarDetached)
                         shell.attachSidebar(false)
