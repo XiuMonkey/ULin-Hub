@@ -248,9 +248,6 @@ Item {
                         if (!dockGrip.dragging)
                             return
                         dragged = true
-                        console.log("[EV] RS onDragMoved start dx=" + dx + " dy=" + dy
-                                    + " detached=" + root.sideDetached + " dragged=" + dragged
-                                    + " provider=" + (root.moveWindowProvider ? "yes" : "no"))
 
                         if (root.sideDetached) {
                             // 独立态：三个点**照样能拖**（需求要保留）—— 拖的就是那扇独立窗口。
@@ -263,19 +260,17 @@ Item {
                             //    按住三个点**完全不动**；改成"沿 parent 链现找"也不行：reparent 之后
                             //    父链上是 `panelSlot → 窗口 contentItem → QQuickRootItem`，
                             //    **壳层不在链上**（实测）。所以出口由 Shell 注入（见 root.moveWindowProvider）。
-                            const before = root.Window.window
-                                ? (root.Window.window.x + "," + root.Window.window.y) : "?"
+                            // ⚠️ 拖动路径上**不许打日志**：每次 move 都拼字符串 + 写盘，
+                            //    实测会把拖动变成幻灯片（这里曾经有 4 条 console.log）。
+                            // 出错只记一次（拖动中的重复日志本身就是卡顿源）。
                             try {
                                 root.moveWindowTo(Math.round(pressWinX + dx), Math.round(pressWinY + dy))
                             } catch (e) {
-                                console.log("[EV] RS moveWindowTo THREW: " + e)
+                                if (!root.moveWindowErrorLogged) {
+                                    root.moveWindowErrorLogged = true
+                                    console.log("[sidebar-drag] moveWindowTo 失败（只记一次）: " + e)
+                                }
                             }
-                            const after = root.Window.window
-                                ? (root.Window.window.x + "," + root.Window.window.y) : "?"
-                            console.log("[EV] RS drag dx=" + dx + " dy=" + dy
-                                        + " pressWin=" + pressWinX + "," + pressWinY
-                                        + " provider=" + (root.moveWindowProvider ? "yes" : "no")
-                                        + " before=" + before + " after=" + after)
                             // 光标落回右栏原位置附近 ⇒ 亮起落点提示（松手才真的回附）
                             const over = insideAttachZone(globalPos)
                             if (over !== armed) {
