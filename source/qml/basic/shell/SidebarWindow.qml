@@ -408,10 +408,13 @@ Window {
     }
 
     Component.onCompleted: {
-        // 曾经在这里调 WindowBridge.attachAuxWindow(win) 给副窗补 WS_THICKFRAME/WS_CAPTION，
-        // 想让它像主窗那样走 DWM 非客户区路径 —— 那条路**没解决问题**（黑块照旧）✗，
-        // 真正的原因是窗口底色不透明（见上面的 color: "transparent"）。所以这里不再补样式：
-        // 少一套"多窗口原生样式"机制，副窗回到简单态。
+        // 补上和主窗口**同一排**原生样式位（WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角）：
+        //   · 黑块的真凶是**窗口底色不透明**（见上面的 color: "transparent"）✗ 不是缺样式位；
+        //   · 但样式位仍然要补：有 WS_THICKFRAME，缩放/搬窗才走**系统原生快路径**，
+        //     否则拖动会一卡一卡（实测：撤掉这行后拖动又变卡）。
+        // 用 attachAuxWindow（**附加**窗口）：attachWindow 会把"主窗口"换成这扇窗，
+        // WindowBridge 的窗口动作与可绑定属性都只认主窗口，换掉就是罪状级 bug。
+        WindowBridge.attachAuxWindow(win)
         console.log("[sidebar-detach] window created " + win.width + "x" + win.height
                     + " at " + win.x + "," + win.y)
     }

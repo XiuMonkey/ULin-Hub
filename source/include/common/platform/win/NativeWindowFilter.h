@@ -34,7 +34,9 @@ public:
 	// 返回值无意义，仅为调用方便。
 	void applyNativeStyle(QWindow* window);
 
-	// 自绘标题栏：窗口内的拖动区（QML 的 TitleBar item）。为空 = 没有拖动区
+	// 自绘标题栏：窗口内的拖动区（QML 的 TitleBar item）。为空 = 没有拖动区。
+	// ⚠️ **按 item 所属的窗口生效**（见 hitTest）：本类是**多窗**的（主窗口 + 右栏副窗口），
+	//    caption/窗口控件都拿"该 item 实际在的那扇窗"去比，登记进来的项只影响自己那扇窗。
 	void setCaptionItem(QQuickItem* item);
 	// 窗口按钮：落在这些 item 上不交给系统当标题栏。kind 见 WindowControlKind
 	void addWindowControl(QQuickItem* item, int kind);
@@ -95,8 +97,8 @@ private:
 	};
 
 	QWindow* findByHwnd(void* hwnd);
-	// 命中该点的窗口按钮（没有则 nullptr）
-	const ControlEntry* windowControlAt(const QPoint& logicalPos) const;
+	// 命中该点的窗口按钮（没有则 nullptr）。只算**属于 window 这扇窗**的登记项
+	const ControlEntry* windowControlAt(QWindow* window, const QPoint& logicalPos) const;
 	// 返回 WM_NCHITTEST 的命中码；controlKind 回填命中的窗口按钮角色
 	qintptr hitTest(QWindow* window, const QPoint& logicalPos, int* controlKind) const;
 	void updateHoveredKind(int kind);
