@@ -13,11 +13,7 @@
 //     `common/platform/win/NativeWindowFilter`。原因：那套原生机制是**单窗口**绑定的
 //     （`m_captionItem` 与窗口控件表都是全局一份，靠 `WindowBridge` 绑在主窗口上），
 //     硬套到第二扇窗要先拆它；而自绘缩放的最小尺寸钳制在 QML 里也能做得很干净。
-//     代价：没有系统的贴边吸附/Aero Snap。
-//   · ⚠️ **改尺寸时的黑块**（本次修的那条）：自绘缩放会在拖动期间**每个鼠标事件**下发一次原生
-//     窗口尺寸变更，QtQuick 于是每帧重建渲染目标/交换链，WebEngine 的内容跟不上 ⇒ 露黑。
-//     修法见下面 applyGeometry：几何改为"每帧最多下发一次"（Qt.callLater 合并，丢中间帧）。
-//     ⚠️ 别再退回"谁调谁写"那版 —— 那正是黑块的成因。
+//     代价：没有系统的贴边吸附/Aero Snap，缩放跟手程度取决于 Qt 的窗口重建（实测见 PROGRESS）。
 //   · 最大化用**真窗口状态** `Window.Maximized`（探针实测：无边框窗口最大化取的是**工作区**
 //     1280x752，不是整块屏幕 ⇒ 不会盖任务栏），还原回 `Window.Windowed` 并显式写回记下的几何。
 //
@@ -75,47 +71,11 @@ Window {
     // ——拖动不碰宽高，与这里同一套"按下时位置 + 屏幕位移"的算法。
     // ⚠️ 这里**不**给自己写 x/y/width/height 的绑定（绑上去会被拖动摘掉，或反过来每帧盖回来）；
     //    几何由 Shell 在"拿起来/跟手"时推（applySidebarWindowGeometry），之后以窗口为准。
-    //
-    // ---- 几何下发**每帧最多一次**（修"缩放黑块"的核心，见文件头）----
-    // 为什么不能"谁调谁写"：跟手的 Timer 是 8ms（~125Hz），自绘那 8 条缩放热区在拖动时更是每次
-    // onPositionChanged 都调进来 —— 直接写 x/y/width/height 就等于**每个鼠标事件一次原生窗口尺寸
-    // 变更**（Windows 上落到 MoveWindow）。QtQuick 为此每帧都要重建渲染目标/交换链，而内容
-    // （终端、网页都是 WebEngine）跟不上这次重建 ⇒ 那一帧露出来的就是黑块。
-    // 折法：把"最后一次想要的几何"记进待办，用 Qt.callLater 排到**本轮事件循环末尾**统一下发。
-    // 同一帧里的 N 次请求于是合并成 1 次原生变更（60Hz 屏 ≈ 60 次/秒，而不是 125+ 次/秒），
-    // 且下发的是**最新那个值**（丢中间帧，不是排队补帧 —— 缩放要的是跟手，不是把动画放完整）。
-    // 用 callLater 而不是"16ms 定时器"：它自己就贴着事件循环/渲染节拍，不必猜帧率常量。
-    property rect geomPending: Qt.rect(0, 0, 0, 0)
-    property bool geomPendingValid: false
-    property bool geomCallScheduled: false
-
     function applyGeometry(x, y, w, h) {
-        geomPending = Qt.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
-        geomPendingValid = true
-        // 窗口还没显示（"拿起来"那一刻）：**立刻**摆好再露出来。
-        // 这时候合并没有意义（没有可见帧要省），而延后一帧就会让人先看到窗口在 0,0 处
-        // 那个默认尺寸上闪一下 —— 拿起来必须是"零跳变"的（见 Shell.liftSidebarForDrag）。
-        if (!win.visible) {
-            win.geometryFlush()
-            return
-        }
-        if (geomCallScheduled)
-            return                      // 本帧已经排过一次：只更新待办值，不再排
-        geomCallScheduled = true
-        Qt.callLater(win.geometryFlush)
-    }
-
-    // **真正**写原生窗口的唯一一处（每帧最多一次）。最小尺寸等钳制仍由 Qt 在这一层做
-    // （见 resizeApply / minTotalW 的说明：越界请求由调用方先钳死，这里只管下发）。
-    function geometryFlush() {
-        geomCallScheduled = false
-        if (!geomPendingValid)
-            return
-        const g = geomPending
-        win.x = g.x
-        win.y = g.y
-        win.width = g.width
-        win.height = g.height
+        win.x = Math.round(x)
+        win.y = Math.round(y)
+        win.width = Math.round(w)
+        win.height = Math.round(h)
     }
 
     // 「拿起来」的三步（都由 Shell 按序调，见 Shell.liftSidebarForDrag）：
@@ -178,38 +138,39 @@ Window {
     function resizeBegin(sx, sy) {
         win.resizePressScreenX = sx
         win.resizePressScreenY = sy
-        // ⚠️ 基准几何要取**待办**里那个"最后一次想要的"值，不能取 win.x/width：几何是
-        //    Qt.callLater 延后下发的（见 applyGeometry），win.* 可能还停在上一次下发的值上；
-        //    用旧值当基准会让每次拖动都从"上一帧的窗口"重新起算 ⇒ 跟手位移被吃掉一截。
-        const g = win.geomPendingValid ? win.geomPending : Qt.rect(win.x, win.y, win.width, win.height)
-        win.resizePressGeom = Qt.rect(g.x, g.y, g.width, g.height)
+        win.resizePressGeom = Qt.rect(win.x, win.y, win.width, win.height)
     }
 
     // edges 用 Qt.LeftEdge / Qt.TopEdge / Qt.RightEdge / Qt.BottomEdge 的位或
-    //
-    // ⚠️ 这里**改成交给系统原生缩放**（2026-10-16）：原来是自己每帧算 x/y/w/h 再 applyGeometry，
-    //    也就是"每帧改一次原生窗口尺寸" —— 副窗里跑着 WebEngine（终端/网页块），原生 surface 每帧
-    //    重建，拖动四边时就会看到黑块/渲染延迟（附着态不黑是因为那只是同一个窗口内改 QML 尺寸，
-    //    原生 surface 不动）。`Window.startSystemResize(edges)` 让 OS 接管 sizing loop，语义上就是
-    //    "和附着态一样，交给上层去改尺寸"，QML 不再一帧一帧地推几何。
-    //    实测过：QML 的 Window 上 `startSystemResize` 是可调函数（绑定日志确认）。
-    //    系统接管后 QML 收不到后续 move（鼠标被系统循环捕获）⇒ 用 handedOff 兜住重复进入。
-    property bool resizeHandedOff: false
-
-    // 保留这两个入口（八条热区与"代码驱动取证"共用），Begin 只做基准记录、Apply 负责交棒
-    function resizeBegin(sx, sy) {
-        win.resizePressScreenX = sx
-        win.resizePressScreenY = sy
-        win.resizeHandedOff = false
-        const g = win.geomPendingValid ? win.geomPending : Qt.rect(win.x, win.y, win.width, win.height)
-        win.resizePressGeom = Qt.rect(g.x, g.y, g.width, g.height)
-    }
-
     function resizeApply(edges, sx, sy) {
-        if (win.resizeHandedOff)
-            return
-        win.resizeHandedOff = true
-        win.startSystemResize(edges)
+        const dx = sx - win.resizePressScreenX
+        const dy = sy - win.resizePressScreenY
+        let x = win.resizePressGeom.x
+        let y = win.resizePressGeom.y
+        let w = win.resizePressGeom.width
+        let h = win.resizePressGeom.height
+
+        // 左/上边：动的同时改宽度/高度；到下限就把那条边钉住。
+        // ⚠️ 必须自己钳死：请求一旦低于 Qt 的 minimumWidth/Height，Qt 会钳住宽度而 x 照走
+        //    ⇒ 左边跟着鼠标、右边不动（看着像"缩放坏了"）。
+        if (edges & Qt.LeftEdge) {
+            const right = win.resizePressGeom.x + win.resizePressGeom.width
+            x = Math.min(win.resizePressGeom.x + dx, right - win.minTotalW)
+            w = right - x
+        }
+        else if (edges & Qt.RightEdge) {
+            w = Math.max(win.minTotalW, win.resizePressGeom.width + dx)
+        }
+        if (edges & Qt.TopEdge) {
+            const bottom = win.resizePressGeom.y + win.resizePressGeom.height
+            y = Math.min(win.resizePressGeom.y + dy, bottom - win.minTotalH)
+            h = bottom - y
+        }
+        else if (edges & Qt.BottomEdge) {
+            h = Math.max(win.minTotalH, win.resizePressGeom.height + dy)
+        }
+
+        win.applyGeometry(x, y, w, h)
     }
 
     Item {
