@@ -256,31 +256,7 @@ Item {
         onTriggered: shell.sidebarFollowTick()
     }
 
-    // 右栏标题行那三个点抓手把**某个块**拖出去了（上一轮的"按块脱离"路径）：在光标处建独立窗口。
-    // ⚠️ 现在没有调用方（抓手改拖整个右栏了），保留是因为 DetachedBlockWindow 那条链仍在，
-    //    删掉会连带 Dock.detach/setDetachedGeometry 变成孤儿。
-    // ⚠️ atScreenX/Y 是**屏幕坐标**（抓手在 RightSidebar 里算的：跨窗口判断只能用屏幕坐标）。
-    //    独立窗口的 x/y 本来就是屏幕坐标，所以这里不再做 scene/global 的来回换算 —— 搬家前那版
-    //    把屏幕坐标先 mapFromItem 成场景坐标再当窗口位置用，只在"窗口锚在场景原点"这一条上碰巧等价。
-    function detachActiveBlock(blockId, atScreenX, atScreenY) {
-        const idx = Dock.activeIndex
-        if (idx < 0)
-            return
-        // 拖动的这段时间里活动块可能已经换了（或块被关了）⇒ 只认抓的那个块
-        if (Dock.activeBlockId !== blockId)
-            return
-        const r = dockSceneRect()
-        const w = Math.max(r.width, 480)
-        const h = Math.max(r.height, 240)
-        Dock.detach(idx)
-        Dock.setDetachedGeometry(blockId, Math.round(atScreenX - w / 2 + Theme.spacing.windowMargin),
-                                 Math.round(atScreenY - 20), Math.round(w), Math.round(h))
-        // 脱离 = 这个块有自己的窗口了：右栏收起（留着的话同一块在两处画两份）。
-        // 块本身仍是"已附着 + 活动"（Dock 里没动它），所以拖回去就回到原位。
-        Hub.closeRightSidebar()
-        console.log("[detach] detach block idx=" + idx + " id=" + blockId + " at "
-                    + Math.round(atScreenX) + "," + Math.round(atScreenY) + " " + w + "x" + h)
-    }
+    // 跟手驱动（需求 ①）
 
     // ---- 右侧栏：宽度可拖（拖左边缘），压窄量 = 宽度 + 间距 ----
     // 这是本文件里唯一被动画驱动的量：它一变，顶栏卡片与会话卡片**同时**变窄，
@@ -533,44 +509,11 @@ Item {
         host: shell
     }
 
-    // ---- 抓手的脱离接线：两条广播都落在壳层（见 PanelDockModel 的 requestDetach / setDetachPreview）----
-    // 抓手在 RightSidebar 的标题行里，够不着 PanelDock 的内部信号 —— 所以它把请求发给单例 Dock，
-    // 这里接住：提示由壳层画（DockDropHint）、独立窗口也由壳层建（下面的 Repeater）。
-    // ⚠️ 两条都挂在 shell 上（不是挂在某个面板实例上）：抓手换了宿主，这段接线不该跟着换。
-    Connections {
-        target: Dock
+    // （这里曾有"按块脱离"的接线：抓手把某个块拖出去成独立窗口。抓手现在拖的是**整个右栏**，
+    //   那条链连同 PanelDockModel 的 requestDetach/setDetachPreview/detachedBlocks 一起删了。）
 
-        // 拖动中：拖出右栏（>48px）或水平位移 >60px ⇒ 亮起落点提示。
-        // 开关就是抓手算出来的那个布尔量，这里不再由壳层叠一条"正在拖"的状态：
-        // 抓手在右栏里按下时本来就在落点矩形内，overTarget=false ⇒ 提示不亮，
-        // 与搬家前同一个观感（拖动前不亮、拖出去才亮）；叠一条反而会让提示一开始就亮着。
-        function onDetachPreviewChanged(overTarget) {
-            if (overTarget)
-                shell.beginDetachPreview(overTarget)
-            else
-                shell.endDetachPreview()
-        }
-
-        // 松手且够阈值：在光标处把活动块脱离成独立窗口
-        function onDetachRequested(blockId, atScreenX, atScreenY) {
-            shell.detachActiveBlock(blockId, atScreenX, atScreenY)
-        }
-    }
-
-    // ---- 独立窗口：一块一扇窗（需求 ②③④）----
-    // 清单来自模型（Dock.detachedBlocks）：哪一项没了窗口就跟着销毁、visible=false 就只是隐藏
-    // （"已附着但隐藏"，需求 ⑤ 的第二态）。系统装饰窗口自带四边缩放与最小化/最大化按钮。
-    // geometry 由窗口自己回写模型，下一次脱离沿用它 ⇒ "拖回去再拖出来"不会跳回原位。
-    Repeater {
-        model: Dock.detachedBlocks
-
-        delegate: DetachedBlockWindow {
-            required property var modelData
-            entry: modelData
-            mainWindow: shell.Window.window
-            host: shell
-        }
-    }
+    // （这里曾有"一块一扇窗"的 Repeater + DetachedBlockWindow 委托：属于"按块脱离"，
+    //   已随那条链一起删除。现在只有 SidebarWindow 一扇副窗口，装的就是整个右栏。）
 
     // ---- 拖回时的落点提示：画在原右栏位置（需求 ③：建议给落点提示）----
     // z 抬到面板之上：拖动期间右栏还在自己的位置（附着态）或在独立窗口里（脱离态），

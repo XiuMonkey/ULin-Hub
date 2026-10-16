@@ -31,22 +31,8 @@ Item {
     readonly property int activeIndex: Dock.activeIndex
     readonly property bool homeVisible: Dock.homeVisible
 
-    // 当前块是否**已经脱离**成独立窗口（那个块的内容由 basic/shell/DetachedBlockWindow.qml 装载，
-    // 坞里不能同时再装一份 WebEngineView）。判定读 Dock.detachedBlocks（状态在模型里）。
-    readonly property bool activeDetached: {
-        const list = Dock.detachedBlocks
-        for (let i = 0; i < list.length; ++i) {
-            if (list[i].blockId === Dock.activeBlockId)
-                return true
-        }
-        return false
-    }
-
-    // 抓手拖出的判定（阈值按需求："离开右栏区域 >48px，或水平位移 >60px"）已随抓手一起
-    // 搬到 basic/shell/RightSidebar.qml 的标题行（那里不会再被页签条盖住），接线走**全局单例 Dock**：
-    // `Dock.setDetachPreview(bool)` 开落点预览、`Dock.requestDetach(blockId, screenX, screenY)`
-    // 请求脱离某个块，两条都由 Shell.qml 接住（它已经拥有 DockDropHint 与 DetachedBlockWindow）。
-    // 本文件不再有脱离相关的信号：坞只是"显示活动块内容"的那一层，抓手不在它里面了。
+    // （这里曾有 activeDetached：判断"当前块是否已脱离成独立窗口"，读 Dock.detachedBlocks。
+    //   那是"按块脱离"那条链的东西 —— 抓手现在拖的是**整个右栏**，链已删除。）
 
     // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
     property real contentT: 1
@@ -276,14 +262,10 @@ Item {
             }
 
             // 当前块
-            // ⚠️ 块脱离后这里**不装**（active=false）也不会画（visible=false）：那个块的界面对不起
-            //    第二份（终端/网页都是 WebEngineView，同页两份会各自跑一份渲染进程）。它此时在
-            //    DetachedBlockWindow 里，坞里留一块干净的空面 + 一句说明。
             Loader {
                 id: tabContent
                 anchors.fill: parent
-                active: !dock.activeDetached
-                visible: !dock.homeVisible && !dock.activeDetached
+                visible: !dock.homeVisible
 
                 // 内容路由：`kind → 视图` 的映射表在 C++（PanelDockModel::viewFor），这里只按 C++ 给的
                 // 那组值装机 —— 路由里不再出现任何 kind 字符串（与启动器表、中文块名同一条分层）。
@@ -332,15 +314,6 @@ Item {
                     title: Dock.activeTitle
                     detail: Dock.activeViewDetail
                 }
-            }
-
-            // 活动块已脱离：坞里这块画一句说明（界面文案与块名同层，QML 只摆位置）。
-            // 文案刻意说清"还能拖回来"，否则用户会以为块丢了（独立窗口上也有同样的抓手）。
-            PanelPlaceholder {
-                anchors.fill: parent
-                visible: !dock.homeVisible && dock.activeDetached
-                title: Dock.activeTitle
-                detail: "这个块已经在独立窗口里。\n拖动它顶部的三个点回到右栏位置，可以重新附着。"
             }
         }
     }
