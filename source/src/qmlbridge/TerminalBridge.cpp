@@ -677,7 +677,7 @@ void TerminalBridge::init(DshApiClient* api)
 // 那是个 JS 数组字面量，而 C++ 注册的 QML 单例在数组元素的位置上是"类型包装"，转 QObject* 得到 null
 // —— 实测会在面板创建时打出 `Cannot register null object to WebChannel`，页面永远收不到对象。
 // 从 C++ 注册既确定又可日志；同一个桥注册到多个面板的 channel 是允许的（每个 channel 各自一份注册表）。
-bool TerminalBridge::registerOn(QObject* channel)
+bool TerminalBridge::registerOn(QObject* channel, QObject* transport)
 {
 	QWebChannel* webChannel = qobject_cast<QWebChannel*>(channel);
 	if (!webChannel) {
@@ -687,10 +687,18 @@ bool TerminalBridge::registerOn(QObject* channel)
 	if (m_channels.contains(webChannel))
 		return true;
 
-	webChannel->registerObject(objectName(), this);
+	// 后端被扩展顶替时注册它的对象，本桥只留 QML 面那几处转接（pageGone / closeBlock）。
+	// 页面按 channel.objects 的第一个 key 取对象、不看类型，所以两种情况下 id 都保持 "ulinterm"。
+	QObject* target = transport ? transport : this;
+	m_transport = transport;
+	if (target->objectName().isEmpty())
+		target->setObjectName(objectName());
+
+	webChannel->registerObject(target->objectName(), target);
 	m_channels.insert(webChannel);
 	connect(webChannel, &QObject::destroyed, this, [this, webChannel]() { m_channels.remove(webChannel); });
-	qInfo().noquote() << "[Terminal] 已注册到 WebChannel id=" << objectName();
+	qInfo().noquote() << "[Terminal] 已注册到 WebChannel id=" << target->objectName()
+					  << (transport ? "（扩展后端）" : "（内置桥）");
 	return true;
 }
 
@@ -749,6 +757,13 @@ QObject* TerminalBridge::session(const QString& blockId)
 
 void TerminalBridge::closeBlock(const QString& blockId)
 {
+	// 后端被扩展顶替：会话由它管，本桥里没有这个块的 TerminalSession（拿不到就只能什么都不做）
+	if (m_transport) {
+		if (!QMetaObject::invokeMethod(m_transport, "closeBlock", Q_ARG(QString, blockId)))
+			qWarning().noquote() << "[Terminal] 扩展后端没有 closeBlock(QString) 槽，关块没能转过去：" << blockId;
+		return;
+	}
+
 	const auto it = m_sessions.find(blockId);
 	if (it == m_sessions.end())
 		return;
@@ -777,6 +792,13 @@ void TerminalBridge::pageReady(const QString& blockId)
 
 void TerminalBridge::pageGone(const QString& blockId)
 {
+	// 后端被扩展顶替：解绑也归它（本桥没有它的会话，照原路走就是空操作、还没日志）
+	if (m_transport) {
+		if (!QMetaObject::invokeMethod(m_transport, "pageGone", Q_ARG(QString, blockId)))
+			qWarning().noquote() << "[Terminal] 扩展后端没有 pageGone(QString) 槽，解绑没能转过去：" << blockId;
+		return;
+	}
+
 	if (TerminalSession* session = findSession(blockId))
 		session->pageGone();
 }

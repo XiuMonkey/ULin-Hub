@@ -38,7 +38,8 @@ cmake_minimum_required(VERSION 3.21)
 project(ULinHub
 	VERSION 1.0.0
 	DESCRIPTION "ULin Hub - desktop client"
-	LANGUAGES CXX)
+	# C：内嵌的 libvterm 是 C99（见 3rdparty/libvterm/README.md）。
+	LANGUAGES C CXX)
 
 # 源码根目录（本文件位于 <root>/CMake/ 下）
 get_filename_component(ULINHUB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
@@ -81,8 +82,30 @@ file(GLOB_RECURSE ULINHUB_SOURCES CONFIGURE_DEPENDS
 	"${ULINHUB_ROOT}/src/*.h"
 	"${ULINHUB_ROOT}/include/*.h")
 
+# 内嵌的 VT 解析器（3rdparty/libvterm）：9 个 C99 编译单元，零外部依赖。
+# 与 .vcxproj 的 9 条 <ClCompile> 一一对应 —— 那边是手工列举，新增文件时两边都要动。
+file(GLOB_RECURSE ULINHUB_VENDOR_SOURCES CONFIGURE_DEPENDS
+	"${ULINHUB_ROOT}/3rdparty/libvterm/src/*.c")
+list(APPEND ULINHUB_SOURCES ${ULINHUB_VENDOR_SOURCES})
+
+# 原样引入的第三方 C 代码不随我们改，构建侧替它放行 CRT 弃用警告：
+# parser.c:53 的 strncpy 在 MSVC 下报 C4996。VCXPROJ 侧还叠了 /sdl 会把它抬成错误，
+# CMake 的 MSVC 默认参数里没有 /sdl，所以这边只需要这一个宏。
+if(MSVC)
+	set_source_files_properties(${ULINHUB_VENDOR_SOURCES} PROPERTIES
+		COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
+endif()
+
+# 原样引入的第三方 C 代码不随我们改，工程侧替它放行 CRT 弃用警告：
+# MSVC 下工程开了 SDLCheck(/sdl)，会把 parser.c:53 那处 strncpy 的 C4996 抬成错误。
+# 与 .vcxproj 里那 9 条的 <PreprocessorDefinitions> 保持一致。
+if(MSVC)
+	set_source_files_properties(${ULINHUB_VENDOR_SOURCES} PROPERTIES
+		COMPILE_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
+endif()
+
 list(LENGTH ULINHUB_SOURCES ULINHUB_SOURCE_COUNT)
-message(STATUS "ULin Hub: 已收集 ${ULINHUB_SOURCE_COUNT} 个源文件（src/ + include/）")
+message(STATUS "ULin Hub: 已收集 ${ULINHUB_SOURCE_COUNT} 个源文件（src/ + include/ + 3rdparty/libvterm）")
 
 # 同名源文件：src/ui/Main.cpp 与 src/core/main.cpp 基名相同。
 # Ninja / Makefile 生成器按相对路径区分对象文件，没有问题；Visual Studio 生成器
@@ -113,6 +136,8 @@ set_target_properties(ulinhub PROPERTIES
 
 target_include_directories(ulinhub PRIVATE
 	"${ULINHUB_ROOT}/include"
+	# libvterm 只公开这一层头（src/ 内部头是相对同目录包含的）
+	"${ULINHUB_ROOT}/3rdparty/libvterm/include"
 	# resources/ 只为下面 rc.exe 解析 "ulin-hub.ico" 的相对路径用：
 	# CMake 会把 include 目录翻成 /I 传给 rc.exe（<INCLUDES> 占位符）。
 	"${ULINHUB_ROOT}/../assets/resources")

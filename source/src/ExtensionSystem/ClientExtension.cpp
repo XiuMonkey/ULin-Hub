@@ -3,6 +3,7 @@
 #include "common/util/HostIndex.h"
 #include "common/util/ConnectionManager.h"
 #include "common/util/CommonRegistry.h"
+#include "ExtensionSystem/HostUi.h"
 #include "VirtualClass/VirtualApiTakeover.h"
 
 #include <QCoreApplication>
@@ -192,6 +193,10 @@ namespace ClientExtension
 				// 不交还的话，扩展卸下之后那些按钮会变成"点了没反应" —— 它接的槽已经不存在了。
 				// 放在 unload() 之前：此刻插件还活着，断开的是它那条连接。
 				ConnectionManager::instance().ReleaseTakeoversFor(name);
+				// 顶替面板坞块后端的登记同理要撤：不撤的话登记表里会留一具尸体 —— HasPanelBackend
+				// 一直报真（自省/界面提示据此说"已被扩展接管"），而 panelBackend 因 QPointer 置空
+				// 返回空指针，两边说法不一致。撤掉它，语义才回到"该 kind 用内置后端"。
+				HostUi::instance().releasePanelBackends(name);
 
 				const bool unloaded = loader->unload();  // unload() 自己会把根组件删掉，这里不该手工 delete 插件对象
 				qInfo("[ClientExtension] remove: detach+unload %s -> %s", qPrintable(name),

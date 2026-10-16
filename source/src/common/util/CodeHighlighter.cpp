@@ -72,7 +72,9 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 	const QString lang = language.isEmpty() ? QStringLiteral("default") : language;
 	const QVector<Rule> rules = m_rules.value(lang, m_rules.value(QStringLiteral("default")));
 
-	QString html;
+	// 外层必须套 <pre>：QML 侧用 RichText 渲染，裸换行与**连续空格都会折叠** ——
+	// 不套的话多行代码会挤成一行、缩进全丢（实测 lineCount=1，加 <pre> 后正常）
+	QString html = QStringLiteral("<pre style=\"margin:0;font-family:Consolas,monospace;\">");
 	int pos = 0;
 	const int codeLength = code.length();
 
@@ -118,6 +120,7 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 		pos = bestPos + bestLen;
 	}
 
+	html += QStringLiteral("</pre>");
 	m_cache.insert(key, html);
 	return html;
 }

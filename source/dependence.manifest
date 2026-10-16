@@ -48,6 +48,20 @@
   <file name="Qt6QuickTemplates2.dll" />
   <file name="Qt6QuickEffects.dll" />
 
+  <!-- Qt WebEngine（右侧浏览器面板）。这 7 个是 qmake 侧 webenginequick 的依赖闭包：
+       webenginequick → QtQuick + webenginecore + webchannelquick；webenginecore → network +
+       webchannel + positioning。WebChannel / Positioning 在 Qt 里是 addons，装 Qt 时容易漏勾。
+       d3dcompiler_47.dll 是 Qt6WebEngineCore.dll 的**静态导入**（Windows 上 WebEngine 的硬依赖），
+       不在 Qt6*.dll 命名里，但它不在位时 WebEngine 初始化会直接失败。 -->
+  <file name="Qt6WebEngineCore.dll" />
+  <file name="Qt6WebEngineQuick.dll" />
+  <file name="Qt6WebEngineQuickDelegatesQml.dll" />
+  <file name="Qt6WebChannel.dll" />
+  <file name="Qt6WebChannelQuick.dll" />
+  <file name="Qt6Positioning.dll" />
+  <file name="Qt6PositioningQuick.dll" />
+  <file name="d3dcompiler_47.dll" />
+
   <!-- MSVC 运行库（app-local 部署，exe 自身的 manifest 里没有 Microsoft.VC*.CRT 依赖） -->
   <file name="concrt140.dll" />
   <file name="msvcp140.dll" />

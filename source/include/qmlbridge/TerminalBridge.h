@@ -28,6 +28,7 @@
 #include <QByteArray>
 #include <QHash>
 #include <QObject>
+#include <QPointer>
 #include <QQueue>
 #include <QSet>
 #include <QString>
@@ -166,10 +167,12 @@ public:
 	void init(DshApiClient* api);
 
 	// ---- QML 面 ----
-	// 把本桥注册到一个 QWebChannel 上（QML 侧的 WebChannel 对象）。**必须**从 C++ 注册，别在 QML 里写
-	// `registeredObjects: [Terminal]`：那是个 JS 数组字面量，C++ 注册的 QML 单例在这个位置是"类型包装"，
-	// 转 QObject* 得到 null（实测日志：`Cannot register null object to WebChannel`）。返回是否注册成功。
-	Q_INVOKABLE bool registerOn(QObject* channel);
+	// 把终端后端的"要注册的对象"注册到 QWebChannel 上（QML 侧的 WebChannel 对象）。**必须**从 C++ 注册，
+	// 别在 QML 里写 `registeredObjects: [Terminal]`：那是个 JS 数组字面量，C++ 注册的 QML 单例在这个位置
+	// 是"类型包装"，转 QObject* 得到 null（实测日志：`Cannot register null object to WebChannel`）。
+	// transport 非空 = 该块后端被扩展顶替（HostUi::panelBackend("terminal")），注册它、页面直连它；
+	// 空 = 用内置的本桥。返回是否注册成功。
+	Q_INVOKABLE bool registerOn(QObject* channel, QObject* transport);
 	// 取某个块的会话对象（按稳定 id 复用，不存在则建）；关块才调 closeBlock
 	Q_INVOKABLE QObject* session(const QString& blockId);
 	Q_INVOKABLE void closeBlock(const QString& blockId);
@@ -207,4 +210,7 @@ private:
 	DshApiClient* m_api = nullptr;
 	QHash<QString, TerminalSession*> m_sessions;
 	QSet<QWebChannel*> m_channels;   // 已注册过的 WebChannel（每个面板一个；同一个桥可注册到多个）
+	// 被扩展顶替时的替代后端（HostUi::panelBackend("terminal")，registerOn 时记下）：
+	// 页面直连它，本桥只负责把 QML 面那几处（pageGone / closeBlock）转过去
+	QPointer<QObject> m_transport;
 };

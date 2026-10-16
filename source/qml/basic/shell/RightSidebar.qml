@@ -180,7 +180,6 @@ Item {
                 // ⚠️ 不要退回"贴着标题右边"：那正是用户否掉的位置（看着像贴着 ✕ 那一侧）。
                 PanelGrip {
                     id: dockGrip
-                    objectName: "panelGrip"   // TEMP-EVIDENCE：取证脚本按名字找它（用后删除）
                     anchors.horizontalCenter: header.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     // 三点**常驻**（需求 ①）：只要右栏这张卡片在显示，三个点就在。
@@ -273,7 +272,6 @@ Item {
                             }
                             const after = root.Window.window
                                 ? (root.Window.window.x + "," + root.Window.window.y) : "?"
-                            // TEMP-EVIDENCE：搬窗前后（用后整段删除）
                             console.log("[EV] RS drag dx=" + dx + " dy=" + dy
                                         + " pressWin=" + pressWinX + "," + pressWinY
                                         + " provider=" + (root.moveWindowProvider ? "yes" : "no")

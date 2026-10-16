@@ -16,7 +16,8 @@ public:
 	// 从 JSON 文件加载高亮规则；重复调用会先清空旧规则
 	bool loadFromFile(const QString& filePath);
 
-	// 对代码进行高亮，返回可直接放入 <pre> 的 HTML
+	// 对代码进行高亮，返回可直接交给 RichText（Text/TextEdit）的 HTML；
+	// 返回值自带 <pre> 包裹，否则调用方的 RichText 会把换行与缩进折叠掉
 	QString highlight(const QString& language, const QString& code) const;
 
 	void clearCache();

@@ -14,6 +14,7 @@
 //   VirtualTheme → ThemeManager (kThemeManager)          VirtualMain → DshApiClient (kMainWindow)
 //   VirtualConnectionManager → ConnectionManager (kConnectionManager)
 //   VirtualTranslation → TranslationNotifier (kTranslationNotifier)   VirtualUiHost → HostUi (kUiHost)
+//   VirtualPanelHost → HostUi (kUiHost，与 VirtualUiHost 同一个单例 —— 不单列 index)
 // 登记名见 HostIndex.h，取址入口见 HostExports.h，IID 见文件末尾。
 // ⚠️ 跨模块只能 qobject_cast，不能 dynamic_cast（RTTI 不跨 DLL，恒 nullptr）；取接口与调用都只在 GUI 线程。
 // ⚠️ ABI：虚方法只许末尾追加（不改名 / 不换签名 / 不插中间 / 不删），接口只能增（新类 + 新 IID）——
@@ -117,11 +118,38 @@ public:
 	virtual int UnmountOwner(const char* owner) = 0;
 };
 
+// VirtualPanelHost —— 让扩展**顶替**面板坞某个块的**后端**（当前只落地终端块）。
+// 与 VirtualUiHost 的分工：UiHost 是"往宿主对象下面**追加**自己的 QML"；本接口是"把某个块背后
+// 干活的那个对象换成扩展的" —— **界面仍是宿主的**：终端块照旧由宿主 TerminalPanel + WebEngine +
+// xterm.js 渲染（底色跟主题走），扩展只提供喂给页面的传输对象，**不用自带 QML**。
+// 实现类 = 同一个 HostUi 单例（登记名 kUiHost）：登记存在它身上，TerminalPanel 建 QWebChannel 时
+// 取出来注册给页面；页面（宿主 qrc）对后端的调用契约见 EXTENSION_DEV §11.7。
+// 没登记时一切照旧（终端走内置 TerminalBridge + 服务端引擎）。
+class VirtualPanelHost {
+public:
+	virtual ~VirtualPanelHost() = default;
+
+	// 登记顶替：kind = 块的种类（当前只有 "terminal" 落地；browser / files 预留）；
+	// backend = 扩展提供的后端对象，必须自带 objectName `ulinterm`，且实现宿主页面认的槽/信号
+	// （start / pageReady / pageGone / write / resize / ack / log / pageHello / closeBlock +
+	// frameReady / statusChanged）。宿主把它**原样**注册到该块的 QWebChannel 上，页面直连它。
+	// 传 nullptr 等于撤销。owner = 扩展安装目录名：宿主按 kind 只记一份，后登记者取得该 kind。
+	// ⚠️ 只在 GUI 线程调，且要赶在**该块的面板被创建之前**（即 attachHost() 里）：面板只在创建时
+	//    取一次后端，晚了它已经接上内置桥。
+	virtual bool SetPanelBackend(const QString& owner, const QString& kind, QObject* backend) = 0;
+	// 撤销：仅当该 kind 当前登记的 owner 就是调用方时才撤（免得卸 A 时把 B 顶上去的登记清掉）；
+	// 撤掉后该 kind 恢复内置后端。
+	virtual void ClearPanelBackend(const QString& owner, const QString& kind) = 0;
+	// 该 kind 当前是否已被顶替（扩展自省 / 宿主界面提示用）
+	virtual bool HasPanelBackend(const QString& kind) = 0;
+};
+
 Q_DECLARE_INTERFACE(VirtualMain, "com.ulinhub.VirtualWindow/1.0")   // IID 里的 VirtualWindow 是历史名，别跟着类名改
 Q_DECLARE_INTERFACE(VirtualConnectionManager, "com.ulinhub.VirtualConnectionManager/1.0")
 Q_DECLARE_INTERFACE(VirtualTheme, "com.ulinhub.VirtualTheme/1.0")
 Q_DECLARE_INTERFACE(VirtualTranslation, "com.ulinhub.VirtualTranslation/1.0")
 Q_DECLARE_INTERFACE(VirtualUiHost, "com.ulinhub.VirtualUiHost/1.0")
+Q_DECLARE_INTERFACE(VirtualPanelHost, "com.ulinhub.VirtualPanelHost/1.0")
 
 // 已删接口（旧文档 / 旧插件可能还在引用，不要照抄）：VirtualTopBar、VirtualSidebar、VirtualShell、VirtualMessageHost ——
 // 实现类均随 M8 删 src/ui 一起没了，findObject 必得空；kTopBar / kSidebar 后来以"宿主 QML 对象登记名"的含义恢复。

@@ -23,7 +23,6 @@ Item {
         evStart()
     }
 
-    // ===== TEMP-EVIDENCE-PATCH（用后整段删除）=====
     function evSay(msg) {
         console.log("[EV] " + msg)
     }
@@ -213,7 +212,6 @@ Item {
         const grip = evFindGrip(rightSidebar)
         return grip ? (grip.pressWinX + "," + grip.pressWinY) : "?"
     }
-    // ===== /TEMP-EVIDENCE-PATCH =====
 
     // 供子界面报一句轻提示（未落地的入口用它，别放哑按钮）
     function notify(text) {

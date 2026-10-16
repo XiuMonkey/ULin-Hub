@@ -20,7 +20,8 @@ namespace DshHostIndex
 	inline constexpr const char* kTopBar = "topBar";
 	inline constexpr const char* kSidebar = "sidebar";
 	inline constexpr const char* kComposer = "composer";
-	// 扩展 UI 宿主单例（HostUi）：转成 VirtualUiHost* 拿上面这些对象、挂载/卸载扩展自己的 QML。
+	// 扩展 UI 宿主单例（HostUi）：转成 VirtualUiHost* 拿上面这些对象、挂载/卸载扩展自己的 QML；
+	// 同一个单例也实现 VirtualPanelHost*（**顶替**面板坞某个块的**后端**，与"追加"相对），所以不再单列 index。
 	inline constexpr const char* kUiHost = "uiHost";
 	// 样式表管理单例（ThemeManager），init() 末尾登记；插件转成 VirtualTheme* 调
 	// ExternalApplyToWindow / ExternalReloadStyles，以及末尾追加的 ExternalIsDarkMode /

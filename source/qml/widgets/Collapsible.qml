@@ -10,6 +10,7 @@ Column {
 
     property string title: ""
     property string meta: ""            // 表头右侧小灰字（计数/状态）
+    property string summary: ""         // 折叠时显示的正文摘要（自动压成一行、右侧省略）
     property bool expanded: false
     property bool showChevron: true
     property color headerColor: "transparent"
@@ -17,6 +18,9 @@ Column {
     default property alias body: bodyHolder.data
 
     readonly property bool hovered: headerArea.containsMouse
+
+    // 先截断再压平：换行/制表/连续空格一律并成单空格，否则一行放不下（也免得对长正文跑正则）
+    readonly property string summaryLine: summary.substr(0, 600).trim().replace(/\s+/g, " ")
 
     // 宽度由调用方给（part 文件里一般是 anchors.fill 或 width: parent.width）
 
@@ -59,6 +63,24 @@ Column {
             font.pixelSize: Theme.font.body
             font.weight: Theme.font.weightMedium
             elide: Text.ElideRight
+        }
+
+        // 折叠态的正文摘要：跟在标题后被推着 elide；展开后正文自身可见，不再重复一遍
+        Text {
+            id: summaryText
+            objectName: "summaryText"
+            anchors.left: titleText.right
+            anchors.right: metaText.left
+            anchors.leftMargin: Theme.spacing.labelGap
+            anchors.rightMargin: Theme.spacing.labelGap
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.summaryLine.length > 0 && !root.expanded && width > 24
+            text: root.summaryLine
+            color: Theme.color.textCaption
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.caption
+            elide: Text.ElideRight
+            maximumLineCount: 1
         }
 
         Text {

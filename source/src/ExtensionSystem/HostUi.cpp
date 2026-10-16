@@ -200,3 +200,56 @@ QVariantList HostUi::mounted() const
 	}
 	return rows;
 }
+
+bool HostUi::SetPanelBackend(const QString& owner, const QString& kind, QObject* backend)
+{
+	if (kind.isEmpty())
+		return false;
+	if (!backend) {                  // 空后端 = 撤销，省得调用方自己判
+		ClearPanelBackend(owner, kind);
+		return true;
+	}
+
+	PanelBackend& entry = m_panelBackends[kind];
+	entry.owner = owner;             // 按 kind 只记一份：后登记者取得该 kind，前一份被顶掉
+	entry.backend = backend;
+	qInfo().noquote() << QStringLiteral("[HostUi] %1: %2 块的后端改由扩展提供（%3）")
+		.arg(owner, kind, QString::fromLatin1(backend->metaObject()->className()));
+	return true;
+}
+
+void HostUi::ClearPanelBackend(const QString& owner, const QString& kind)
+{
+	const auto found = m_panelBackends.constFind(kind);
+	// 只撤自己登记的：别的扩展顶上来之后，旧扩展的卸载不该把新登记清掉
+	if (found == m_panelBackends.constEnd() || found.value().owner != owner)
+		return;
+
+	m_panelBackends.remove(kind);
+}
+
+bool HostUi::HasPanelBackend(const QString& kind)
+{
+	return m_panelBackends.constFind(kind) != m_panelBackends.constEnd();
+}
+
+QObject* HostUi::panelBackend(const QString& kind) const
+{
+	const auto found = m_panelBackends.constFind(kind);
+	return found == m_panelBackends.constEnd() ? nullptr : found.value().backend.data();
+}
+
+int HostUi::releasePanelBackends(const QString& owner)
+{
+	int removed = 0;
+	for (auto it = m_panelBackends.begin(); it != m_panelBackends.end();) {
+		if (it.value().owner == owner) {
+			it = m_panelBackends.erase(it);
+			++removed;
+		}
+		else {
+			++it;
+		}
+	}
+	return removed;
+}
