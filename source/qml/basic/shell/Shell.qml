@@ -18,200 +18,7 @@ Item {
     id: shell
 
     // 扩展注入点：扩展用 HostUi.item("shell") 拿到本对象后 setParentItem 进来（见 HostExports.h 的名字契约）
-    Component.onCompleted: {
-        HostUi.registerItem("shell", this)
-        evStart()
-    }
-
-    function evSay(msg) {
-        console.log("[EV] " + msg)
-    }
-    function evStart() {
-        evSay("BOOT")
-        evRzHandoff = Qt.application.arguments.indexOf("--ev-handoff") >= 0
-        evSay("BOOT handoff=" + evRzHandoff + " args=" + Qt.application.arguments)
-        evTimer.restart()
-    }
-    Timer {
-        id: evTimer
-        interval: 3000
-        repeat: true
-        onTriggered: shell.evStep()
-    }
-    // 缩放取证节拍：走**真**入口（SidebarWindow.resizeBegin/resizeApply，与八条热区同一个）
-    Timer {
-        id: evResizeTimer
-        interval: 10
-        repeat: true
-        onTriggered: shell.evResizeTick()
-    }
-    property int evRzN: 0
-    property int evRzTarget: 80
-    property bool evRzHandoff: false
-    property real evRzBaseW: 0
-    property real evRzBaseH: 0
-    function evResizeStart() {
-        evRzN = 0
-        evRzBaseW = sidebarWindow.width
-        evRzBaseH = sidebarWindow.height
-        evSay("RZ start base=" + evRzBaseW + "x" + evRzBaseH + " @" + sidebarWindow.x + ","
-              + sidebarWindow.y + " dpr=" + sidebarWindow.devicePixelRatio)
-        evResizeTimer.restart()
-    }
-    function evResizeTick() {
-        if (evRzN > evRzTarget) {
-            evResizeTimer.stop()
-            evSay("RZ done " + sidebarWindow.width + "x" + sidebarWindow.height)
-            return
-        }
-        evRzN++
-        // 与八条热区完全同一条路：先 resizeBegin（按下点 = 基准屏幕坐标），再 resizeApply。
-        // 每拍都 resizeBegin 是因为 resizeApply 的"交给系统"那一档有一次手势只交接一次的门
-        // —— 代码驱动没有真实手势，只能按拍重开。
-        // ⚠️ 上限钳在屏幕内：窗口一旦超出屏幕，屏幕抓图会把"屏幕外的部分"读成黑，污染黑块统计
-        const maxW = Screen.desktopAvailableWidth - sidebarWindow.x - 40
-        const maxH = Screen.desktopAvailableHeight - sidebarWindow.y - 40
-        const w = Math.min(evRzBaseW + evRzN * 3, maxW)
-        const h = Math.min(evRzBaseH + evRzN * 2, maxH)
-        sidebarWindow.resizeBegin(0, 0)
-        sidebarWindow.resizeApply(Qt.RightEdge, w - evRzBaseW, h - evRzBaseH, evRzHandoff)
-        if (evRzN % 8 === 0 || evRzN === 1)
-            evSay("RZ n=" + evRzN + " win=" + sidebarWindow.width + "x" + sidebarWindow.height
-                  + " @" + sidebarWindow.x + "," + sidebarWindow.y)
-    }
-    property int evN: 0
-    property real evGripX: 0
-    property real evGripY: 0
-    function evStep() {
-        evN++
-        if (evN === 1) {
-            // ① 先打开右栏（脱离需要右栏在槽位里）
-            Hub.openRightSidebar()
-            evSay("S0 open rightSidebar=" + Hub.rightSidebarOpen + " dock=" + dockScreenRect())
-            return
-        }
-        if (evN === 2) {
-            // ② 脱离成独立窗口（代码驱动，不合成鼠标）
-            liftSidebarForDrag()
-            finishSidebarDrag(20, 20)
-            sidebarWindow.moveTo(400, 200)
-            evSay("S1 detached=" + sidebarDetached
-                  + " win=" + sidebarWindow.x + "," + sidebarWindow.y + " "
-                  + sidebarWindow.width + "x" + sidebarWindow.height)
-            return
-        }
-        if (evN === 3) {
-            evSay("DONE-detach win=" + sidebarWindow.x + "," + sidebarWindow.y + " "
-                  + sidebarWindow.width + "x" + sidebarWindow.height)
-            evResizePass()
-            return
-        }
-        if (evN === 4) {
-            // ② 三点抓手在独立态下搬窗：复现 RightSidebar 的 owner 查找（findShell 未定义）
-            const grip = evFindGrip(rightSidebar)
-            if (!grip) {
-                evSay("S2 grip NOT FOUND")
-                return
-            }
-            evGripX = grip.mapToGlobal(grip.width / 2, grip.height / 2).x
-            evGripY = grip.mapToGlobal(grip.width / 2, grip.height / 2).y
-            evSay("S2 grip found " + grip + " detached=" + sidebarDetached
-                  + " gripScreen=" + evGripX + "," + evGripY
-                  + " win=" + sidebarWindow.x + "," + sidebarWindow.y)
-            // 走的就是 RightSidebar 里那段：owner = findShell() —— 若未定义会抛 ReferenceError
-            let found = null
-            try {
-                found = findShell()
-            } catch (e) {
-                evSay("S2 findShell() THREW: " + e)
-            }
-            evSay("S2 findShell() -> " + found)
-            return
-        }
-        if (evN >= 5 && evN <= 7) {
-            // ③ 喂屏幕坐标（1:1 跟手判据），再跑一次缩放取证（多跑几轮好让外部采样窗口对齐）
-            const dx = 40 + (evN - 5) * 40
-            const dy = 25 + (evN - 5) * 25
-            // 先按一次（真抓手的按下路径：记 pressWinX/Y）
-            gripPress()
-            const before = sidebarWindow.x + "," + sidebarWindow.y
-            gripDragTo(dx, dy)
-            evSay("S3 feed d=" + dx + "," + dy + " pressWin=" + gripPressWin()
-                  + " owner=" + evFindOwner()
-                  + " before=" + before + " after=" + sidebarWindow.x + "," + sidebarWindow.y)
-            evSay("S3 chain:" + evChain())
-            if (evN === 7) {
-                evSay("S4 done win=" + sidebarWindow.x + "," + sidebarWindow.y)
-                evResizePass()
-            }
-            return
-        }
-        if (evN === 8) {
-            evSay("S5 all done")
-            evTimer.stop()
-        }
-    }
-    // 跑一轮缩放取证（3s 后开始，每 10ms 一拍）
-    function evResizePass() {
-        evRzDelay.restart()
-    }
-    // 启动时就按命令行开关选档：环境变量由取证脚本给（无参数 = 只跑 resizeApply 那一档）
-    function evProbeMode() {
-        return Qt.application.arguments.indexOf("--ev-qml-resize") >= 0
-    }
-    Timer {
-        id: evRzDelay
-        interval: 3000
-        repeat: false
-        onTriggered: shell.evResizeStart()
-    }
-    // 找到抓手（RightSidebar 头部那三个点）
-    function evFindGrip(item) {
-        if (!item) return null
-        if (item.objectName === "panelGrip") return item
-        const kids = item.children
-        for (let i = 0; i < kids.length; i++) {
-            const f = evFindGrip(kids[i])
-            if (f) return f
-        }
-        return null
-    }
-    // 用**真**抓手发拖拽信号：与 RightSidebar 的 onDragMoved 接线同一条路
-    function gripDragTo(dx, dy) {
-        const grip = evFindGrip(rightSidebar)
-        if (!grip) return
-        grip.dragging = true   // 真机上"越过 6px 手感阈值"置的就是它（RightSidebar 会拿它门控）
-        grip.dragMoved(dx, dy, Qt.point(evGripX + dx, evGripY + dy), Qt.point(0, 0))
-    }
-    // 找壳层（RightSidebar 里那段要复现的"父链查找"）
-    function evFindOwner() {
-        for (let p = rightSidebar.parent; p; p = p.parent) {
-            if (p.moveSidebarWindowTo)
-                return p
-        }
-        return null
-    }
-    // 打印右栏的 parent 链，看清楚 reparent 之后到底挂在谁下面
-    function evChain() {
-        let out = ""
-        let p = rightSidebar.parent
-        let guard = 0
-        while (p && guard < 12) {
-            const has = p.moveSidebarWindowTo ? "HAS" : "no"
-            out += " <- " + p + "[" + has + "]"
-            p = p.parent
-            guard++
-        }
-        return out
-    }
-    function gripPress() {
-        const grip = evFindGrip(rightSidebar)
-        if (grip) grip.pressStarted()
-    }
-    function gripPressWin() {
-        const grip = evFindGrip(rightSidebar)
-        return grip ? (grip.pressWinX + "," + grip.pressWinY) : "?"
-    }
+    Component.onCompleted: HostUi.registerItem("shell", this)
 
     // 供子界面报一句轻提示（未落地的入口用它，别放哑按钮）
     function notify(text) {
@@ -283,18 +90,17 @@ Item {
                && p.y >= r.y - dropSlack && p.y <= r.y + r.height + dropSlack
     }
 
-    // 程序化摆独立窗口（只走这一条路；窗口自己改了几何走 setSidebarWindowGeometry 回写）。
-    // ⚠️ **不要**在这里直接写 `sidebarWindow.x/y/width/height`：那会绕过窗口里那条"每帧最多下发一次"
-    //    的合并（SidebarWindow.applyGeometry / Qt.callLater），把 125Hz 的跟手节拍原样变成
-    //    125 次/秒的原生窗口尺寸变更 —— 正是"拖右下角缩放时出黑块"的成因（见 SidebarWindow 文件头）。
-    //    所以这里只更新壳层记着的目标值，真正下发交给窗口那一个入口。
+    // 程序化摆独立窗口（只走这一条路；窗口自己改了几何走 setSidebarWindowGeometry 回写）
     function applySidebarWindowGeometry(x, y, w, h) {
         sidebarWinApplying = true
         sidebarWinX = Math.round(x)
         sidebarWinY = Math.round(y)
         sidebarWinW = Math.round(w)
         sidebarWinH = Math.round(h)
-        sidebarWindow.applyGeometry(sidebarWinX, sidebarWinY, sidebarWinW, sidebarWinH)
+        sidebarWindow.x = sidebarWinX
+        sidebarWindow.y = sidebarWinY
+        sidebarWindow.width = sidebarWinW
+        sidebarWindow.height = sidebarWinH
         sidebarWinApplying = false
     }
     // 独立窗口 move/resize 的回写口（SidebarWindow 调）
@@ -411,19 +217,6 @@ Item {
         else
             Hub.closeRightSidebar()
         console.log("[sidebar-detach] attach open=" + open)
-    }
-
-    // 把副窗口**移动**到某处（面板头部那条拖动热区、独立态下三点抓手都调它；只改 x/y、不动尺寸）。
-    // 为什么不让它们直接写 win.x/win.y（原来就是那样）：几何必须**只有一个出口**
-    // （SidebarWindow.applyGeometry 的"每帧最多下发一次"），多一个直接写窗口的口子就等于绕开合并 ——
-    // 拖动是 125Hz 的，绕开之后又变成每帧多次原生窗口变更，缩放那边刚修好的东西会被它带回来。
-    // 尺寸取壳层记着的值（拖动不改宽高），位置按"按下时位置 + 屏幕位移"给（1:1 跟手）。
-    function moveSidebarWindowTo(x, y) {
-        evSay("MSW to " + x + "," + y + " detached=" + sidebarDetached + " floating=" + sidebarFloating
-              + " w=" + sidebarWinW + " h=" + sidebarWinH + " applying=" + sidebarWinApplying)
-        if (!sidebarDetached && !sidebarFloating)
-            return
-        applySidebarWindowGeometry(x, y, sidebarWinW, sidebarWinH)
     }
 
     // 面板头部那两颗窗口按钮（− 最小化 / □❐ 最大化-还原）的转发口：按钮只在副窗口态可见
@@ -702,11 +495,6 @@ Item {
             // 独立态（**确认脱离之后**）：三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
             sideDetached: shell.sidebarDetached
             attachZoneProvider: shell.dockScreenRect
-            // 几何出口注入：脱离后本 Item 的 parent 链上**没有**壳层（见 RightSidebar 的说明），
-            // 所以"搬那扇窗"只能靠这个函数引用 —— 与 attachZoneProvider 同一个道理。
-            // ⚠️ 必须包一层箭头函数：QML 的自定义方法**不能**当函数值跨组件直接调用（实测
-            //    `TypeError: Property 'moveSidebarWindowTo' of object function … is not a function`）。
-            moveWindowProvider: (x, y) => shell.moveSidebarWindowTo(x, y)
             // 面板自己标题行那颗 ✕：跟手/独立态下它也必须走"回附 + 关窗"（否就只收起主窗口那半边，
             // 内容留在副窗口里 = 状态自相矛盾）；附着态照旧只收起右栏。
             onCloseRequested: {
