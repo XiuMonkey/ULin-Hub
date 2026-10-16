@@ -403,10 +403,10 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: Theme.spacing.columnClearance
                 anchors.rightMargin: Theme.spacing.columnClearance
-                // ⚠️ 这里恢复成 columnClearance(16)：之前两次"输入框下移 6px"改的其实是**这条**，
-                //    结果整条输入框（连同里面的小字/hint）一起被推下去了，并没有缩短它与会话区的距离
-                //    （会话区下端是跟着输入框顶走的）。要缩短距离，改的是上面那两条 anchor 边距。
-                anchors.bottomMargin: Theme.spacing.columnClearance
+                // 用户要求：输入框（连同它下方那行调用量小字）的**底部对齐会话栏底部**。
+                // 所以这里归零（原来 columnClearance=16 ⇒ 小字悬在半空 16px）。
+                // 小字与列底之间只留 Composer 自己的 cardPadBottom。
+                anchors.bottomMargin: 0
                 height: item ? item.implicitHeight : 0
                 visible: Hub.currentSessionId.length > 0
                 source: Style.url("basic/chat/Composer.qml")

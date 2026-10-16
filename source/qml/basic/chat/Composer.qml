@@ -41,8 +41,10 @@ Item {
     readonly property real cardPadH: Theme.spacing.cardPadding
     // 上内边距 12（sectionGap）+ 编辑器自身的 editorPadTop(4) = 16 = cardPadH：左上角内缩成正方形
     readonly property real cardPadTop: Theme.spacing.sectionGap
-    // 下内边距 12（sectionGap）：发送键是实心深色圆钮，比文字"重"，底部留到 12 才不显挤
-    readonly property real cardPadBottom: Theme.spacing.sectionGap
+    // 下内边距：原 12（sectionGap）—— 用户要求"调用量小字的底部对齐会话栏底部"，
+    // 于是宿主那条 composerLoader.bottomMargin 归零，这里也收到 4（editorPadTop）
+    // ⇒ 小字底距会话栏底约 4px，视觉上就是对齐。
+    readonly property real cardPadBottom: Theme.spacing.editorPadTop
     // 编辑区与控制行/用量小字之间的行距：原 8（labelGap）⇒ 用户要求"再近一些"，收到 2（panelGap）。
     // 这一列内部的行距统一走它，所以编辑区↔chip↔小字会一起收紧（观感更成套）。
     readonly property real cardGap: Theme.spacing.panelGap
