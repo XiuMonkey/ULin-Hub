@@ -34,14 +34,16 @@ Item {
     height: Math.max(1, zone.height)
     visible: anyZone
 
-    // 面与描边：与右栏卡片同一个圆角 token，颜色取主题的强调色（提示"这里是有效落点"）
+    // 面与描边：与右栏卡片同一个圆角 token。颜色用**浅灰**（与三个点抓手同款
+    // Theme.color.textTertiary）—— 原来取的是主题强调色 accent（蓝），实测观感不好看。
+    // 灰的对比度比蓝低，所以把填充透明度略微调高，保证"亮起"这一档仍然看得出来。
     Rectangle {
         anchors.fill: parent
         radius: Theme.radius.panel
-        color: Theme.color.accent
-        opacity: root.active ? 0.16 : 0.07
+        color: Theme.color.textTertiary
+        opacity: root.active ? 0.22 : 0.10
         border.width: 2
-        border.color: Theme.color.accent
+        border.color: Theme.color.textTertiary
 
         Behavior on opacity {
             NumberAnimation { duration: Theme.motion.fast }
