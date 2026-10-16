@@ -17,8 +17,8 @@
 // 基线记在同目录的 release-manifest.json（相对路径 → 上次释放时的内容哈希）。
 //
 // 升级陈旧化：磁盘包里的 QML 会遮蔽新内置件，而 QML 陈旧（模型 role/属性改名）会运行期报错 ——
-// 所以 pack.json 带 uiAbi，与本版本的 kStylePackUiAbi 不一致就**整包拒载、全部回退内置**，
-// 并把原因暴露给设置页（见 rejectReason）。
+// 所以 pack.json 带 uiAbi，与本版本的 kStylePackUiAbi 不一致就**整包拒载、全部回退内置**
+// （拒载原因只留在 m_rejectReason 与警告日志里，不再往 QML 面暴露）。
 
 // QML 壳与风格包之间的契约版本早就搬到了 common/appearance/UiAbi.h —— 它同时被下层的
 // ThemeManager / ExtensionLoader 使用，留在桥层会让下层反向依赖 QML 桥层。
@@ -32,10 +32,7 @@
 class StyleResolver : public QObject
 {
 	Q_OBJECT
-	Q_PROPERTY(bool packPresent READ packPresent NOTIFY packChanged)
-	Q_PROPERTY(bool packAccepted READ packAccepted NOTIFY packChanged)
 	Q_PROPERTY(QString packVersion READ packVersion NOTIFY packChanged)
-	Q_PROPERTY(QString rejectReason READ rejectReason NOTIFY packChanged)
 	Q_PROPERTY(QString stylesDir READ stylesDir CONSTANT)
 
 public:
@@ -52,10 +49,7 @@ public:
 	// 重新做门控与缓存失效（用户/扩展改过磁盘包后调用）
 	Q_INVOKABLE void reload();
 
-	bool packPresent() const { return m_packPresent; }
-	bool packAccepted() const { return m_packAccepted; }
 	QString packVersion() const { return m_packVersion; }
-	QString rejectReason() const { return m_rejectReason; }
 	QString stylesDir() const { return m_stylesDir; }
 
 signals:
@@ -74,6 +68,8 @@ private:
 
 	QString m_stylesDir;
 	mutable QHash<QString, QString> m_urlCache;
+	// ⚠️ 下面三个是**解析期的内部状态**（inspectPack 写、url()/日志读），刻意保留：
+	//    它们不是死代码，只是不再有 QML 面（Q_PROPERTY/getter 已删）。
 	bool m_packPresent = false;
 	bool m_packAccepted = true;
 	QString m_packVersion;

@@ -27,20 +27,6 @@ namespace
 			return NativeWindowFilter::ControlClose;
 		return NativeWindowFilter::ControlOther;
 	}
-
-	QString controlNameFromKind(int kind)
-	{
-		switch (kind) {
-		case NativeWindowFilter::ControlMinimize:
-			return QStringLiteral("min");
-		case NativeWindowFilter::ControlMaximize:
-			return QStringLiteral("max");
-		case NativeWindowFilter::ControlClose:
-			return QStringLiteral("close");
-		default:
-			return QString();
-		}
-	}
 }
 
 WindowBridge& WindowBridge::instance()
@@ -52,15 +38,9 @@ WindowBridge& WindowBridge::instance()
 WindowBridge::WindowBridge(QObject* parent)
 	: QObject(parent)
 {
-	// 悬停态来自原生命中测试：交给系统处理的窗口按钮不会给 QML 发鼠标事件
-	NativeWindowFilter::instance().setHoveredKindChanged([this](int kind) {
-		const QString name = controlNameFromKind(kind);
-		if (m_hoveredControl == name)
-			return;
-
-		m_hoveredControl = name;
-		emit hoveredControlChanged();
-	});
+	// 这里曾经订阅 NativeWindowFilter 的"悬停到哪个窗口按钮"回调（setHoveredKindChanged），
+	// 唯一用途是喂 QML 面的 hoveredControl 属性；该属性全仓无人读（悬停反馈由 QML 自己画），
+	// 已随死成员一起删除，所以本构造函数不再订阅任何东西。
 }
 
 void WindowBridge::attachWindow(QObject* window)

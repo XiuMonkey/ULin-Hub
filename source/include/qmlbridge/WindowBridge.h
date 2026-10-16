@@ -31,9 +31,6 @@ class WindowBridge : public QObject
 		Q_PROPERTY(bool fullScreen READ isFullScreen NOTIFY frameStateChanged)
 		// 最大化时系统多给的那一圈（逻辑像素）：根内容按它内缩，可见内容才落进工作区
 		Q_PROPERTY(int contentInset READ contentInset NOTIFY frameStateChanged)
-		// 悬停到哪个窗口按钮上（"" / min / max / close）。交给系统处理的按钮收不到鼠标事件，
-		// 悬停反馈只能由原生命中测试回传
-		Q_PROPERTY(QString hoveredControl READ hoveredControl NOTIFY hoveredControlChanged)
 		// 三个窗口按钮是否交给系统处理（true = 系统负责点击/悬停/贴边吸附与 Snap Layouts，QML 只画）。
 		// 置 false 时由 QML 自己点、自己画悬停，代价是失去 Snap Layouts —— 仅作调试兜底
 		Q_PROPERTY(bool nativeWindowButtons READ nativeWindowButtons WRITE setNativeWindowButtons NOTIFY nativeWindowButtonsChanged)
@@ -53,8 +50,8 @@ public:
 	//
 	// ⚠️ **主窗口行为一个字都不变**：本方法不碰 m_window（那是"主窗口"的语义），窗口动作
 	//    （minimize/toggleMaximize/closeWindow/startSystemMove/startSystemResize）、可绑定属性
-	//    （maximized/contentInset/hoveredControl）与最近点击位置仍然只服务主窗口；附加窗口自己
-	//    没有标题栏/窗口按钮，也就不需要那些。
+	//    （maximized/fullScreen/contentInset/nativeWindowButtons/isDark）与最近点击位置仍然只服务主窗口；
+	//    附加窗口自己没有标题栏/窗口按钮，也就不需要那些。
 	// 幂等：同一扇窗重复调只是刷一遍样式位（applyNativeStyle 自己按样式位判重）。
 	Q_INVOKABLE void attachAuxWindow(QObject* window);
 
@@ -88,14 +85,12 @@ public:
 	bool isMaximized() const;
 	bool isFullScreen() const;
 	int contentInset() const;
-	QString hoveredControl() const { return m_hoveredControl; }
 	bool nativeWindowButtons() const;
 	void setNativeWindowButtons(bool enabled);
 	bool isDark() const;
 
 signals:
 	void frameStateChanged();
-	void hoveredControlChanged();
 	void nativeWindowButtonsChanged();
 	void themeChanged();
 
@@ -108,7 +103,6 @@ private:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 	QPointer<QQuickWindow> m_window;
-	QString m_hoveredControl;
 
 	// 最近一次点击的位置与它距今多久（isValid() == false = 窗口起来之后还没见过点击）。
 	// 只记**主窗口**的：它是"弹出位置"的上下文（覆盖页/弹窗都长在主窗口里）

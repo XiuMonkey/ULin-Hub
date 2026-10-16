@@ -47,9 +47,9 @@ public:
 	bool available() const { return !m_items.isEmpty(); }
 
 	// 命令行文法（与引擎 parseCommand 同一正则）：斜杠在字节 0，小写名，后接空白或行尾。
-	// 静态版给 C++ 用（QmlBridge 判"这条到底走命令还是走模型"），QML 版给输入区用。
+	// 静态版给 C++ 用（QmlBridge 判"这条到底走命令还是走模型"）；QML 侧也直接读
+	// Hub.commands 的 available/matching，不需要再来问一遍文法。
 	static bool looksLikeCommand(const QString& line);
-	Q_INVOKABLE bool isCommandLine(const QString& line) const { return looksLikeCommand(line); }
 
 	// 当前输入命中的候选：只在"还在敲命令名"时返回（`/com` 会过滤，`/compact ` 之后不再弹菜单）。
 	Q_INVOKABLE QVariantList matching(const QString& text) const;

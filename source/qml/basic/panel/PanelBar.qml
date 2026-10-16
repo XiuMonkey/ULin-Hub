@@ -269,7 +269,7 @@ Item {
                             } catch (e) {
                                 if (!root.moveWindowErrorLogged) {
                                     root.moveWindowErrorLogged = true
-                                    console.log("[sidebar-drag] moveWindowTo 失败（只记一次）: " + e)
+                                    console.log("[panelBar-drag] moveWindowTo 失败（只记一次）: " + e)
                                 }
                             }
                             // 光标落回右栏原位置附近 ⇒ 亮起落点提示（松手才真的回附）
