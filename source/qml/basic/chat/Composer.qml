@@ -1,12 +1,18 @@
-// 输入区（按原版 ui/ChatInputWidget.cpp + chat.qss 复刻）
+// 输入区（原版 ui/ChatInputWidget.cpp + chat.qss 复刻，视觉上做了一次"成套化"收敛）
 //
 // 结构（自上而下，与原版一一对应）：
-//   ① 带阴影的卡片（原版 ShadowPanel{blur 12, dy 3, radius 22} + 整体下移 6）
-//   ② #inputCapsule（panelBg + 1px composerBorder + radius 22；内部上内边距 10、行间距 12）
-//        ├ 输入框（16px、内边距 4/12/0/16、高度 40–336、超出靠内部滚动、无可见滚动条）
-//        └ #inputControlRow（内边距 8/2/8/6、spacing 12）：左侧模型/思考 chip，中间 stretch，
-//          右侧发送键（32×32，永远可用，streaming 时变中止）
-//   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；整体比卡片底边再低 6px
+//   ① 细阴影卡片（圆角 Theme.radius.composer=16；1px composerBorder；MultiEffect 阴影取
+//      Theme.shadow.inputBlur/inputDy = 8/2，与 Card 的 cardBlur/cardDy 同一档，克制不发光）
+//   ② 卡片内容列（左右统一 cardPadH=16、上 cardPadTop=12、下 cardPadBottom=12、段间距 cardGap=8）：
+//        ├ 输入框（13px；左右内边距=cardPadH、上=editorPadTop 4、下 0；高 28–336、超出靠内部滚动、
+//        │  无可见滚动条）—— 文字左上角内缩 16/16，与卡片左边距同列
+//        └ #inputControlRow（高 = 发送键 32）：左 chip（24px 配角）、右发送键（32×32 圆钮），
+//          两者各贴一边、行内垂直居中；chip 文字与编辑器文字同列，圆钮右缘与编辑器文字右缘同列
+//   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；整体比卡片底边再低 14px
+//
+// 视觉约定（**改一处即全局成套**）：内边距/行距全部由 token 派生（cardPadding / sectionGap /
+// labelGap / editorPadTop），颜色圆角一律取 token；字号三档相邻（13 / 12 / 11），
+// 聚焦态只把 1px 描边从 10% 黑加深到 textSecondary 灰（**不用 accent 蓝**），不加发光、不加第二层阴影。
 //
 // 与原版一致的键位：Enter/Return 无 Shift 则发送（输出中则中止）——**Ctrl+Enter 也发送**；
 // Shift+Enter 换行。输入区**从不禁用**；空文本静默丢弃（拦截在宿主）。
@@ -28,6 +34,20 @@ Item {
     readonly property var commandMenuRef: commandMenu
 
     property bool streaming: Hub.streaming
+
+    // ---- 视觉节奏（只在这里定数，下面全部引用它，保证内边距/行距/对齐三者成套）----
+    // 左右统一内边距 16（cardPadding）：编辑器文字左缘、编辑器文字右缘、发送键右缘都落在这一列上
+    readonly property real cardPadH: Theme.spacing.cardPadding
+    // 上内边距 12（sectionGap）+ 编辑器自身的 editorPadTop(4) = 16 = cardPadH：左上角内缩成正方形
+    readonly property real cardPadTop: Theme.spacing.sectionGap
+    // 下内边距 12（sectionGap）：发送键是实心深色圆钮，比文字"重"，底部留到 12 才不显挤
+    readonly property real cardPadBottom: Theme.spacing.sectionGap
+    // 编辑区与控制行之间的行距 8（labelGap）
+    readonly property real cardGap: Theme.spacing.labelGap
+
+    // 发送键的"可用"观感：空文本且未在输出中 ⇒ 压暗。
+    // ⚠️ **纯视觉**：按钮依旧可点（原版语义 = 空文本静默丢弃，拦截在宿主），键盘 Enter 规则也不变。
+    readonly property bool canSend: streaming || editor.text.trim().length > 0
 
     implicitHeight: shadowHost.height + Theme.size.statsLineHeight
 
@@ -93,7 +113,8 @@ Item {
         anchors.top: parent.top
         implicitHeight: capsule.implicitHeight
 
-        // 原版阴影：blur 12 / dy 3 / radius 22（token 里叫 inputBlur/inputDy/inputRadius）
+        // 阴影：blur 8 / dy 2 / radius 16（token inputBlur/inputDy/inputRadius）——
+        // 与 Card 的 cardBlur/cardDy 同一档，把原来"更重的一档"收平，避免输入卡比顶栏卡片更抢眼
         MultiEffect {
             anchors.fill: capsule
             anchors.topMargin: Theme.shadow.inputDy
@@ -113,14 +134,18 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            implicitHeight: content.implicitHeight + 10
+            // 高度 = 内容 + 上下内边距（不再是写死的 +10，改内边距时高度自动跟着成套）
+            implicitHeight: content.implicitHeight + root.cardPadTop + root.cardPadBottom
             radius: Theme.radius.composer
             // composerBg：可选 token。壁纸类皮肤需要单独把输入卡做成半透明，
             // 但输入卡与 Agent 气泡共用 panelBg（AgentBubble.qml），靠 panelBg 区分不开，
             // 所以给输入卡留一个专属键；皮肤不定义它时回退 panelBg（行为与原来完全一致）。
             color: Theme.color.composerBg || Theme.color.panelBg
             border.width: 1
-            border.color: Theme.color.composerBorder
+            // 聚焦态：只把描边换成**更深的灰**（Theme.color.textSecondary），不发光、不加阴影、不改高度。
+            // 为什么不用 accent 蓝：输入区是常驻控件，蓝描边在整个界面里过于抢眼，也把"主色"用在了
+            // 一个只需要"我在这儿"提示的地方；灰阶描边与静息态（composerBorder，10% 黑）同一族，只深一档。
+            border.color: editor.activeFocus ? Theme.color.textSecondary : Theme.color.composerBorder
         }
 
         // 真实内容（与 capsule 同尺寸；卡片本体不参与绘制）
@@ -129,16 +154,16 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.topMargin: 10           // kCardTopPadding
-            spacing: 12                     // kCardGap
+            anchors.topMargin: root.cardPadTop
+            spacing: root.cardGap
 
             TextEdit {
                 id: editor
                 objectName: "composerEditor"   // 供离屏试装台定位（见 misc/tools/qml-harness.py）
                 width: parent.width
-                // 内边距：上 4 / 右 12 / 左 16（原版 chat.qss:125-134）
-                leftPadding: 16
-                rightPadding: 12
+                // 内边距：左右 = cardPadH（与卡片左右内边距同列）/ 上 4 / 下 0
+                leftPadding: root.cardPadH
+                rightPadding: root.cardPadH
                 topPadding: Theme.spacing.editorPadTop
                 bottomPadding: 0
                 textFormat: TextEdit.PlainText
@@ -149,8 +174,12 @@ Item {
                 selectionColor: Theme.color.selectionBg
                 selectedTextColor: Theme.color.textPrimary
                 font.family: "Microsoft YaHei UI"
-                font.pixelSize: Theme.font.lead          // 16px
-                // 高度自适应：40–336（原版 kEditorMinHeight / kEditorMaxHeight）。
+                // 13px（Theme.font.body）：与 widgets/SearchField.qml 的输入文字同档。
+                // 原来取 lead(16) 比全应用正文大 3px，输入区显得"字很大"；现在整条输入区的字号是
+                // 13（正文/chip 之上）→ 12（chip、菜单说明、统计行）→ 11（▾、分组标签）三档相邻，
+                // 主次靠**颜色**（textPrimary / textSecondary / textTertiary）拉开，不靠字号断层。
+                font.pixelSize: Theme.font.body
+                // 高度自适应：28–336（原版 kEditorMinHeight 40 / kEditorMaxHeight 336；单行时收到 28）。
                 // ⚠️ TextEdit 的 implicitHeight 是只读的（原版也是 setFixedHeight 而非设 implicit），
                 // 所以这里给 height 赋值。
                 height: Math.min(Math.max(contentHeight + topPadding, Theme.size.editorMinHeight),
@@ -158,14 +187,16 @@ Item {
                 // 无可见滚动条：超出靠编辑器内部滚动
                 Text {
                     anchors.left: parent.left
-                    anchors.leftMargin: 16
+                    // 占位符与正文同列同基线：直接引用编辑器自己的内边距/字体，改一处不会跑偏
+                    anchors.leftMargin: editor.leftPadding
                     anchors.top: parent.top
-                    anchors.topMargin: Theme.spacing.editorPadTop
+                    anchors.topMargin: editor.topPadding
                     visible: editor.text.length === 0
                     text: qsTrId("chat_input_placeholder")
-                    color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
-                    font.pixelSize: Theme.font.lead
+                    // 占位符再弱一档（textCaption），与 widgets/SearchField.qml 的 placeholder 同色
+                    color: Theme.color.textCaption
+                    font.family: editor.font.family
+                    font.pixelSize: editor.font.pixelSize
                 }
 
                 onTextChanged: {
@@ -182,56 +213,58 @@ Item {
                 }
             }
 
-            // ---- #inputControlRow：左 chip / 中 stretch / 右发送键 ----
-            // 控制行：原版 #inputControlRow 的 margins 是 (8,2,8,6)，而 QHBoxLayout 是**按内容框**居中。
-            // 之前直接在带非对称 padding 的 Row 里用 anchors.verticalCenter，等于按"整行高"居中，
-            // 比内容框中心低 2px —— 这就是发送键看起来歪的原因。现在外层 Item 只负责 margin，
-            // 内层 Row 铺满内容框，子项在 Row 内居中。
+            // ---- #inputControlRow：左 chip / 右发送键（配角区）----
+            // 用锚点而不是 Row + 手算 stretch：两件配角各贴一边、在同一行里垂直居中，
+            // 行高就取发送键高（chip 更矮，居中后与圆钮同心）。这样既没有"手算宽度在
+            // chip 隐藏（width 0）时算错"的隐患，也不再需要那个 height:1 的占位块。
             Item {
                 id: controlRow
                 width: parent.width
-                implicitHeight: inner.height + 2 + 6
+                implicitHeight: sendButton.implicitHeight
 
-                Row {
-                    id: inner
+                // 模型 / 思考档位 chip（配角：24px、12px、次级色；无模型时自身隐藏 ⇒ 宽 0）
+                ModelSelectorChip {
+                    id: chip
                     anchors.left: parent.left
+                    // chip 内部左右各留 labelGap(8)，这里再退 8 ⇒ chip **文字**正好落在
+                    // cardPadH(16) 这一列上，与上面的输入文字左对齐（悬停底色会往左溢出 8px，
+                    // 那是 chip 的点击热区，属于有意为之）。
+                    anchors.leftMargin: root.cardPadH - Theme.spacing.labelGap
+                    anchors.verticalCenter: parent.verticalCenter
+                    onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
+                    onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
+                }
+
+                IconButton {
+                    id: sendButton
                     anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.leftMargin: 8                  // kRowSidePadding
-                    anchors.rightMargin: 8
-                    anchors.topMargin: 2                   // kRowTopPadding
-                    height: Math.max(chip.implicitHeight, sendButton.implicitHeight)
-                    spacing: 12
-
-                    // 模型 / 思考档位 chip（原版 ModelSelector：28px 高，无模型时隐藏）
-                    ModelSelectorChip {
-                        id: chip
-                        anchors.verticalCenter: parent.verticalCenter
-                        onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
-                        onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
-                    }
-
-                    Item {
-                        width: parent.width - chip.width - sendButton.width - 2 * parent.spacing
-                        height: 1
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    IconButton {
-                        id: sendButton
-                        anchors.verticalCenter: parent.verticalCenter
-                        boxSize: Theme.size.sendButton   // 32×32
-                        // 原版：enter-btn.png / stop-btn.png（ChatInputWidget.cpp:334/418）
-                        iconSource: root.streaming
-                            ? "qrc:/ULinHub/stop-btn.png"
-                            : "qrc:/ULinHub/enter-btn.png"
-                        iconSize: Theme.size.sendButton
-                        // 原版悬停：叠在图标之上的圆形白色蒙版（hover 35% / pressed 55%）
-                        circleHoverOverlay: true
-                        tooltip: root.streaming ? qsTrId("chat_stop_output") : qsTrId("common_send")
-                        // 原版：按钮**永远可用**（没有 disabled 判定）
-                        onClicked: root.streaming ? root.stop() : root.submit()
-                    }
+                    // 圆钮右缘 = 编辑器文字右缘（同在 cardPadH 这一列），不再比文字多探出 4px
+                    anchors.rightMargin: root.cardPadH
+                    anchors.verticalCenter: parent.verticalCenter
+                    boxSize: Theme.size.sendButton   // 32×32
+                    // 原版：enter-btn.png / stop-btn.png（ChatInputWidget.cpp:334/418）。
+                    // 现在是**成对**资源，按主题选一套（IconButton.qml:68 写明的约定，与 SessionBar 的 logo 同例）：
+                    //   浅色 = 深灰圆 #343A42 + 白图形 ｜ 暗色 = 白圆 #FFFFFF + 深灰图形（两套几何逐像素相同，只换色）。
+                    // 四条路径都写字面量、不拼后缀：改名/挪位时 grep 得到，也免得白圆悄悄贴到白面板上整个消失
+                    // （见 ulinhub.qrc 里那段注记）。
+                    readonly property string sendIcon: Theme.isDark
+                        ? "qrc:/ULinHub/enter-btn-dark.png"
+                        : "qrc:/ULinHub/enter-btn.png"
+                    readonly property string stopIcon: Theme.isDark
+                        ? "qrc:/ULinHub/stop-btn-dark.png"
+                        : "qrc:/ULinHub/stop-btn.png"
+                    iconSource: root.streaming ? stopIcon : sendIcon
+                    iconSize: Theme.size.sendButton
+                    // 四态：可用（满不透明=1.0）/ 空文本（压暗=0.45，视觉上的"不可用"）/
+                    //      悬停（圆形蒙版 35%）/ 按下（55%）—— 由 circleHoverOverlay 统一给
+                    opacity: root.canSend ? 1.0 : 0.45
+                    circleHoverOverlay: root.canSend
+                    // 蒙版基色跟着圆底走：暗色主题下圆底是**白的**，白蒙版叠上去等于没叠
+                    // （悬停/按下会完全没有反馈）⇒ 白底改成压暗；浅色主题维持原样的提亮。
+                    circleHoverTint: Theme.isDark ? "#000000" : "#FFFFFF"
+                    tooltip: root.streaming ? qsTrId("chat_stop_output") : qsTrId("common_send")
+                    // 原版：按钮**永远可用**（没有 disabled 判定）；上面只改观感，行为一字不动
+                    onClicked: root.streaming ? root.stop() : root.submit()
                 }
             }
         }
@@ -243,7 +276,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        // 比卡片底边再低 14px：原先与卡片底边贴齐，被输入卡的阴影（inputDy 3 / inputBlur 12）顶着。
+        // 比卡片底边再低 14px：原先与卡片底边贴齐，被输入卡的阴影（inputDy 2 / inputBlur 8）顶着。
         // 只挪文字、**不动 root.implicitHeight** —— 调用方（Shell 的 composerLoader）是底部对齐的，
         // 加高度会把输入卡连同消息列表一起顶上移。
         // 余量：composerLoader 的 bottomMargin = Theme.spacing.columnClearance（16px），
@@ -387,7 +420,9 @@ Item {
                             Text {
                                 id: nameText
                                 text: "/" + commandRow.modelData.name
-                                color: Theme.color.accent
+                                // 命令名走 textPrimary 而不是 accent 蓝：整个输入区（含弹层）不出现蓝色，
+                                // 层级靠"白底黑字 > 灰字"拉开，和输入框的灰阶体系保持一致
+                                color: Theme.color.textPrimary
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
                                 anchors.verticalCenter: parent.verticalCenter

@@ -88,12 +88,12 @@ namespace
 		map.insert(QStringLiteral("check"), 5);        // chat #interactionPanel QCheckBox::indicator
 		map.insert(QStringLiteral("tiny"), 4);         // 勾选框指示器/进度条/滚动条滑块/复制按钮（6 处）
 		map.insert(QStringLiteral("dot"), 9);          // chat #interactionPanel QRadioButton::indicator（几何量，与 size.radioIndicator 配套）
-		map.insert(QStringLiteral("chip"), 14);        // chat #modelSelectorChip = ModelSelector.cpp kChipHeight 28 / 2
+		map.insert(QStringLiteral("chip"), 12);        // chat #modelSelectorChip = selectorChipHeight 24 / 2
 		map.insert(QStringLiteral("pill"), 16);        // chat #sendButton、popups #toastLabel（3 处）
 		map.insert(QStringLiteral("popup"), 16);       // popups #popupBody 16px，与 PopupWindow.cpp:29 setRadius(16) 配对
 		map.insert(QStringLiteral("menu"), 12);        // chat #modelSelectorMenu（上拉菜单）
 		map.insert(QStringLiteral("float"), 20);       // popups #initCard/#themeSwitchBody；Main.cpp:273 setRadius(20)（CardShadow::level3 的 14 被它硬纠正）
-		map.insert(QStringLiteral("composer"), 22);    // chat #inputCapsule；与 shadow.inputRadius 绑定
+		map.insert(QStringLiteral("composer"), 16);    // 输入卡片；与 shadow.inputRadius 绑定（原版 22，视觉收敛为 16）
 		return map;
 	}
 
@@ -158,10 +158,10 @@ namespace
 		map.insert(QStringLiteral("preferredWindowHeight"), 880);   // kPreferredWindowHeight（另加标题栏高度）
 		map.insert(QStringLiteral("minConversationWidth"), 320);    // kMinConversationColumnWidth
 		map.insert(QStringLiteral("sendButton"), 32);               // chat #sendButton 四边 32px
-		map.insert(QStringLiteral("selectorChipHeight"), 28);       // ModelSelector.cpp kChipHeight
+		map.insert(QStringLiteral("selectorChipHeight"), 24);       // ModelSelector 的 chip 高（原版 kChipHeight 28，作为配角收小）
 		map.insert(QStringLiteral("scrollbarThickness"), 8);        // scrollbars.qss QScrollBar 宽/高
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
-		map.insert(QStringLiteral("editorMinHeight"), 40);          // ChatInputWidget.cpp kEditorMinHeight
+		map.insert(QStringLiteral("editorMinHeight"), 28);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 + 7 余量
 		map.insert(QStringLiteral("editorMaxHeight"), 336);         // kEditorMaxHeight
 		map.insert(QStringLiteral("dropdownArrowWidth"), 18);       // #settingsLanguageCombo::drop-down 宽度
 		map.insert(QStringLiteral("comboMinWidth"), 200);           // #settingsLanguageCombo min-width
@@ -187,9 +187,9 @@ namespace
 		map.insert(QStringLiteral("cardBlur"), 8);        // Main.cpp kSidebarShadow/kTopBarShadow = CardShadow::Spec{8, 2, 12}
 		map.insert(QStringLiteral("cardDy"), 2);
 		map.insert(QStringLiteral("cardRadius"), 12);     // 必须等于 radius.panel（Main.cpp:134/176 setRadius(12)）
-		map.insert(QStringLiteral("inputBlur"), 12);      // ChatInputWidget::shadowSpec() = Spec{12, 3, 22}
-		map.insert(QStringLiteral("inputDy"), 3);
-		map.insert(QStringLiteral("inputRadius"), 22);    // 必须等于 radius.composer
+		map.insert(QStringLiteral("inputBlur"), 8);       // 输入卡片阴影（原版 ChatInputWidget::shadowSpec = Spec{12,3,22}，收平到 Card 一档）
+		map.insert(QStringLiteral("inputDy"), 2);
+		map.insert(QStringLiteral("inputRadius"), 16);    // 必须等于 radius.composer
 		map.insert(QStringLiteral("floatBlur"), 24);      // CardShadow.h level3() = Spec{24, 8, 14}
 		map.insert(QStringLiteral("floatDy"), 8);
 		map.insert(QStringLiteral("floatRadius"), 14);    // ⚠ 与 radius.float(20) 不同：旧壳靠 Main.cpp:273 setRadius(20) 硬纠正 #initCard 的圆角

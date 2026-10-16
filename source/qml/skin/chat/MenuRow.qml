@@ -1,5 +1,5 @@
 // 菜单行（模型 / 思考档位共用；原版 ModelSelectorRow，objectName modelSelectorOption）
-// 最小高 38、内边距 8/6/8/6、间距 8；选中时右侧 ✓（accent）；悬停/聚焦 chipHoverBg；选中行背景仍透明。
+// 最小高 38、内边距 8/6/8/6、间距 8；选中时右侧 ✓（textPrimary，不用蓝）；悬停/聚焦 chipHoverBg；选中行背景仍透明。
 
 import QtQuick
 import ULinHub 1.0
@@ -57,7 +57,10 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.checked ? "✓" : ""
             horizontalAlignment: Text.AlignHCenter
-            color: Theme.color.accent
+            // 选中钩走 textPrimary 灰黑而不是 accent 蓝：本控件**只**被 ModelSelectorChip 的弹层用到
+            // （grep 全仓：唯一调用点就是 basic/chat/ModelSelectorChip.qml 的两处 delegate），
+            // 而输入区整体不用蓝色 —— 见 Composer.qml 顶部"视觉约定"。
+            color: Theme.color.textPrimary
             font.pixelSize: Theme.font.title
             font.weight: Theme.font.weightBold
         }

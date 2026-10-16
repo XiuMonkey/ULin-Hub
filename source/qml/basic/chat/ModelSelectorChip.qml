@@ -1,7 +1,9 @@
-// 模型 / 思考档位 chip + 弹层（按原版 ui/ModelSelector.cpp + chat.qss 复刻）
+// 模型 / 思考档位 chip + 弹层（按原版 ui/ModelSelector.cpp + chat.qss 复刻，视觉上做了"降一档"处理）
 //
-// chip：28px 高、radius 14、透明底；悬停 chipHoverBg、按下 activeBg；
-//       文字 = 当前模型名（textPrimary 13/500）+ 当前档位名（textCaption 13/500）+ ▾/▴；
+// chip：24px 高、radius chip(12)、透明底；悬停 chipHoverBg、按下 activeBg；
+//       文字 = 当前模型名（textSecondary 12/500）+ 当前档位名（textTertiary 12）+ ▾/▴（textCaption 11）；
+//       整块比正文弱一档（次级色 + 小一号字），它是输入区的配角，不跟编辑区（13px textPrimary）抢主视觉；
+//       左右各留 labelGap(8) —— Composer 靠这个值把 chip 文字对齐到编辑器文字的列线上；
 //       目录已加载但为空 → chip 隐藏（原版 setVisible(hasModels())）。
 // 弹层：宽 300、menuBg + 1px menuBorder + radius 12、贴 chip 上方 8px；
 //       两节：模型（model_label）/ 思考深度（model_think_depth）；行最小高 38、右侧 ✓；
@@ -22,13 +24,14 @@ Item {
     signal selectLevelRequested(string levelId)
 
     visible: Hub.hasModels
-    width: visible ? chipRow.implicitWidth + 14 : 0
+    // 宽 = 内容宽 + 左右各 labelGap(8)：与上面 "chip 文字落在编辑器文字列线上" 的推导配套
+    width: visible ? chipRow.implicitWidth + 2 * Theme.spacing.labelGap : 0
     height: Theme.size.selectorChipHeight
 
     Rectangle {
         id: chip
         anchors.fill: parent
-        radius: 14
+        radius: Theme.radius.chip
         color: chipMouse.pressed
             ? Theme.color.activeBg
             : (chipMouse.containsMouse ? Theme.color.chipHoverBg : "transparent")
@@ -37,7 +40,7 @@ Item {
             id: chipRow
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
-            anchors.leftMargin: 8
+            anchors.leftMargin: Theme.spacing.labelGap
             spacing: 4
 
             Text {
@@ -46,9 +49,9 @@ Item {
                 text: Hub.currentModelName.length > 0
                     ? Hub.currentModelName
                     : qsTrId("model_none_published")
-                color: Theme.color.textPrimary
+                color: Theme.color.textSecondary
                 font.family: "Microsoft YaHei UI"
-                font.pixelSize: Theme.font.title
+                font.pixelSize: Theme.font.caption
                 font.weight: Theme.font.weightMedium
             }
 
@@ -57,16 +60,14 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: Hub.currentLevelName.length > 0
                 text: Hub.currentLevelName
-                color: Theme.color.textCaption
+                color: Theme.color.textTertiary
                 font.family: "Microsoft YaHei UI"
-                font.pixelSize: Theme.font.title
-                font.weight: Theme.font.weightMedium
+                font.pixelSize: Theme.font.caption
             }
 
             Text {
                 id: chevron
                 anchors.verticalCenter: parent.verticalCenter
-                rightPadding: 6
                 text: menu.visible ? "▴" : "▾"
                 color: Theme.color.textCaption
                 font.pixelSize: Theme.font.small
