@@ -8,7 +8,8 @@
 //        │  无可见滚动条）—— 文字左上角内缩 16/16，与卡片左边距同列
 //        └ #inputControlRow（高 = 发送键 32）：左 chip（24px 配角）、右发送键（32×32 圆钮），
 //          两者各贴一边、行内垂直居中；chip 文字与编辑器文字同列，圆钮右缘与编辑器文字右缘同列
-//   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；整体比卡片底边再低 14px
+//   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；上沿离卡片下沿 statsGap(4px)、
+//      字号 caption(12) —— 它是卡片的附属说明，不跟编辑区抢视线
 //
 // 视觉约定（**改一处即全局成套**）：内边距/行距全部由 token 派生（cardPadding / sectionGap /
 // labelGap / editorPadTop），颜色圆角一律取 token；字号三档相邻（13 / 12 / 11），
@@ -42,8 +43,9 @@ Item {
     readonly property real cardPadTop: Theme.spacing.sectionGap
     // 下内边距 12（sectionGap）：发送键是实心深色圆钮，比文字"重"，底部留到 12 才不显挤
     readonly property real cardPadBottom: Theme.spacing.sectionGap
-    // 编辑区与控制行之间的行距 8（labelGap）
-    readonly property real cardGap: Theme.spacing.labelGap
+    // 编辑区与控制行/用量小字之间的行距：原 8（labelGap）⇒ 用户要求"再近一些"，收到 2（panelGap）。
+    // 这一列内部的行距统一走它，所以编辑区↔chip↔小字会一起收紧（观感更成套）。
+    readonly property real cardGap: Theme.spacing.panelGap
 
     // 发送键的"可用"观感：空文本且未在输出中 ⇒ 压暗。
     // ⚠️ **纯视觉**：按钮依旧可点（原版语义 = 空文本静默丢弃，拦截在宿主），键盘 Enter 规则也不变。
@@ -276,12 +278,16 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        // 比卡片底边再低 14px：原先与卡片底边贴齐，被输入卡的阴影（inputDy 2 / inputBlur 8）顶着。
-        // 只挪文字、**不动 root.implicitHeight** —— 调用方（Shell 的 composerLoader）是底部对齐的，
-        // 加高度会把输入卡连同消息列表一起顶上移。
-        // 余量：composerLoader 的 bottomMargin = Theme.spacing.columnClearance（16px），
-        // 减去这 14px 后距容器底边还剩 2px，不会被裁切。上限是 -16。
-        anchors.bottomMargin: -14
+        // 卡片下沿 → 本行**上沿**的距离 = Theme.spacing.statsGap（4px）。
+        // 取值为什么是 -statsGap：本行 bottom 锚在 root.bottom 上，而 root.bottom 由 Shell 的
+        // composerLoader（bottomMargin = columnClearance 16）定住、与 implicitHeight 无关，
+        // 所以"本行上沿 − 卡片下沿"= −bottomMargin ⇒ 写 -statsGap 就是"离卡片 4px"。
+        // ⚠️ 只挪文字、**不动 root.implicitHeight**（仍是 卡片高 + statsLineHeight）：卡片位置一分不动
+        // ⇒ Shell 里那条"会话区 ↔ 输入框"的缝不受影响。代价：本行底边离会话区底边还剩 12px
+        // （原来只差 2px），观感上它是卡片的附属说明，而不是贴着容器底的一行。
+        // 另一条路（本行贴住容器底、把卡片往下拉 4px）会让 root 高 4px、消息区同步缩 4px ——
+        // 那会动到 Shell 侧刚调好的缝，所以没走。
+        anchors.bottomMargin: -Theme.spacing.statsGap
         height: Theme.size.statsLineHeight
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignHCenter
