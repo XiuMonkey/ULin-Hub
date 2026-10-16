@@ -130,6 +130,9 @@ namespace
 		map.insert(QStringLiteral("fieldPadWideX"), 12);
 		map.insert(QStringLiteral("labelGap"), 8);             // 单选/复选行、#toolsFilterToolRow 的 spacing
 		map.insert(QStringLiteral("editorPadTop"), 4);         // ChatInputWidget.cpp kEditorVerticalPadding
+		// 输入卡片下沿 → 底下那行用量小字上沿的距离（新键，只在 basic/chat/Composer.qml 用）：
+		// 原来小字紧贴会话区底、离卡片 14px，显得"两截"；收到 4px 让它是卡片的附属说明。
+		map.insert(QStringLiteral("statsGap"), 4);
 		return map;
 	}
 
@@ -161,7 +164,7 @@ namespace
 		map.insert(QStringLiteral("selectorChipHeight"), 24);       // ModelSelector 的 chip 高（原版 kChipHeight 28，作为配角收小）
 		map.insert(QStringLiteral("scrollbarThickness"), 8);        // scrollbars.qss QScrollBar 宽/高
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
-		map.insert(QStringLiteral("editorMinHeight"), 28);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 + 7 余量
+		map.insert(QStringLiteral("editorMinHeight"), 38);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 + 7 余量
 		map.insert(QStringLiteral("editorMaxHeight"), 336);         // kEditorMaxHeight
 		map.insert(QStringLiteral("dropdownArrowWidth"), 18);       // #settingsLanguageCombo::drop-down 宽度
 		map.insert(QStringLiteral("comboMinWidth"), 200);           // #settingsLanguageCombo min-width

@@ -44,7 +44,8 @@
     "fieldPadWideY": 8,
     "fieldPadWideX": 12,
     "labelGap": 8,
-    "editorPadTop": 4
+    "editorPadTop": 4,
+    "statsGap": 4
   },
   "size": {
     "sessionBarWidth": 240,
@@ -68,7 +69,7 @@
     "selectorChipHeight": 24,
     "scrollbarThickness": 8,
     "scrollbarHandleMin": 20,
-    "editorMinHeight": 28,
+    "editorMinHeight": 38,
     "editorMaxHeight": 336,
     "dropdownArrowWidth": 18,
     "comboMinWidth": 200,
