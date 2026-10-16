@@ -256,11 +256,11 @@
     <ClCompile Include="src\ExtensionSystem\ClientExtension.cpp" />
     <ClCompile Include="src\ExtensionSystem\ExtensionRegistry.cpp" />
     <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp" />
-    <None Include="..\assets\resources\highlight-rules.json" />
-    <None Include="..\assets\resources\ulin-hub-logo-tiny@2x.png" />
-    <None Include="..\assets\resources\ulin-hub-logo-tiny-dark@2x.png" />
-    <None Include="..\assets\resources\ulin-hub-icon.png" />
-    <None Include="..\assets\resources\ulin-hub.ico" />
+    <None Include="..\assets\resources\config\highlight-rules.json" />
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny@2x.png" />
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny-dark@2x.png" />
+    <None Include="..\assets\resources\icons\ulin-hub-icon.png" />
+    <None Include="..\assets\resources\icons\ulin-hub.ico" />
     <ResourceCompile Include="..\assets\resources\ulin-hub.rc" />
   </ItemGroup>
   <ItemGroup>

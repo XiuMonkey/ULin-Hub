@@ -138,7 +138,8 @@ target_include_directories(ulinhub PRIVATE
 	"${ULINHUB_ROOT}/include"
 	# libvterm 只公开这一层头（src/ 内部头是相对同目录包含的）
 	"${ULINHUB_ROOT}/3rdparty/libvterm/include"
-	# resources/ 只为下面 rc.exe 解析 "ulin-hub.ico" 的相对路径用：
+	# resources/ 只为下面 rc.exe 解析 "icons/ulin-hub.ico" 的相对路径用
+	# （.rc 留在 resources/ 顶层，图标移进了 icons/，故这里的搜索根必须是 resources/）：
 	# CMake 会把 include 目录翻成 /I 传给 rc.exe（<INCLUDES> 占位符）。
 	"${ULINHUB_ROOT}/../assets/resources")
 
@@ -319,7 +320,7 @@ endif()
 # 后续步骤（本文件暂未涉及，见 README「跨平台」相关讨论）
 # ------------------------------------------------------------------
 # 运行时资源还没有纳入构建：程序启动时会在可执行文件同目录找
-# resources/server/node[.exe]、resources/harness-node-entry.mjs 等（见
+# resources/server/node[.exe]、resources/node/harness-node-entry.mjs 等（见
 # ServerManager.cpp / PluginMarketInstaller.cpp）。这些是「按平台分发」的事，
 # 不适合塞进构建脚本：Linux/macOS 需要各自平台编译出来的 node 运行时，
 # 以及在该平台重新 install 的 node_modules。等做跨平台部署时再补 install()/

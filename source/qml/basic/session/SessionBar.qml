@@ -11,7 +11,7 @@ import "../../skin/session"
 Item {
     id: sessionBar
 
-    // 扩展注入点（名字契约见 assets/resources/EXTENSION_DEV.zh-CN.md §11.3）；四条连接交给宿主建：
+    // 扩展注入点（名字契约见 assets/resources/docs/EXTENSION_DEV.zh-CN.md §11.3）；四条连接交给宿主建：
     // 有真实 handle ⇒ 可挂起/恢复/接管/交还。
     // 签名手写：带回参的信号要写全类型；接收端必须具名且**参数带类型标注**（未标注在元对象里是 QVariant，接不上）。
     Component.onCompleted: {
@@ -68,8 +68,8 @@ Item {
             width: 200
             height: 69
             source: Theme.isDark
-                ? "qrc:/ULinHub/ulin-hub-logo-tiny-dark@2x.png"
-                : "qrc:/ULinHub/ulin-hub-logo-tiny@2x.png"
+                ? "qrc:/ULinHub/icons/ulin-hub-logo-tiny-dark@2x.png"
+                : "qrc:/ULinHub/icons/ulin-hub-logo-tiny@2x.png"
             sourceSize.width: 400
             sourceSize.height: 138
             fillMode: Image.PreserveAspectFit
@@ -121,14 +121,14 @@ Item {
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/ULinHub/setting-icon.png"
+            iconSource: "qrc:/ULinHub/icons/setting-icon.png"
             tooltip: qsTrId("settings_title")
             onClicked: sessionBar.openSettingsRequested()
         }
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/ULinHub/plugin-icon.png"
+            iconSource: "qrc:/ULinHub/icons/plugin-icon.png"
             tooltip: qsTrId("sidebar_plugins")
             onClicked: sessionBar.openPluginMarketRequested()
         }
@@ -139,14 +139,14 @@ Item {
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/ULinHub/theme-icon.png"
+            iconSource: "qrc:/ULinHub/icons/theme-icon.png"
             tooltip: qsTrId("sidebar_switch_theme")
             onClicked: Hub.toggleTheme()
         }
         IconButton {
             boxSize: 32
             iconSize: 20
-            iconSource: "qrc:/ULinHub/extension-icon.png"
+            iconSource: "qrc:/ULinHub/icons/extension-icon.png"
             tooltip: qsTrId("ext_manager_title")
             onClicked: Hub.extensions.openPage()
         }
@@ -163,7 +163,7 @@ Item {
         anchors.left: navColumn.right
         anchors.verticalCenter: navColumn.verticalCenter
         spacing: 0
-        // 扩展注入点（名字契约见 assets/resources/EXTENSION_DEV.zh-CN.md §11.3）
+        // 扩展注入点（名字契约见 assets/resources/docs/EXTENSION_DEV.zh-CN.md §11.3）
         Component.onCompleted: HostUi.registerItem("sidebar.extDock", extDock)
     }
 

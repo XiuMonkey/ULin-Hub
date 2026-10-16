@@ -11,7 +11,7 @@
 namespace
 {
 	// 内置高亮规则在 qrc 里的位置（见 assets/resources/ulinhub.qrc），外部覆盖优先
-	const char kRulesResource[] = ":/ULinHub/highlight-rules.json";
+	const char kRulesResource[] = ":/ULinHub/config/highlight-rules.json";
 	QString g_rulesPath;
 	bool g_rulesLoaded = false;
 

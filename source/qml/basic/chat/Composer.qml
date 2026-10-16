@@ -252,11 +252,11 @@ Item {
                     // 四条路径都写字面量、不拼后缀：改名/挪位时 grep 得到，也免得白圆悄悄贴到白面板上整个消失
                     // （见 ulinhub.qrc 里那段注记）。
                     readonly property string sendIcon: Theme.isDark
-                        ? "qrc:/ULinHub/enter-btn-dark.png"
-                        : "qrc:/ULinHub/enter-btn.png"
+                        ? "qrc:/ULinHub/buttons/enter-btn-dark.png"
+                        : "qrc:/ULinHub/buttons/enter-btn.png"
                     readonly property string stopIcon: Theme.isDark
-                        ? "qrc:/ULinHub/stop-btn-dark.png"
-                        : "qrc:/ULinHub/stop-btn.png"
+                        ? "qrc:/ULinHub/buttons/stop-btn-dark.png"
+                        : "qrc:/ULinHub/buttons/stop-btn.png"
                     iconSource: root.streaming ? stopIcon : sendIcon
                     iconSize: Theme.size.sendButton
                     // 四态：可用（满不透明=1.0）/ 空文本（压暗=0.45，视觉上的"不可用"）/

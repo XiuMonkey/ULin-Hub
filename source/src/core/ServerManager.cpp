@@ -335,7 +335,10 @@ void ServerManager::startBundledServer()
 	const QString appDir = QCoreApplication::applicationDirPath();
 
 	QString nodePath = appDir + QStringLiteral("/resources/server/node.exe");
-	QString entryPath = appDir + QStringLiteral("/resources/harness-node-entry.mjs");
+	// 入口脚本在发布目录的 resources/node/ 下：该目录结构与 assets/resources/node/ 一一对应
+	// （2026-10 素材整理时把 harness-node-entry.mjs 从 resources/ 顶层挪进了 node/），
+	// 发布/打包时 resources 这棵树要照搬仓库里的分目录结构。
+	QString entryPath = appDir + QStringLiteral("/resources/node/harness-node-entry.mjs");
 	QString dshEntry = appDir + QStringLiteral("/resources/server/node_modules/@deepseek-ai/dsh/lib/bin.js");
 	QString cwd = defaultWorkspacePath();
 	QString dshHome = appDir + QStringLiteral("/resources/server/harness");

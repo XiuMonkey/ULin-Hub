@@ -19,7 +19,7 @@
 // ⚠️ 跨模块只能 qobject_cast，不能 dynamic_cast（RTTI 不跨 DLL，恒 nullptr）；取接口与调用都只在 GUI 线程。
 // ⚠️ ABI：虚方法只许末尾追加（不改名 / 不换签名 / 不插中间 / 不删），接口只能增（新类 + 新 IID）——
 //    vtable 槽位 = 声明顺序，插中间会让旧插件调到错槽位，不报错、只在调用时崩。末尾追加的标了【末尾追加】。
-// 扩展开发全貌见 assets/resources/EXTENSION_DEV.zh-CN.md（界面注入 §11.3、ABI §11.5）。
+// 扩展开发全貌见 assets/resources/docs/EXTENSION_DEV.zh-CN.md（界面注入 §11.3、ABI §11.5）。
 
 class QWidget;   // 只出现在 VirtualTheme / VirtualMain 的历史签名里；QML 壳已无 QWidget
 
