@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QJsonArray>    // 身份三件套里的 dependence 是数组 ⇒ 解析要用到 QJsonArray（此前只用到 QJsonObject）
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QRegularExpression>
@@ -602,6 +603,25 @@ bool ExtensionLoader::readDescriptor(const QString& jsonPath, LoadedExtension* o
 
 	out->declaredName = root.value(QStringLiteral("Name")).toString();
 	out->type = root.value(QStringLiteral("Type")).toString();
+	// ---- 扩展身份三件套（2026-10-16 新增）：本版**只登记，不给行为** ----
+	// ID：标识符（约定小写 + 下划线）。未声明就留空 —— 不报错、不拒绝整包，调用方按 Name 兜底。
+	out->declaredId = root.value(QStringLiteral("ID")).toString();
+	// version：扩展自身版本。字符串与数字都认（JSON5 里忘加引号写成 1.0 时不至于变 0）。
+	{
+		const QJsonValue v = root.value(QStringLiteral("version"));
+		out->declaredVersion = v.isString() ? v.toString()
+		                    : (v.isDouble() ? QString::number(v.toDouble()) : QString());
+	}
+	// dependence：依赖的其它扩展 ID 数组。非数组、非字符串、空串一律忽略（这里不做依赖解析）。
+	{
+		const QJsonValue dep = root.value(QStringLiteral("dependence"));
+		if (dep.isArray()) {
+			for (const QJsonValue& item : dep.toArray()) {
+				if (item.isString() && !item.toString().isEmpty())
+					out->dependencies.append(item.toString());
+			}
+		}
+	}
 	// ABIVersion：可选（只影响 ui/ 是否装载，不拒绝整包）。缺省 = -1 ⇒ 视为匹配；
 	// JSON5 里写成字符串也认，免得扩展作者加引号就静默失配。
 	{
@@ -614,10 +634,13 @@ bool ExtensionLoader::readDescriptor(const QString& jsonPath, LoadedExtension* o
 			out->uiAbi = -1;
 	}
 
-	qInfo().noquote() << QStringLiteral("[ExtensionLoader] descriptor Name=%1 Type=%2 ABIVersion=%3")
+	qInfo().noquote() << QStringLiteral("[ExtensionLoader] descriptor Name=%1 Type=%2 ABIVersion=%3 ID=%4 version=%5 dependence=[%6]")
 		.arg(out->declaredName.isEmpty() ? QStringLiteral("(none)") : out->declaredName,
 			out->type.isEmpty() ? QStringLiteral("(none)") : out->type,
-			out->uiAbi < 0 ? QStringLiteral("(none)") : QString::number(out->uiAbi));
+			out->uiAbi < 0 ? QStringLiteral("(none)") : QString::number(out->uiAbi),
+			out->declaredId.isEmpty() ? QStringLiteral("(none)") : out->declaredId,
+			out->declaredVersion.isEmpty() ? QStringLiteral("(none)") : out->declaredVersion,
+			out->dependencies.join(QStringLiteral(", ")));
 	return true;
 }
 
