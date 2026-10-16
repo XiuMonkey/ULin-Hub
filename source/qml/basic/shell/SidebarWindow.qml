@@ -350,29 +350,6 @@ Window {
         }
     }
 
-    // 缩放期间盖一层**面板底色**（治"看得见的黑"）：
-    // 原生窗口尺寸在变的那些帧里，WebEngine（终端/网页块）自己的渲染面正在重建 ⇒ 露黑；
-    // `Window.color` 早已是 panelBg 也挡不住这一层（黑来自 Chromium 的面，不是窗口底色）。
-    // 硬啃原生（DWM 非客户区/多窗口那套）是一大工程（备份见 build/temp/sidebar-native/interrupted-backup/），
-    // 这里先用"盖住"：系统接管缩放期间显示面板底色，松手立刻恢复 —— 用户看不到黑块。
-    // 何时收起：系统 sizing loop 期间 QML 收不到鼠标事件，所以轮询左键是否已松开。
-    Rectangle {
-        anchors.fill: parent
-        color: Theme.color.panelBg
-        visible: win.resizeHandedOff
-        z: 9999
-    }
-
-    Timer {
-        interval: 60
-        repeat: true
-        running: win.resizeHandedOff
-        onTriggered: {
-            if (!WindowBridge.leftButtonDown())
-                win.resizeHandedOff = false
-        }
-    }
-
     // 被搬动/改尺寸：回写 Shell。只在值真的变了时响；Shell 程序化摆窗口期间有自己的 applying 门
     // （sidebarWinApplying）⇒ 不会自激（"模型→窗口→模型"来回弹）。
     onXChanged: pushGeometry()
