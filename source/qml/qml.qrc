@@ -20,16 +20,16 @@
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
         <file>basic/browser/WebBrowserPanel.qml</file>
-        <file>basic/shell/RightSidebar.qml</file>
+        <file>basic/panel/PanelBar.qml</file>
         <file>basic/shell/PanelDock.qml</file>
         <file>basic/shell/DockDropHint.qml</file>
         <!-- 右栏整体"拿起来"跟着光标走 / 脱离成**无边框**独立窗口（自绘标题栏与四边缩放；
-             内容是 reparent 进去的同一份 RightSidebar）-->
-        <file>basic/shell/SidebarWindow.qml</file>
+             内容是 reparent 进去的同一份 PanelBar）-->
+        <file>basic/panel/PanelBarWindow.qml</file>
         <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>
         <file>basic/terminal/TerminalPanel.qml</file>
-        <file>basic/sidebar/Sidebar.qml</file>
+        <file>basic/session/SessionBar.qml</file>
         <file>basic/topbar/TopBar.qml</file>
         <file>Main.qml</file>
         <file>metrics.json</file>
@@ -41,8 +41,8 @@
         <file>skin/chat/UserBubble.qml</file>
         <file>skin/settings/FieldBox.qml</file>
         <file>skin/shell/ThemeSwitchOverlay.qml</file>
-        <file>skin/sidebar/SessionRow.qml</file>
-        <file>skin/sidebar/WorkspaceHeader.qml</file>
+        <file>skin/session/SessionRow.qml</file>
+        <file>skin/session/WorkspaceHeader.qml</file>
         <file>skin/window/Backdrop.qml</file>
         <file>skin/window/TitleBar.qml</file>
         <file>widgets/ActionButton.qml</file>

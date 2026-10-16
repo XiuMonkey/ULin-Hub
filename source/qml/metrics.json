@@ -47,9 +47,9 @@
     "editorPadTop": 4
   },
   "size": {
-    "sidebarWidth": 240,
-    "rightSidebarWidth": 300,
-    "rightSidebarMinWidth": 260,
+    "sessionBarWidth": 240,
+    "panelBarWidth": 300,
+    "panelBarMinWidth": 260,
     "titleBarHeight": 42,
     "titleBarPadLeft": 14,
     "windowButtonWidth": 46,

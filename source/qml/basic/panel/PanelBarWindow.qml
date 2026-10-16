@@ -4,7 +4,7 @@
 //   需求要的是"拖出去后是无边框窗口，最小化/最大化自己实现"。
 //
 // ⚠️ 本窗口**没有**自己的标题栏（用户否掉了那一版）：副窗口的标题栏就是**面板自己的头部行**
-//    —— 那一行里的「面板」+ 三点抓手 + − / □❐ / ✕（按钮在 RightSidebar.qml 里，✕ 左边两颗只在
+//    —— 那一行里的「面板」+ 三点抓手 + − / □❐ / ✕（按钮在 PanelBar.qml 里，✕ 左边两颗只在
 //    副窗口态可见）。所以窗口几何 = 右栏那块矩形**本身**（尺寸/位置逐像素一致、不上移、不多留高度，
 //    见 Shell.liftSidebarForDrag），内容"零跳变"落进窗口，也不会多出一条谁也不认的横杠。
 //
@@ -20,7 +20,7 @@
 //   · 最大化用**真窗口状态** `Window.Maximized`（探针实测：无边框窗口最大化取的是**工作区**
 //     1280x752，不是整块屏幕 ⇒ 不会盖任务栏），还原回 `Window.Windowed` 并显式写回记下的几何。
 //
-// ⚠️ 本文件**不装内容**：右栏那块 RightSidebar 是 reparent 进 `panelSlot` 的**同一份实例**
+// ⚠️ 本文件**不装内容**：右栏那块 PanelBar 是 reparent 进 `panelSlot` 的**同一份实例**
 //    （见 Shell.liftSidebarForDrag / attachSidebar）—— 两个宿主各放一份会让终端/网页各跑一个会话。
 //
 // ⚠️ 头部那两颗窗口按钮**不要**登记进 `WindowBridge.addWindowControl`：那是**主窗口**的原生命中测试
@@ -28,8 +28,8 @@
 //    主窗口的某个位置莫名变成窗口按钮。本窗口是无边框但**没有**原生命中测试介入，QML 自己收点击。
 //
 // 状态都由 Shell 推（本文件不存"该不该显示"）：
-//   · `sidebarFloating` —— 三点刚"拿起来"，跟着光标走、结局未定；
-//   · `sidebarDetached` —— 确认脱离（松手在右栏原区域之外）后才为真 —— 头部那两颗按钮也只在
+//   · `panelBarFloating` —— 三点刚"拿起来"，跟着光标走、结局未定；
+//   · `panelBarDetached` —— 确认脱离（松手在右栏原区域之外）后才为真 —— 头部那两颗按钮也只在
 //     这一态才出现（跟手期间还没"成为"独立窗口）。
 
 import QtQuick
@@ -42,7 +42,7 @@ Window {
     // 由 Shell 注入：状态与几何都在壳层（本文件只把窗摆出来 + 自己拖/自己缩放）
     required property var host
 
-    // 内容槽：Shell 把 RightSidebar reparent 到这里（填满整扇窗 —— 副窗口没有自己的标题栏）
+    // 内容槽：Shell 把 PanelBar reparent 到这里（填满整扇窗 —— 副窗口没有自己的标题栏）
     readonly property alias panelSlot: slot
 
     // 任务栏/Alt+Tab 上显示的名字（窗口没有自绘标题栏，这是唯一的窗口名来源）
@@ -50,19 +50,19 @@ Window {
     // 无边框：系统标题栏/边框/按钮全不要，最小化/最大化/关闭与四边缩放都在本文件里自己做
     flags: Qt.Window | Qt.FramelessWindowHint
     // 显示条件：跟着光标走（拿起来）或已确认脱离（独立）。两态都由 Shell 给
-    visible: win.host ? win.host.sidebarInWindow : false
+    visible: win.host ? win.host.panelBarInWindow : false
     // 窗口底色：**必须和主窗口一样用 transparent**（Main.qml 也是 color: "transparent"）。
     //   不透明的无边框顶层窗口在缩放时，DWM 不做逐帧合成 ⇒ 没画到的那块就露黑（矩形、方角，
     //   表现为"圆角卡片旁边的黑块"）。透明窗口由 DWM 合成，缩放干净；圆角照旧由面板卡片自己画
     //   （角上透出桌面，和主窗口的表现一致）。面板卡片本身不透明且铺满整扇窗 ⇒ 平时看不到透出。
     color: "transparent"
-    minimumWidth: Theme.size.rightSidebarMinWidth
+    minimumWidth: Theme.size.panelBarMinWidth
     // ⚠️ 这里**不再**加 `Theme.size.titleBarHeight`：自绘标题栏那条已删，窗口就是面板矩形那么大
     minimumHeight: 200
 
     // 面板内容的下限（与 Window.minimumWidth 同源）：左/上边缩放时 Qt 一钳最小尺寸，x 就会与
     // 宽度脱钩（左边跟着鼠标走、右边不动）⇒ 这里先自己钳死，绝不让请求越界。
-    readonly property int minTotalW: Theme.size.rightSidebarMinWidth
+    readonly property int minTotalW: Theme.size.panelBarMinWidth
     readonly property int minTotalH: 200
 
     // 最大化态（= 真窗口状态，图标与"能不能拖/缩放"都看它）
@@ -73,10 +73,10 @@ Window {
     property rect liftGeometry: Qt.rect(0, 0, 0, 0)
 
     // 唯一的几何写入口：八条缩放热区（以及"拿起来/跟手"）都走它。
-    // 面板头部那条拖动热区（RightSidebar.qml 的 headerDragArea）与三点抓手直接写 win.x/win.y
+    // 面板头部那条拖动热区（PanelBar.qml 的 headerDragArea）与三点抓手直接写 win.x/win.y
     // ——拖动不碰宽高，与这里同一套"按下时位置 + 屏幕位移"的算法。
     // ⚠️ 这里**不**给自己写 x/y/width/height 的绑定（绑上去会被拖动摘掉，或反过来每帧盖回来）；
-    //    几何由 Shell 在"拿起来/跟手"时推（applySidebarWindowGeometry），之后以窗口为准。
+    //    几何由 Shell 在"拿起来/跟手"时推（applyPanelBarWindowGeometry），之后以窗口为准。
     function applyGeometry(x, y, w, h) {
         win.x = Math.round(x)
         win.y = Math.round(y)
@@ -86,7 +86,7 @@ Window {
 
     // 「拿起来」的三步（都由 Shell 按序调，见 Shell.liftSidebarForDrag）：
     //   ① prepareForLift  —— 记下目标几何、清掉上次的还原几何；
-    //   ② （Shell 置 sidebarFloating ⇒ 这扇窗才显示出来）
+    //   ② （Shell 置 panelBarFloating ⇒ 这扇窗才显示出来）
     //   ③ normalizeForLift —— 保证是普通态。
     // 为什么非要③：上一次可能是最大化/最小化态被收起来的（隐藏时 Qt 只把 visibility 记成 Hidden，
     // 平台窗口还留着放大的摆放）⇒ 再显示出来会是放大/最小化的样子；而 showNormal() 会还原
@@ -198,11 +198,11 @@ Window {
         anchors.fill: parent
 
         // ⚠️ 这里**没有**自绘标题栏（用户否掉了那一版："面板不是自带删除按钮吗？你给另外两个按钮
-        //    放在删除按钮旁边不就行了"）。副窗口的标题栏 = 面板自己的头部行（RightSidebar.qml 里
+        //    放在删除按钮旁边不就行了"）。副窗口的标题栏 = 面板自己的头部行（PanelBar.qml 里
         //    那行「面板」+ 三点抓手 + − / □❐ / ✕）：按钮在那边，拖动也在那边（头部空白处拖窗口）。
         //    于是本窗口只需要一个"填满整扇窗"的内容槽。
 
-        // 内容槽：RightSidebar reparent 到这里（`anchors.fill: parent` 于是自动填满整扇窗）
+        // 内容槽：PanelBar reparent 到这里（`anchors.fill: parent` 于是自动填满整扇窗）
         Item {
             id: slot
             anchors.fill: parent
@@ -382,7 +382,7 @@ Window {
     }
 
     // 被搬动/改尺寸：回写 Shell。只在值真的变了时响；Shell 程序化摆窗口期间有自己的 applying 门
-    // （sidebarWinApplying）⇒ 不会自激（"模型→窗口→模型"来回弹）。
+    // （panelBarWinApplying）⇒ 不会自激（"模型→窗口→模型"来回弹）。
     onXChanged: pushGeometry()
     onYChanged: pushGeometry()
     onWidthChanged: pushGeometry()
@@ -391,16 +391,16 @@ Window {
     function pushGeometry() {
         // 只有"确认脱离"之后才算独立窗口的几何：跟手期间（floating）窗口位置是光标跟出来的，
         // 不是用户摆的，回写只会把上次的几何覆盖成中间态 —— 而那时的值 Shell 自己就有。
-        if (!win.host || !win.host.sidebarDetached)
+        if (!win.host || !win.host.panelBarDetached)
             return
-        win.host.setSidebarWindowGeometry(Math.round(win.x), Math.round(win.y),
+        win.host.setPanelBarWindowGeometry(Math.round(win.x), Math.round(win.y),
                                           Math.round(win.width), Math.round(win.height))
     }
 
     // 系统 ✕ / Alt+F4 / 任务栏"关闭窗口"：与"点顶栏 ◫ 关副窗口"**同一语义**（需求 ③）——
     // 右栏回"已附着但隐藏"（内容 reparent 回 Shell、窗口隐藏），下一次点 ◫ 默认以**附着**状态打开。
     // close.accepted = true：不让系统直接收掉这扇窗（它还要把内容还回去），隐藏由
-    // host.sidebarInWindow 那条绑定完成。
+    // host.panelBarInWindow 那条绑定完成。
     onClosing: (close) => {
         close.accepted = true
         console.log("[sidebar-detach] window closing")

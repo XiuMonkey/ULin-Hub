@@ -136,13 +136,13 @@ namespace
 	QVariantMap defaultSize()
 	{
 		QVariantMap map;
-		map.insert(QStringLiteral("sidebarWidth"), 240);            // Main.cpp kSidebarWidth
+		map.insert(QStringLiteral("sessionBarWidth"), 240);            // Main.cpp kSidebarWidth
 		// 右侧栏（面板坞）宽度。⚠️ 新 token 必须**先在这里**登记：metrics.json 只是覆盖层，
 		// 未知键会被 overlayGroup 直接忽略 —— 只加 metrics.json 的话运行时读到 undefined，
 		// 表现是"面板不出现、压窄量算成 NaN"（踩过一次，日志/布局都正常但界面毫无反应）。
-		map.insert(QStringLiteral("rightSidebarWidth"), 300);
+		map.insert(QStringLiteral("panelBarWidth"), 300);
 		// 右侧栏拖拽下限：再窄标题和关闭键就挤在一起了；上限由 Shell 按"会话区最小宽度"现算
-		map.insert(QStringLiteral("rightSidebarMinWidth"), 260);
+		map.insert(QStringLiteral("panelBarMinWidth"), 260);
 		map.insert(QStringLiteral("titleBarHeight"), 42);           // TitleBar::kHeight
 		map.insert(QStringLiteral("titleBarPadLeft"), 14);          // TitleBar.cpp:56 布局左边距
 		map.insert(QStringLiteral("windowButtonWidth"), 46);        // kButtonWidth

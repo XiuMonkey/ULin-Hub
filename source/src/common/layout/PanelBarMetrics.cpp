@@ -1,7 +1,7 @@
-// 见 SidebarMetrics.h：右侧栏宽度的纯数值策略（自由函数、无 QObject、无 QML 依赖）。
-// 公式与搬到 common 之前逐字等价；qmlbridge/SidebarLayout 只是转发。
+// 见 PanelBarMetrics.h：右侧栏宽度的纯数值策略（自由函数、无 QObject、无 QML 依赖）。
+// 公式与搬到 common 之前逐字等价；qmlbridge/PanelBarLayout 只是转发。
 
-#include "common/layout/SidebarMetrics.h"
+#include "common/layout/PanelBarMetrics.h"
 
 #include <algorithm>
 
@@ -11,7 +11,7 @@ namespace
 	const double kConversationMinRatio = 0.25;
 }
 
-namespace SidebarMetrics
+namespace PanelBarMetrics
 {
 	double conversationMinWidth(double shellWidth, double tokenMinConversationWidth)
 	{
@@ -19,9 +19,9 @@ namespace SidebarMetrics
 	}
 
 	double maxWidth(double shellWidth, double minWidth, double conversationMinWidth,
-		double windowMargin, double sidebarWidth, double panelGap)
+		double windowMargin, double sessionBarWidth, double panelGap)
 	{
-		const double available = shellWidth - 2.0 * windowMargin - sidebarWidth - panelGap - conversationMinWidth;
+		const double available = shellWidth - 2.0 * windowMargin - sessionBarWidth - panelGap - conversationMinWidth;
 		return std::max(minWidth, available);
 	}
 

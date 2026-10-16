@@ -142,7 +142,7 @@ public:
 	Q_INVOKABLE void setDetachedGeometry(const QString& blockId, int x, int y, int w, int h);
 
 	// ---- 抓手的"脱离"接线（QML 侧的广播口，不是模型状态）----
-	// 为什么放在这个单例上：三个点抓手从 PanelDock.qml 的页签条搬到了 RightSidebar.qml 的标题行，
+	// 为什么放在这个单例上：三个点抓手从 PanelDock.qml 的页签条搬到了 PanelBar.qml 的标题行，
 	// 而"落点预览开关"与"请求把某个块脱离出去"原本是 **PanelDock.qml 内部的信号** —— 搬过去就够不着了。
 	// 这两条都属于壳层级接线（提示由 Shell.qml 画、独立窗口由 Shell.qml 建），放模型单例上正是
 	// "任意面板都能发起脱离"的那个广播口；模型**不因此存任何状态**（预览开关是纯 UI 状态，

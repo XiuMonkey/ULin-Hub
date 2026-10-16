@@ -1,17 +1,17 @@
 // 搬家后的真 C++ 自检（不依赖 QML/引擎）：直接链接被测的 4 个 .cpp。
 // 覆盖：① UrlInput 规范化 ② PanelDockModel 的 open/close/activate/showHome + 视图表（kind → 视图）
-//       ③ SidebarMetrics 的钳制/拖动公式（common/layout，自由函数）+ SidebarLayout 转发层是否逐位一致。
+//       ③ PanelBarMetrics 的钳制/拖动公式（common/layout，自由函数）+ PanelBarLayout 转发层是否逐位一致。
 //       ④【本次新增】PanelDockModel 的「块脱离成独立窗口」状态机（脱离/回附/关独立窗口/几何回写）。
 // 两个被测类都是"程序级唯一实例、刻意不析构"的单例（QML 单例注册要求活过引擎）⇒ 用 instance()。
 //
 // 路径已随"领域归位 2026-10-15"更新：模型搬去 common/**（PanelDockModel → common/shell），
-// 右栏宽度公式抽成 common/layout/SidebarMetrics（自由函数），qmlbridge/SidebarLayout 只剩转发。
+// 右栏宽度公式抽成 common/layout/PanelBarMetrics（自由函数），qmlbridge/PanelBarLayout 只剩转发。
 // 这正是能把它们搬出 QML 的理由：断言只需要 QtCore，不需要 QML 引擎。
 
-#include "common/layout/SidebarMetrics.h"
+#include "common/layout/PanelBarMetrics.h"
 #include "common/shell/PanelDockModel.h"
 #include "common/util/UrlInput.h"
-#include "qmlbridge/SidebarLayout.h"
+#include "qmlbridge/PanelBarLayout.h"
 
 #include <QCoreApplication>
 #include <QHash>
@@ -147,33 +147,33 @@ static void modelCases()
 
 static void sidebarCases()
 {
-	std::printf("\n=== ③ SidebarMetrics（common/layout，自由函数）+ SidebarLayout 转发层 ===\n");
+	std::printf("\n=== ③ PanelBarMetrics（common/layout，自由函数）+ PanelBarLayout 转发层 ===\n");
 
 	// ---- 算法本体：自由函数，没有 QObject、不碰 QML ----
-	const double convMin = SidebarMetrics::conversationMinWidth(1232.0, 308.0);
-	const double maxW = SidebarMetrics::maxWidth(1232.0, 260.0, convMin, 12.0, 311.0, 12.0);
-	const double dragLeft = SidebarMetrics::widthFromDrag(100.0, 300.0, 50.0, 260.0, maxW);
-	const double dragRight = SidebarMetrics::widthFromDrag(100.0, 300.0, 500.0, 260.0, maxW);
-	std::printf("    [SidebarMetrics] convMin(1232,308)=%.1f  maxW=%.1f  dragL(50)=%.1f  dragR(500)=%.1f\n",
+	const double convMin = PanelBarMetrics::conversationMinWidth(1232.0, 308.0);
+	const double maxW = PanelBarMetrics::maxWidth(1232.0, 260.0, convMin, 12.0, 311.0, 12.0);
+	const double dragLeft = PanelBarMetrics::widthFromDrag(100.0, 300.0, 50.0, 260.0, maxW);
+	const double dragRight = PanelBarMetrics::widthFromDrag(100.0, 300.0, 500.0, 260.0, maxW);
+	std::printf("    [PanelBarMetrics] convMin(1232,308)=%.1f  maxW=%.1f  dragL(50)=%.1f  dragR(500)=%.1f\n",
 	            convMin, maxW, dragLeft, dragRight);
 	check(qFuzzyCompare(convMin, 308.0), QStringLiteral("对话区保底 = min(token, 窗口*0.25)"), QString::number(convMin));
 	check(maxW >= 260.0, QStringLiteral("上限不低于最小宽度"), QString::number(maxW));
 	check(qFuzzyCompare(dragLeft, 350.0), QStringLiteral("往左拖 50 ⇒ 300->350（1:1）"), QString::number(dragLeft));
 	check(qFuzzyCompare(dragRight, 260.0), QStringLiteral("往右拖过头 ⇒ 夹在下限 260"), QString::number(dragRight));
-	check(qFuzzyCompare(SidebarMetrics::clampWidth(10.0, 260.0, maxW), 260.0), QStringLiteral("低于下限夹到 min"));
-	check(qFuzzyCompare(SidebarMetrics::clampWidth(9999.0, 260.0, maxW), maxW), QStringLiteral("超过上限夹到 max"));
+	check(qFuzzyCompare(PanelBarMetrics::clampWidth(10.0, 260.0, maxW), 260.0), QStringLiteral("低于下限夹到 min"));
+	check(qFuzzyCompare(PanelBarMetrics::clampWidth(9999.0, 260.0, maxW), maxW), QStringLiteral("超过上限夹到 max"));
 
 	// ---- QML 契约面：单例只转发 —— 与自由函数逐位比对（转发层少传/串了参数，这里会红）----
-	SidebarLayout& layout = SidebarLayout::instance();
+	PanelBarLayout& layout = PanelBarLayout::instance();
 	const double bConvMin = layout.conversationMinWidth(1232.0, 308.0);
 	const double bMaxW = layout.maxWidth(1232.0, 260.0, bConvMin, 12.0, 311.0, 12.0);
 	const double bDragLeft = layout.widthFromDrag(100.0, 300.0, 50.0, 260.0, bMaxW);
 	const double bClamp = layout.clampWidth(9999.0, 260.0, bMaxW);
-	std::printf("    [SidebarLayout 转发] convMin=%.1f  maxW=%.1f  dragL=%.1f  clamp(9999)=%.1f\n",
+	std::printf("    [PanelBarLayout 转发] convMin=%.1f  maxW=%.1f  dragL=%.1f  clamp(9999)=%.1f\n",
 	            bConvMin, bMaxW, bDragLeft, bClamp);
 	check(qFuzzyCompare(bConvMin, convMin) && qFuzzyCompare(bMaxW, maxW)
 	          && qFuzzyCompare(bDragLeft, dragLeft) && qFuzzyCompare(bClamp, maxW),
-	      QStringLiteral("单例与 SidebarMetrics 逐位一致（qmlbridge 只转发）"));
+	      QStringLiteral("单例与 PanelBarMetrics 逐位一致（qmlbridge 只转发）"));
 }
 
 // ④ 面板坞「块脱离成独立窗口」的状态机（**本次新增**，2026-10-15）：

@@ -327,7 +327,7 @@ void PanelDockModel::setDetachedGeometry(const QString& blockId, int x, int y, i
 // ---- 抓手的"脱离"接线（见头文件）----
 // 这一对是**广播口**：模型不存状态、不改块表，只把"某个抓手请求把某块脱离出去 / 落点预览该怎么亮"
 // 转给 QML 的壳层（Shell.qml 接住 detachRequested / onDetachPreviewChanged）。
-// 为什么要经过模型这一跳：抓手在 basic/shell/RightSidebar.qml（可被风格包覆盖的单元），
+// 为什么要经过模型这一跳：抓手在 basic/panel/PanelBar.qml（可被风格包覆盖的单元），
 // 它够不着 PanelDock.qml 的内部信号，也不该自己去拿壳层的引用（那就把壳层耦合进卡片了）。
 void PanelDockModel::requestDetach(const QString& blockId, qreal atScreenX, qreal atScreenY)
 {

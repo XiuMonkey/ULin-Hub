@@ -154,12 +154,12 @@
     <ClCompile Include="src\common\util\UrlInput.cpp" />
     <ClCompile Include="src\qmlbridge\UrlInputBridge.cpp" />
     <ClCompile Include="src\common\shell\PanelDockModel.cpp" />
-    <ClCompile Include="src\qmlbridge\SidebarLayout.cpp" />
+    <ClCompile Include="src\qmlbridge\PanelBarLayout.cpp" />
     <!-- 右栏「终端」块的接线层（QML 单例 Terminal）：唯一注册到 QWebChannel 的对象 -->
     <ClCompile Include="src\qmlbridge\TerminalBridge.cpp" />
     <!-- 终端 VT 核心：把引擎给的字节流解析成网格。不依赖 Qt，见 include/common/terminal/TerminalVt.h -->
     <ClCompile Include="src\common\terminal\TerminalVt.cpp" />
-    <ClCompile Include="src\common\layout\SidebarMetrics.cpp" />
+    <ClCompile Include="src\common\layout\PanelBarMetrics.cpp" />
     <!-- 内嵌的 VT 解析器（见 3rdparty\libvterm\README.md）。9 个编译单元全是 C99，上游文件零改动，
          所以工程侧要替它们做四件事（都是实测过的，别凭印象改）：
          ① CompileAsC —— 免得被工程级的 ConformanceMode / stdcpp17 带过去当 C++ 编（C99 会因隐式转换报错）；
@@ -318,9 +318,9 @@
     <!-- 面板坞块列表 / 地址栏规范化 / 右栏宽度钳制：QML 单例注册都要 moc -->
     <QtMoc Include="include\common\shell\PanelDockModel.h" />
     <QtMoc Include="include\qmlbridge\UrlInputBridge.h" />
-    <QtMoc Include="include\qmlbridge\SidebarLayout.h" />
+    <QtMoc Include="include\qmlbridge\PanelBarLayout.h" />
     <QtMoc Include="include\qmlbridge\TerminalBridge.h" />
-    <ClInclude Include="include\common\layout\SidebarMetrics.h" />
+    <ClInclude Include="include\common\layout\PanelBarMetrics.h" />
     <ClInclude Include="include\common\util\UrlInput.h" />
     <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
     <ClInclude Include="include\common\util\MarkdownSegmenter.h" />

@@ -5,7 +5,7 @@
 // 分层规矩（领域归位 2026-10-15，全仓通用）：
 //   · common/**    = 领域与纯逻辑（解析、策略、状态机、模型本体）：不 import QML 概念，能脱离 QML 引擎单测。
 //   · qmlbridge/** = 只做接线：属性/信号、Q_INVOKABLE 转发、QAbstractListModel 的角色名映射，**不放算法**。
-//   留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge、SidebarLayout（只转发）；
+//   留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge、PanelBarLayout（只转发）；
 //   带逻辑的模型与控制器（SessionListModel / CommandController / SettingsController / PanelDockModel /
 //   PluginMarketController / StyleResolver）已搬去 common/**，算法在那边、QML 面在这里。
 //
@@ -93,8 +93,8 @@ class QmlBridge : public QObject
 	Q_PROPERTY(ToolsFilter* toolsFilter READ toolsFilter CONSTANT)
 	Q_PROPERTY(bool toolsFilterOpen READ toolsFilterOpen NOTIFY toolsFilterOpenChanged)
 	// 右侧栏（面板坞）开合：纯界面状态，QML 用它决定面板是否装载 / 压窄多少；
-	// 顶栏那颗 ◫ 走 toggleRightSidebar()，面板自己的 ✕ 走 closeRightSidebar()。
-	Q_PROPERTY(bool rightSidebarOpen READ rightSidebarOpen NOTIFY rightSidebarOpenChanged)
+	// 顶栏那颗 ◫ 走 togglePanelBar()，面板自己的 ✕ 走 closePanelBar()。
+	Q_PROPERTY(bool panelBarOpen READ panelBarOpen NOTIFY panelBarOpenChanged)
 
 public:
 	static QmlBridge& instance();  // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
@@ -163,14 +163,14 @@ public:
 	// ---- 工具过滤器（面板开关在桥里，数据全在 ToolsFilter）----
 	ToolsFilter* toolsFilter() const { return m_toolsFilter; }
 	bool toolsFilterOpen() const { return m_toolsFilterOpen; }
-	bool rightSidebarOpen() const { return m_rightSidebarOpen; }
+	bool panelBarOpen() const { return m_panelBarOpen; }
 	// 顶栏 ☰：开着就收起，否则打开并拉一次该会话的工具目录
 	Q_INVOKABLE void openToolsFilter();
 	Q_INVOKABLE void closeToolsFilter();
 	// 右侧栏：顶栏当开关用（toggle），面板自己的 ✕ 直接 close
-	Q_INVOKABLE void toggleRightSidebar();
-	Q_INVOKABLE void openRightSidebar();
-	Q_INVOKABLE void closeRightSidebar();
+	Q_INVOKABLE void togglePanelBar();
+	Q_INVOKABLE void openPanelBar();
+	Q_INVOKABLE void closePanelBar();
 	// 旧壳是 app 内设置窗口（Settings(m_api)）；QML 侧等 M6 再做等价页面，这条通路先解决"配不了模型"
 	Q_INVOKABLE void openModelSettings();
 	// QML 侧诊断出口：console.log 不落盘，诊断信息统一从这里走项目 Logger（qInfo → logs/general/info.log）
@@ -189,7 +189,7 @@ signals:
 	void themeSwitchingChanged();
 	void toolsFilterOpenChanged();
 	// 右侧栏开合（顶栏 ◫ / 面板 ✕）
-	void rightSidebarOpenChanged();
+	void panelBarOpenChanged();
 	void interactionChanged();
 	void olderChanged();
 	void olderPrepended();
@@ -215,5 +215,5 @@ private:
 	CommandController* m_commands = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	bool m_toolsFilterOpen = false;   // 纯界面状态：工具过滤面板是否打开
-	bool m_rightSidebarOpen = false;  // 纯界面状态：右侧栏是否展开（不落盘，暂不跨会话记忆）
+	bool m_panelBarOpen = false;  // 纯界面状态：右侧栏是否展开（不落盘，暂不跨会话记忆）
 };

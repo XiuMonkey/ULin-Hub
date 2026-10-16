@@ -18,7 +18,7 @@
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
 #include "common/shell/PanelDockModel.h"
-#include "qmlbridge/SidebarLayout.h"
+#include "qmlbridge/PanelBarLayout.h"
 #include "qmlbridge/UrlInputBridge.h"
 #include "common/session/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
@@ -98,8 +98,8 @@ int main(int argc, char* argv[])
 	// 面板坞的运行时能力：本构建带 WebEngine（上面已 QtWebEngineQuick::initialize()，vcxproj 也列了
 	// webenginequick）⇒ 网页/终端块给真视图。缺了它这两个块会降级成说明页，而不是去建 WebEngineView 崩掉。
 	PanelDockModel::instance().setWebEngineAvailable(true);
-	// 右侧栏宽度的钳制策略（纯数值规则）：QML 侧 SidebarLayout.widthFromDrag(...) 等
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "SidebarLayout", &SidebarLayout::instance());
+	// 右侧栏宽度的钳制策略（纯数值规则）：QML 侧 PanelBarLayout.widthFromDrag(...) 等
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarLayout", &PanelBarLayout::instance());
 	// 右栏「终端」块的接线层：QML 侧 Terminal.session(blockId)/closeBlock(...) 拿会话并收尾；
 	// 页面那侧的 QWebChannel 也是注册它（Terminal.registerOn(channel)，见 TerminalBridge.h 的说明）。
 	// init(api) 已在 QmlBridge::init() 里调过（出站 RPC 只走那一个 DshApiClient）

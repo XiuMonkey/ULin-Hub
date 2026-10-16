@@ -5,7 +5,7 @@
 //   · 面板是固定宽的卡片，滑动期间若改自己的 width，里面的文字每帧都要重排（白花 CPU 且会闪），
 //     只改 x/opacity 的话每帧就一次平移。
 //
-// 内容用默认属性注入：`RightSidebar { 你的面板 {} }`；没注入时显示占位文案。
+// 内容用默认属性注入：`PanelBar { 你的面板 {} }`；没注入时显示占位文案。
 // 后续要挂的东西（见 build/temp/dsh-official/GAP-REPORT.md）：终端 / 工作区文件 / 文档预览 / 轨迹。
 
 import QtQuick
@@ -23,7 +23,7 @@ Item {
     property string title: qsTrId("right_sidebar_title")
     // 没有注入内容时的占位
     property string emptyHint: qsTrId("right_sidebar_empty_hint")
-    // 关闭请求：Shell 接到 Hub.closeRightSidebar()
+    // 关闭请求：Shell 接到 Hub.closePanelBar()
     signal closeRequested()
 
     // ---------------- 整个右栏脱离成独立窗口（本次的驱动路径）----------------
@@ -35,10 +35,10 @@ Item {
     //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。
     property bool sideDetached: false
     property var attachZoneProvider: null
-    // 几何的唯一出口（Shell.moveSidebarWindowTo）——**由 Shell 注入的函数引用**。
+    // 几何的唯一出口（Shell.movePanelBarWindowTo）——**由 Shell 注入的函数引用**。
     // ⚠️ 为什么必须注入、不能沿 parent 链现找：本 Item 在脱离时被 reparent 进副窗口的
     //    panelSlot，parent 链变成 `panelSlot → 窗口 contentItem → QQuickRootItem` ——
-    //    **壳层不在链上**（实测打印出来的链里一个带 moveSidebarWindowTo 的都没有），
+    //    **壳层不在链上**（实测打印出来的链里一个带 movePanelBarWindowTo 的都没有），
     //    于是"父链查找"永远返回 null ⇒ 按住三个点拖动时整段逻辑被 `if (!owner) return` 吞掉，
     //    表现就是"完全不动"。函数引用由 Shell 在装载时给（那时还能看见 shell），
     //    reparent 之后照样可调（与 attachZoneProvider 同一个道理）。
@@ -49,7 +49,7 @@ Item {
         if (moveWindowProvider)
             return moveWindowProvider
         for (let p = root.parent; p; p = p.parent) {
-            if (p.moveSidebarWindowTo)
+            if (p.movePanelBarWindowTo)
                 return p
         }
         return null
@@ -58,7 +58,7 @@ Item {
     function moveWindowTo(x, y) {
         const owner = moveOwner()
         if (owner) {
-            owner.moveSidebarWindowTo(x, y)
+            owner.movePanelBarWindowTo(x, y)
             return
         }
         // 兜底：拿不到壳层就直接写窗口坐标（等价于 HEAD 那版的行为，至少不会"完全不动"）
@@ -72,7 +72,7 @@ Item {
     // 副窗口态下头部那一行**就是**副窗口的标题栏（Shell 那边不再画标题栏）：所以窗口的
     // 最小化 / 最大化-还原两颗按钮就并进这一行，放在既有的 ✕ **左边**（用户原话：
     // "你给另外两个按钮放在删除按钮旁边不就行了，为什么要多加个标题栏呢"）。
-    // 实现不在这里 —— 窗口归 Shell 所有，这里只发请求，由 Shell 转发给 SidebarWindow 的
+    // 实现不在这里 —— 窗口归 Shell 所有，这里只发请求，由 Shell 转发给 PanelBarWindow 的
     // minimizeWindow() / toggleMaximize()（绝不在这里复制一份窗口操作）。
     signal minimizeWindowRequested()
     signal toggleMaximizeRequested()
@@ -84,15 +84,15 @@ Item {
     }
 
     // 抓手的四条请求，全部由 Shell 接住（它才知道窗口与壳层几何）：
-    //   · sidebarLiftRequested —— 附着态下三点越过手感阈值：**现在**就把右栏"拿起来"
+    //   · panelBarLiftRequested —— 附着态下三点越过手感阈值：**现在**就把右栏"拿起来"
     //     （进无边框临时窗口跟手，需求 ①）。跟手期间主窗口布局一动不动（壳层保证）；
-    //   · sidebarDropRequested —— 松手（壳层按落点决定回附还是独立）；
-    //   · sidebarAttachRequested / sidebarPreviewChanged —— 独立态：拖回右栏 + 落点提示。
-    signal sidebarLiftRequested()
-    signal sidebarDropRequested(real screenX, real screenY)
-    signal sidebarAttachRequested()
+    //   · panelBarDropRequested —— 松手（壳层按落点决定回附还是独立）；
+    //   · panelBarAttachRequested / panelBarPreviewChanged —— 独立态：拖回右栏 + 落点提示。
+    signal panelBarLiftRequested()
+    signal panelBarDropRequested(real screenX, real screenY)
+    signal panelBarAttachRequested()
     // 拖动中的落点预览开关（拖动期间主窗口收不到 hover，只能由正在拖的抓手推过去）
-    signal sidebarPreviewChanged(bool over)
+    signal panelBarPreviewChanged(bool over)
 
     Card {
         anchors.fill: parent
@@ -135,7 +135,7 @@ Item {
                         pressScreenX = g.x
                         pressScreenY = g.y
                         // ⚠️ 读窗口自己的 x/y（绝对真值）：副窗口的几何是延后一帧下发的，
-                        //    壳层记着的 sidebarWinX/Y 可能比窗口实际位置旧一拍。
+                        //    壳层记着的 panelBarWinX/Y 可能比窗口实际位置旧一拍。
                         pressWinX = win.x
                         pressWinY = win.y
                     }
@@ -219,7 +219,7 @@ Item {
                     // 由 Shell 注入（它才知道主窗口与壳层几何）；**现算**而不是缓存成属性 ——
                     // 主窗口被搬动/改尺寸后属性绑定不会重算（那是 C++ 侧改的窗口坐标）。
                     // ⚠️ 这里必须用 root（本文件根 id）：上一轮从 PanelDock.qml 抄过来时写的是 `dock`，
-                    //    未定义 ⇒ 整张 RightSidebar 编译失败 ⇒ Shell 报 "Type RightSidebar unavailable"，
+                    //    未定义 ⇒ 整张 PanelBar 编译失败 ⇒ Shell 报 "Type PanelBar unavailable"，
                     //    表现是**整个窗口空白**（踩过一次）。
                     function attachZone() {
                         if (!root.attachZoneProvider)
@@ -254,7 +254,7 @@ Item {
                             // 独立态：三个点**照样能拖**（需求要保留）—— 拖的就是那扇独立窗口。
                             // 位移用**屏幕坐标差**加在按下时的窗口位置上：窗口自己在动，
                             // 拿局部坐标算会自己追自己。
-                            // ⚠️ 几何只走一个出口：root.moveWindowTo → Shell.moveSidebarWindowTo
+                            // ⚠️ 几何只走一个出口：root.moveWindowTo → Shell.movePanelBarWindowTo
                             //    （不直接写 win.x/win.y，避免绕开壳层的记录）。
                             // ⚠️ 这里曾经写成 `owner = findShell()` —— 那个函数**不存在**，每次
                             //    dragMoved 都抛 `ReferenceError: findShell is not defined` ⇒ 副窗口态
@@ -276,24 +276,24 @@ Item {
                             const over = insideAttachZone(globalPos)
                             if (over !== armed) {
                                 armed = over
-                                root.sidebarPreviewChanged(over)
+                                root.panelBarPreviewChanged(over)
                             }
                             return
                         }
 
                         // 附着态：越过手感阈值 ⇒ **立刻拿起来**（需求 ①）。
                         // 之后这扇窗跟着光标 1:1 走、主窗口布局一动不动，松手才定结局；
-                        // 位置由壳层按"屏幕坐标差"跟（见 Shell.sidebarFollowTick）。
+                        // 位置由壳层按"屏幕坐标差"跟（见 Shell.panelBarFollowTick）。
                         if (!handedOff) {
                             handedOff = true
-                            root.sidebarLiftRequested()
+                            root.panelBarLiftRequested()
                         }
                     }
                     onDragFinished: (dx, dy, globalPos) => {
                         const wasArmed = armed
                         armed = false
                         // 预览一律先收（松手之后就没有"正在拖"这件事了）
-                        root.sidebarPreviewChanged(false)
+                        root.panelBarPreviewChanged(false)
                         const wasDragged = dragged
                         dragged = false
                         if (handedOff) {
@@ -306,12 +306,12 @@ Item {
                             return
                         if (root.sideDetached) {
                             if (wasArmed)
-                                root.sidebarAttachRequested()   // 落回右栏位置 ⇒ 重新附着
+                                root.panelBarAttachRequested()   // 落回右栏位置 ⇒ 重新附着
                         } else {
                             // 附着态没交接就松手 = 没过手感阈值（点了一下）⇒ 什么都不做。
                             // 这里仍然报一次"松手"，壳层按落点决定（它自己会判"没在跟手"直接返回），
                             // 免得日后有人把阈值调大后忘了这条线。
-                            root.sidebarDropRequested(globalPos.x, globalPos.y)
+                            root.panelBarDropRequested(globalPos.x, globalPos.y)
                         }
                     }
                 }
@@ -331,7 +331,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
 
-                    // 最小化：走 Shell → SidebarWindow.minimizeWindow()（showMinimized）
+                    // 最小化：走 Shell → PanelBarWindow.minimizeWindow()（showMinimized）
                     IconButton {
                         id: minimizeButton
                         visible: root.sideDetached
@@ -339,7 +339,7 @@ Item {
                         onClicked: root.minimizeWindowRequested()
                     }
 
-                    // 最大化/还原：走 Shell → SidebarWindow.toggleMaximize()
+                    // 最大化/还原：走 Shell → PanelBarWindow.toggleMaximize()
                     IconButton {
                         id: maximizeButton
                         visible: root.sideDetached

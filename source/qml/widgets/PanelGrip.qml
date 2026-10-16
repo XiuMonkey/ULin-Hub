@@ -44,7 +44,7 @@ Item {
     // 抓手被页签条 Flickable 整个盖住（见 basic/shell/PanelDock.qml 的说明），不是尺寸。
     // 抓手搬到右栏标题行后用户直接反馈"这三个点为什么这么大"⇒ 回到通用控件的 4/5。
     // ⚠️ 这两个值刻意**不是 readonly**：调用方要更大/更小的点可以直接赋值覆盖
-    //    （曾经从 RightSidebar 赋 readonly 属性 ⇒ 整张右栏实例化失败、壳层全空，见那次教训）。
+    //    （曾经从 PanelBar 赋 readonly 属性 ⇒ 整张右栏实例化失败、壳层全空，见那次教训）。
     property int dotSize: 4
     property int dotGap: 5
 

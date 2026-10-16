@@ -15,8 +15,8 @@ Item {
     // ⚠️ 保留这个信号与 `qml.topbar.toolsFilter` 登记项：宿主侧栏/扩展里还有人用"请求打开工具过滤"
     //    这条通用入口（自己直接开面板就成了）；改名的代价大于收益。
     signal toolsFilterRequested()
-    // 右侧栏开合（面板本体在 basic/shell/RightSidebar.qml，由 Shell.qml 装载；这里只发"点了一下"）
-    signal rightSidebarRequested()
+    // 右侧栏开合（面板本体在 basic/panel/PanelBar.qml，由 Shell.qml 装载；这里只发"点了一下"）
+    signal panelBarRequested()
 
     implicitHeight: 44
 
@@ -26,7 +26,7 @@ Item {
         id: titleText
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.columnClearance
-        anchors.right: rightSidebarButton.left
+        anchors.right: panelBarButton.left
         anchors.rightMargin: Theme.spacing.columnClearance
         anchors.verticalCenter: parent.verticalCenter
         text: Hub.currentSessionTitle.length > 0 ? Hub.currentSessionTitle : "ULin Hub"
@@ -37,16 +37,16 @@ Item {
         elide: Text.ElideRight
     }
 
-    // 右侧栏开关：开合状态直接读 Hub.rightSidebarOpen（面板开着时高亮，当开关的手感）
+    // 右侧栏开关：开合状态直接读 Hub.panelBarOpen（面板开着时高亮，当开关的手感）
     IconButton {
-        id: rightSidebarButton
+        id: panelBarButton
         anchors.right: toolsButton.left
         anchors.rightMargin: Theme.spacing.buttonGap
         anchors.verticalCenter: parent.verticalCenter
         glyph: "◫"
         tooltip: qsTrId("topbar_right_sidebar_tip")
-        selected: Hub.rightSidebarOpen
-        onClicked: topBar.rightSidebarRequested()
+        selected: Hub.panelBarOpen
+        onClicked: topBar.panelBarRequested()
     }
 
     IconButton {

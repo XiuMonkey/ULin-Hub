@@ -368,31 +368,31 @@ void QmlBridge::closeToolsFilter()
 }
 
 // ---- 右侧栏：纯界面开关（不涉及数据，也就不需要会话/服务端）----
-void QmlBridge::toggleRightSidebar()
+void QmlBridge::togglePanelBar()
 {
 	// 与 openToolsFilter 同理：**只允许被调一次**。顶栏那颗按钮只发信号，由 Shell 接到这里；
 	// 若哪天两处都调，表现就是"点了没反应"（开→立刻收），排查时先看这行日志出现几次。
-	if (m_rightSidebarOpen)
-		closeRightSidebar();
+	if (m_panelBarOpen)
+		closePanelBar();
 	else
-		openRightSidebar();
+		openPanelBar();
 }
 
-void QmlBridge::openRightSidebar()
+void QmlBridge::openPanelBar()
 {
-	if (m_rightSidebarOpen)
+	if (m_panelBarOpen)
 		return;
-	qInfo().noquote() << "[Shell] openRightSidebar";
-	m_rightSidebarOpen = true;
-	emit rightSidebarOpenChanged();
+	qInfo().noquote() << "[Shell] openPanelBar";
+	m_panelBarOpen = true;
+	emit panelBarOpenChanged();
 }
 
-void QmlBridge::closeRightSidebar()
+void QmlBridge::closePanelBar()
 {
-	if (!m_rightSidebarOpen)
+	if (!m_panelBarOpen)
 		return;
-	m_rightSidebarOpen = false;
-	emit rightSidebarOpenChanged();
+	m_panelBarOpen = false;
+	emit panelBarOpenChanged();
 }
 
 void QmlBridge::openModelSettings()

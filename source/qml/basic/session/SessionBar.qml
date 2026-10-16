@@ -6,10 +6,10 @@ import QtQuick
 import QtQuick.Controls.Basic
 import ULinHub 1.0
 import "../../widgets"
-import "../../skin/sidebar"
+import "../../skin/session"
 
 Item {
-    id: sidebar
+    id: sessionBar
 
     // 扩展注入点（名字契约见 assets/resources/EXTENSION_DEV.zh-CN.md §11.3）；四条连接交给宿主建：
     // 有真实 handle ⇒ 可挂起/恢复/接管/交还。
@@ -24,7 +24,7 @@ Item {
     }
     // 四条连接的默认处理器（没人接管时 = 宿主原本行为）
     function handleSessionCreateFailed(message: string) {
-        sidebar.notify(message)
+        sessionBar.notify(message)
     }
     function handleOpenSettings() {
         Hub.settings.openPage()
@@ -91,7 +91,7 @@ Item {
         // 语义已核对（旧壳 Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）：
         // 清本地会话数据 + 删服务端全部工作区 + 建一个新的默认会话。请求交给连接表，默认处理器是
         // handleClearSessions（扩展可接管 "qml.sidebar.clearSessions"）。
-        onClicked: sidebar.clearSessionsRequested()
+        onClicked: sessionBar.clearSessionsRequested()
     }
 
     ActionButton {
@@ -123,14 +123,14 @@ Item {
             iconSize: 20
             iconSource: "qrc:/ULinHub/setting-icon.png"
             tooltip: qsTrId("settings_title")
-            onClicked: sidebar.openSettingsRequested()
+            onClicked: sessionBar.openSettingsRequested()
         }
         IconButton {
             boxSize: 32
             iconSize: 20
             iconSource: "qrc:/ULinHub/plugin-icon.png"
             tooltip: qsTrId("sidebar_plugins")
-            onClicked: sidebar.openPluginMarketRequested()
+            onClicked: sessionBar.openPluginMarketRequested()
         }
         // 插件转译器的入口按钮**不在这里** —— 它归扩展自己（PluginTranspiler 自绘
         // ui/EntryButton.qml，运行时注入下方的 extDock）。插件转译器不是宿主的功能，
@@ -233,9 +233,9 @@ Item {
                 onAddSessionRequested: Hub.createSession(rowRoot.workspaceId)
                 onDeleteRequested: {
                     // 原版：右键就地弹出一个**小按钮**（不是菜单、不是遮罩）
-                    sidebar.pendingId = rowRoot.workspaceId
-                    sidebar.pendingIsWorkspace = true
-                    sidebar.pendingY = rowRoot.y
+                    sessionBar.pendingId = rowRoot.workspaceId
+                    sessionBar.pendingIsWorkspace = true
+                    sessionBar.pendingY = rowRoot.y
                 }
             }
 
@@ -249,9 +249,9 @@ Item {
                 selected: rowRoot.selected
                 onSelectRequested: Hub.selectSession(rowRoot.sessionId)
                 onDeleteRequested: {
-                    sidebar.pendingId = rowRoot.sessionId
-                    sidebar.pendingIsWorkspace = false
-                    sidebar.pendingY = rowRoot.y
+                    sessionBar.pendingId = rowRoot.sessionId
+                    sessionBar.pendingIsWorkspace = false
+                    sessionBar.pendingY = rowRoot.y
                 }
             }
         }
@@ -288,10 +288,10 @@ Item {
     MouseArea {
         anchors.fill: parent
         z: 40
-        visible: sidebar.pendingId.length > 0
+        visible: sessionBar.pendingId.length > 0
         onClicked: {
-            sidebar.pendingId = ""
-            sidebar.confirmOpen = false
+            sessionBar.pendingId = ""
+            sessionBar.confirmOpen = false
         }
     }
 
@@ -299,21 +299,21 @@ Item {
         id: deleteButton
 
         z: 41
-        visible: sidebar.pendingId.length > 0 && !sidebar.confirmOpen
+        visible: sessionBar.pendingId.length > 0 && !sessionBar.confirmOpen
         width: 132
         height: 36
         radius: 10
         color: deleteHover.containsMouse ? Theme.color.dangerBg : Theme.color.panelBg
         border.width: 1
         border.color: Theme.color.border
-        x: Math.max(4, sidebar.width - width - 12)
-        y: Math.max(4, Math.min(sidebar.height - height - 4,
-            list.y + sidebar.pendingY - list.contentY + list.spacing))
+        x: Math.max(4, sessionBar.width - width - 12)
+        y: Math.max(4, Math.min(sessionBar.height - height - 4,
+            list.y + sessionBar.pendingY - list.contentY + list.spacing))
 
         Text {
             anchors.centerIn: parent
             // 会话与工作区各有一句删除确认（工作区是"只移出列表、不动它下面的会话"）
-            text: sidebar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
+            text: sessionBar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
             color: deleteHover.containsMouse ? Theme.color.danger : Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
@@ -324,7 +324,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: sidebar.confirmOpen = true    // 第二步：确认（原版是原生 QMessageBox，同样不遮罩）
+            onClicked: sessionBar.confirmOpen = true    // 第二步：确认（原版是原生 QMessageBox，同样不遮罩）
         }
     }
 
@@ -333,7 +333,7 @@ Item {
         id: confirmCard
 
         z: 42
-        visible: sidebar.confirmOpen
+        visible: sessionBar.confirmOpen
         anchors.centerIn: parent
         width: 320
         implicitHeight: confirmColumn.implicitHeight + 28
@@ -352,7 +352,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: sidebar.pendingIsWorkspace
+                text: sessionBar.pendingIsWorkspace
                     ? qsTrId("workdir_delete_confirm")
                     : qsTrId("session_delete_confirm")
                 wrapMode: Text.WordWrap
@@ -374,8 +374,8 @@ Item {
                         height: 34
                         text: qsTrId("common_cancel")
                         onClicked: {
-                            sidebar.confirmOpen = false
-                            sidebar.pendingId = ""
+                            sessionBar.confirmOpen = false
+                            sessionBar.pendingId = ""
                         }
                     }
 
@@ -385,12 +385,12 @@ Item {
                         text: qsTrId("common_delete")
                         variant: "danger"
                         onClicked: {
-                            if (sidebar.pendingIsWorkspace)
-                                Hub.deleteWorkspace(sidebar.pendingId)
+                            if (sessionBar.pendingIsWorkspace)
+                                Hub.deleteWorkspace(sessionBar.pendingId)
                             else
-                                Hub.deleteSession(sidebar.pendingId)
-                            sidebar.confirmOpen = false
-                            sidebar.pendingId = ""
+                                Hub.deleteSession(sessionBar.pendingId)
+                            sessionBar.confirmOpen = false
+                            sessionBar.pendingId = ""
                         }
                     }
                 }

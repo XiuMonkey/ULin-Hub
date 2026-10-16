@@ -4,8 +4,8 @@
 就能像这样脱离窗口验证（也正因为如此才把它们从 QML 搬出来）。
 
 领域归位（2026-10-15）之后，被测对象都在 common/**：UrlInput（common/util）、
-PanelDockModel（common/shell）、SidebarMetrics（common/layout，自由函数）；
-qmlbridge/SidebarLayout 只剩转发，所以自检额外核对"单例转发层与 SidebarMetrics 逐位一致"。
+PanelDockModel（common/shell）、PanelBarMetrics（common/layout，自由函数）；
+qmlbridge/PanelBarLayout 只剩转发，所以自检额外核对"单例转发层与 PanelBarMetrics 逐位一致"。
 
 跑法（一键，推荐）：
   powershell -NoProfile -ExecutionPolicy Bypass -File misc\tools\cpp-selfcheck\run.ps1
@@ -16,20 +16,20 @@ qmlbridge/SidebarLayout 只剩转发，所以自检额外核对"单例转发层�
 
 跑法（手动，等价于脚本里那两段。$q = Qt 目录，$d = 仓库根）：
   $q\bin\moc.exe $d\source\include\common\shell\PanelDockModel.h -o moc_PanelDockModel.cpp
-  $q\bin\moc.exe $d\source\include\qmlbridge\SidebarLayout.h    -o moc_SidebarLayout.cpp
+  $q\bin\moc.exe $d\source\include\qmlbridge\PanelBarLayout.h    -o moc_PanelBarLayout.cpp
   cl /nologo /std:c++17 /Zc:__cplusplus /permissive- /utf-8 /EHsc /MD /O2 ^
      /I"$q\include" /I"$q\include\QtCore" /I"$d\source\include" ^
      selfcheck.cpp $d\source\src\common\util\UrlInput.cpp ^
      $d\source\src\common\shell\PanelDockModel.cpp ^
-     $d\source\src\common\layout\SidebarMetrics.cpp ^
-     $d\source\src\qmlbridge\SidebarLayout.cpp ^
-     moc_PanelDockModel.cpp moc_SidebarLayout.cpp /Fe:selfcheck.exe ^
+     $d\source\src\common\layout\PanelBarMetrics.cpp ^
+     $d\source\src\qmlbridge\PanelBarLayout.cpp ^
+     moc_PanelDockModel.cpp moc_PanelBarLayout.cpp /Fe:selfcheck.exe ^
      /link /LIBPATH:"$q\lib" Qt6Core.lib
   （/utf-8 不能省：源文件里有中文注释且没有 BOM。）
 
 覆盖：
   ① UrlInput 规范化 8 个输入；
   ② PanelDockModel 的 open/close/showHome（count / 同类标题编号 / activeIndex 收敛 / homeVisible）；
-  ③ SidebarMetrics 的会话区保底、上限、两端夹取与拖动换算（往左 50 ⇒ 宽度 +50，1:1 跟手），
-     外加 SidebarLayout 单例（QML 契约面）与自由函数逐位一致。
+  ③ PanelBarMetrics 的会话区保底、上限、两端夹取与拖动换算（往左 50 ⇒ 宽度 +50，1:1 跟手），
+     外加 PanelBarLayout 单例（QML 契约面）与自由函数逐位一致。
 输出为逐条 PASS/FAIL，末尾汇总；全 PASS 时退出码 0。
