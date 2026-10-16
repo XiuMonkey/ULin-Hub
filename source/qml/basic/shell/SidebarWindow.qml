@@ -51,8 +51,11 @@ Window {
     flags: Qt.Window | Qt.FramelessWindowHint
     // 显示条件：跟着光标走（拿起来）或已确认脱离（独立）。两态都由 Shell 给
     visible: win.host ? win.host.sidebarInWindow : false
-    // 窗口底色（缩放/重绘的那一瞬间不闪白；面板卡片自己铺满整扇窗）
-    color: Theme.color.panelBg
+    // 窗口底色：**必须和主窗口一样用 transparent**（Main.qml 也是 color: "transparent"）。
+    //   不透明的无边框顶层窗口在缩放时，DWM 不做逐帧合成 ⇒ 没画到的那块就露黑（矩形、方角，
+    //   表现为"圆角卡片旁边的黑块"）。透明窗口由 DWM 合成，缩放干净；圆角照旧由面板卡片自己画
+    //   （角上透出桌面，和主窗口的表现一致）。面板卡片本身不透明且铺满整扇窗 ⇒ 平时看不到透出。
+    color: "transparent"
     minimumWidth: Theme.size.rightSidebarMinWidth
     // ⚠️ 这里**不再**加 `Theme.size.titleBarHeight`：自绘标题栏那条已删，窗口就是面板矩形那么大
     minimumHeight: 200
