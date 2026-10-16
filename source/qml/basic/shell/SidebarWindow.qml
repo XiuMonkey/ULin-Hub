@@ -134,43 +134,32 @@ Window {
     property real resizePressScreenX: 0
     property real resizePressScreenY: 0
     property rect resizePressGeom: Qt.rect(0, 0, 0, 0)
+    // 本次手势是否已经把缩放交给系统（见 resizeApply 的说明）
+    property bool resizeHandedOff: false
 
     function resizeBegin(sx, sy) {
         win.resizePressScreenX = sx
         win.resizePressScreenY = sy
         win.resizePressGeom = Qt.rect(win.x, win.y, win.width, win.height)
+        win.resizeHandedOff = false
     }
 
     // edges 用 Qt.LeftEdge / Qt.TopEdge / Qt.RightEdge / Qt.BottomEdge 的位或
+    //
+    // ⚠️ 改成交给**系统原生缩放**（2026-10-16）：原来是自己每帧算 x/y/w/h 再 applyGeometry，
+    //    也就是"每帧改一次原生窗口尺寸" —— 副窗里跑着 WebEngine（终端/网页块），原生 surface
+    //    每帧重建，拖四边就会看到黑块/渲染延迟；附着态之所以不黑，正因为那只是同一个窗口内改
+    //    QML 尺寸，原生 surface 不动。
+    //    `Window.startSystemResize(edges)` 让 OS 接管 sizing loop —— 语义上就是"和附着态一样，
+    //    交给上层去改尺寸"，QML 不再一帧一帧地推几何（该 API 已在 QML 的 Window 上实测可调）。
+    //    系统接管后 QML 收不到后续 move（鼠标被系统循环捕获）⇒ 用 handedOff 兜住重复进入。
+    // ⚠️ 这是**同一个函数改函数体**：不要再新增同名函数 —— 曾因同名重复导致
+    //    `SidebarWindow.qml: Duplicate method name` ⇒ 整扇副窗加载失败（Type SidebarWindow unavailable）。
     function resizeApply(edges, sx, sy) {
-        const dx = sx - win.resizePressScreenX
-        const dy = sy - win.resizePressScreenY
-        let x = win.resizePressGeom.x
-        let y = win.resizePressGeom.y
-        let w = win.resizePressGeom.width
-        let h = win.resizePressGeom.height
-
-        // 左/上边：动的同时改宽度/高度；到下限就把那条边钉住。
-        // ⚠️ 必须自己钳死：请求一旦低于 Qt 的 minimumWidth/Height，Qt 会钳住宽度而 x 照走
-        //    ⇒ 左边跟着鼠标、右边不动（看着像"缩放坏了"）。
-        if (edges & Qt.LeftEdge) {
-            const right = win.resizePressGeom.x + win.resizePressGeom.width
-            x = Math.min(win.resizePressGeom.x + dx, right - win.minTotalW)
-            w = right - x
-        }
-        else if (edges & Qt.RightEdge) {
-            w = Math.max(win.minTotalW, win.resizePressGeom.width + dx)
-        }
-        if (edges & Qt.TopEdge) {
-            const bottom = win.resizePressGeom.y + win.resizePressGeom.height
-            y = Math.min(win.resizePressGeom.y + dy, bottom - win.minTotalH)
-            h = bottom - y
-        }
-        else if (edges & Qt.BottomEdge) {
-            h = Math.max(win.minTotalH, win.resizePressGeom.height + dy)
-        }
-
-        win.applyGeometry(x, y, w, h)
+        if (win.resizeHandedOff)
+            return
+        win.resizeHandedOff = true
+        win.startSystemResize(edges)
     }
 
     Item {
