@@ -282,13 +282,12 @@ Item {
         anchors.bottom: parent.bottom
         // 卡片下沿 → 本行**上沿**的距离 = Theme.spacing.statsGap（4px）。
         // 取值为什么是 -statsGap：本行 bottom 锚在 root.bottom 上，而 root.bottom 由 Shell 的
-        // composerLoader（bottomMargin = columnClearance 16）定住、与 implicitHeight 无关，
+        // composerLoader 定住（现在 bottomMargin = 0 ⇒ root.bottom 就是会话栏底边）、与 implicitHeight 无关，
         // 所以"本行上沿 − 卡片下沿"= −bottomMargin ⇒ 写 -statsGap 就是"离卡片 4px"。
-        // ⚠️ 只挪文字、**不动 root.implicitHeight**（仍是 卡片高 + statsLineHeight）：卡片位置一分不动
-        // ⇒ Shell 里那条"会话区 ↔ 输入框"的缝不受影响。代价：本行底边离会话区底边还剩 12px
-        // （原来只差 2px），观感上它是卡片的附属说明，而不是贴着容器底的一行。
-        // 另一条路（本行贴住容器底、把卡片往下拉 4px）会让 root 高 4px、消息区同步缩 4px ——
-        // 那会动到 Shell 侧刚调好的缝，所以没走。
+        // ⚠️ 只挪文字、**不动 root.implicitHeight**（仍是 卡片高 + statsLineHeight）：卡片位置一分不动，
+        // 会话区与输入框之间那条缝不受影响。
+        // 由此本行底边落在会话栏底边**下 4px**：会话栏底不画任何东西（会话区是透明 Item），
+        // 而列底距窗口底还有 contentSideInset(9px) ⇒ 小字实际离窗口底边约 5px，不会被裁切。
         anchors.bottomMargin: -Theme.spacing.statsGap
         height: Theme.size.statsLineHeight
         verticalAlignment: Text.AlignVCenter
