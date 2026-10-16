@@ -603,8 +603,49 @@ bool ExtensionLoader::readDescriptor(const QString& jsonPath, LoadedExtension* o
 
 	out->declaredName = root.value(QStringLiteral("Name")).toString();
 	out->type = root.value(QStringLiteral("Type")).toString();
-	// ---- 扩展身份三件套（2026-10-16 新增）：本版**只登记，不给行为** ----
-	// ID：标识符（约定小写 + 下划线）。未声明就留空 —— 不报错、不拒绝整包，调用方按 Name 兜底。
+	// 身份字段（ID / version / dependence / platform）：本版**只登记，不给行为**。
+	// 解析规则集中在 readIdentityFields（启动扫描已安装扩展时也走它）。
+	readIdentityFields(jsonPath, out);
+	// ABIVersion：可选（只影响 ui/ 是否装载，不拒绝整包）。缺省 = -1 ⇒ 视为匹配；
+	// JSON5 里写成字符串也认，免得扩展作者加引号就静默失配。
+	{
+		const QJsonValue abi = root.value(QStringLiteral("ABIVersion"));
+		if (abi.isDouble())
+			out->uiAbi = abi.toInt();
+		else if (abi.isString())
+			out->uiAbi = abi.toString().toInt();
+		else
+			out->uiAbi = -1;
+	}
+
+	qInfo().noquote() << QStringLiteral("[ExtensionLoader] descriptor Name=%1 Type=%2 ABIVersion=%3 ID=%4 version=%5 dependence=[%6] platform=[%7]")
+		.arg(out->declaredName.isEmpty() ? QStringLiteral("(none)") : out->declaredName,
+			out->type.isEmpty() ? QStringLiteral("(none)") : out->type,
+			out->uiAbi < 0 ? QStringLiteral("(none)") : QString::number(out->uiAbi),
+			out->declaredId.isEmpty() ? QStringLiteral("(none)") : out->declaredId,
+			out->declaredVersion.isEmpty() ? QStringLiteral("(none)") : out->declaredVersion,
+			out->dependencies.join(QStringLiteral(", ")),
+			out->platforms.join(QStringLiteral(", ")));
+	return true;
+}
+
+void ExtensionLoader::readIdentityFields(const QString& jsonPath, LoadedExtension* out)
+{
+	if (!out)
+		return;
+
+	QFile file(jsonPath);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+		return;   // 尽力而为：读不到就什么都不登记（调用方各自决定要不要报错）
+	const QByteArray raw = file.readAll();
+	file.close();
+
+	QString parseError;
+	const QJsonObject root = parseJson5Object(raw, &parseError);
+	if (!parseError.isEmpty())
+		return;
+
+	// ID：标识符（约定小写 + 下划线）。未声明就留空 —— 不报错、不拒绝整包。
 	out->declaredId = root.value(QStringLiteral("ID")).toString();
 	// version：扩展自身版本。字符串与数字都认（JSON5 里忘加引号写成 1.0 时不至于变 0）。
 	{
@@ -622,26 +663,20 @@ bool ExtensionLoader::readDescriptor(const QString& jsonPath, LoadedExtension* o
 			}
 		}
 	}
-	// ABIVersion：可选（只影响 ui/ 是否装载，不拒绝整包）。缺省 = -1 ⇒ 视为匹配；
-	// JSON5 里写成字符串也认，免得扩展作者加引号就静默失配。
+	// platform：为跨平台做准备。字符串（"windows"）或数组（["windows","linux"]）两种写法都认；
+	// 空数组 = 未声明（本版视为不限平台）。同样不参与判定。
 	{
-		const QJsonValue abi = root.value(QStringLiteral("ABIVersion"));
-		if (abi.isDouble())
-			out->uiAbi = abi.toInt();
-		else if (abi.isString())
-			out->uiAbi = abi.toString().toInt();
-		else
-			out->uiAbi = -1;
+		const QJsonValue plat = root.value(QStringLiteral("platform"));
+		if (plat.isString()) {
+			if (!plat.toString().isEmpty())
+				out->platforms.append(plat.toString());
+		} else if (plat.isArray()) {
+			for (const QJsonValue& item : plat.toArray()) {
+				if (item.isString() && !item.toString().isEmpty())
+					out->platforms.append(item.toString());
+			}
+		}
 	}
-
-	qInfo().noquote() << QStringLiteral("[ExtensionLoader] descriptor Name=%1 Type=%2 ABIVersion=%3 ID=%4 version=%5 dependence=[%6]")
-		.arg(out->declaredName.isEmpty() ? QStringLiteral("(none)") : out->declaredName,
-			out->type.isEmpty() ? QStringLiteral("(none)") : out->type,
-			out->uiAbi < 0 ? QStringLiteral("(none)") : QString::number(out->uiAbi),
-			out->declaredId.isEmpty() ? QStringLiteral("(none)") : out->declaredId,
-			out->declaredVersion.isEmpty() ? QStringLiteral("(none)") : out->declaredVersion,
-			out->dependencies.join(QStringLiteral(", ")));
-	return true;
 }
 
 bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& serverProfilePath, LoadedExtension* out, QString* error)

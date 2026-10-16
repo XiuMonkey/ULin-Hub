@@ -1,5 +1,6 @@
 #include "ExtensionSystem/ClientExtension.h"
 #include "ExtensionSystem/DshHostPlugin.h"
+#include "ExtensionSystem/ExtensionLoader.h"   // 身份字段解析（readIdentityFields）：与安装路径共用一份
 #include "common/util/HostIndex.h"
 #include "common/util/ConnectionManager.h"
 #include "common/util/CommonRegistry.h"
@@ -275,6 +276,20 @@ namespace ClientExtension
 				qInfo("[ClientExtension] skip (no regulation.json5, likely a removal leftover): %s",
 					qPrintable(sub.fileName()));
 				continue;
+			}
+
+			// 身份字段（ID / version / dependence / platform）：本版**只登记、不参与任何判定**。
+			// 解析与安装路径共用 ExtensionLoader::readIdentityFields（规则只有一份，改一处就够）；
+			// 这里打一行日志，让"已安装扩展的清单字段"在启动时也能被看到（安装时才解析就看不见了）。
+			{
+				ExtensionLoader::LoadedExtension ident;
+				ExtensionLoader::readIdentityFields(regulationPath(sub.absoluteFilePath()), &ident);
+				qInfo().noquote() << QStringLiteral("[ClientExtension] installed %1 ID=%2 version=%3 dependence=[%4] platform=[%5]")
+					.arg(sub.fileName(),
+						ident.declaredId.isEmpty() ? QStringLiteral("(none)") : ident.declaredId,
+						ident.declaredVersion.isEmpty() ? QStringLiteral("(none)") : ident.declaredVersion,
+						ident.dependencies.join(QStringLiteral(", ")),
+						ident.platforms.join(QStringLiteral(", ")));
 			}
 
 			QString dll = subDir.filePath(QStringLiteral("main.dll"));

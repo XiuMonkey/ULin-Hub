@@ -42,7 +42,15 @@ public:
 		QString declaredVersion;
 		// dependence：依赖的其它扩展 ID 列表。非数组/非字符串项一律忽略（不报错、不拒绝整包）。
 		QStringList dependencies;
+		// platform：适用的平台（为跨平台做准备）。接受字符串（"windows"）或数组（["windows","linux"]）两种写法；
+		// 空 = 未声明（本版视为"不限平台"，同样不参与判定）。
+		QStringList platforms;
 	};
+
+	// 只读"扩展身份"字段（ID / version / dependence / platform）：**尽力而为，不报错、不失败**。
+	// 安装路径（readDescriptor）与启动扫描（ClientExtension::loadAll 扫已安装扩展）共用这一份解析，
+	// 免得两处各写一份（解析规则一改就漏一处）。本版这些字段只登记、不参与任何装载判定。
+	static void readIdentityFields(const QString& jsonPath, LoadedExtension* out);
 
 	bool loadAndInstall(const QString& extFilePath, const QString& serverProfilePath, LoadedExtension* out, QString* error = nullptr);
 
