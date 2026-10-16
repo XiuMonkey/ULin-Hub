@@ -37,6 +37,7 @@ class DshApiClient;
 class QJsonObject;
 class QTimer;
 class QWebChannel;
+class TerminalVtModel;
 
 // 一个「终端块」的会话状态：终端 id / attachmentId / 尺寸 / 帧序 / 待投队列 / 输入队列。
 // 块被切走、右栏收起时页面会销毁，但本对象**活着**：终端进程继续跑，重新绑定页面时换新 attachment
@@ -52,6 +53,7 @@ class TerminalSession : public QObject
 
 public:
 	TerminalSession(const QString& blockId, DshApiClient* api, QObject* parent = nullptr);
+	~TerminalSession() override;
 
 	QString blockId() const { return m_blockId; }
 	QString state() const { return m_attachState; }
@@ -64,16 +66,28 @@ public:
 	// 关块：断开附着 + terminal/close（之后 terminal/list 里就没有它了）
 	void shutdown();
 
+	// ---- 视图（QML）面 ----
+	// 自绘视图挂上来看网格：建 / 取本块的 VT 模型。**由视图调用**，等价于原来页面的 pageReady。
+	// 没有绑定就没有快照取帧（见 attach()）—— "谁在看"决定要不要占一条 follow 流。
+	// ⚠️ Q_INVOKABLE 的名字要唯一（重载会让 moc 生成两个签名、QML 侧解析不出重载）—— 所以是
+	//    "viewModel() 建、vtModel() 取"这一对，别写成重载。
+	Q_INVOKABLE TerminalVtModel* viewModel();
+	Q_INVOKABLE TerminalVtModel* vtModel() const { return m_vt; }
+	// 视图销毁（切块/收右栏）：只断附着，**不关终端**
+	void viewGone();
+	// 视图键盘编好的字节 → 写队列（Terminal.flushInput 转进来）
+	void flushViewModelInput();
+
 	// ---- 页面（JS）面（由 TerminalBridge 按 blockId 转进来）----
-	void pageReady();                 // 页面已建好 xterm 并接上 QWebChannel
 	void pageGone();                  // 页面要销毁/换绑了（切块/收右栏），**不关终端**
-	void write(const QString& data);  // 键盘/粘贴：页面 onData → 这里 → terminal/write
-	void resize(int cols, int rows);  // addon-fit 量出来的尺寸 → terminal/resize（限幅/去重）
-	void ack();                       // 上一帧已写进 xterm，放行下一帧（背压）
-	void log(const QString& message); // 页面里的诊断信息（console.log 不落盘）→ 项目日志
+	void write(const QString& data);  // 键盘/粘贴：与扩展后端同形状的入口 → terminal/write
+	void writeBytes(const QByteArray& data);   // 键盘编好的字节（UTF-8 串走 write 就行）
+	void resize(int cols, int rows);  // 视图量出来的尺寸 → terminal/resize（限幅/去重）
+	void ack();                       // 扩展后端：上一帧已收下，放行下一帧（背压）
+	void log(const QString& message); // 诊断信息（页面 console 不落盘）→ 项目日志
 
 signals:
-	// Qt → 页面：kind = "snapshot"（页面先 term.reset() 再 write）| "output"
+	// Qt → 页面（仅当后端被扩展顶替时还有消费者，见 TerminalBridge::registerOn）
 	void frameReady(const QString& kind, int sequence, const QString& text);
 	void stateChanged();
 	void statusTextChanged();
@@ -101,12 +115,16 @@ private:
 	void setStatusText(const QString& text);
 	void setReadOnly(bool value);
 	void applyInfo(const QJsonObject& info);            // WebTerminalInfo → 本地镜像（title/cols/rows/进程态）
+	void syncViewModel();                               // 把状态镜像推给 VT 模型（状态行/只读/标题）
 
 	// ---- 帧路径 ----
 	void onStreamOpened(const QString& streamId);
 	void onFrame(const QString& streamId, const QJsonObject& frame);
 	void onStreamEnded(const QString& streamId);
 	void onStreamError(const QString& streamId, const QString& code, const QString& message);
+	// 自绘路径：直接喂 VT 模型（不再排队等 ack —— 没有页面就没有"跟不上"这回事）
+	void feedViewModel(const QString& kind, const QString& text);
+	// 扩展后端路径：仍旧按"发一帧、等 ack、再发下一帧"排队
 	void enqueueFrame(const QString& kind, int sequence, const QString& text);
 	void pumpFrames();
 
@@ -127,8 +145,11 @@ private:
 	QString m_statusText;
 	QString m_title;
 	bool m_readOnly = false;
-	bool m_pageReady = false;
+	bool m_pageReady = false;   // 有视图挂上来了（自绘视图 bindView，或扩展后端的 pageReady）
 	bool m_mounting = false;
+
+	// 自绘网格模型：视图 bindView 时建、随本会话活（终端会话在，VT 状态就在）
+	TerminalVtModel* m_vt = nullptr;
 
 	// 引擎能力（terminal/environment）
 	int m_maxCols = 500;
@@ -177,9 +198,19 @@ public:
 	Q_INVOKABLE QObject* session(const QString& blockId);
 	Q_INVOKABLE void closeBlock(const QString& blockId);
 
+	// ---- 自绘视图（QML）面：视图挂上/摘下，以及按块路由输入 ----
+	// 视图挂上来（面板给终端块建 TerminalView 时调一次）：建/取该块的网格模型，并让它开始取帧。
+	// **这是"谁在看"的唯一入口**：不调它就不会 attach、也不会去引擎建终端。
+	Q_INVOKABLE TerminalVtModel* bindView(const QString& blockId);
+	// 视图收起来了（切块/收右栏）：只解绑附着，终端进程继续跑
+	Q_INVOKABLE void viewGone(const QString& blockId);
+	// 视图的键盘：模型攒好的字节取出来写 PTY（terminal/write 的串行化/记账仍在会话里）
+	Q_INVOKABLE void flushInput(const QString& blockId);
+	// 视图量出来的网格尺寸（列/行）→ 引擎 terminal/resize
+	Q_INVOKABLE void applyGridSize(const QString& blockId, int cols, int rows);
+
 	// ---- 页面（JS）面：每个调用都带 blockId，路由到对应会话 ----
 	Q_INVOKABLE void pageHello();
-	Q_INVOKABLE void pageReady(const QString& blockId);
 	Q_INVOKABLE void pageGone(const QString& blockId);
 	Q_INVOKABLE void start(const QString& blockId, const QString& sessionId);
 	Q_INVOKABLE void write(const QString& blockId, const QString& data);

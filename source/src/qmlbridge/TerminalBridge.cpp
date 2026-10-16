@@ -1,10 +1,16 @@
 // 见 TerminalBridge.h：右栏「终端」块的接线层（QML 单例 `Terminal`）。
 // 协议依据：build/temp/terminal-probe/TERMINAL-REPORT.md（§2 契约、§4 实测、§5.5 MVP 清单）。
+//
+// 解析归属变更（自绘终端接入）：本类**只做协议状态**，VT 解析与网格都不在这里 ——
+// terminal/follow 的 snapshot/output 帧原样交给 TerminalSession 的 TerminalVtModel（→ TerminalVt），
+// 由 TerminalView.qml 逐格画。页面/xterm.js 那条路已经退役。
 
 #include "qmlbridge/TerminalBridge.h"
 
+#include "common/terminal/TerminalVt.h"
 #include "network/DshApiClient.h"
 #include "network/SessionCommands.h"
+#include "qmlbridge/TerminalVtModel.h"
 
 #include <QDebug>
 #include <QJsonArray>
@@ -75,6 +81,13 @@ TerminalSession::TerminalSession(const QString& blockId, DshApiClient* api, QObj
 {
 	setObjectName(blockId);   // 只为日志/调试好看：注册到 QWebChannel 的是桥自己（见 TerminalBridge 段）
 
+	// 自绘网格模型：随会话活（视图还没挂上来时也建 —— 它同时是"这个块的 VT 状态"的持有者）。
+	// 刻意**不**挂在 this 下当子对象：模型要被 QML 直接持有（bindView 的返回值），
+	// 父对象会跟 QML 的所有权管理打架；销毁统一由本会话的析构负责。
+	m_vt = new TerminalVtModel(nullptr);
+	// 模型攒下键盘字节 → 立刻走写路径（terminal/write 的串行化与 maxInputBytes 记账在 writeBytes 里）
+	connect(m_vt, &TerminalVtModel::inputReady, this, [this]() { flushViewModelInput(); });
+
 	if (!m_api)
 		return;
 
@@ -94,11 +107,27 @@ TerminalSession::TerminalSession(const QString& blockId, DshApiClient* api, QObj
 	});
 }
 
+// 自绘网格模型是本会话的（不是 this 的子对象，见构造函数注释）；会话没了它就该没
+TerminalSession::~TerminalSession()
+{
+	delete m_vt;
+	m_vt = nullptr;
+}
+
+// 把状态镜像推给网格模型：视图的状态行/只读提示读的就是这份（不再有"页面自己来问"）
+void TerminalSession::syncViewModel()
+{
+	if (!m_vt)
+		return;
+	m_vt->setSessionState(m_attachState, m_statusText, m_title, m_readOnly);
+}
+
 void TerminalSession::setAttachState(const QString& state)
 {
 	if (m_attachState == state)
 		return;
 	m_attachState = state;
+	syncViewModel();
 	emit stateChanged();
 }
 
@@ -107,6 +136,7 @@ void TerminalSession::setStatusText(const QString& text)
 	if (m_statusText == text)
 		return;
 	m_statusText = text;
+	syncViewModel();
 	emit statusTextChanged();
 }
 
@@ -115,6 +145,7 @@ void TerminalSession::setReadOnly(bool value)
 	if (m_readOnly == value)
 		return;
 	m_readOnly = value;
+	syncViewModel();
 	emit readOnlyChanged();
 }
 
@@ -136,6 +167,8 @@ void TerminalSession::applyInfo(const QJsonObject& info)
 		m_cols = info.value(QStringLiteral("cols")).toInt(m_cols);
 	if (info.contains(QStringLiteral("rows")))
 		m_rows = info.value(QStringLiteral("rows")).toInt(m_rows);
+
+	syncViewModel();
 }
 
 void TerminalSession::start(const QString& sessionId)
@@ -385,19 +418,40 @@ void TerminalSession::resetForNewAttachment(const QString& why)
 	attach();
 }
 
-void TerminalSession::pageReady()
-{
-	m_pageReady = true;
-	if (!m_terminalId.isEmpty())
-		attach();
-}
-
 void TerminalSession::pageGone()
 {
 	m_pageReady = false;
 	detachStream();   // 只断附着：终端进程继续跑，回来时取新快照
 	if (!m_terminalId.isEmpty() && m_attachState != QStringLiteral("closed"))
 		setAttachState(QStringLiteral("idle"));
+}
+
+// ------------------------------------------------------------------
+// 自绘视图（TerminalView.qml）面
+// ------------------------------------------------------------------
+
+// 视图挂上来看网格（原来的 pageReady 位置）。**不在这里建终端**：终端由 start(sessionId) 那条路
+// 按"当前会话"建；本方法只声明"有人在看"（m_pageReady），好让 start/attach 之后有地方收帧。
+TerminalVtModel* TerminalSession::viewModel()
+{
+	m_pageReady = true;
+	return m_vt;
+}
+
+void TerminalSession::viewGone()
+{
+	// 与 pageGone 同义：视图收起来了，只解绑、不关终端
+	pageGone();
+}
+
+// 视图键盘攒下的字节 → 写队列。这里刻意**复用** writeBytes → 与扩展后端走同一条串行化/记账路径。
+void TerminalSession::flushViewModelInput()
+{
+	if (!m_vt)
+		return;
+	const QByteArray bytes = m_vt->takePendingInput();
+	if (!bytes.isEmpty())
+		writeBytes(bytes);
 }
 
 // ------------------------------------------------------------------
@@ -427,11 +481,16 @@ void TerminalSession::onFrame(const QString& streamId, const QJsonObject& frame)
 		if (m_attachState != QStringLiteral("attached"))
 			setAttachState(QStringLiteral("attached"));
 		m_readOnly = false;
+		syncViewModel();
 		emit readOnlyChanged();
 		setStatusText(QStringLiteral("已连接 %1（%2×%3）。")
 			.arg(m_title.isEmpty() ? QStringLiteral("终端") : m_title).arg(m_cols).arg(m_rows));
-		enqueueFrame(QStringLiteral("snapshot"), m_sequence, frame.value(QStringLiteral("screen")).toString());
-		pushResize();   // 附着已被引擎认下：这时才把页面量出来的尺寸推过去
+		// 画面：自绘视图直接把重放串喂进本地 VT（快照 = 整屏重来）；只有扩展后端那条路才排队等 ack
+		if (m_vt)
+			feedViewModel(QStringLiteral("snapshot"), frame.value(QStringLiteral("screen")).toString());
+		else
+			enqueueFrame(QStringLiteral("snapshot"), m_sequence, frame.value(QStringLiteral("screen")).toString());
+		pushResize();   // 附着已被引擎认下：这时才把视图量出来的尺寸推过去
 		return;
 	}
 
@@ -447,7 +506,10 @@ void TerminalSession::onFrame(const QString& streamId, const QJsonObject& frame)
 		}
 
 		m_sequence = sequence;
-		enqueueFrame(QStringLiteral("output"), sequence, frame.value(QStringLiteral("data")).toString());
+		if (m_vt)
+			feedViewModel(QStringLiteral("output"), frame.value(QStringLiteral("data")).toString());
+		else
+			enqueueFrame(QStringLiteral("output"), sequence, frame.value(QStringLiteral("data")).toString());
 		return;
 	}
 
@@ -512,6 +574,27 @@ void TerminalSession::noteControlUnavailable(const QString& message)
 		.arg(message.isEmpty() ? QStringLiteral("control-unavailable") : message));
 }
 
+// 自绘路径：一帧直接进本地 VT。
+// kind == "snapshot" 是 xterm 的序列化重放串 —— 语义上"整屏重来"，所以先硬复位再喂（回滚历史/标题
+// 不跨快照）。尺寸也在这一刻对齐：视图量出来的网格是 VT 的网格，引擎的快照按它重排。
+void TerminalSession::feedViewModel(const QString& kind, const QString& text)
+{
+	if (!m_vt)
+		return;
+
+	if (m_wantCols > 0 && m_wantRows > 0
+		&& (m_wantCols != m_vt->cols() || m_wantRows != m_vt->rows()))
+		m_vt->resizeGrid(m_wantRows, m_wantCols);
+
+	const QByteArray bytes = text.toUtf8();
+	if (kind == QStringLiteral("snapshot"))
+		m_vt->feedSnapshot(bytes);
+	else
+		m_vt->feed(bytes);
+
+	syncViewModel();
+}
+
 void TerminalSession::enqueueFrame(const QString& kind, int sequence, const QString& text)
 {
 	m_frames.enqueue(PendingFrame{ kind, sequence, text });
@@ -551,7 +634,6 @@ void TerminalSession::pumpFrames()
 	}
 	m_frameWatchdog->start(kFrameWatchdogMs);
 }
-
 void TerminalSession::ack()
 {
 	if (m_frameWatchdog)
@@ -586,6 +668,35 @@ void TerminalSession::write(const QString& data)
 
 	for (const QByteArray& chunk : sliceInput(data, m_maxInputBytes))
 		m_writes.enqueue(chunk);
+	pumpWrites();
+}
+
+// 自绘视图送来的是**已经编好的字节**（键盘表生成的转义序列，不是 Unicode 文本）：这里只做切片记账。
+// 切片边界仍按完整 UTF-8 码点找（粘贴的中文可能落在边界上）。
+void TerminalSession::writeBytes(const QByteArray& data)
+{
+	if (data.isEmpty())
+		return;
+	if (m_readOnly) {
+		qInfo().noquote() << "[Terminal] 只读态丢弃输入 block=" << m_blockId;
+		return;
+	}
+	if (!m_api || m_terminalId.isEmpty() || m_attachmentId.isEmpty()) {
+		qInfo().noquote() << "[Terminal] 未附着，丢弃输入 block=" << m_blockId;
+		return;
+	}
+
+	const int limit = qMax(1, m_maxInputBytes);
+	int start = 0;
+	while (start < data.size())
+	{
+		int end = qMin(start + limit, data.size());
+		// 别把多字节序列劈开：回退到最后一个 UTF-8 续字节之后
+		while (end < data.size() && (static_cast<unsigned char>(data.at(end)) & 0xc0) == 0x80)
+			++end;
+		m_writes.enqueue(data.mid(start, end - start));
+		start = end;
+	}
 	pumpWrites();
 }
 
@@ -781,13 +892,44 @@ void TerminalBridge::pageHello()
 	emit pageHelloReceived();
 }
 
-void TerminalBridge::pageReady(const QString& blockId)
+// ---- 自绘视图面 ----
+
+// 视图挂上来：建/取该块的会话与网格模型。**这一步是"谁在看"的开关** —— 没有它就不会 attach。
+// 注意后端被扩展顶替时**不走这里**：那种情况下面板不装自绘视图（见 TerminalPanel.qml）。
+TerminalVtModel* TerminalBridge::bindView(const QString& blockId)
 {
 	TerminalSession* session = ensureSession(blockId);
 	if (!session)
+		return nullptr;
+	TerminalVtModel* model = session->viewModel();
+	qInfo().noquote() << "[Terminal] 自绘视图已挂上 block=" << blockId
+		<< "网格=" << model->cols() << "x" << model->rows();
+	return model;
+}
+
+void TerminalBridge::viewGone(const QString& blockId)
+{
+	// 后端被扩展顶替：解绑也归它（与本桥的 pageGone 同一条路）
+	if (m_transport) {
+		if (!QMetaObject::invokeMethod(m_transport, "pageGone", Q_ARG(QString, blockId)))
+			qWarning().noquote() << "[Terminal] 扩展后端没有 pageGone(QString) 槽，解绑没能转过去：" << blockId;
 		return;
-	session->pageReady();
-	emitStatus(session);   // 页面据此画顶部那行提示（页面不主动问状态，避免来回异步取值）
+	}
+
+	if (TerminalSession* session = findSession(blockId))
+		session->viewGone();
+}
+
+void TerminalBridge::flushInput(const QString& blockId)
+{
+	if (TerminalSession* session = findSession(blockId))
+		session->flushViewModelInput();
+}
+
+void TerminalBridge::applyGridSize(const QString& blockId, int cols, int rows)
+{
+	if (TerminalSession* session = findSession(blockId))
+		session->resize(cols, rows);
 }
 
 void TerminalBridge::pageGone(const QString& blockId)

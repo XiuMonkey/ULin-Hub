@@ -258,6 +258,9 @@
     <ClCompile Include="src\common\terminal\TerminalVt.cpp">
       <Filter>src\common\terminal</Filter>
     </ClCompile>
+    <ClCompile Include="src\qmlbridge\TerminalVtModel.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\network\DshEventParser.h">
@@ -431,6 +434,9 @@
       <Filter>include\common\PluginMarket</Filter>
     </QtMoc>
     <QtMoc Include="include\qmlbridge\ExtensionManagerController.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\TerminalVtModel.h">
       <Filter>include\qmlbridge</Filter>
     </QtMoc>
   </ItemGroup>

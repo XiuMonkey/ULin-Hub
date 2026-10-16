@@ -28,7 +28,9 @@
         <file>basic/panel/PanelBarWindow.qml</file>
         <file>basic/shell/PanelPlaceholder.qml</file>
         <file>basic/shell/Shell.qml</file>
+        <!-- 终端：Panel 是面板坞那个块，View 是宿主自绘的网格渲染（TerminalVtModel → TerminalVt） -->
         <file>basic/terminal/TerminalPanel.qml</file>
+        <file>basic/terminal/TerminalView.qml</file>
         <file>basic/session/SessionBar.qml</file>
         <file>basic/topbar/TopBar.qml</file>
         <file>Main.qml</file>

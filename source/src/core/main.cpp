@@ -23,6 +23,7 @@
 #include "common/session/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
 #include "qmlbridge/TerminalBridge.h"
+#include "qmlbridge/TerminalVtModel.h"
 #include "qmlbridge/ThemeBridge.h"
 #include "qmlbridge/WindowBridge.h"
 
@@ -100,10 +101,13 @@ int main(int argc, char* argv[])
 	PanelDockModel::instance().setWebEngineAvailable(true);
 	// 右侧栏宽度的钳制策略（纯数值规则）：QML 侧 PanelBarLayout.widthFromDrag(...) 等
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarLayout", &PanelBarLayout::instance());
-	// 右栏「终端」块的接线层：QML 侧 Terminal.session(blockId)/closeBlock(...) 拿会话并收尾；
-	// 页面那侧的 QWebChannel 也是注册它（Terminal.registerOn(channel)，见 TerminalBridge.h 的说明）。
+	// 右栏「终端」块的接线层：QML 侧 Terminal.bindView(blockId)/closeBlock(...) 拿会话与网格模型。
 	// init(api) 已在 QmlBridge::init() 里调过（出站 RPC 只走那一个 DshApiClient）
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Terminal", &TerminalBridge::instance());
+	// 终端网格模型（TerminalVtModel）：QML 侧由 Terminal.bindView(blockId) 提供，
+	// 视图（TerminalView.qml）只读它的属性/调它的 INvokable —— 登记类型是为了属性有静态类型可查。
+	qmlRegisterUncreatableType<TerminalVtModel>("ULinHub", 1, 0, "TerminalVtModel",
+		QStringLiteral("由 Terminal.bindView(blockId) 提供，不要在 QML 里创建"));
 	// 工具过滤器（data + 摊平的行模型）：QML 侧 Hub.toolsFilter 就是这个对象
 	qmlRegisterUncreatableType<ToolsFilter>("ULinHub", 1, 0, "ToolsFilter",
 		QStringLiteral("由 Hub.toolsFilter 提供，不要在 QML 里创建"));
