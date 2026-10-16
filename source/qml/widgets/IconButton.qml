@@ -16,6 +16,10 @@ Item {
     // 圆形悬停蒙版（原版输入区发送键的做法：蒙版叠在**图标之上**、鼠标穿透、
     // hover 白 35% / pressed 白 55%、圆角 = 边长一半）。给了它就不再画方形悬停底。
     property bool circleHoverOverlay: false
+    // 蒙版基色。默认白 —— 底色深（或透明）时"提亮"才是对的悬停反馈。
+    // 但底色本身是浅色（如暗色主题下的白圆发送键）时，白蒙版叠上去等于没叠，
+    // 悬停/按下会**完全没有反馈** ⇒ 那种情况由调用方改成黑（见 Composer.qml）。
+    property color circleHoverTint: "#FFFFFF"
     property string tooltip: ""
     property bool selected: false
     property int glyphSize: Theme.font.lead
@@ -91,9 +95,12 @@ Item {
         anchors.fill: parent
         visible: root.circleHoverOverlay
         radius: width / 2
+        // 白 35% / 55% 原样保留，只是基色可换（默认白 ⇒ 与改动前逐像素相同）
         color: root.pressed
-            ? Qt.rgba(1, 1, 1, 0.55)
-            : (root.hovered ? Qt.rgba(1, 1, 1, 0.35) : "transparent")
+            ? Qt.rgba(root.circleHoverTint.r, root.circleHoverTint.g, root.circleHoverTint.b, 0.55)
+            : (root.hovered
+               ? Qt.rgba(root.circleHoverTint.r, root.circleHoverTint.g, root.circleHoverTint.b, 0.35)
+               : "transparent")
     }
 
     AppToolTip {
