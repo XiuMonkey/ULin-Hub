@@ -1,5 +1,6 @@
 // 表单输入框皮肤（对应原版 model-list.qss 的 `#modelListForm QLineEdit#modelListField`）：
-// panelBg + 1px scrollbar 描边 + radius 8 + 内边距 6/10 + 13px textPrimary，聚焦时描边转 accent。
+// panelBg + 1px scrollbar 描边 + radius 8 + 内边距 6/10 + 13px textPrimary，
+// 聚焦时描边转 textSecondary（中性灰；原版是强调蓝，按"设置页不出蓝"改）。
 
 import QtQuick
 import ULinHub 1.0
@@ -16,7 +17,7 @@ Rectangle {
     radius: Theme.radius.control
     color: Theme.color.panelBg
     border.width: 1
-    border.color: input.activeFocus ? Theme.color.accent : Theme.color.scrollbar
+    border.color: input.activeFocus ? Theme.color.textSecondary : Theme.color.scrollbar
     TextInput {
         id: input
         anchors.fill: parent

@@ -2,7 +2,7 @@
 //
 // 结构（自上而下，与原版一一对应）：
 //   1 标题 model_list_title(14/600)   2 说明 model_list_desc(12 secondary)
-//   3 状态行(12 secondary，加载/汇总/失败逐条)   4 瞬时提示(12 accent，4 秒自隐)
+//   3 状态行(12 secondary，加载/汇总/失败逐条)   4 瞬时提示(12 secondary，4 秒自隐；原版是强调色，见"去蓝"注释)
 //   5 滚动区：#modelListGroup 分组标题 + #modelListEntry 成员卡（点击展开详情）+ 空态 + 新增表单
 //   6 「添加模型」按钮在滚动区**外**（表单在滚动区内，面板高度才不随表单开合变化）
 //
@@ -170,7 +170,8 @@ Item {
             visible: Hub.settings.notice.length > 0
             text: Hub.settings.notice
             wrapMode: Text.WordWrap
-            color: Theme.color.accent
+            // 瞬时提示：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
+            color: Theme.color.textSecondary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
         }
@@ -282,8 +283,10 @@ Item {
                                             visible: rowHost.modelData.userDeclared || !rowHost.modelData.declared
                                             implicitWidth: badgeText.implicitWidth + 16
                                             implicitHeight: badgeText.implicitHeight + 2
-                                            radius: 8
-                                            color: Theme.color.tagBg
+                                            // 徽章走中性面：tagBg 是蓝调底（#EEF2FF / #1E3A5F），
+                                            // 设置页不出蓝 ⇒ 换成中性灰 buttonBg，与说明文字同档
+                                            radius: Theme.radius.control
+                                            color: Theme.color.buttonBg
                                             anchors.verticalCenter: parent.verticalCenter
 
                                             Text {
@@ -292,7 +295,7 @@ Item {
                                                 text: rowHost.modelData.userDeclared
                                                     ? qsTrId("model_source_custom")
                                                     : qsTrId("model_source_adapter_builtin")
-                                                color: Theme.color.accent
+                                                color: Theme.color.textSecondary
                                                 font.family: "Microsoft YaHei UI"
                                                 font.pixelSize: Theme.font.small
                                             }
@@ -453,6 +456,8 @@ Item {
                                 font.pixelSize: Theme.font.caption
                             }
 
+                            // 与"外观设置"的语言下拉同款中性皮肤（原来这个框走 Basic 默认：平台灰底、
+                            // 无圆角，且键盘焦点时描边是 palette.highlight = 强调蓝）。
                             ComboBox {
                                 id: providerCombo
                                 width: parent.width - page.labelWidth - parent.spacing
@@ -461,6 +466,73 @@ Item {
                                 textRole: "label"
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
+                                leftPadding: Theme.spacing.fieldPadX
+                                rightPadding: Theme.spacing.fieldPadX + Theme.size.dropdownArrowWidth
+
+                                HoverHandler {
+                                    id: providerHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                indicator: Text {
+                                    x: providerCombo.width - Theme.size.dropdownArrowWidth
+                                        - Math.round(Theme.spacing.fieldPadX / 2)
+                                    y: Math.round((providerCombo.height - height) / 2)
+                                    width: Theme.size.dropdownArrowWidth
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: "\u25BE"
+                                    color: Theme.color.textSecondary
+                                    font.pixelSize: Theme.font.small
+                                }
+
+                                background: Rectangle {
+                                    color: Theme.color.inputBg
+                                    border.width: 1
+                                    // 悬停略深一档；聚焦（键盘走查）用 textSecondary，都是中性灰
+                                    border.color: providerCombo.activeFocus
+                                        ? Theme.color.textSecondary
+                                        : (providerHover.hovered ? Theme.color.scrollbarHover : Theme.color.scrollbar)
+                                    radius: Theme.radius.control
+                                }
+
+                                // 与语言下拉同一套：只把 Basic 风格用到的两个调色板角色换成中性 token
+                                delegate: ItemDelegate {
+                                    id: providerOption
+
+                                    required property var modelData
+                                    required property int index
+
+                                    width: ListView.view ? ListView.view.width : 0
+                                    text: providerOption.modelData.label
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+
+                                    palette.text: Theme.color.textPrimary
+                                    palette.light: Theme.color.activeBg
+                                    palette.highlightedText: Theme.color.textPrimary
+                                }
+
+                                popup: Popup {
+                                    y: providerCombo.height + 2
+                                    width: providerCombo.width
+                                    implicitHeight: Math.min(contentItem.implicitHeight + 8, 260)
+                                    padding: 4
+
+                                    background: Rectangle {
+                                        radius: Theme.radius.control
+                                        color: Theme.color.menuBg
+                                        border.width: 1
+                                        border.color: Theme.color.menuBorder
+                                    }
+
+                                    contentItem: ListView {
+                                        clip: true
+                                        implicitHeight: contentHeight
+                                        model: providerCombo.delegateModel
+                                        currentIndex: providerCombo.highlightedIndex
+                                        ScrollBar.vertical: AppScrollBar { }
+                                    }
+                                }
                             }
                         }
 
@@ -647,11 +719,60 @@ Item {
                                 font.pixelSize: Theme.font.caption
                             }
 
+                            // 勾选控件：默认 Basic 风格的指示器是 28×28 方角 + 1px 平台灰描边，
+                            // 且 **键盘焦点时描边取 palette.highlight（ThemeManager 装的是强调蓝）**。
+                            // 这里换成一枚中性指示器：18×18 / radius.check(5) / 未选中透明描边、
+                            // 悬停浅灰底、选中 = textPrimary 近黑面 + 反相勾（panelBg），
+                            // 禁用退回 border 描边。整体高 = 18 + 上下 padding 12 = 30px（命中区 > 24px）。
+                            // 只改观感：checkState/checked 的属性与信号一律沿用 CheckBox 自己的。
                             CheckBox {
                                 id: imageInputBox
                                 text: qsTrId("model_supports_image")
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
+                                spacing: Theme.spacing.labelGap
+                                // 标签色/高亮色也钉在 token 上：不再受全局 QPalette 影响（深色主题下尤其重要）
+                                palette.windowText: Theme.color.textPrimary
+                                palette.text: Theme.color.textPrimary
+                                palette.highlight: Theme.color.textSecondary
+                                palette.highlightedText: Theme.color.panelBg
+
+                                indicator: Rectangle {
+                                    implicitWidth: Theme.size.checkbox
+                                    implicitHeight: Theme.size.checkbox
+                                    x: imageInputBox.leftPadding
+                                    y: imageInputBox.topPadding
+                                        + (imageInputBox.availableHeight - height) / 2
+                                    radius: Theme.radius.check
+                                    color: {
+                                        if (!imageInputBox.enabled)
+                                            return "transparent"
+                                        if (imageInputBox.checked)
+                                            return Theme.color.textPrimary
+                                        return imageInputBox.hovered ? Theme.color.hoverBg : "transparent"
+                                    }
+                                    border.width: 1
+                                    border.color: {
+                                        if (!imageInputBox.enabled)
+                                            return Theme.color.border
+                                        if (imageInputBox.checked)
+                                            return Theme.color.textPrimary
+                                        return (imageInputBox.hovered || imageInputBox.visualFocus)
+                                            ? Theme.color.textSecondary
+                                            : Theme.color.scrollbarHover
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        // 勾：反相中性色（浅色下"近黑面 + 白勾"，深色下"近白面 + 深灰勾"）
+                                        visible: imageInputBox.checkState === Qt.Checked
+                                        text: "✓"
+                                        color: Theme.color.panelBg
+                                        font.family: "Microsoft YaHei UI"
+                                        font.pixelSize: Theme.font.small
+                                        font.weight: Theme.font.weightBold
+                                    }
+                                }
                             }
                         }
 
@@ -704,7 +825,8 @@ Item {
                             width: parent.width
                             text: Hub.settings.formFeedback
                             wrapMode: Text.WordWrap
-                            color: Theme.color.accent
+                            // 表单反馈：原版走强调色（蓝）⇒ 中性灰
+                            color: Theme.color.textSecondary
                             font.family: "Microsoft YaHei UI"
                             font.pixelSize: Theme.font.caption
                         }

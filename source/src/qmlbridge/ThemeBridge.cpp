@@ -162,7 +162,10 @@ namespace
 		map.insert(QStringLiteral("minConversationWidth"), 320);    // kMinConversationColumnWidth
 		map.insert(QStringLiteral("sendButton"), 32);               // chat #sendButton 四边 32px
 		map.insert(QStringLiteral("selectorChipHeight"), 24);       // ModelSelector 的 chip 高（原版 kChipHeight 28，作为配角收小）
-		map.insert(QStringLiteral("scrollbarThickness"), 8);        // scrollbars.qss QScrollBar 宽/高
+		map.insert(QStringLiteral("scrollbarThickness"), 8);        // scrollbars.qss QScrollBar 宽/高（也是可点/可拖的轨道宽）
+		// 可见把手的粗细：比轨道窄一圈（AppScrollBar 按 (thickness - handleWidth) / 2 内收），
+		// 于是"细窄 + 留白"只改观感 —— 拖拽/点轨道的几何仍由框架按 contentItem（= thickness）算。
+		map.insert(QStringLiteral("scrollbarHandleWidth"), 6);
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
 		map.insert(QStringLiteral("editorMinHeight"), 38);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 + 7 余量
 		map.insert(QStringLiteral("editorMaxHeight"), 336);         // kEditorMaxHeight

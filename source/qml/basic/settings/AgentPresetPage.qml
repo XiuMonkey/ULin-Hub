@@ -143,7 +143,8 @@ Item {
             visible: Hub.settings.presetFeedback.length > 0
             text: Hub.settings.presetFeedback
             wrapMode: Text.WordWrap
-            color: Theme.color.accent
+            // 反馈文案：原版走强调色，设置页不出蓝 ⇒ 中性灰（与同页说明文字同档）
+            color: Theme.color.textSecondary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
         }

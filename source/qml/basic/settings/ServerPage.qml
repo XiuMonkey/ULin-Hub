@@ -39,7 +39,8 @@ Item {
             radius: Theme.radius.control
             color: Theme.color.panelBg
             border.width: 1
-            border.color: urlInput.activeFocus ? Theme.color.accent : Theme.color.border
+            // 聚焦描边走中性灰 textSecondary（原来是强调蓝 accent）：与输入卡片（Composer）的聚焦态同款
+            border.color: urlInput.activeFocus ? Theme.color.textSecondary : Theme.color.border
 
             TextInput {
                 id: urlInput
