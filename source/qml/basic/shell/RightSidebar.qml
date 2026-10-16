@@ -10,6 +10,7 @@
 
 import QtQuick
 import QtQuick.Window
+import QtQuick.Effects
 import ULinHub 1.0
 import "../../widgets"
 
@@ -364,9 +365,36 @@ Item {
                 height: parent.height - header.height
 
                 // 注入点自己是空的：占位文案靠 body.children.length 判断（所以占位不能放进 body）
+                //
+                // ⚠️ 这里要**按卡片圆角裁一刀**：终端/网页块是 QtWebEngineView，本身就是个**直角**
+                //    矩形 ✗ —— 直接铺到底会把卡片的圆角盖掉（现象：打开终端或浏览器时，右栏底部
+                //    没有圆角）。用 MultiEffect 的 mask 把注入内容裁成"下方两角 = 卡片圆角"；
+                //    上方顶着标题行，本来就不在圆角处，所以不裁上边。
                 Item {
                     id: body
                     anchors.fill: parent
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true
+                        maskSource: bodyMask
+                    }
+                }
+
+                // 遮罩源：白 = 保留、透明 = 裁掉。visible: false + layer.enabled 是 MultiEffect
+                // 取源的固定用法（它要的是一张纹理，不是屏幕上的可见项）。
+                Item {
+                    id: bodyMask
+                    anchors.fill: parent
+                    visible: false
+                    layer.enabled: true
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "white"
+                        bottomLeftRadius: Theme.radius.panel
+                        bottomRightRadius: Theme.radius.panel
+                    }
                 }
 
                 Text {
