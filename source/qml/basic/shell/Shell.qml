@@ -403,7 +403,10 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: Theme.spacing.columnClearance
                 anchors.rightMargin: Theme.spacing.columnClearance
-                anchors.bottomMargin: Theme.spacing.columnClearance
+                // 用户要求：输入框整体**下移约 6px**（原来取 columnClearance = 16 ⇒ 现在 10）。
+                // 这里写死像素是有意的：它是"这个控件距卡片底"的一次性观感微调，与 spacing 语义
+                // （列内缩进）不是一回事；将来若要复用再抽 token（metrics.json + ThemeBridge 两处同名）。
+                anchors.bottomMargin: 10
                 height: item ? item.implicitHeight : 0
                 visible: Hub.currentSessionId.length > 0
                 source: Style.url("basic/chat/Composer.qml")
