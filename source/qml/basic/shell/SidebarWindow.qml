@@ -9,11 +9,14 @@
 //    见 Shell.liftSidebarForDrag），内容"零跳变"落进窗口，也不会多出一条谁也不认的横杠。
 //
 // 取舍（写在 PROGRESS 里，也别来回改）：
-//   · 四边缩放**自己实现**（QML 侧 8 条热区改 x/y/width/height），**没有**动
-//     `common/platform/win/NativeWindowFilter`。原因：那套原生机制是**单窗口**绑定的
-//     （`m_captionItem` 与窗口控件表都是全局一份，靠 `WindowBridge` 绑在主窗口上），
-//     硬套到第二扇窗要先拆它；而自绘缩放的最小尺寸钳制在 QML 里也能做得很干净。
-//     代价：没有系统的贴边吸附/Aero Snap，缩放跟手程度取决于 Qt 的窗口重建（实测见 PROGRESS）。
+//   · 四边缩放**自己实现**（QML 侧 8 条热区改 x/y/width/height），原生那套只负责"样式位"。
+//     ⚠️ 2026-10-16 修正（旧注释说"没有动 NativeWindowFilter"，那是错的）：本窗口在
+//     Component.onCompleted 里走 `WindowBridge.attachAuxWindow` 补上和**主窗口同一排**原生
+//     样式位（WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角）。原因：主窗口之所以"改尺寸不出黑块"
+//     不是因为它改得少（它的窗口也会被子窗口/最大化改尺寸），而是因为它有这排样式位、走的是
+//     DWM 非客户区路径；无边框窗口缺了它们，每帧改原生尺寸就会露出一块还没画的黑色区域
+//     （实测：同一手势 263 帧里 120 帧有黑块，最长连续黑 486px）。
+//     代价：没有系统的贴边吸附/Aero Snap（这一点由"头部空白处拖动"的自绘搬窗承担）。
 //   · 最大化用**真窗口状态** `Window.Maximized`（探针实测：无边框窗口最大化取的是**工作区**
 //     1280x752，不是整块屏幕 ⇒ 不会盖任务栏），还原回 `Window.Windowed` 并显式写回记下的几何。
 //
@@ -146,20 +149,45 @@ Window {
 
     // edges 用 Qt.LeftEdge / Qt.TopEdge / Qt.RightEdge / Qt.BottomEdge 的位或
     //
-    // ⚠️ 改成交给**系统原生缩放**（2026-10-16）：原来是自己每帧算 x/y/w/h 再 applyGeometry，
-    //    也就是"每帧改一次原生窗口尺寸" —— 副窗里跑着 WebEngine（终端/网页块），原生 surface
-    //    每帧重建，拖四边就会看到黑块/渲染延迟；附着态之所以不黑，正因为那只是同一个窗口内改
-    //    QML 尺寸，原生 surface 不动。
-    //    `Window.startSystemResize(edges)` 让 OS 接管 sizing loop —— 语义上就是"和附着态一样，
-    //    交给上层去改尺寸"，QML 不再一帧一帧地推几何（该 API 已在 QML 的 Window 上实测可调）。
-    //    系统接管后 QML 收不到后续 move（鼠标被系统循环捕获）⇒ 用 handedOff 兜住重复进入。
-    // ⚠️ 这是**同一个函数改函数体**：不要再新增同名函数 —— 曾因同名重复导致
-    //    `SidebarWindow.qml: Duplicate method name` ⇒ 整扇副窗加载失败（Type SidebarWindow unavailable）。
-    function resizeApply(edges, sx, sy) {
-        if (win.resizeHandedOff)
+    // 两档实现，用 handOffToSystem 选（默认 = 跟手自己算，见下）：
+    //   · true  —— 交系统 sizing loop（`Window.startSystemResize`）。只在**真有按下**的手势里有效
+    //     （Windows 的 SC_SIZE 循环靠鼠标按钮推进；代码驱动没有按下时它什么都不做 —— 实测）。
+    //   · false —— 自己按屏幕坐标差算 x/y/w/h 写回窗口（**当前默认**）。它每帧改一次原生窗口尺寸，
+    //     于是**必须有**原生样式位（见文件头 attachAuxWindow），否则每帧露出黑块。
+    // 两档都在；哪个更跟手由实测决定，且都不改本函数的**名字**（同名重复会是 Duplicate method name）。
+    function resizeApply(edges, sx, sy, handOffToSystem) {
+        if (handOffToSystem) {
+            if (win.resizeHandedOff)
+                return
+            win.resizeHandedOff = true
+            win.startSystemResize(edges)
             return
-        win.resizeHandedOff = true
-        win.startSystemResize(edges)
+        }
+        // 位移一律用**屏幕坐标差**（热区自己会跟着窗口动，用局部坐标会自己追自己 —— 同 PanelGrip 那条坑）
+        const dx = sx - win.resizePressScreenX
+        const dy = sy - win.resizePressScreenY
+        let x = win.resizePressGeom.x
+        let y = win.resizePressGeom.y
+        let w = win.resizePressGeom.width
+        let h = win.resizePressGeom.height
+        // 左/上边：动的同时改宽/高；到下限就把那条边钳住。
+        // ⚠️ 必须自己钳死：请求一旦低于 Qt 的 minimumWidth/Height，Qt 会钳**宽**而 x 照走
+        //    （右边不动、左边跟着鼠标 ⇒ 看着像"缩放坏了"）。
+        if (edges & Qt.LeftEdge) {
+            const right = win.resizePressGeom.x + win.resizePressGeom.width
+            x = Math.min(win.resizePressGeom.x + dx, right - win.minTotalW)
+            w = right - x
+        } else if (edges & Qt.RightEdge) {
+            w = Math.max(win.minTotalW, win.resizePressGeom.width + dx)
+        }
+        if (edges & Qt.TopEdge) {
+            const bottom = win.resizePressGeom.y + win.resizePressGeom.height
+            y = Math.min(win.resizePressGeom.y + dy, bottom - win.minTotalH)
+            h = bottom - y
+        } else if (edges & Qt.BottomEdge) {
+            h = Math.max(win.minTotalH, win.resizePressGeom.height + dy)
+        }
+        win.applyGeometry(x, y, w, h)
     }
 
     Item {
@@ -376,6 +404,14 @@ Window {
         win.closeWindow()
     }
 
-    Component.onCompleted: console.log("[sidebar-detach] window created " + win.width + "x" + win.height
-                                       + " at " + win.x + "," + win.y)
+    Component.onCompleted: {
+        // 补上和主窗口**同一套**原生样式位（WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角）：
+        // 无边框窗口每帧改原生尺寸时会露出还没画的那块（黑块/延迟），主窗口之所以不露，正是因为
+        // 它在 WindowBridge.attachWindow 里拿到了这排样式位、走 DWM 非客户区路径。
+        // ⚠️ 必须用 attachAuxWindow（**附加**窗口）：attachWindow 会把"主窗口"换成这扇窗 ——
+        //    WindowBridge 的窗口动作与可绑定属性都只认主窗口，换掉就是罪状级 bug。
+        WindowBridge.attachAuxWindow(win)
+        console.log("[sidebar-detach] window created " + win.width + "x" + win.height
+                    + " at " + win.x + "," + win.y)
+    }
 }

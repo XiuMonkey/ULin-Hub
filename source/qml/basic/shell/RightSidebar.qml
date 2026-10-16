@@ -34,6 +34,39 @@ Item {
     //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。
     property bool sideDetached: false
     property var attachZoneProvider: null
+    // 几何的唯一出口（Shell.moveSidebarWindowTo）——**由 Shell 注入的函数引用**。
+    // ⚠️ 为什么必须注入、不能沿 parent 链现找：本 Item 在脱离时被 reparent 进副窗口的
+    //    panelSlot，parent 链变成 `panelSlot → 窗口 contentItem → QQuickRootItem` ——
+    //    **壳层不在链上**（实测打印出来的链里一个带 moveSidebarWindowTo 的都没有），
+    //    于是"父链查找"永远返回 null ⇒ 按住三个点拖动时整段逻辑被 `if (!owner) return` 吞掉，
+    //    表现就是"完全不动"。函数引用由 Shell 在装载时给（那时还能看见 shell），
+    //    reparent 之后照样可调（与 attachZoneProvider 同一个道理）。
+    property var moveWindowProvider: null
+
+    // 现找几何出口：注入的优先；没有注入时才退回父链（附着态下父链上是壳层，能找得到）
+    function moveOwner() {
+        if (moveWindowProvider)
+            return moveWindowProvider
+        for (let p = root.parent; p; p = p.parent) {
+            if (p.moveSidebarWindowTo)
+                return p
+        }
+        return null
+    }
+    // 搬窗（只改 x/y，不动尺寸）：两个拖动入口共用这一条
+    function moveWindowTo(x, y) {
+        const owner = moveOwner()
+        if (owner) {
+            owner.moveSidebarWindowTo(x, y)
+            return
+        }
+        // 兜底：拿不到壳层就直接写窗口坐标（等价于 HEAD 那版的行为，至少不会"完全不动"）
+        const w = root.Window.window
+        if (w) {
+            w.x = Math.round(x)
+            w.y = Math.round(y)
+        }
+    }
 
     // 副窗口态下头部那一行**就是**副窗口的标题栏（Shell 那边不再画标题栏）：所以窗口的
     // 最小化 / 最大化-还原两颗按钮就并进这一行，放在既有的 ✕ **左边**（用户原话：
@@ -100,19 +133,21 @@ Item {
                         const g = headerDragArea.mapToGlobal(mouse.x, mouse.y)
                         pressScreenX = g.x
                         pressScreenY = g.y
+                        // ⚠️ 读窗口自己的 x/y（绝对真值）：副窗口的几何是延后一帧下发的，
+                        //    壳层记着的 sidebarWinX/Y 可能比窗口实际位置旧一拍。
                         pressWinX = win.x
                         pressWinY = win.y
                     }
                     onPositionChanged: (mouse) => {
                         if (!pressed)
                             return
-                        const win = root.Window.window
-                        if (!win)
-                            return
                         const g = headerDragArea.mapToGlobal(mouse.x, mouse.y)
-                        // 窗口自己搬自己：把**按下时**的位置 + 屏幕位移写回去（1:1 跟手）
-                        win.x = Math.round(pressWinX + (g.x - pressScreenX))
-                        win.y = Math.round(pressWinY + (g.y - pressScreenY))
+                        // 窗口自己搬自己：把**按下时**的位置 + 屏幕位移交给壳层（1:1 跟手）。
+                        // ⚠️ 走 root.moveWindowTo（现注入的几何出口）：脱离之后 parent 链上
+                        //    **没有**壳层（见 root.moveWindowProvider 的说明），父链现找会返回 null
+                        //    ⇒ 这条"拖面板头部搬窗"的路会整段静默失效。
+                        root.moveWindowTo(Math.round(pressWinX + (g.x - pressScreenX)),
+                                          Math.round(pressWinY + (g.y - pressScreenY)))
                     }
                 }
 
@@ -145,6 +180,7 @@ Item {
                 // ⚠️ 不要退回"贴着标题右边"：那正是用户否掉的位置（看着像贴着 ✕ 那一侧）。
                 PanelGrip {
                     id: dockGrip
+                    objectName: "panelGrip"   // TEMP-EVIDENCE：取证脚本按名字找它（用后删除）
                     anchors.horizontalCenter: header.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     // 三点**常驻**（需求 ①）：只要右栏这张卡片在显示，三个点就在。
@@ -213,16 +249,35 @@ Item {
                         if (!dockGrip.dragging)
                             return
                         dragged = true
+                        console.log("[EV] RS onDragMoved start dx=" + dx + " dy=" + dy
+                                    + " detached=" + root.sideDetached + " dragged=" + dragged
+                                    + " provider=" + (root.moveWindowProvider ? "yes" : "no"))
 
                         if (root.sideDetached) {
                             // 独立态：三个点**照样能拖**（需求要保留）—— 拖的就是那扇独立窗口。
                             // 位移用**屏幕坐标差**加在按下时的窗口位置上：窗口自己在动，
                             // 拿局部坐标算会自己追自己。
-                            const win = root.Window.window
-                            if (!win)
-                                return
-                            win.x = Math.round(pressWinX + dx)
-                            win.y = Math.round(pressWinY + dy)
+                            // ⚠️ 几何只走一个出口：root.moveWindowTo → Shell.moveSidebarWindowTo
+                            //    （不直接写 win.x/win.y，避免绕开壳层的记录）。
+                            // ⚠️ 这里曾经写成 `owner = findShell()` —— 那个函数**不存在**，每次
+                            //    dragMoved 都抛 `ReferenceError: findShell is not defined` ⇒ 副窗口态
+                            //    按住三个点**完全不动**；改成"沿 parent 链现找"也不行：reparent 之后
+                            //    父链上是 `panelSlot → 窗口 contentItem → QQuickRootItem`，
+                            //    **壳层不在链上**（实测）。所以出口由 Shell 注入（见 root.moveWindowProvider）。
+                            const before = root.Window.window
+                                ? (root.Window.window.x + "," + root.Window.window.y) : "?"
+                            try {
+                                root.moveWindowTo(Math.round(pressWinX + dx), Math.round(pressWinY + dy))
+                            } catch (e) {
+                                console.log("[EV] RS moveWindowTo THREW: " + e)
+                            }
+                            const after = root.Window.window
+                                ? (root.Window.window.x + "," + root.Window.window.y) : "?"
+                            // TEMP-EVIDENCE：搬窗前后（用后整段删除）
+                            console.log("[EV] RS drag dx=" + dx + " dy=" + dy
+                                        + " pressWin=" + pressWinX + "," + pressWinY
+                                        + " provider=" + (root.moveWindowProvider ? "yes" : "no")
+                                        + " before=" + before + " after=" + after)
                             // 光标落回右栏原位置附近 ⇒ 亮起落点提示（松手才真的回附）
                             const over = insideAttachZone(globalPos)
                             if (over !== armed) {

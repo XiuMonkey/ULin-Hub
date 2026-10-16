@@ -67,6 +67,21 @@
     <Filter Include="src\viewmodel">
       <UniqueIdentifier>{0da4c455-2315-4db7-80a7-4f19a3a9ae8f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="3rdparty\libvterm">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\include">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\src">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\src\encoding">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\terminal">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000005}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\common\util\ConnectionManager.cpp">
@@ -213,6 +228,36 @@
     <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\encoding.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\keyboard.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\mouse.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\parser.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\pen.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\screen.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\state.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\unicode.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\vterm.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\terminal\TerminalVt.cpp">
+      <Filter>src\common\terminal</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\network\DshEventParser.h">
@@ -295,6 +340,24 @@
     </ClInclude>
     <ClInclude Include="include\common\util\MarkdownSegmenter.h">
       <Filter>include\common\util</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\include\vterm.h">
+      <Filter>3rdparty\libvterm\include</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\include\vterm_keycodes.h">
+      <Filter>3rdparty\libvterm\include</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\vterm_internal.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\rect.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\utf8.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\terminal\TerminalVt.h">
+      <Filter>src\common\terminal</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -404,6 +467,27 @@
     </None>
     <None Include="..\assets\resources\ulin-hub.ico">
       <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\fullwidth.inc">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.inc">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.tbl">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\uk.inc">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\LICENSE">
+      <Filter>3rdparty\libvterm</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\README.md">
+      <Filter>3rdparty\libvterm</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\VENDOR.sha256">
+      <Filter>3rdparty\libvterm</Filter>
     </None>
   </ItemGroup>
 </Project>

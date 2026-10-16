@@ -87,7 +87,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
     </ClCompile>
@@ -95,14 +95,14 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MaxSpeed</Optimization>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
@@ -116,7 +116,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
@@ -157,7 +157,70 @@
     <ClCompile Include="src\qmlbridge\SidebarLayout.cpp" />
     <!-- 右栏「终端」块的接线层（QML 单例 Terminal）：唯一注册到 QWebChannel 的对象 -->
     <ClCompile Include="src\qmlbridge\TerminalBridge.cpp" />
+    <!-- 终端 VT 核心：把引擎给的字节流解析成网格。不依赖 Qt，见 include/common/terminal/TerminalVt.h -->
+    <ClCompile Include="src\common\terminal\TerminalVt.cpp" />
     <ClCompile Include="src\common\layout\SidebarMetrics.cpp" />
+    <!-- 内嵌的 VT 解析器（见 3rdparty\libvterm\README.md）。9 个编译单元全是 C99，上游文件零改动，
+         所以工程侧要替它们做四件事（都是实测过的，别凭印象改）：
+         ① CompileAsC —— 免得被工程级的 ConformanceMode / stdcpp17 带过去当 C++ 编（C99 会因隐式转换报错）；
+         ② SDLCheck=false —— /sdl 会把两处警告抬成**错误**：parser.c:53 的 C4996（strncpy 弃用）、
+            parser.c:183 的 C4703（string_start 可能未初始化）。实测 /WX- 撤不掉这个升级，只能关 /sdl；
+         ③ _CRT_SECURE_NO_WARNINGS —— 关掉 /sdl 后 C4996 退回普通警告，再用这个宏清掉；
+         ④ TreatWarningAsError=false —— state.c:319/326 还有 size_t→int 的 C4267 普通警告，别让日后的 /WX 挡住。 -->
+    <ClCompile Include="3rdparty\libvterm\src\encoding.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\keyboard.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\mouse.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\parser.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\pen.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\screen.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\state.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\unicode.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\vterm.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
     <QtMoc Include="include\core\ServerManager.h" />
     <QtMoc Include="include\core\ClientRuntime.h" />
     <ClCompile Include="src\network\DshApiClient.cpp" />
@@ -261,6 +324,19 @@
     <ClInclude Include="include\common\util\UrlInput.h" />
     <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
     <ClInclude Include="include\common\util\MarkdownSegmenter.h" />
+    <ClInclude Include="include\common\terminal\TerminalVt.h" />
+    <ClInclude Include="3rdparty\libvterm\include\vterm.h" />
+    <ClInclude Include="3rdparty\libvterm\include\vterm_keycodes.h" />
+    <ClInclude Include="3rdparty\libvterm\src\vterm_internal.h" />
+    <ClInclude Include="3rdparty\libvterm\src\rect.h" />
+    <ClInclude Include="3rdparty\libvterm\src\utf8.h" />
+    <None Include="3rdparty\libvterm\src\fullwidth.inc" />
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.inc" />
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.tbl" />
+    <None Include="3rdparty\libvterm\src\encoding\uk.inc" />
+    <None Include="3rdparty\libvterm\LICENSE" />
+    <None Include="3rdparty\libvterm\README.md" />
+    <None Include="3rdparty\libvterm\VENDOR.sha256" />
     <QtTranslation Include="..\assets\translations\ulinhub_en.ts" />
   </ItemGroup>
   <!-- QtTranslation 的 BuildAction **必须保持 false**（即不参与构建）。

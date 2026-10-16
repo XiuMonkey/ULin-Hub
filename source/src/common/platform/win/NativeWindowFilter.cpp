@@ -277,10 +277,15 @@ QWindow* NativeWindowFilter::findByHwnd(void* hwnd)
 	return nullptr;
 }
 
-const NativeWindowFilter::ControlEntry* NativeWindowFilter::windowControlAt(const QPoint& logicalPos) const
+const NativeWindowFilter::ControlEntry* NativeWindowFilter::windowControlAt(QWindow* window,
+	const QPoint& logicalPos) const
 {
 	for (const ControlEntry& entry : m_windowControls) {
 		if (!entry.item || !entry.item->isVisible())
+			continue;
+		// 登记项按"它实际在哪扇窗"归属：控件表只有一份，但同一份表服务多扇窗
+		// （主窗口的自绘标题栏按钮 + 覆盖率页的抓手都在主窗口里；副窗口没有登记项）
+		if (entry.item->window() != window)
 			continue;
 		if (itemRectInWindow(entry.item.data()).contains(logicalPos))
 			return &entry;
@@ -323,9 +328,13 @@ qintptr NativeWindowFilter::hitTest(QWindow* window, const QPoint& logicalPos, i
 	}
 
 	// 自绘标题栏：整块是拖动区，窗口按钮区域除外 —— 否则鼠标落在按钮上会被系统当成标题栏拖动，
-	// 按钮永远收不到点击
-	if (m_captionItem && itemRectInWindow(m_captionItem.data()).contains(logicalPos)) {
-		const ControlEntry* control = windowControlAt(logicalPos);
+	// 按钮永远收不到点击。
+	// ⚠️ 只有 caption item **本身在这扇窗里**时才算：本类服务多扇窗（主窗口 + 右栏副窗口），
+	//    而 caption 是主窗口的自绘标题栏；拿它的矩形去判副窗口会算到"别的窗口的场景坐标"里去，
+	//    副窗口整块都可能被判成 HTCAPTION（副窗口不能整块拖动）。
+	if (m_captionItem && m_captionItem->window() == window
+		&& itemRectInWindow(m_captionItem.data()).contains(logicalPos)) {
+		const ControlEntry* control = windowControlAt(window, logicalPos);
 		if (!control)
 			return HTCAPTION;
 
