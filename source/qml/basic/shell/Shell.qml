@@ -403,10 +403,10 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: Theme.spacing.columnClearance
                 anchors.rightMargin: Theme.spacing.columnClearance
-                // 用户要求：输入框整体**下移约 6px**（原来取 columnClearance = 16 ⇒ 现在 10）。
-                // 这里写死像素是有意的：它是"这个控件距卡片底"的一次性观感微调，与 spacing 语义
-                // （列内缩进）不是一回事；将来若要复用再抽 token（metrics.json + ThemeBridge 两处同名）。
-                anchors.bottomMargin: 10
+                // ⚠️ 这里恢复成 columnClearance(16)：之前两次"输入框下移 6px"改的其实是**这条**，
+                //    结果整条输入框（连同里面的小字/hint）一起被推下去了，并没有缩短它与会话区的距离
+                //    （会话区下端是跟着输入框顶走的）。要缩短距离，改的是上面那两条 anchor 边距。
+                anchors.bottomMargin: Theme.spacing.columnClearance
                 height: item ? item.implicitHeight : 0
                 visible: Hub.currentSessionId.length > 0
                 source: Style.url("basic/chat/Composer.qml")
@@ -420,10 +420,9 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: composerLoader.top
-                // 这条边距在"提问/审批面板没显示"时也生效（Loader 高 0，但这条 margin 照算）——
-                // 原来取 columnClearance(16)，与列表底边距、messageLoader 的边距叠成 40px 空地。
-                // 现在取 panelGap(2)（配合列表底边距 8、messageLoader 的 2 ⇒ 合计 12px，用户要的 ~10px）。
-                anchors.bottomMargin: Theme.spacing.panelGap
+                // 会话区底 → 输入框顶的缝：**用户要的就是这一条变短**（原来三处叠成 40px，
+                // 先收到 12px；这次再收紧 ⇒ 这里取 0，配合列表内容底边距 8 ⇒ 实际缝约 8px）。
+                anchors.bottomMargin: 0
                 anchors.leftMargin: Theme.spacing.columnClearance
                 anchors.rightMargin: Theme.spacing.columnClearance
                 height: item ? item.implicitHeight : 0
@@ -437,9 +436,9 @@ Item {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: interactionLoader.top
-                // 会话区底 → 输入框顶的间距：这里取 panelGap(2)（原来 labelGap=8）。
-                // 三处合计 8（列表内容底边距）+ 2（本行）+ 2（interactionLoader）≈ 12px。
-                anchors.bottomMargin: Theme.spacing.panelGap
+                // 会话区底 → 输入框顶那条缝的第二段：取 0（原来 labelGap=8 ⇒ 再 panelGap=2）。
+                // 现在"列表内容底边距 8"就是唯一来源 ⇒ 缝约 8px。
+                anchors.bottomMargin: 0
                 visible: Hub.currentSessionId.length > 0
                 // ⚠️ 必须等宽度定下来再创建列表：首帧宽度≈0 时委托里的 Text 会按假宽度排版
                 //    （行数翻几倍），量出的 contentHeight 是最终的 ~3 倍 → 滑块长度先长后短，
