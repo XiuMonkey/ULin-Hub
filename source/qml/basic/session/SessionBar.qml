@@ -16,11 +16,11 @@ Item {
     // 签名手写：带回参的信号要写全类型；接收端必须具名且**参数带类型标注**（未标注在元对象里是 QVariant，接不上）。
     Component.onCompleted: {
         HostUi.registerItem("sidebar", this)
-        HostConnections.RegisterConnection("qml.sidebar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sidebar, "handleSessionCreateFailed(QString)")
-        HostConnections.RegisterConnection("qml.sidebar.openSettings", sidebar, "openSettingsRequested()", sidebar, "handleOpenSettings()")
-        HostConnections.RegisterConnection("qml.sidebar.openPluginMarket", sidebar, "openPluginMarketRequested()", sidebar, "handleOpenPluginMarket()")
+        HostConnections.RegisterConnection("qml.sidebar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sessionBar, "handleSessionCreateFailed(QString)")
+        HostConnections.RegisterConnection("qml.sidebar.openSettings", sessionBar, "openSettingsRequested()", sessionBar, "handleOpenSettings()")
+        HostConnections.RegisterConnection("qml.sidebar.openPluginMarket", sessionBar, "openPluginMarketRequested()", sessionBar, "handleOpenPluginMarket()")
         // 清空会话与上面两条同一条路：默认处理器在本组件里，扩展可接管这条 index 换成自己的实现
-        HostConnections.RegisterConnection("qml.sidebar.clearSessions", sidebar, "clearSessionsRequested()", sidebar, "handleClearSessions()")
+        HostConnections.RegisterConnection("qml.sidebar.clearSessions", sessionBar, "clearSessionsRequested()", sessionBar, "handleClearSessions()")
     }
     // 四条连接的默认处理器（没人接管时 = 宿主原本行为）
     function handleSessionCreateFailed(message: string) {
