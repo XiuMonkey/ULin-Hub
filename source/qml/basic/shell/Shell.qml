@@ -9,7 +9,7 @@ import QtQuick.Window
 import ULinHub 1.0
 import "../../widgets"
 // ui/shell 与 ui/sidebar、ui/topbar 是并列目录：QML 只按同目录/已 import 的目录解析组件名，
-// 所以跨目录用裸组件名（Sidebar / TopBar）必须显式 import
+// 所以跨目录用裸组件名（SessionBar / TopBar）必须显式 import
 import "../session"
 import "../topbar"
 import "../browser"
@@ -44,9 +44,9 @@ Item {
     // 状态就下面这几条（窗口对象是文件末尾的 PanelBarWindow 实例）。
     //
     // 时序（本次改动的核心，别退回"到阈值就在松手时出窗"那版）：
-    //   ① 三点越过手感阈值 ⇒ liftSidebarForDrag：右栏进**无边框临时窗口**，从这一刻起 1:1 跟着光标；
+    //   ① 三点越过手感阈值 ⇒ liftPanelBarForDrag：右栏进**无边框临时窗口**，从这一刻起 1:1 跟着光标；
     //      ⚠️ 这时**不动**主窗口布局（不调 Hub.closePanelBar）⇒ 顶栏/会话区尺寸一动不动；
-    //   ② 松手 ⇒ finishSidebarDrag：落回右栏原区域（±24）就 reparent 回槽位；
+    //   ② 松手 ⇒ finishPanelBarDrag：落回右栏原区域（±24）就 reparent 回槽位；
     //      落在区域外才**确认脱离**（panelBarDetached=true）+ 这时才腾出主窗口的空间。
     property bool panelBarDetached: false
     // 独立窗口几何：跟手/自己摆的时候都走 applyPanelBarWindowGeometry 这一条路（见下）。
@@ -120,7 +120,7 @@ Item {
     // 「拿起来」（需求 ①）：三点越过手感阈值那一刻调。把右栏搬进**无边框临时窗口**，
     // 从此这扇窗跟着光标 1:1 走 —— 不再是"到阈值时松手才突然出窗"。
     // ⚠️ 跟手期间**绝不**碰主窗口布局（不调 Hub.closePanelBar）：顶栏/会话区尺寸一动不动。
-    function liftSidebarForDrag() {
+    function liftPanelBarForDrag() {
         if (panelBarInWindow)
             return
         // 窗口几何 = 右栏那块矩形**本身**（位置/尺寸逐像素一致）：不再为自绘标题栏多留一条高度、
@@ -177,11 +177,11 @@ Item {
         const p = WindowBridge.cursorScreenPos()
         panelBarFollowTo(p.x, p.y)
         if (!WindowBridge.leftButtonDown())
-            finishSidebarDrag(p.x, p.y)
+            finishPanelBarDrag(p.x, p.y)
     }
 
     // 松手：按落点分两个分支（需求 ①②）。重复调用是安全的（跟手的 Timer 与抓手的 finished 都汇到这儿）。
-    function finishSidebarDrag(atScreenX, atScreenY) {
+    function finishPanelBarDrag(atScreenX, atScreenY) {
         if (!panelBarFloating)
             return
         const over = insideDockZone(Qt.point(atScreenX, atScreenY))
@@ -207,7 +207,7 @@ Item {
     // 回附（需求 ③⑤）：内容 reparent 回附着槽位、关掉独立窗口。
     //   · 从独立窗口把三点拖回右栏位置松手 ⇒ open=true（用户就是想看它，落回来就展开）；
     //   · 点顶栏 ◫ / 点独立窗口自绘的 ✕ / 系统 ✕ ⇒ open=false（"已附着但隐藏"，下次点 ◫ 默认以附着状态打开）。
-    function attachSidebar(open) {
+    function attachPanelBar(open) {
         if (!panelBarDetached)
             return
         // 副窗口被最小化时先还原再隐藏：否则下次"拿起来"show 出来的还是一扇最小化的窗
@@ -378,7 +378,7 @@ Item {
                 //    所以这条分支只看 panelBarDetached，不再经过那两个接口。
                 onPanelBarRequested: {
                     if (shell.panelBarDetached)
-                        shell.attachSidebar(false)
+                        shell.attachPanelBar(false)
                     else
                         Hub.togglePanelBar()
                 }
@@ -479,18 +479,18 @@ Item {
             // 内容留在副窗口里 = 状态自相矛盾）；附着态照旧只收起右栏。
             onCloseRequested: {
                 if (shell.panelBarInWindow)
-                    shell.attachSidebar(false)
+                    shell.attachPanelBar(false)
                 else
                     Hub.closePanelBar()
             }
             // 抓手的四条请求：拿起来（跟手开始）/ 松手（壳层按落点定结局）/ 回附 / 拖动中的落点预览
-            onSidebarLiftRequested: shell.liftSidebarForDrag()
-            onSidebarDropRequested: (screenX, screenY) => shell.finishSidebarDrag(screenX, screenY)
-            onSidebarAttachRequested: shell.attachSidebar(true)
+            onPanelBarLiftRequested: shell.liftPanelBarForDrag()
+            onPanelBarDropRequested: (screenX, screenY) => shell.finishPanelBarDrag(screenX, screenY)
+            onPanelBarAttachRequested: shell.attachPanelBar(true)
             // 头部那两颗窗口按钮（− / □❐，只在副窗口态可见）：转发给 PanelBarWindow 自己那两个入口
             onMinimizeWindowRequested: shell.minimizePanelBarWindow()
             onToggleMaximizeRequested: shell.toggleMaximizePanelBarWindow()
-            onSidebarPreviewChanged: (over) => {
+            onPanelBarPreviewChanged: (over) => {
                 if (over)
                     shell.beginDetachPreview(true)
                 else
@@ -506,7 +506,7 @@ Item {
     }
 
     // ---- 独立窗口：右栏整体"拿起来"之后住在这儿（无边框 + 自绘标题栏，需求 ③）----
-    // 内容**不是副本**：PanelBar 那个 Item 由 liftSidebarForDrag/attachSidebar reparent
+    // 内容**不是副本**：PanelBar 那个 Item 由 liftPanelBarForDrag/attachPanelBar reparent
     // 进/出 `panelSlot`。窗口本身只做：按 panelBarInWindow 显示、被 Shell 摆几何、自己的 move/resize 回写。
     PanelBarWindow {
         id: panelBarWindow
@@ -628,7 +628,7 @@ Item {
                 // 只靠父级 visible 是不够的 —— 不可见的 item 上的动画照样每帧改属性、
                 // 把场景标脏，于是应用**空闲时也在满速重绘**（实测：空闲 5.4% 单核 + GPU 3D 25~29%，
                 // 换成壁纸皮肤后每帧还要多跑两个全窗离屏层，移动窗口就卡）。
-                // Sidebar / PluginMarketPage 里的同类转圈都传了 running，这里漏了。
+                // SessionBar / PluginMarketPage 里的同类转圈都传了 running，这里漏了。
                 running: Hub.initializing
                 visible: Hub.initializing
             }

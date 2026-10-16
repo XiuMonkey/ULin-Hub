@@ -29,7 +29,7 @@ Item {
     // ---------------- 整个右栏脱离成独立窗口（本次的驱动路径）----------------
     // 状态在 Shell（它拥有独立窗口），这里只拿两条注入进来的事实：
     //   · sideDetached —— **确认脱离之后**为真（本 Item 此刻在独立窗口里，reparent 过去了，
-    //     见 Shell.liftSidebarForDrag / finishSidebarDrag）。三个点于是改成"搬那扇窗 + 落回右栏位置就回附"；
+    //     见 Shell.liftPanelBarForDrag / finishPanelBarDrag）。三个点于是改成"搬那扇窗 + 落回右栏位置就回附"；
     //   · attachZoneProvider —— 取"主窗口里右栏附着时所在的**屏幕矩形**"的函数。
     //     跨窗口判断只能用屏幕坐标（各自窗口的场景原点不是一个）。
     //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。

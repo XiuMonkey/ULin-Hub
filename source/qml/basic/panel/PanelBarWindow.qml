@@ -6,7 +6,7 @@
 // ⚠️ 本窗口**没有**自己的标题栏（用户否掉了那一版）：副窗口的标题栏就是**面板自己的头部行**
 //    —— 那一行里的「面板」+ 三点抓手 + − / □❐ / ✕（按钮在 PanelBar.qml 里，✕ 左边两颗只在
 //    副窗口态可见）。所以窗口几何 = 右栏那块矩形**本身**（尺寸/位置逐像素一致、不上移、不多留高度，
-//    见 Shell.liftSidebarForDrag），内容"零跳变"落进窗口，也不会多出一条谁也不认的横杠。
+//    见 Shell.liftPanelBarForDrag），内容"零跳变"落进窗口，也不会多出一条谁也不认的横杠。
 //
 // 取舍（写在 PROGRESS 里，也别来回改）：
 //   · 四边缩放**自己实现**（QML 侧 8 条热区改 x/y/width/height），原生那套只负责"样式位"。
@@ -21,7 +21,7 @@
 //     1280x752，不是整块屏幕 ⇒ 不会盖任务栏），还原回 `Window.Windowed` 并显式写回记下的几何。
 //
 // ⚠️ 本文件**不装内容**：右栏那块 PanelBar 是 reparent 进 `panelSlot` 的**同一份实例**
-//    （见 Shell.liftSidebarForDrag / attachSidebar）—— 两个宿主各放一份会让终端/网页各跑一个会话。
+//    （见 Shell.liftPanelBarForDrag / attachPanelBar）—— 两个宿主各放一份会让终端/网页各跑一个会话。
 //
 // ⚠️ 头部那两颗窗口按钮**不要**登记进 `WindowBridge.addWindowControl`：那是**主窗口**的原生命中测试
 //    （`NativeWindowFilter` 里窗口控件表只有一份，矩形按各自窗口的场景坐标算），登记进来会让
@@ -84,7 +84,7 @@ Window {
         win.height = Math.round(h)
     }
 
-    // 「拿起来」的三步（都由 Shell 按序调，见 Shell.liftSidebarForDrag）：
+    // 「拿起来」的三步（都由 Shell 按序调，见 Shell.liftPanelBarForDrag）：
     //   ① prepareForLift  —— 记下目标几何、清掉上次的还原几何；
     //   ② （Shell 置 panelBarFloating ⇒ 这扇窗才显示出来）
     //   ③ normalizeForLift —— 保证是普通态。
@@ -130,7 +130,7 @@ Window {
     // 于是"关闭后再点 ◫ = 默认以附着状态打开"这条三态语义不破（内容 reparent 回槽位、窗口隐藏）。
     function closeWindow() {
         if (win.host)
-            win.host.attachSidebar(false)
+            win.host.attachPanelBar(false)
     }
 
     // ---- 四边/四角缩放（需求 ③，自己实现，见文件头）----
