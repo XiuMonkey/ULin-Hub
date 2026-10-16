@@ -417,7 +417,10 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: composerLoader.top
-                anchors.bottomMargin: Theme.spacing.columnClearance
+                // 这条边距在"提问/审批面板没显示"时也生效（Loader 高 0，但这条 margin 照算）——
+                // 原来取 columnClearance(16)，与列表底边距、messageLoader 的边距叠成 40px 空地。
+                // 现在取 panelGap(2)（配合列表底边距 8、messageLoader 的 2 ⇒ 合计 12px，用户要的 ~10px）。
+                anchors.bottomMargin: Theme.spacing.panelGap
                 anchors.leftMargin: Theme.spacing.columnClearance
                 anchors.rightMargin: Theme.spacing.columnClearance
                 height: item ? item.implicitHeight : 0
@@ -431,7 +434,9 @@ Item {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: interactionLoader.top
-                anchors.bottomMargin: Theme.spacing.labelGap
+                // 会话区底 → 输入框顶的间距：这里取 panelGap(2)（原来 labelGap=8）。
+                // 三处合计 8（列表内容底边距）+ 2（本行）+ 2（interactionLoader）≈ 12px。
+                anchors.bottomMargin: Theme.spacing.panelGap
                 visible: Hub.currentSessionId.length > 0
                 // ⚠️ 必须等宽度定下来再创建列表：首帧宽度≈0 时委托里的 Text 会按假宽度排版
                 //    （行数翻几倍），量出的 contentHeight 是最终的 ~3 倍 → 滑块长度先长后短，

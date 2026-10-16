@@ -36,7 +36,11 @@ ListView {
     ScrollBar.vertical: AppScrollBar { }
 
     topMargin: Theme.spacing.cardPadding
-    bottomMargin: Theme.spacing.cardPadding
+    // 底部内容边距：原来与上/左右一样取 cardPadding(16) —— 连同 Shell 里两条 anchor 边距，
+    // "列表底 → 输入框顶"合计 40px，看着是一块空地。用户要求收到 ~10px：
+    // 这里取 labelGap(8)，Shell 那两条取 panelGap(2) ⇒ 合计 12px。
+    // ⚠️ maxContentY（下面）用的就是这个值 ⇒ 改它会同步影响"滚到底"的判定，这是预期的。
+    bottomMargin: Theme.spacing.labelGap
     leftMargin: Theme.spacing.cardPadding
     rightMargin: Theme.spacing.cardPadding
 
