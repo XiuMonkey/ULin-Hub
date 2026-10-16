@@ -92,26 +92,6 @@ void WindowBridge::attachWindow(QObject* window)
 	refreshFrameState();
 }
 
-void WindowBridge::attachAuxWindow(QObject* window)
-{
-	auto* quickWindow = qobject_cast<QQuickWindow*>(window);
-	if (!quickWindow) {
-		qWarning().noquote() << "[WindowBridge] attachAuxWindow 只接受 QQuickWindow，收到:" << window;
-		return;
-	}
-
-	// 主窗口的路由已经把它自己记成 m_window 了；这里再调也不要把它当"附加窗口"降级处理
-	// （主窗口的样式位本来就是同一套，applyNativeStyle 幂等）。但 m_window 一个字段都不动。
-	if (m_window == quickWindow) {
-		NativeWindowFilter::instance().applyNativeStyle(quickWindow);
-		return;
-	}
-
-	// 只补原生样式位：附加窗口没有自绘标题栏、没有窗口按钮、也不参与"弹出位置"上下文
-	// （见头文件的说明），所以这里刻意不接信号、不装事件过滤器、不改任何状态。
-	NativeWindowFilter::instance().applyNativeStyle(quickWindow);
-}
-
 bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
 {
 	// 只记"按下了 / 松开了"，不看位置变化：弹窗的起点要的是**这次点击落在哪**，

@@ -47,17 +47,6 @@ public:
 	// 根 Window 的 Component.onCompleted 里调一次：记窗口、装原生样式位、接帧状态信号
 	Q_INVOKABLE void attachWindow(QObject* window);
 
-	// **附加**窗口（右栏副窗口在 Component.onCompleted 里调）：只给它补同一套原生样式位
-	// （WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角），让它和主窗口走同一条 DWM 非客户区路径
-	// —— 无边框窗口每帧改原生尺寸时"露出还没画的那块"（黑块）正是缺了这排样式位。
-	//
-	// ⚠️ **主窗口行为一个字都不变**：本方法不碰 m_window（那是"主窗口"的语义），窗口动作
-	//    （minimize/toggleMaximize/closeWindow/startSystemMove/startSystemResize）、可绑定属性
-	//    （maximized/contentInset/hoveredControl）与最近点击位置仍然只服务主窗口；附加窗口自己
-	//    没有标题栏/窗口按钮，也就不需要那些。
-	// 幂等：同一扇窗重复调只是刷一遍样式位（applyNativeStyle 自己按样式位判重）。
-	Q_INVOKABLE void attachAuxWindow(QObject* window);
-
 	// 自绘标题栏与窗口按钮登记（语义见 NativeWindowFilter 的同名方法）
 	Q_INVOKABLE void setCaptionItem(QObject* item);
 	Q_INVOKABLE void addWindowControl(QObject* item, const QString& kind);
@@ -110,8 +99,7 @@ private:
 	QPointer<QQuickWindow> m_window;
 	QString m_hoveredControl;
 
-	// 最近一次点击的位置与它距今多久（isValid() == false = 窗口起来之后还没见过点击）。
-	// 只记**主窗口**的：它是"弹出位置"的上下文（覆盖页/弹窗都长在主窗口里）
+	// 最近一次点击的位置与它距今多久（isValid() == false = 窗口起来之后还没见过点击）
 	QPointF m_pointerPos;
 	QElapsedTimer m_pointerAge;
 };

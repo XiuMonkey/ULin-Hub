@@ -408,12 +408,10 @@ Window {
     }
 
     Component.onCompleted: {
-        // 补上和主窗口**同一套**原生样式位（WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角）：
-        // 无边框窗口每帧改原生尺寸时会露出还没画的那块（黑块/延迟），主窗口之所以不露，正是因为
-        // 它在 WindowBridge.attachWindow 里拿到了这排样式位、走 DWM 非客户区路径。
-        // ⚠️ 必须用 attachAuxWindow（**附加**窗口）：attachWindow 会把"主窗口"换成这扇窗 ——
-        //    WindowBridge 的窗口动作与可绑定属性都只认主窗口，换掉就是罪状级 bug。
-        WindowBridge.attachAuxWindow(win)
+        // 曾经在这里调 WindowBridge.attachAuxWindow(win) 给副窗补 WS_THICKFRAME/WS_CAPTION，
+        // 想让它像主窗那样走 DWM 非客户区路径 —— 那条路**没解决问题**（黑块照旧）✗，
+        // 真正的原因是窗口底色不透明（见上面的 color: "transparent"）。所以这里不再补样式：
+        // 少一套"多窗口原生样式"机制，副窗回到简单态。
         console.log("[sidebar-detach] window created " + win.width + "x" + win.height
                     + " at " + win.x + "," + win.y)
     }
