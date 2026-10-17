@@ -773,6 +773,38 @@ void ServerManager::startBundledServer()
 		// 但 profile 里没有挂它的行 —— 缺这一行时 /api/terminal/* 一律 404 not found（实测）。
 		// 与 session-stats 同样幂等补行：首次生成的模板已经带上它，这里兜的是"profile 早就生成好"的安装。
 		{
+			// 插件市场：dshmarket 是**标准插件**，它自己注册 /dsh-market/* 那一整批路由
+			// （registry / installed / install / uninstall / backup / restore / webdav …）。
+			// 包里带了它，但引擎 profile 不加载它 ⇒ 这些路由全部 404（实测 /dsh-market/registry
+			// 一直 404，界面只能退回内置快照，"正在等待最新数据"永远等不到）。与终端那条同样幂等补行。
+			{
+				const QString marketName = QStringLiteral("dshmarket");
+				const bool marketAvailable =
+					QFile::exists(profileDir + QStringLiteral("/node_modules/") + marketName
+						+ QStringLiteral("/package.json"))
+					|| QFile::exists(appDir + QStringLiteral("/resources/server/harness/profiles/web/node_modules/")
+						+ marketName + QStringLiteral("/package.json"))
+					|| QFile::exists(appDir + QStringLiteral("/resources/server/node_modules/") + marketName
+						+ QStringLiteral("/package.json"));
+
+				if (!marketAvailable) {
+					qWarning().noquote() << QStringLiteral(
+						"[ServerManager] 找不到 %1：插件市场只能退到快照（/dsh-market/* 全 404）。").arg(marketName);
+				}
+				else {
+					QString marketError;
+					const ExtensionRegistry::PatchEntryResult marketRow = ExtensionRegistry::ensurePatchEntry(profileDir,
+						QStringLiteral("dshmarket"), marketName,
+						QStringLiteral("plugin market: /dsh-market/registry|installed|install|uninstall|update|backup|restore"),
+						&marketError);
+
+					if (marketRow == ExtensionRegistry::PatchEntryResult::Failed)
+						qWarning().noquote() << QStringLiteral(
+							"[ServerManager] profile patch 补不上 %1: %2").arg(marketName, marketError);
+					else if (marketRow == ExtensionRegistry::PatchEntryResult::Added)
+						qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(marketName);
+				}
+			}
 			const QString terminalName = QStringLiteral("@deepseek-ai/dsh-api-terminal-controller");
 			const bool terminalAvailable =
 				QFile::exists(profileDir + QStringLiteral("/node_modules/") + terminalName
