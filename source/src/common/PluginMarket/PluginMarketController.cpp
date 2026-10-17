@@ -42,8 +42,17 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 			setBusy(false);
 			setStatus(qtTrId("plugin_load_failed_fmt").arg(error));
 			// 404 = /dsh-market/* 不存在 ⇒ 市场包没装：自动安装（旧壳 PluginsManager 同路）
-			if (status == 404)
+			if (status == 404 && !m_marketInstallTried)
+			{
+				m_marketInstallTried = true;
 				startMarketInstall();
+			}
+			else if (status == 404)
+			{
+				// 已经试过装市场包仍是 404 ⇒ 引擎确实没有这个端点。别再重试：否则 refresh() 会把
+				// 状态打回 plugin_loading（"正在等待最新数据"），界面看起来永远在等。
+				setStatus(qtTrId("plugin_loaded_offline"));
+			}
 		});
 
 	// ---- 市场包自动安装（pnpm add dshmarket）----

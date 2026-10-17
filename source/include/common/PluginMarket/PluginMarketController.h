@@ -128,4 +128,8 @@ private:
 	// 是否已经拿到过一次 registry（打开市场时据此决定要不要重取：启动 1.8s 已预热过，
 	// 打开时再取一次只会在数据回来时触发模型 reset + 委托批量重建 ⇒ 打开后 1.5s 卡一下）。
 	bool m_haveRegistry = false;
+	// 404 自动安装市场包**只试一次**：引擎没有 /dsh-market/* 时，装失败会回到 registryFailed
+	// ⇒ 又触发安装 ⇒ 无限重试；而每轮 refresh() 都把状态打回 plugin_loading（"正在等待最新数据"）
+	// ⇒ 界面看起来永远在等数据。加这个标记后只试一次，之后停在离线快照上。
+	bool m_marketInstallTried = false;
 };
