@@ -434,13 +434,17 @@ Item {
             }
 
             Text {
+                id: statusText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 0
+                // 限宽：左边给按钮留 160px（原来左右都锚在 parent 上 ⇒ 文案一长就压到按钮）。
+                // 只保留右边锚定，宽度取「文字宽」与「可用宽」的较小值，超出用尾部省略号。
+                width: Math.min(implicitWidth, Math.max(0, parent.width - 160))
                 horizontalAlignment: Text.AlignRight
                 text: Hub.plugins.status
                 elide: Text.ElideRight
+                maximumLineCount: 1
+                wrapMode: Text.NoWrap
                 color: Theme.color.textSecondary
                 font.family: "Microsoft YaHei UI"
                 font.pixelSize: Theme.font.caption
