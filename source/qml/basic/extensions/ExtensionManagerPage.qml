@@ -59,16 +59,9 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                BusySpinner {
-                    width: 16
-                    height: 16
-                    lineWidth: 2
-                    // 卡片正在展开/收回时先停（理由同市场页：转圈让整窗每帧重绘，动画会掉帧）
-                    running: Hub.extensions.busy && !page.overlayAnimating
-                    visible: Hub.extensions.busy && !page.overlayAnimating
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
+                // 这里原有一颗 BusySpinner（running: Hub.extensions.busy），但 Hub.extensions.busy
+                // 从来没有被置真过 ⇒ 它永远不会显示，是个死控件（用户："扩展管理页哪有转圈？"）。
+                // 需要"加载中"提示时再加静态文字（理由见 PluginMarketPage：转圈会拖整窗重绘）。
                 IconButton {
                     glyph: "✕"
                     tooltip: qsTrId("common_close")
