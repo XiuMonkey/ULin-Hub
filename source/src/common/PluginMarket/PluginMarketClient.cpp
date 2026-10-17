@@ -92,6 +92,21 @@ void PluginMarketClient::fetchRegistry()
 	QNetworkRequest request(endpointUrl(path));
 	qInfo().noquote() << "[Market] GET" << path;
 
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
 		const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -134,6 +149,21 @@ void PluginMarketClient::fetchInstalled()
 	QNetworkRequest request(endpointUrl(path));
 	qInfo().noquote() << "[Market] GET" << path;
 
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
 		const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -227,6 +257,21 @@ void PluginMarketClient::fetchDiagnosticLogs(const QString& reason)
 {
 	QNetworkRequest request(endpointUrl(QLatin1String(kLogsPath)));
 
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
+	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
+	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	request.setTransferTimeout(1500);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [reason, reply]() {
 		const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
