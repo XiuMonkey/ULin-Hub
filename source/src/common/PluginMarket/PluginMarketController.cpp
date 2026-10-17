@@ -222,6 +222,10 @@ void PluginMarketController::setSearch(const QString& keyword)
 
 void PluginMarketController::refresh()
 {
+	// refresh: 重新取 token —— 引擎每次重启都会换 launch token（例如装完市场那次重启），
+	// 构造时缓存的旧 token 会一直 401 host requires authentication。
+	if (m_api)
+		m_client->setAuthToken(m_api->launchToken());
 	updateBaseUrl();
 	setBusy(true);
 	setStatus(qtTrId("plugin_loading"));
