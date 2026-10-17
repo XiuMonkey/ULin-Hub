@@ -167,7 +167,9 @@ ListView {
             radius: Theme.radius.panel
             color: olderClick.hovered ? Theme.color.hoverBg : Theme.color.panelBg
             border.width: 1
-            border.color: Theme.color.border
+            // 静息描边走 inputBorder(10% 黑) 而不是 border(4%)：官方 DSH 里"可点的胶囊/按钮"这一档
+            // 用 `--dsw-alias-border-l2`，4% 太浅会看不出这里是个按钮。
+            border.color: Theme.color.inputBorder
 
             Text {
                 anchors.centerIn: parent

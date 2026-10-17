@@ -120,8 +120,9 @@ Item {
                             color: (!dock.homeVisible && block.index === Dock.activeIndex)
                                    ? Theme.color.hoverBg : "transparent"
                             border.width: 1
+                            // 当前块的那圈提示线走 inputBorder(10% 黑)：border 已收到 4%，当"选中提示"太浅
                             border.color: (!dock.homeVisible && block.index === Dock.activeIndex)
-                                          ? Theme.color.border : "transparent"
+                                          ? Theme.color.inputBorder : "transparent"
 
                             Text {
                                 id: blockLabel

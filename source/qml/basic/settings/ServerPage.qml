@@ -39,8 +39,9 @@ Item {
             radius: Theme.radius.control
             color: Theme.color.panelBg
             border.width: 1
-            // 聚焦描边走中性灰 textSecondary（原来是强调蓝 accent）：与输入卡片（Composer）的聚焦态同款
-            border.color: urlInput.activeFocus ? Theme.color.textSecondary : Theme.color.border
+            // 聚焦描边走中性灰 textSecondary（原来是强调蓝 accent）：与输入卡片（Composer）的聚焦态同款；
+            // 静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`（输入类控件那一档）
+            border.color: urlInput.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
 
             TextInput {
                 id: urlInput

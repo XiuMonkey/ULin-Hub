@@ -305,7 +305,9 @@ Item {
         radius: 10
         color: deleteHover.containsMouse ? Theme.color.dangerBg : Theme.color.panelBg
         border.width: 1
-        border.color: Theme.color.border
+        // 浮在列表上的小按钮：走"面板级环线" inputBorder(10%)。border 已按官方 DSH 收到 4%，
+        // 当浮层边缘太浅（官方浮层是 4% 环 + elevation 阴影，这里没有阴影，取深一档补回来）。
+        border.color: Theme.color.inputBorder
         x: Math.max(4, sessionBar.width - width - 12)
         y: Math.max(4, Math.min(sessionBar.height - height - 4,
             list.y + sessionBar.pendingY - list.contentY + list.spacing))
@@ -340,7 +342,8 @@ Item {
         radius: Theme.radius.panel
         color: Theme.color.panelBg
         border.width: 1
-        border.color: Theme.color.border
+        // 同上：确认卡是浮层，用面板级环线 inputBorder(10%)，别跟着 border(4%) 一起淡到看不见
+        border.color: Theme.color.inputBorder
 
         Column {
             id: confirmColumn

@@ -198,7 +198,10 @@ Item {
                         width: 8
                         height: 8
                         radius: 4
-                        color: row.modelData.loaded ? Theme.color.textPrimary : Theme.color.border
+                        // 状态点：已装载 = 近黑实心，未装载 = textCaption（最淡的文字档）。
+                        // 原来是 `border`，但 border 现在按官方 DSH 的 `--dsw-alias-border-l1` 收到 4% 黑，
+                        // 当"实心小圆点"用会几乎看不见 —— 圆点是内容，不是描边，所以走文字色阶。
+                        color: row.modelData.loaded ? Theme.color.textPrimary : Theme.color.textCaption
                     }
 
                     MouseArea {
