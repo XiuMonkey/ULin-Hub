@@ -56,18 +56,19 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                BusySpinner {
-                    width: 16
-                    height: 16
-                    lineWidth: 2
-                    // 卡片正在展开/收回时先停：转圈会让整窗每帧重绘（实测 +10ms/帧），
-                    // 叠在动画上就是"加载中的打开动画明显更卡"。由 PageOverlay 绑过来。
-                    // 精确条件：展开/收起动画期间（PageOverlay 把 t 的区间绑到页面根的 overlayAnimating）不转
-                    running: Hub.plugins.busy && !page.overlayAnimating
-                    visible: Hub.plugins.busy && !page.overlayAnimating
+                // 加载指示用**静态**文字，不用转圈（这是本轮实测的结论，不是偷懒）：
+                //   转圈 = 常驻无限动画 ⇒ 窗口每帧整窗重绘（本项目窗口带整窗背景层 + MultiEffect）
+                //   ⇒ 只要它在转，加载期间整窗就是 ~30ms/帧；而"按时间门控"要么盖住建卡阶段
+                //   （卡不如/要延迟 450ms），要么在 139ms 后放开（正好撞上建卡 ⇒ 又卡）。
+                //   静态文字两项都满足：**立刻可见**（无延迟）、**永不重绘**（无掉帧）。
+                Text {
                     anchors.verticalCenter: parent.verticalCenter
+                    visible: Hub.plugins.busy
+                    text: Hub.plugins.statusText.length > 0 ? Hub.plugins.statusText : qsTrId("plugin_loading")
+                    color: Theme.color.textTertiary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.small
                 }
-
                 IconButton {
                     glyph: "✕"
                     tooltip: qsTrId("common_close")
