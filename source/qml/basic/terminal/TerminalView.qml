@@ -126,10 +126,10 @@ Item {
     function reloadRows(first, last) {
         if (!model)
             return
-        var json = model.rowsJson(first, last)
-        if (!json || json.length === 0)
+        // 直接拿结构化数据（C++ 给的 QVariantList）：**不再 JSON.parse** —— 解析是 C++ 的活。
+        var parsed = model.rows(first, last)
+        if (!parsed || parsed.length === 0)
             return
-        var parsed = JSON.parse(json)
         var next = rows.slice()   // 浅拷贝：只换脏的那几项，别让所有行都重新绑定
         for (var i = 0; i < parsed.length; ++i) {
             var rowIndex = first + i

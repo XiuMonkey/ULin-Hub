@@ -210,6 +210,15 @@ void TerminalVtModel::setGridSize(int rows, int cols)
 // 网格读取：按行给"同样式合并后的段"
 // ------------------------------------------------------------------
 
+QVariantList TerminalVtModel::rows(int first, int last) const
+{
+	// 结构化的同一份数据：**复用 rowsJson 的合并逻辑**（段合并只此一份，别复制），
+	// 只是把序列化成文本换成在 C++ 里直接给出 QVariantList。
+	// 好处：QML 不再 JSON.parse（分层上那属于越界逻辑），且省掉每帧一次文本编解码。
+	const QJsonDocument doc = QJsonDocument::fromJson(rowsJson(first, last).toUtf8());
+	return doc.array().toVariantList();
+}
+
 QString TerminalVtModel::rowsJson(int first, int last) const
 {
 	const int rows = m_vt.rows();
