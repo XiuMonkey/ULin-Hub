@@ -161,8 +161,13 @@ void PluginMarketController::openPage()
 	// 再刷一次只是把同一个查询重发一遍 —— 数据 1.5 秒后回来时 models 整体 reset、ListView 一次性
 	// 建出十几张卡 ⇒ 正好在"打开后 1.5 秒"卡一下（实测单帧 51ms，用户体感就是打开不流畅，且
 	// 5 天前没有这个行为）。有数据就直接用缓存；只有"还没拿到过"时才去取。
-	if (!m_haveRegistry)
-		refresh();
+	// 先显示**手上已有的**（上次拿到的快照/结果），别等网络；再后台拉最新的。
+	// 用户的要求："先显示快照，然后后台慢慢拉" —— 数据到达后 registryLoaded 会整体替换并更新状态。
+	if (!m_all.isEmpty()) {
+		setBusy(false);
+		setStatus(qtTrId("plugin_loaded_offline"));
+	}
+	refresh();   // 后台拉：不阻塞界面（busy 只影响状态行）
 }
 
 void PluginMarketController::closePage()
