@@ -203,6 +203,14 @@ void TerminalSession::shutdown()
 {
 	detachStream();
 
+	// 扩展后端在场：终端进程归它管，关块的通知由 TerminalBridge::closeBlock 转过去，
+	// 这里**不发** terminal/close（这个块在引擎侧根本没有终端）
+	if (m_backend) {
+		setAttachState(QStringLiteral("closed"));
+		setStatusText(QStringLiteral("终端已关闭。"));
+		return;
+	}
+
 	if (m_terminalId.isEmpty() || m_sessionId.isEmpty()) {
 		setAttachState(QStringLiteral("closed"));
 		setStatusText(QStringLiteral("终端已关闭。"));
@@ -421,6 +429,9 @@ void TerminalSession::resetForNewAttachment(const QString& why)
 void TerminalSession::pageGone()
 {
 	m_pageReady = false;
+	// 扩展后端在场：告诉它"这个块没人看了"（别在这里关终端，契约与页面时代一致）
+	if (m_backend)
+		invokeBackend("pageGone", {});
 	detachStream();   // 只断附着：终端进程继续跑，回来时取新快照
 	if (!m_terminalId.isEmpty() && m_attachState != QStringLiteral("closed"))
 		setAttachState(QStringLiteral("idle"));
@@ -435,6 +446,9 @@ void TerminalSession::pageGone()
 TerminalVtModel* TerminalSession::viewModel()
 {
 	m_pageReady = true;
+	// 扩展后端在场：告诉它"这个块开始有人看了"（页面时代的 pageReady）
+	if (m_backend)
+		invokeBackend("pageReady", {});
 	return m_vt;
 }
 
@@ -452,6 +466,134 @@ void TerminalSession::flushViewModelInput()
 	const QByteArray bytes = m_vt->takePendingInput();
 	if (!bytes.isEmpty())
 		writeBytes(bytes);
+}
+
+// ------------------------------------------------------------------
+// 扩展后端（页面时代的 transport 面）—— 自绘路径下的字节来源
+// ------------------------------------------------------------------
+
+// 把扩展后端接到本会话：帧/状态从它的信号来，输入/尺寸/解绑走它的槽。
+// **判定方式**是"鸭子类型"：同名同签名的信号/槽在就接上，不在就记一次日志（不刷屏）。
+// 这样扩展对象不必共享宿主的头文件（它本来就是别人的 DLL）。
+void TerminalSession::attachBackend(QObject* backend)
+{
+	if (m_backend == backend)
+		return;
+
+	if (m_backend)
+		disconnect(m_backend, nullptr, this, nullptr);
+
+	m_backend = backend;
+	m_backendMissing.clear();
+
+	if (!backend) {
+		qInfo().noquote() << "[Terminal] 后端拆除，回到内置引擎 block=" << m_blockId;
+		return;
+	}
+
+	// 上行：后端 → 宿主（帧/状态）。字符串信号：不依赖扩展侧包含宿主的头文件。
+	// ⚠️ 槽的参数必须从**信号签名左边**开始对齐（frameReady 的第一个参数是 blockId），
+	//    所以 onBackendFrameSlot 收 4 个参数、自己按 blockId 过滤。
+	const bool frameHooked = connect(backend, SIGNAL(frameReady(QString,QString,int,QString)),
+		this, SLOT(onBackendFrameSlot(QString,QString,int,QString)));
+	const bool statusHooked = connect(backend, SIGNAL(statusChanged(QString,QString,QString,bool,QString)),
+		this, SLOT(onBackendStatusSlot(QString,QString,QString,bool,QString)));
+
+	qInfo().noquote() << "[Terminal] 扩展后端已接上 block=" << m_blockId
+		<< "后端=" << QString::fromLatin1(backend->metaObject()->className())
+		<< "frameReady=" << frameHooked << "statusChanged=" << statusHooked;
+
+	setAttachState(QStringLiteral("attached"));
+	// 画面能不能来，取决于后端有没有 frameReady：没有就如实说（别让面板看起来"已经连上"）
+	setStatusText(frameHooked
+		? QStringLiteral("已接上扩展后端（%1）。").arg(QString::fromLatin1(backend->metaObject()->className()))
+		: QStringLiteral("扩展后端（%1）缺少 frameReady 信号 —— 收不到画面。")
+			.arg(QString::fromLatin1(backend->metaObject()->className())));
+
+	// 下游：告诉后端"这个块开始用了"（页面时代是页面接上 QWebChannel 后调 pageReady）
+	invokeBackend("pageReady", {});
+}
+
+// 后端一帧 → 本地 VT。kind=="snapshot" 先硬复位（与引擎帧同语义），sequence 不参与（后端自己管序）。
+// blockId 只用来过滤（同一个后端对象服务多个块）。
+void TerminalSession::onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence,
+	const QString& text)
+{
+	if (!blockId.isEmpty() && blockId != m_blockId)
+		return;
+	onBackendFrame(blockId, kind, sequence, text);
+}
+
+void TerminalSession::onBackendFrame(const QString& blockId, const QString& kind, int sequence,
+	const QString& text)
+{
+	Q_UNUSED(blockId);
+	Q_UNUSED(sequence);
+	if (!m_vt)
+		return;
+	if (m_wantCols > 0 && m_wantRows > 0
+		&& (m_wantCols != m_vt->cols() || m_wantRows != m_vt->rows()))
+		m_vt->resizeGrid(m_wantRows, m_wantCols);
+
+	const QByteArray bytes = text.toUtf8();
+	if (kind == QStringLiteral("snapshot"))
+		m_vt->feedSnapshot(bytes);
+	else
+		m_vt->feed(bytes);
+	syncViewModel();
+	// 背压：页面时代要等页面 ack 才放行下一帧；自绘路径的消费是同步的（feed 回来就吃完了），
+	// 所以立刻 ack，让后端的"发一帧等 ack"队列不至于卡在 5 秒看门狗上
+	invokeBackend("ack", {});
+}
+
+void TerminalSession::onBackendStatusSlot(const QString& blockId, const QString& state,
+	const QString& statusText, bool readOnly, const QString& title)
+{
+	if (!blockId.isEmpty() && blockId != m_blockId)
+		return;
+	onBackendStatus(blockId, state, statusText, readOnly, title);
+}
+
+void TerminalSession::onBackendStatus(const QString& blockId, const QString& state,
+	const QString& statusText, bool readOnly, const QString& title)
+{
+	Q_UNUSED(blockId);
+	if (!state.isEmpty())
+		setAttachState(state);
+	setStatusText(statusText);
+	setReadOnly(readOnly);
+	if (!title.isEmpty() && m_title != title) {
+		m_title = title;
+		emit titleChanged();
+	}
+}
+
+// 给后端发一个"带 blockId 前缀"的调用；缺这个槽只记一次，别刷屏。
+//   extraArgs 空        → method(blockId)
+//   extraArgs 1 个串    → method(blockId, data)          （write）
+//   extraArgs 2 个整数  → method(blockId, a, b)          （resize：blockId, cols, rows）
+bool TerminalSession::invokeBackend(const char* method, const QVariantList& extraArgs)
+{
+	if (!m_backend)
+		return false;
+
+	bool ok = false;
+	if (extraArgs.isEmpty())
+		ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId));
+	else if (extraArgs.size() == 1)
+		ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId),
+			Q_ARG(QString, extraArgs.at(0).toString()));
+	else if (extraArgs.size() == 2)
+		ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId),
+			Q_ARG(int, extraArgs.at(0).toInt()), Q_ARG(int, extraArgs.at(1).toInt()));
+
+	const QString name = QString::fromLatin1(method);
+	if (!ok && !m_backendMissing.contains(name)) {
+		m_backendMissing.append(name);
+		qWarning().noquote() << "[Terminal] 扩展后端没有可调的" << name << "槽 block=" << m_blockId
+			<< "后端=" << QString::fromLatin1(m_backend->metaObject()->className());
+	}
+	return ok;
 }
 
 // ------------------------------------------------------------------
@@ -660,6 +802,11 @@ void TerminalSession::write(const QString& data)
 		qInfo().noquote() << "[Terminal] 只读态丢弃输入 block=" << m_blockId;
 		return;
 	}
+	// 扩展后端在场：输入交给它（write(blockId, data)），不走引擎
+	if (m_backend) {
+		invokeBackend("write", { data });
+		return;
+	}
 	if (!m_api || m_terminalId.isEmpty() || m_attachmentId.isEmpty()) {
 		// 还没附着上：丢掉比乱序发更好（用户看到的是"没反应"，日志里有据可查）
 		qInfo().noquote() << "[Terminal] 未附着，丢弃输入 block=" << m_blockId;
@@ -681,6 +828,13 @@ void TerminalSession::writeBytes(const QByteArray& data)
 		qInfo().noquote() << "[Terminal] 只读态丢弃输入 block=" << m_blockId;
 		return;
 	}
+
+	// 扩展后端在场：输入直接交给它（它的契约是 write(blockId, data)，data 是字符串）
+	if (m_backend) {
+		invokeBackend("write", { QString::fromUtf8(data) });
+		return;
+	}
+
 	if (!m_api || m_terminalId.isEmpty() || m_attachmentId.isEmpty()) {
 		qInfo().noquote() << "[Terminal] 未附着，丢弃输入 block=" << m_blockId;
 		return;
@@ -729,6 +883,9 @@ void TerminalSession::resize(int cols, int rows)
 {
 	m_wantCols = qBound(2, cols, qMax(2, m_maxCols));
 	m_wantRows = qBound(1, rows, qMax(1, m_maxRows));
+	// 扩展后端在场：尺寸交给它（resize(blockId, cols, rows)），不走引擎
+	if (m_backend)
+		invokeBackend("resize", { m_wantCols, m_wantRows });
 	pushResize();
 }
 
@@ -801,7 +958,8 @@ bool TerminalBridge::registerOn(QObject* channel, QObject* transport)
 	// 后端被扩展顶替时注册它的对象，本桥只留 QML 面那几处转接（pageGone / closeBlock）。
 	// 页面按 channel.objects 的第一个 key 取对象、不看类型，所以两种情况下 id 都保持 "ulinterm"。
 	QObject* target = transport ? transport : this;
-	m_transport = transport;
+	// transport 的接线只走这一个共用实现（历史遗留的页面注册 + 自绘路径的 bindBackend 共用）
+	attachTransport(transport);
 	if (target->objectName().isEmpty())
 		target->setObjectName(objectName());
 
@@ -811,6 +969,13 @@ bool TerminalBridge::registerOn(QObject* channel, QObject* transport)
 	qInfo().noquote() << "[Terminal] 已注册到 WebChannel id=" << target->objectName()
 					  << (transport ? "（扩展后端）" : "（内置桥）");
 	return true;
+}
+
+// 自绘路径的扩展后端缝（registerOn 的 QWebChannel 版本在无页面时没有调用方）。
+// 面板每次就绪都调一次也没事：attachTransport 是幂等的。
+bool TerminalBridge::bindBackend(QObject* transport)
+{
+	return attachTransport(transport);
 }
 
 // 会话的信号 → 桥的上行信号（都补上 blockId，页面按自己的块过滤）
@@ -857,6 +1022,9 @@ TerminalSession* TerminalBridge::ensureSession(const QString& blockId)
 	TerminalSession* session = new TerminalSession(blockId, m_api, this);
 	m_sessions.insert(blockId, session);
 	wireSession(session);
+	// 新建的会话也要立刻用上当前的后端（扩展可能先登记、面板后建块）
+	if (m_transport)
+		session->attachBackend(m_transport);
 	qInfo().noquote() << "[Terminal] 新建会话对象 block=" << blockId;
 	return session;
 }
@@ -868,13 +1036,13 @@ QObject* TerminalBridge::session(const QString& blockId)
 
 void TerminalBridge::closeBlock(const QString& blockId)
 {
-	// 后端被扩展顶替：会话由它管，本桥里没有这个块的 TerminalSession（拿不到就只能什么都不做）
+	// 扩展后端在场：关块的收尾先交给它（它的终端进程归它管）
 	if (m_transport) {
 		if (!QMetaObject::invokeMethod(m_transport, "closeBlock", Q_ARG(QString, blockId)))
 			qWarning().noquote() << "[Terminal] 扩展后端没有 closeBlock(QString) 槽，关块没能转过去：" << blockId;
-		return;
 	}
 
+	// 本桥这边的会话（VT 状态/网格模型）照常收掉：不然模型与回滚历史会一直挂着
 	const auto it = m_sessions.find(blockId);
 	if (it == m_sessions.end())
 		return;
@@ -890,6 +1058,43 @@ void TerminalBridge::closeBlock(const QString& blockId)
 void TerminalBridge::pageHello()
 {
 	emit pageHelloReceived();
+}
+
+// 把扩展后端接上（registerOn 的 transport 分支与 bindBackend 共用这一份实现）。
+// 它做三件事：① 记下 transport（空 = 退回内置桥）② 让**已有会话**改用后端（attachBackend）
+// ③ 让**以后新建的会话**也用后端（ensureSession 里看 m_transport）。
+bool TerminalBridge::attachTransport(QObject* transport)
+{
+	if (m_transport == transport) {
+		// 幂等：面板每次就绪都会调一次，同一个后端不重复动作
+		return true;
+	}
+
+	QObject* previous = m_transport.data();
+	m_transport = transport;
+
+	if (!transport) {
+		// 撤销：退回内置桥（引擎 terminal/*）。已有会话改回引擎路径。
+		for (TerminalSession* session : m_sessions)
+			session->attachBackend(nullptr);
+		qInfo().noquote() << "[Terminal] bindBackend: 已撤销扩展后端，退回内置桥";
+		return true;
+	}
+
+	if (transport->objectName().isEmpty())
+		transport->setObjectName(objectName());   // 契约：objectName 必须是 ulinterm（空着就替它设）
+
+	qInfo().noquote() << "[Terminal] bindBackend ok 后端="
+		<< QString::fromLatin1(transport->metaObject()->className())
+		<< "objectName=" << transport->objectName()
+		<< "（上一任=" << (previous ? QString::fromLatin1(previous->metaObject()->className())
+			: QStringLiteral("内置桥")) << "）";
+
+	// 已有会话改用后端；之后新建的会话在 ensureSession 里接上
+	for (TerminalSession* session : m_sessions)
+		session->attachBackend(transport);
+
+	return true;
 }
 
 // ---- 自绘视图面 ----

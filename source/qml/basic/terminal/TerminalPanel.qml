@@ -27,13 +27,10 @@ Item {
     // 终端是**会话作用域**的：跟着当前会话走（换会话就改挂到那个会话的终端上）
     property string sessionId: Hub.currentSessionId
 
-    // 被扩展顶替时的后端（空 = 用内置桥）。契约上这是"面板创建时读一次"：登记发生在启动期
-    // （扩展的 attachHost），而本面板是用户点开块才建的，顺序上必然早于这里。
+    // 被扩展顶替时的后端（空 = 内置引擎）。**不再"创建时读一次"**：自绘路径下由 Terminal.bindBackend
+    // 把这条缝接上，而扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），
+    // 所以下面有一个低频轮询兜底（见 syncBackend 的注释）。
     readonly property var backend: HostUi.panelBackend("terminal")
-
-    // 面板底色跟主题：暗色纯黑；亮色用 3% 灰而不是纯白 —— 面板本身在亮色下就是 #FFFFFF，
-    // 纯白终端底会和面板糊成一片、看不出块的边界。
-    readonly property color terminalBg: Theme.isDark ? "#000000" : "#F7F7F7"
 
     // ANSI 16 色（索引语义固定）：与 TerminalView 内置的默认表同值（两份是有意的 —— 视图那份是
     // "没有宿主时的默认"，这份是"宿主主题的现行值"）。
@@ -41,14 +38,41 @@ Item {
     readonly property var ansiDark: ["#000000", "#CD3131", "#0DBC79", "#E5E510", "#2472C8", "#BC3FBC", "#11A8CD", "#E5E5E5", "#666666", "#F14C4C", "#23D18B", "#F5F543", "#3B8EEA", "#D670D6", "#29B8DB", "#FFFFFF"]
     readonly property var ansiLight: ["#000000", "#CD3131", "#00BC00", "#949800", "#0451A5", "#BC05BC", "#0598BC", "#555555", "#666666", "#CD3131", "#14CE12", "#B5BA00", "#0451A5", "#BC05BC", "#0598BC", "#A5A5A5"]
 
-    // 绑定：给视图要模型、把"这个块属于哪个会话"推给桥。两个 onChanged 都会走到这里（幂等）。
+    // 后端缝：页面时代是 registerOn(channel, backend)，自绘路径没有页面了 ⇒ 走 Terminal.bindBackend。
+    // **幂等**（同一个后端反复接不动作），所以可以在多个时机反复调：
+    //   ① 面板就绪 / 换块；② 低频轮询（HostUi 没有"后端变了"的信号，而扩展可能晚于面板登记，
+    //      也可能在运行期被卸载撤销 —— 轮询是唯一不引入新信号就能同时覆盖"晚到"和"撤销"的办法，
+    //      一次调用只是两次哈希查找，1 秒一次可以忽略）。
+    function syncBackend() {
+        // 直接调：attachTransport 自己就是幂等的（同一个后端不重复动作、null→null 也不动作），
+        // 所以不需要在这里记"上次是谁"。这样"晚到"与"撤销"两个方向都被覆盖。
+        Terminal.bindBackend(HostUi.panelBackend("terminal"))
+    }
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: root.blockId.length > 0
+        onTriggered: root.syncBackend()
+    }
+
+    // 绑定：给视图要模型、把"这个块属于哪个会话"推给桥、把扩展后端接上。两个 onChanged 都会走到这里（幂等）。
     function bind() {
-        if (root.blockId.length === 0 || root.backend !== null) {
+        if (root.blockId.length === 0) {
             view.model = null
             return
         }
+        // 先接后端缝：接上之后会话只吃后端的帧、不再去引擎建终端
+        root.syncBackend()
         view.model = Terminal.bindView(root.blockId)
-        Terminal.start(root.blockId, root.sessionId)
+        // 有扩展后端时，引擎那条路（terminal/environment → create）不该跑：不调 start。
+        // ⚠️ 扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），那时这里读到的是 null，
+        //    于是 start() 照旧跑一次（内置引擎）。等轮询接上后端后，会话改用后端、引擎那次失败不会影响画面。
+        if (HostUi.panelBackend("terminal") === null)
+            Terminal.start(root.blockId, root.sessionId)
+        // 换块/首次打开都要把**键盘焦点**交给视图：终端一打开用户第一件事就是打字，
+        // 而壳里 Composer / 输入框 / Popup 都会抢焦点。callLater = 等这一帧别处的 focus 请求先落定。
+        Qt.callLater(view.grabFocus)
     }
 
     // 主题切换：**不需要重画** —— 视图里每一处颜色都是 `darkTheme` / `defaultFg` / `defaultBg` 的绑定，
@@ -90,24 +114,7 @@ Item {
         }
     }
 
-    // 后端被扩展顶替：自绘视图接不上它的 QWebChannel/xterm 契约，如实说明（不静默黑屏）
-    Rectangle {
-        anchors.fill: parent
-        visible: root.backend !== null
-        color: root.terminalBg
-
-        Text {
-            anchors.centerIn: parent
-            width: Math.min(parent.width - 32, 420)
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.Wrap
-            color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
-            font.pixelSize: Theme.font.caption
-            text: "终端后端已被扩展接管，而宿主终端面板已经换成自绘视图 —— "
-                  + "扩展后端认的是原页面（xterm.js / QWebChannel）那套协议，两边接不上。\n\n"
-                  + "要恢复：卸载该扩展的终端后端登记（HostUi.ClearPanelBackend(owner, \"terminal\")），"
-                  + "或等扩展提供自绘视图版本。"
-        }
-    }
+    // 后端被扩展顶替时**照常渲染**：Terminal.bindBackend 把后端的 frameReady 接进本地 VT，
+    // 输入走它的 write —— 页面时代那张"两边接不上"的说明牌已经不需要了。
+    // 后端缺 frameReady 一类的方法时，会话的状态行会如实说明（TerminalSession::attachBackend 里设的）。
 }

@@ -32,6 +32,7 @@
 #include <QQueue>
 #include <QSet>
 #include <QString>
+#include <QVariantList>
 
 class DshApiClient;
 class QJsonObject;
@@ -78,6 +79,17 @@ public:
 	// 视图键盘编好的字节 → 写队列（Terminal.flushInput 转进来）
 	void flushViewModelInput();
 
+	// ---- 扩展后端（页面时代的 transport 面）----
+	// 自绘路径没有页面了，但**后端缝**要留着：SetPanelBackend 给的对象成为本块的字节来源。
+	// 契约（旧页面面，扩展侧保持不变）：
+	//   本类 → 后端：pageReady(blockId) / pageGone(blockId) / write(blockId, data) / resize(blockId, cols, rows)
+	//                  / ack(blockId) / closeBlock(blockId)
+	//   后端 → 本类：frameReady(blockId, kind, sequence, text) / statusChanged(blockId, state, statusText,
+	//                  readOnly, title)
+	// 接上之后**绕过引擎**：帧直接进本地 VT（kind=="snapshot" 先硬复位），输入走后端的 write。
+	void attachBackend(QObject* backend);
+	QObject* backend() const { return m_backend.data(); }
+
 	// ---- 页面（JS）面（由 TerminalBridge 按 blockId 转进来）----
 	void pageGone();                  // 页面要销毁/换绑了（切块/收右栏），**不关终端**
 	void write(const QString& data);  // 键盘/粘贴：与扩展后端同形状的入口 → terminal/write
@@ -117,6 +129,15 @@ private:
 	void applyInfo(const QJsonObject& info);            // WebTerminalInfo → 本地镜像（title/cols/rows/进程态）
 	void syncViewModel();                               // 把状态镜像推给 VT 模型（状态行/只读/标题）
 
+	// 扩展后端的两条入流（旧页面面的信号；用**字符串信号**接，扩展对象不必共享头文件）
+	void onBackendFrame(const QString& blockId, const QString& kind, int sequence, const QString& text);
+	void onBackendStatus(const QString& blockId, const QString& state, const QString& statusText,
+		bool readOnly, const QString& title);
+	// 给后端发一个带 blockId 的调用（缺这个方法就只记一次日志，不刷屏）
+	bool invokeBackend(const char* method, const QVariantList& extraArgs);
+
+
+
 	// ---- 帧路径 ----
 	void onStreamOpened(const QString& streamId);
 	void onFrame(const QString& streamId, const QJsonObject& frame);
@@ -151,6 +172,11 @@ private:
 	// 自绘网格模型：视图 bindView 时建、随本会话活（终端会话在，VT 状态就在）
 	TerminalVtModel* m_vt = nullptr;
 
+	// 扩展后端（空 = 走内置引擎）。非空时本会话**完全不碰 terminal/***：帧来自后端的信号，
+	// 输入/尺寸/关块都转给它的槽（见 attachBackend 的契约注释）。
+	QPointer<QObject> m_backend;
+	QStringList m_backendMissing;   // 已经报过"后端缺这个方法"的名单（同一个只报一次，别刷屏）
+
 	// 引擎能力（terminal/environment）
 	int m_maxCols = 500;
 	int m_maxRows = 200;
@@ -174,6 +200,12 @@ private:
 
 	QQueue<QByteArray> m_writes;
 	bool m_writeInFlight = false;
+
+private Q_SLOTS:
+	// 这两个要能被**字符串连接**找到，所以必须是真正的槽（扩展对象是别人的 DLL，没有共享头文件）
+	void onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence, const QString& text);
+	void onBackendStatusSlot(const QString& blockId, const QString& state, const QString& statusText,
+		bool readOnly, const QString& title);
 };
 
 class TerminalBridge : public QObject
@@ -209,6 +241,17 @@ public:
 	// 视图量出来的网格尺寸（列/行）→ 引擎 terminal/resize
 	Q_INVOKABLE void applyGridSize(const QString& blockId, int cols, int rows);
 
+	// ---- 自绘路径的**扩展后端缝**（替代页面时代的 registerOn）----
+	// 背景：registerOn 要一个 QWebChannel，自绘面板没有页面了 ⇒ 它没有调用方 ⇒ m_transport 永远是空
+	// ⇒ 扩展给了后端宿主也不知道。本方法就是那条缝的新入口：
+	//   · transport 非空 ⇒ 它成为"终端块后端"（SetPanelBackend 登记的那个对象），本桥与它按页面面交互
+	//     （契约见 TerminalSession::attachBackend 的注释）；
+	//   · transport 为空 ⇒ 撤销、退回内置桥（引擎 terminal/*）。
+	// 幂等：同一个后端反复接不重复动作；面板每次就绪都能调。
+	Q_INVOKABLE bool bindBackend(QObject* transport);
+	// 当前接上的扩展后端（空 = 内置桥）。面板用它决定"装自绘视图还是给说明"。
+	Q_INVOKABLE QObject* panelTransport() const { return m_transport.data(); }
+
 	// ---- 页面（JS）面：每个调用都带 blockId，路由到对应会话 ----
 	Q_INVOKABLE void pageHello();
 	Q_INVOKABLE void pageGone(const QString& blockId);
@@ -237,11 +280,14 @@ private:
 	TerminalSession* findSession(const QString& blockId) const;
 	TerminalSession* ensureSession(const QString& blockId);   // 没有就建（页面绑定时也会走到）
 	void emitStatus(TerminalSession* session);
+	// 「把扩展后端接上/换掉」的唯一实现：registerOn 的 transport 分支与 bindBackend 共用这一份，
+	// 谁都不许再复制一遍（两份接线必然走偏）。幂等：同一个后端重复接是空操作。
+	bool attachTransport(QObject* transport);
 
 	DshApiClient* m_api = nullptr;
 	QHash<QString, TerminalSession*> m_sessions;
 	QSet<QWebChannel*> m_channels;   // 已注册过的 WebChannel（每个面板一个；同一个桥可注册到多个）
-	// 被扩展顶替时的替代后端（HostUi::panelBackend("terminal")，registerOn 时记下）：
-	// 页面直连它，本桥只负责把 QML 面那几处（pageGone / closeBlock）转过去
+	// 被扩展顶替时的替代后端（HostUi::panelBackend("terminal")）：
+	// 自绘路径下它**直接当字节来源**（本桥把它的 frameReady 喂进各块的 VT），不再有页面直连它
 	QPointer<QObject> m_transport;
 };

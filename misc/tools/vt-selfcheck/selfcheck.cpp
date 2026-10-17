@@ -12,6 +12,7 @@
 #include "common/terminal/TerminalVt.h"
 
 #include <cstdio>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -211,7 +212,106 @@ int main(int argc, char** argv)
 		check(foundAfter, "改尺寸后继续喂字节：新内容出现在网格里");
 	}
 
-	// ② 期望内容
+	// ③ 键盘 → 字节（"按键到底有没有变成要回写 PTY 的字节"）。
+	//    这一段是自绘终端唯一的输入出口：QML 的 Keys.onPressed → TerminalVtModel → 本类的键盘表。
+	//    期望值逐条对着 3rdparty/libvterm/src/keyboard.c 的 keycodes 表核过（含 Ctrl/Alt/Shift 与
+	//    DECCKM 应用光标键），不是"跑出来什么就写什么"。
+	{
+		std::printf("\n键盘 → 字节（对照 libvterm keyboard.c 的 keycodes 表）\n");
+		TerminalVt keyboard(24, 80);
+		keyboard.reset();
+		keyboard.takeKeyOutput();
+
+		const auto utf8 = [](uint32_t codepoint) {
+			return toUtf8(codepoint);
+		};
+		const auto hexdump = [](const std::string& bytes) {
+			std::string out;
+			char piece[8];
+			for (unsigned char byte : bytes)
+			{
+				std::snprintf(piece, sizeof(piece), "%02x ", byte);
+				out += piece;
+			}
+			if (!out.empty())
+				out.pop_back();
+			return out;
+		};
+		// 把"上一步攒下的字节"拼成一个串（一个按键可能产出多段）
+		const auto drain = [&keyboard]() {
+			std::string joined;
+			for (const std::string& chunk : keyboard.takeKeyOutput())
+				joined += chunk;
+			return joined;
+		};
+
+		// 逐条核对：动作 → 期望字节。给的是"按一下键"，比较的是整套字节。
+		const auto expectKey = [&](const char* what, const std::function<void()>& act, const std::string& expected) {
+			act();
+			const std::string got = drain();
+			check(got == expected, std::string(what) + " → " + hexdump(expected)
+				+ (got == expected ? "" : ("（实际 " + hexdump(got) + "）")));
+		};
+
+		// ① 普通字符（含 Shift：unichar 会剥掉 Shift）
+		expectKey("'a'", [&] { keyboard.keyUnichar('a', TerminalVt::ModNone); }, "a");
+		expectKey("Shift+'a'", [&] { keyboard.keyUnichar('A', TerminalVt::ModShift); }, "A");
+		expectKey("'1'", [&] { keyboard.keyUnichar('1', TerminalVt::ModNone); }, "1");
+		expectKey("空格", [&] { keyboard.keyUnichar(' ', TerminalVt::ModNone); }, " ");
+
+		// ② Ctrl 组合（可打印键 → C0 控制码；非 a-z 走 CSI u）
+		expectKey("Ctrl+'c'", [&] { keyboard.keyUnichar('c', TerminalVt::ModCtrl); }, std::string(1, '\x03'));
+		expectKey("Ctrl+'d'", [&] { keyboard.keyUnichar('d', TerminalVt::ModCtrl); }, std::string(1, '\x04'));
+		expectKey("Ctrl+'1'", [&] { keyboard.keyUnichar('1', TerminalVt::ModCtrl); }, "\x1b[49;5u");
+
+		// ③ Alt 组合（前缀 ESC）。⚠️ 写成两段字面量：`"\x1ba"` 会被当成十六进制转义 \x1ba（超范围）
+		expectKey("Alt+'a'", [&] { keyboard.keyUnichar('a', TerminalVt::ModAlt); }, "\x1b" "a");
+
+		// ④ 特殊键
+		expectKey("Enter", [&] { keyboard.keySpecial(TerminalVt::KeyEnter, TerminalVt::ModNone); }, "\r");
+		expectKey("Tab", [&] { keyboard.keySpecial(TerminalVt::KeyTab, TerminalVt::ModNone); }, "\t");
+		expectKey("Shift+Tab", [&] { keyboard.keySpecial(TerminalVt::KeyTab, TerminalVt::ModShift); }, "\x1b[Z");
+		expectKey("Backspace", [&] { keyboard.keySpecial(TerminalVt::KeyBackspace, TerminalVt::ModNone); }, "\x7f");
+		expectKey("Escape", [&] { keyboard.keySpecial(TerminalVt::KeyEscape, TerminalVt::ModNone); }, "\x1b");
+		expectKey("Up", [&] { keyboard.keySpecial(TerminalVt::KeyUp, TerminalVt::ModNone); }, "\x1b[A");
+		expectKey("Down", [&] { keyboard.keySpecial(TerminalVt::KeyDown, TerminalVt::ModNone); }, "\x1b[B");
+		expectKey("Left", [&] { keyboard.keySpecial(TerminalVt::KeyLeft, TerminalVt::ModNone); }, "\x1b[D");
+		expectKey("Right", [&] { keyboard.keySpecial(TerminalVt::KeyRight, TerminalVt::ModNone); }, "\x1b[C");
+		expectKey("Home", [&] { keyboard.keySpecial(TerminalVt::KeyHome, TerminalVt::ModNone); }, "\x1b[H");
+		expectKey("End", [&] { keyboard.keySpecial(TerminalVt::KeyEnd, TerminalVt::ModNone); }, "\x1b[F");
+		expectKey("Insert", [&] { keyboard.keySpecial(TerminalVt::KeyInsert, TerminalVt::ModNone); }, "\x1b[2~");
+		expectKey("Delete", [&] { keyboard.keySpecial(TerminalVt::KeyDelete, TerminalVt::ModNone); }, "\x1b[3~");
+		expectKey("PageUp", [&] { keyboard.keySpecial(TerminalVt::KeyPageUp, TerminalVt::ModNone); }, "\x1b[5~");
+		expectKey("PageDown", [&] { keyboard.keySpecial(TerminalVt::KeyPageDown, TerminalVt::ModNone); }, "\x1b[6~");
+		expectKey("Shift+Up", [&] { keyboard.keySpecial(TerminalVt::KeyUp, TerminalVt::ModShift); }, "\x1b[1;2A");
+
+		// ⑤ 功能键（F1-F4 走 SS3，F5 起走 CSI 数字）
+		expectKey("F1", [&] { keyboard.keyFunction(1, TerminalVt::ModNone); }, "\x1bOP");
+		expectKey("F4", [&] { keyboard.keyFunction(4, TerminalVt::ModNone); }, "\x1bOS");
+		expectKey("F5", [&] { keyboard.keyFunction(5, TerminalVt::ModNone); }, "\x1b[15~");
+		expectKey("F12", [&] { keyboard.keyFunction(12, TerminalVt::ModNone); }, "\x1b[24~");
+
+		// ⑥ DECCKM（应用光标键模式，shell 里 readline/vim 会开）：方向键变成 SS3
+		keyboard.feed("\x1b[?1h", 5);   // DECCKM set
+		keyboard.takeDirtyRows();
+		keyboard.takeKeyOutput();
+		expectKey("Up（DECCKM 开）", [&] { keyboard.keySpecial(TerminalVt::KeyUp, TerminalVt::ModNone); }, "\x1bOA");
+		keyboard.feed("\x1b[?1l", 5);   // DECCKM reset
+		keyboard.takeDirtyRows();
+		keyboard.takeKeyOutput();
+		expectKey("Up（DECCKM 关）", [&] { keyboard.keySpecial(TerminalVt::KeyUp, TerminalVt::ModNone); }, "\x1b[A");
+
+		// ⑦ 一串连打（真实输入的样子）：逐键攒、最后一次性取走
+		keyboard.keyUnichar('e', TerminalVt::ModNone);
+		keyboard.keyUnichar('c', TerminalVt::ModNone);
+		keyboard.keyUnichar('h', TerminalVt::ModNone);
+		keyboard.keyUnichar('o', TerminalVt::ModNone);
+		keyboard.keySpecial(TerminalVt::KeyEnter, TerminalVt::ModNone);
+		const std::string typed = drain();
+		check(typed == "echo\r", "连打 \"echo\" + Enter → " + hexdump(typed) + "（实际 " + hexdump(typed) + "）");
+	}
+
+	// ④ 期望内容
 	std::string joined;
 	for (const std::string& line : lines)
 	{

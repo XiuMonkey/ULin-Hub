@@ -87,7 +87,19 @@ Item {
     property bool cursorOn: true
 
     clip: true
+    // 键盘入口：**本视图必须拿到 active focus**，Keys.onPressed 才会来（这是"输入不进去"的第一现场）。
+    // focus:true 只是"在本作用域里声明想要焦点"，真正生效要靠 forceActiveFocus()：
+    // 壳里 Composer / 输入框 / Popup 都会抢焦点，光靠 focus:true 拿不到（实测 Window.activeFocusItem
+    // 一直是 null / QQuickRootItem）。所以下面还有三处主动要焦点：建好模型、绑上块、以及点一下视图。
     focus: true
+    // Tab 必须留给 PTY（补全/切换焦点在 shell 里是 Tab 键的活），所以不参与 Tab 焦点导航
+    activeFocusOnTab: false
+
+    // 主动要焦点：建好模型/换块之后，用户一打开终端就能直接打字
+    function grabFocus() {
+        root.forceActiveFocus()
+        cursorOn = true
+    }
 
     function rgbOf(value) {
         // 0xRRGGBB → "#rrggbb"
@@ -131,12 +143,17 @@ Item {
     Component.onCompleted: {
         if (model)
             reloadAll()
+        // 建好就要焦点（打开终端块后直接能打字）。callLater：让同一帧里别处的 focus 请求先落定，
+        // 我们再"抢"回来 —— 否则会被 Composer 之类后到的请求盖掉。
+        Qt.callLater(root.grabFocus)
     }
 
     onModelChanged: {
         rows = []
-        if (model)
+        if (model) {
             reloadAll()
+            Qt.callLater(root.grabFocus)
+        }
     }
 
     // 脏行通知 → 只重取那几行（rows 赋值会带着 Repeater 里对应 delegate 的 rowCells 一起重绑）
@@ -193,47 +210,61 @@ Item {
         onTriggered: root.cursorOn = !root.cursorOn
     }
 
-    onActiveFocusChanged: cursorOn = true
-
-    // ---- 滚动：鼠标滚轮 → 视口偏移（历史）----
-    MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.NoButton
-        onWheel: (wheel) => {
-            if (!root.model)
-                return
-            var lines = wheel.angleDelta.y / 40   // 一格滚轮 ≈ 3 行（120/40）
-            root.model.scrollBy(lines > 0 ? Math.max(1, Math.round(lines))
-                                          : Math.min(-1, Math.round(lines)))
-        }
-    }
-
-    // 键盘：本视图独占焦点；文本输入走 Keys.onPressed（组合键/IME 在 QML 上按码点给）
-    Keys.onPressed: (event) => {
+    // ---- 键盘 ----
+    // 把"一个按键"翻成终端字节并交给桥。抽成函数（而不是全写在 Keys.onPressed 里）有两个好处：
+    //   ① 按键翻译只有一份，测试/自检可以直接喂 (key, text, modifiers) 调它，不必伪造 QKeyEvent；
+    //   ② Keys.onPressed 只剩"接住事件 + accepted"，焦点相关的行为一眼看清。
+    // 参数就是 QKeyEvent 的三个字段：key = Qt::Key_*，text = 可打印文本（可能为空），modifiers = Qt 的修饰位。
+    function handleKey(key, text, modifiers) {
         if (!root.model)
             return
-        event.accepted = true
 
         // 打字时光标回到实时画面（在历史里打字容易"看不到自己打的字"）
         root.model.scrollToBottom()
 
         var mods = 0
-        if (event.modifiers & Qt.ShiftModifier) mods |= 1
-        if (event.modifiers & Qt.AltModifier) mods |= 2
-        if (event.modifiers & Qt.ControlModifier) mods |= 4
+        if (modifiers & Qt.ShiftModifier) mods |= 1
+        if (modifiers & Qt.AltModifier) mods |= 2
+        if (modifiers & Qt.ControlModifier) mods |= 4
 
-        // 先是"能映射到终端的键"：方向/编辑/翻页/功能键 + Ctrl 组合 + ASCII 可打印键
-        //（Ctrl+V 之类的宿主快捷键不在这里拦：让它们照常走宿主，终端只收 Ctrl+字母/符号）
-        model.sendQtKey(event.key, mods)
+        var isPlainText = (modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) === 0
+        var first = text.length > 0 ? text.charCodeAt(0) : -1
+        var isAsciiPrintable = isPlainText && text.length === 1 && first >= 0x20 && first <= 0x7e
 
-        // 再补**非 ASCII** 文本（中文/IME 提交的串）：这些在 sendQtKey 里被刻意跳过（只认 ASCII），
-        // 否则中文会被当成"码点 = Key_unknown"发一次乱码。
-        // ⚠️ 还要排掉 Ctrl/Alt 组合：那时 event.text 是控制码（\x01）或空串，不是用户要输入的字面文本。
-        var isPlainText = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) === 0
-        if (isPlainText && event.text.length > 0 && event.text.charCodeAt(0) > 0x7f)
-            model.typeText(event.text)
+        if (isAsciiPrintable) {
+            // ⚠️ 可打印 ASCII **必须按 text 发**，不能按 key：Qt 的 QKeyEvent::key 对字母永远是
+            // 大写码点（Qt::Key_A = 'A'），小写/大小写与符号全靠 text。按 key 发的话敲 a 会得到 A。
+            root.model.typeText(text)
+        } else {
+            // 特殊键（方向/编辑/翻页/功能键）、Ctrl 组合、以及非 ASCII 之外的兜底都走键盘表
+            root.model.sendQtKey(key, mods)
+            // 非 ASCII 文本（中文/IME 提交的串）：sendQtKey 刻意只认 ASCII，这里补发一次
+            if (isPlainText && text.length > 0 && first > 0x7f)
+                root.model.typeText(text)
+        }
 
+        // 把模型攒好的字节交给桥（→ TerminalSession::writeBytes → terminal/write 或扩展后端）
         Terminal.flushInput(root.blockId)
+    }
+
+    // 键盘入口：本视图独占焦点，事件才会到这里；**必须 accepted = true**，
+    // 否则未处理的按键会继续往父链走（宿主快捷键/页面导航会把它吞掉，表现为"敲了没反应"）。
+    Keys.onPressed: (event) => {
+        if (!root.model) {
+            event.accepted = false
+            return
+        }
+        event.accepted = true
+        root.handleKey(event.key, event.text, event.modifiers)
+    }
+
+    // 没有 activeFocus 时也把按键接住（比如焦点在别处但鼠标刚点进来这一瞬）：
+    // QML 的 Keys 只在有焦点时投递，这里用 Window 级兜底没有意义 —— 真正的手段是 grabFocus()，
+    // 所以这里只把"焦点丢了"这件事记进日志，别静默（用户报障时第一眼就能看出来）。
+    onActiveFocusChanged: {
+        cursorOn = true
+        if (!activeFocus && model !== null)
+            Terminal.log(blockId, "[视角] 终端视图失去键盘焦点（点击视图或用 Tab 切回来即可继续输入）")
     }
 
     // ---- 状态行：连接中/只读/错误 ----
@@ -423,6 +454,25 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // ---- 鼠标：滚轮 → 视口偏移（历史）；**左键点一下 → 抢焦点** ----
+    // ⚠️ 这个 MouseArea 必须声明在**网格之后**（同 z 时后声明者在上层）：网格里没有别的可交互项
+    //    （Canvas 不吃鼠标事件），由它独占点击/滚轮。放在网格之前会先被 Flickable 那片区域压住。
+    MouseArea {
+        id: inputArea
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton
+        // 只"要焦点"，不拦别的事：以后要加选区的拖动也走这里，不至于把焦点弄丢
+        onPressed: root.grabFocus()
+        onClicked: root.grabFocus()
+        onWheel: (wheel) => {
+            if (!root.model)
+                return
+            var lines = wheel.angleDelta.y / 40   // 一格滚轮 ≈ 3 行（120/40）
+            root.model.scrollBy(lines > 0 ? Math.max(1, Math.round(lines))
+                                          : Math.min(-1, Math.round(lines)))
         }
     }
 
