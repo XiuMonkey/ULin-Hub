@@ -439,6 +439,11 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 0
                 horizontalAlignment: Text.AlignRight
+                // 左侧留 160px：状态文案可能很长（错误信息/插件名），锚满会盖住左边的按钮；
+                // 单行不换行 + 尾部省略号，长度上限由这里到右边缘的距离决定。
+                anchors.leftMargin: 160
+                maximumLineCount: 1
+                wrapMode: Text.NoWrap
                 text: Hub.plugins.status
                 elide: Text.ElideRight
                 color: Theme.color.textSecondary

@@ -41,3 +41,6 @@ build_smoke/
 
 # StyleExample 的整包 zip（185 MB，含壁纸）：不进仓库。要入库就删掉下面这行。
 assets/StyleExample/Bg-Genshin-Keqing.zip
+
+# pnpm 装插件市场时的工作目录（不该进仓库）
+.pnpm-store/
