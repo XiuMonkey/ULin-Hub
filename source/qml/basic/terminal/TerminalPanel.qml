@@ -9,9 +9,9 @@
 // ③ 块关掉（切换/收栏）时通知桥解绑。
 //
 // ⚠️ 对外契约不变：`blockId`（模型给的稳定 id）、`sessionId`（默认跟当前会话）、以及**扩展后端那条缝**
-//    （HostUi::SetPanelBackend(owner, "terminal", backend)）。后端被扩展顶替时本面板**不装自绘视图** ——
-//    扩展后端认的是原来的 QWebChannel/xterm 协议，换了视图它接不上，所以如实给一条状态说明，
-//    而不是静默黑屏（详见报告「没做成/不确定」）。
+//    （HostUi::SetPanelBackend(owner, "terminal", backend)）。后端被扩展顶替时**还是装自绘视图**：
+//    宿主按后端声明的 `apiVersion` 选面 —— >=2 走字节面（hostWrite/hostData，裸字节直通），
+//    否则走页面面（兼容层，deprecated）。两条面都由 TerminalSession 接进同一个 VT，本面板不区分。
 
 import QtQuick
 import ULinHub 1.0
@@ -68,8 +68,12 @@ Item {
         // 有扩展后端时，引擎那条路（terminal/environment → create）不该跑：不调 start。
         // ⚠️ 扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），那时这里读到的是 null，
         //    于是 start() 照旧跑一次（内置引擎）。等轮询接上后端后，会话改用后端、引擎那次失败不会影响画面。
+        // 后端在场时仍要把"块属于哪个会话"告诉桥：字节面的 hostStart(blockId, sessionId) 要这个参数，
+        // 而 bindSession 是**只记 id、不碰引擎**的旁路（不会建终端、不会发任何 terminal/*）。
         if (HostUi.panelBackend("terminal") === null)
             Terminal.start(root.blockId, root.sessionId)
+        else
+            Terminal.bindSession(root.blockId, root.sessionId)
         // 换块/首次打开都要把**键盘焦点**交给视图：终端一打开用户第一件事就是打字，
         // 而壳里 Composer / 输入框 / Popup 都会抢焦点。callLater = 等这一帧别处的 focus 请求先落定。
         Qt.callLater(view.grabFocus)
@@ -114,7 +118,8 @@ Item {
         }
     }
 
-    // 后端被扩展顶替时**照常渲染**：Terminal.bindBackend 把后端的 frameReady 接进本地 VT，
-    // 输入走它的 write —— 页面时代那张"两边接不上"的说明牌已经不需要了。
-    // 后端缺 frameReady 一类的方法时，会话的状态行会如实说明（TerminalSession::attachBackend 里设的）。
+    // 后端被扩展顶替时**照常渲染**：TerminalSession 按面接线 ——
+    // 字节面（默认）：hostData → 本地 VT → 本视图；输入 → hostWrite（裸字节）。
+    // 页面面（兼容层，deprecated）：frameReady → 本地 VT；输入 → write。
+    // 后端缺帧/缺信号的，会话的状态行会如实说明（在 TerminalSession::attachBackend 里设）。
 }

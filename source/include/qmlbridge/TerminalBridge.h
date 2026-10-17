@@ -79,16 +79,36 @@ public:
 	// 视图键盘编好的字节 → 写队列（Terminal.flushInput 转进来）
 	void flushViewModelInput();
 
-	// ---- 扩展后端（页面时代的 transport 面）----
+	// ---- 扩展后端（两条面：字节面默认 / 页面面兼容层）----
 	// 自绘路径没有页面了，但**后端缝**要留着：SetPanelBackend 给的对象成为本块的字节来源。
-	// 契约（旧页面面，扩展侧保持不变）：
+	//
+	// **选面规则（唯一判据，别在别处再判一遍）**：先把后端当 QObject 问 `apiVersion` 属性 ——
+	//   · 有且 >= 2 ⇒ **字节面**（默认，薄），本类按下面的字节面契约接线；
+	//   · 缺省 / < 2 / 字节面的槽与信号不齐 ⇒ 退回**页面面**（兼容层，deprecated）。
+	//
+	// 字节面（v2，新扩展只需要实现这一面）：**4 槽 + 3 信号**
+	//   本类 → 后端：hostStart(blockId, sessionId) / hostWrite(blockId, QByteArray)
+	//                / hostResize(blockId, cols, rows) / hostClose(blockId)
+	//   后端 → 本类：hostData(blockId, QByteArray) / hostReady(blockId) / hostExit(blockId, code)
+	//   · 输入：字节直通（无 QString/UTF-8 往返）；
+	//   · 输出：**直接喂 VT** —— 不分帧、不回 ack、不做 snapshot 特例、不做文本解码；
+	//   · 状态：hostReady ⇒ "已连接"，hostExit(code) ⇒ "已退出（退出码 N）"。
+	//
+	// 页面面（v1，兼容层，**deprecated**：只为仍给页面装 xterm.js 的扩展保留）：
 	//   本类 → 后端：pageReady(blockId) / pageGone(blockId) / write(blockId, data) / resize(blockId, cols, rows)
-	//                  / ack(blockId) / closeBlock(blockId)
+	//                / ack(blockId) / closeBlock(blockId)
 	//   后端 → 本类：frameReady(blockId, kind, sequence, text) / statusChanged(blockId, state, statusText,
-	//                  readOnly, title)
-	// 接上之后**绕过引擎**：帧直接进本地 VT（kind=="snapshot" 先硬复位），输入走后端的 write。
+	//                readOnly, title)
+	//   · 厚：9 槽 + 2 信号 + ack/分帧/快照特例 + UTF-8 往返。
+	// 接上之后**两条面都绕过引擎**：帧直接进本地 VT（页面面的 kind=="snapshot" 先硬复位）。
 	void attachBackend(QObject* backend);
 	QObject* backend() const { return m_backend.data(); }
+	// 本会话接的后端选中的是哪一面（true = 字节面）。关块/解绑那些"带 blockId 的收尾调用"
+	// 要靠它找对槽：字节面是 hostClose，页面面是 closeBlock / pageGone。
+	bool byteFace() const { return m_byteFace; }
+	// 把"这个块属于哪个会话"告诉本会话。自绘路径下面板**不调 start()**（那会去引擎建终端），
+	// 而字节面的 hostStart(blockId, sessionId) 仍需要这个 id。
+	void noteSession(const QString& sessionId);
 
 	// ---- 页面（JS）面（由 TerminalBridge 按 blockId 转进来）----
 	void pageGone();                  // 页面要销毁/换绑了（切块/收右栏），**不关终端**
@@ -133,6 +153,13 @@ private:
 	void onBackendFrame(const QString& blockId, const QString& kind, int sequence, const QString& text);
 	void onBackendStatus(const QString& blockId, const QString& state, const QString& statusText,
 		bool readOnly, const QString& title);
+	// 字节面的两条入流（v2，默认）：hostData 直接喂 VT；hostReady / hostExit 只改状态行
+	bool hookByteFace(QObject* backend);          // 接 3 个信号（缺 hostData 就返回 false ⇒ 回退页面面）
+	void onBackendHostData(const QByteArray& bytes);
+	void onBackendHostReady();
+	void onBackendHostExit(int code);
+	// 把"当前网格"告诉字节面后端（设备起终端用）。视图还没量出尺寸时用 VT 模型当前的网格。
+	void pushByteFaceGrid();
 	// 给后端发一个带 blockId 的调用（缺这个方法就只记一次日志，不刷屏）
 	bool invokeBackend(const char* method, const QVariantList& extraArgs);
 
@@ -175,6 +202,11 @@ private:
 	// 扩展后端（空 = 走内置引擎）。非空时本会话**完全不碰 terminal/***：帧来自后端的信号，
 	// 输入/尺寸/关块都转给它的槽（见 attachBackend 的契约注释）。
 	QPointer<QObject> m_backend;
+	// 选中了字节面（apiVersion>=2 且 3 个信号接得上）。false 且 m_backend 非空 = 页面面（兼容层）。
+	bool m_byteFace = false;
+	// 字节面的两条"只报一次"日志：证明"输入走 hostWrite / 输出直接 feed"（每块一次，别刷屏）
+	bool m_byteWriteLogged = false;
+	bool m_byteDataLogged = false;
 	QStringList m_backendMissing;   // 已经报过"后端缺这个方法"的名单（同一个只报一次，别刷屏）
 
 	// 引擎能力（terminal/environment）
@@ -202,10 +234,14 @@ private:
 	bool m_writeInFlight = false;
 
 private Q_SLOTS:
-	// 这两个要能被**字符串连接**找到，所以必须是真正的槽（扩展对象是别人的 DLL，没有共享头文件）
+	// 这四个要能被**字符串连接**找到，所以必须是真正的槽（扩展对象是别人的 DLL，没有共享头文件）
 	void onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence, const QString& text);
 	void onBackendStatusSlot(const QString& blockId, const QString& state, const QString& statusText,
 		bool readOnly, const QString& title);
+	// 字节面（v2）：hostData 是裸字节，hostReady/hostExit 是状态行
+	void onBackendHostDataSlot(const QString& blockId, const QByteArray& bytes);
+	void onBackendHostReadySlot(const QString& blockId);
+	void onBackendHostExitSlot(const QString& blockId, int code);
 };
 
 class TerminalBridge : public QObject
@@ -220,11 +256,14 @@ public:
 	void init(DshApiClient* api);
 
 	// ---- QML 面 ----
+	// **deprecated**（只为仍带 WebEngine 页面的旧路径保留；自绘面板没有页面，走 bindBackend）：
 	// 把终端后端的"要注册的对象"注册到 QWebChannel 上（QML 侧的 WebChannel 对象）。**必须**从 C++ 注册，
 	// 别在 QML 里写 `registeredObjects: [Terminal]`：那是个 JS 数组字面量，C++ 注册的 QML 单例在这个位置
 	// 是"类型包装"，转 QObject* 得到 null（实测日志：`Cannot register null object to WebChannel`）。
 	// transport 非空 = 该块后端被扩展顶替（HostUi::panelBackend("terminal")），注册它、页面直连它；
 	// 空 = 用内置的本桥。返回是否注册成功。
+	// ⚠️ 自绘终端（TerminalVt/TerminalView）没有 QWebChannel，**没有调用方** —— 新增接线别再写在这里，
+	//    写 bindBackend（同一个 attachTransport 实现）。
 	Q_INVOKABLE bool registerOn(QObject* channel, QObject* transport);
 	// 取某个块的会话对象（按稳定 id 复用，不存在则建）；关块才调 closeBlock
 	Q_INVOKABLE QObject* session(const QString& blockId);
@@ -240,6 +279,9 @@ public:
 	Q_INVOKABLE void flushInput(const QString& blockId);
 	// 视图量出来的网格尺寸（列/行）→ 引擎 terminal/resize
 	Q_INVOKABLE void applyGridSize(const QString& blockId, int cols, int rows);
+	// 面板把"这个块属于哪个会话"告诉桥。**不碰引擎**：只记下 id，扩展后端在场时顺带转成
+	// hostStart(blockId, sessionId)（字节面契约要这个参数；页面面没有对应槽，是空操作）。
+	Q_INVOKABLE void bindSession(const QString& blockId, const QString& sessionId);
 
 	// ---- 自绘路径的**扩展后端缝**（替代页面时代的 registerOn）----
 	// 背景：registerOn 要一个 QWebChannel，自绘面板没有页面了 ⇒ 它没有调用方 ⇒ m_transport 永远是空
@@ -253,12 +295,14 @@ public:
 	Q_INVOKABLE QObject* panelTransport() const { return m_transport.data(); }
 
 	// ---- 页面（JS）面：每个调用都带 blockId，路由到对应会话 ----
-	Q_INVOKABLE void pageHello();
-	Q_INVOKABLE void pageGone(const QString& blockId);
-	Q_INVOKABLE void start(const QString& blockId, const QString& sessionId);
-	Q_INVOKABLE void write(const QString& blockId, const QString& data);
-	Q_INVOKABLE void resize(const QString& blockId, int cols, int rows);
-	Q_INVOKABLE void ack(const QString& blockId);
+	// **整段 deprecated**：自绘终端（TerminalView + TerminalVt）不装载页面，这些调用的消费方只剩
+	// 仍带 WebEngine 页面的旧路径。新接线请用上面的 bindView / bindSession / flushInput / applyGridSize。
+	Q_INVOKABLE void pageHello();                                       // deprecated（页面接上信道的回喊）
+	Q_INVOKABLE void pageGone(const QString& blockId);                  // deprecated（用 viewGone）
+	Q_INVOKABLE void start(const QString& blockId, const QString& sessionId);   // 仍用：引擎 mount 入口
+	Q_INVOKABLE void write(const QString& blockId, const QString& data);        // deprecated（用 flushInput）
+	Q_INVOKABLE void resize(const QString& blockId, int cols, int rows);        // deprecated（用 applyGridSize）
+	Q_INVOKABLE void ack(const QString& blockId);                       // deprecated（自绘路径没有背压）
 	Q_INVOKABLE void log(const QString& blockId, const QString& message);
 
 signals:
@@ -283,11 +327,17 @@ private:
 	// 「把扩展后端接上/换掉」的唯一实现：registerOn 的 transport 分支与 bindBackend 共用这一份，
 	// 谁都不许再复制一遍（两份接线必然走偏）。幂等：同一个后端重复接是空操作。
 	bool attachTransport(QObject* transport);
+	// 「这个块的后端是哪一面」的唯一实现：有会话就听会话（它已经校验过槽/信号是否齐全），
+	// 没有会话就看后端声明的 apiVersion。关块/解绑那类收尾调用要靠它挑对槽。
+	bool transportByteFace(const QString& blockId) const;
 
 	DshApiClient* m_api = nullptr;
 	QHash<QString, TerminalSession*> m_sessions;
 	QSet<QWebChannel*> m_channels;   // 已注册过的 WebChannel（每个面板一个；同一个桥可注册到多个）
 	// 被扩展顶替时的替代后端（HostUi::panelBackend("terminal")）：
-	// 自绘路径下它**直接当字节来源**（本桥把它的 frameReady 喂进各块的 VT），不再有页面直连它
+	// 自绘路径下它**直接当字节来源**（默认字节面：它的 hostData 喂进各块的 VT；页面面：frameReady），
+	// 不再有页面直连它。
 	QPointer<QObject> m_transport;
+	// 后端声明的接口面版本（见 TerminalSession::attachBackend 的选面规则；0 = 没声明 ⇒ 页面面）
+	int m_transportApiVersion = 0;
 };
