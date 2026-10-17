@@ -363,7 +363,9 @@ Item {
         elide: Text.ElideRight
         color: Theme.color.textTertiary
         font.family: "Microsoft YaHei UI"
-        font.pixelSize: Theme.font.caption
+        // 调用量小字：用户觉得原来 12（font.caption）偏大 ⇒ 降到 font.small（11）。
+        // 行高 band 仍是 statsLineHeight(14)，文字垂直居中 ⇒ "底边对齐会话栏底"那条不受影响。
+        font.pixelSize: Theme.font.small
 
         // 仅在被省略号截断时给 tooltip（原版 syncToolTip 同规则）
         AppToolTip {
