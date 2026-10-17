@@ -27,6 +27,13 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 {
 	connect(m_client, &PluginMarketClient::registryLoaded, this,
 		[this](const QJsonArray& plugins, const QString& source) {
+			// 已经有快照了、这次回来的又是快照 ⇒ 内容一样，别重建列表（否则 4 秒后白解析一遍
+			// 839 条、还可能闪一下）。只有拿到**非快照**（实时/缓存）才替换。
+			if (source == QLatin1String("snapshot") && !m_all.isEmpty() && m_haveRegistry) {
+				qInfo().noquote() << "[Market] 后台回来的仍是快照，内容一致 ⇒ 不动列表";
+				return;
+			}
+
 			m_all = PluginMarketModel::parsePlugins(plugins);
 			m_haveRegistry = true;   // 之后打开市场直接用这份，不再重取（见 openPage）
 			setBusy(false);
