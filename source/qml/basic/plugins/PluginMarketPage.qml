@@ -56,16 +56,9 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                BusySpinner {
-                    width: 16
-                    height: 16
-                    lineWidth: 2
-                    // 卡片正在展开/收回时先停：转圈会让整窗每帧重绘（实测 +10ms/帧），
-                    // 叠在动画上就是"加载中的打开动画明显更卡"。由 PageOverlay 绑过来。
-                    running: Hub.plugins.busy && !page.overlayAnimating
-                    visible: Hub.plugins.busy && !page.overlayAnimating
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+                // 加载转圈**去掉**了：这颗 16px 的无限动画会让整窗每帧重绘（本项目窗口带整窗背景层
+                // + MultiEffect），加载那几秒里打开/操作都掉到 30ms 左右；用户明确要求删掉。
+                // 加载状态仍有文本提示（statusText）可看。
 
                 IconButton {
                     glyph: "✕"
