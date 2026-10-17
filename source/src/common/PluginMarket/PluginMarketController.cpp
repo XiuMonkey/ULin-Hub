@@ -40,7 +40,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 
 			// 三种来源的文案与旧壳一致（快照 / 缓存 / 实时）
 			if (source == QLatin1String("snapshot"))
-				setStatus(qtTrId("plugin_loaded_offline"));
+				setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
 			else if (source == QLatin1String("cache"))
 				setStatus(qtTrId("plugin_loaded_cached_fmt").arg(m_all.size()));
 			else
@@ -52,6 +52,17 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 	connect(m_client, &PluginMarketClient::registryFailed, this,
 		[this](const QString& error, int status) {
 			setBusy(false);
+			// 401 = 宿主还没完成 DSH 登录握手（装完市场引擎重启后必然发生一次）。
+			// 这时不该报错：等 cookie 到手后自动重来几次即可（用户手动重开面板能好，说明就是这个原因）。
+			if (status == 401) {
+			    static int sAuthRetries = 0;
+			    if (++sAuthRetries <= 8) {
+			        setStatus(QStringLiteral("正在登录 DSH，请稍候…"));
+			        QTimer::singleShot(1200, this, [this] { refresh(); });
+			        return;
+			    }
+			    sAuthRetries = 0;
+			}
 			setStatus(qtTrId("plugin_load_failed_fmt").arg(error));
 			// 404 = /dsh-market/* 不存在 ⇒ 市场包没装：自动安装（旧壳 PluginsManager 同路）
 			if (status == 404 && !m_marketInstallTried)
@@ -63,7 +74,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 			{
 				// 已经试过装市场包仍是 404 ⇒ 引擎确实没有这个端点。别再重试：否则 refresh() 会把
 				// 状态打回 plugin_loading（"正在等待最新数据"），界面看起来永远在等。
-				setStatus(qtTrId("plugin_loaded_offline"));
+				setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
 			}
 		});
 
@@ -187,7 +198,7 @@ void PluginMarketController::openPage()
 	// 然后后台慢慢拉最新的 —— 界面从不等待网络。
 	if (!m_all.isEmpty()) {
 		setBusy(false);
-		setStatus(qtTrId("plugin_loaded_offline"));
+		setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
 	}
 	else {
 		loadLocalSnapshot();
@@ -318,7 +329,7 @@ bool PluginMarketController::loadLocalSnapshot()
 		m_all = PluginMarketModel::parsePlugins(plugins);
 		m_haveRegistry = true;
 		setBusy(false);
-		setStatus(qtTrId("plugin_loaded_offline"));   // 快照 ⇒ 离线
+		setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));   // 快照 ⇒ 离线
 		rebuild();
 		qInfo().noquote() << "[Market] 先读本地快照" << m_all.size() << "个插件 ·" << path;
 		return true;
