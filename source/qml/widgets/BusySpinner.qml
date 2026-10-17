@@ -47,6 +47,10 @@ Item {
         to: 360
         duration: 900
         loops: Animation.Infinite
-        running: root.running
+                // 只在**真正可见**时才转：running 默认 true，而这里是一条 Animation.Infinite ——
+        // 页面被遮住/收起（visible=false）时动画仍会继续跑，白烧 CPU 并抢帧（插件市场/扩展管理
+        // 这类"页 + 转圈"的界面打开时不流畅就是这个原因）。门控在组件里做，比让每个页面自己
+        // 声明 overlayAnimating 更不容易漏。
+        running: root.running && root.visible
     }
 }
