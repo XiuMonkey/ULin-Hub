@@ -26,6 +26,11 @@ public:
 
 	void setNetworkAccessManager(QNetworkAccessManager* nam);
 
+
+	// 宿主 launch token：所有 /dsh-market/* 请求带上它（见 endpointUrl）。
+
+	void setAuthToken(const QString& token);
+
 	// 各接口路径（也用于让调用方识别失败来源）
 	static QString registryPath();
 	static QString installedPath();
@@ -61,5 +66,10 @@ private:
 	QUrl endpointUrl(const QString& path) const;
 
 	QUrl m_baseUrl;
+
+
+	// 宿主 launch token：新版 dshmarket(1.66.x) 要求宿主身份，否则 401
+
+	QString m_authToken;
 	QNetworkAccessManager* m_nam = nullptr;
 };

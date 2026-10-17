@@ -1,3 +1,4 @@
+#include <QUrlQuery>
 #include "common/PluginMarket/PluginMarketClient.h"
 
 #include <QDebug>
@@ -33,6 +34,10 @@ namespace
 	}
 }
 
+void PluginMarketClient::setAuthToken(const QString& token)
+{
+	m_authToken = token;
+}
 void PluginMarketClient::setNetworkAccessManager(QNetworkAccessManager* nam)
 {
 	if (!nam || nam == m_nam)
@@ -62,6 +67,12 @@ QUrl PluginMarketClient::endpointUrl(const QString& path) const
 	url.setPath(path);
 	url.setQuery(QString());
 	url.setFragment(QString());
+	if (!m_authToken.isEmpty()) {
+		// 新版 dshmarket(1.66.x) 要求宿主身份：沿用引擎握手用的 ?token=<launch token>，否则 401 host requires authentication。
+		QUrlQuery query;
+		query.addQueryItem(QStringLiteral("token"), m_authToken);
+		url.setQuery(query);
+	}
 	return url;
 }
 
