@@ -100,6 +100,11 @@ private:
 	void setBusy(bool busy);
 	void setStatus(const QString& text);
 	void rebuild();
+
+	// 读插件包自带的 registry 快照（dshmarket/data/registry-snapshot.json，约 598KB / 839 条）。
+	// 打开市场时先用它把列表铺出来（毫秒级），网络那趟只在后台慢慢跑。
+	// 找不到文件就返回 false，调用方保持原行为（等引擎）。
+	bool loadLocalSnapshot();
 	void updateBaseUrl();
 	// /dsh-market/* 回 404 = 市场包没装：走 pnpm 自动安装（已在装 / 已存在时什么都不做）
 	void startMarketInstall();

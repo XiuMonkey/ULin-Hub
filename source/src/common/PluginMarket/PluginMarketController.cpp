@@ -2,6 +2,11 @@
 // 本文件在 common/**（领域层）：**不 include core/**、不碰 qmlbridge/**。"装完市场包重启内置服务端"
 // 是宿主行为，只发 serverRestartRequested()，由 qmlbridge/QmlBridge 接住调 ClientRuntime::restartServer()。
 
+#include <QCoreApplication>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "common/PluginMarket/PluginMarketController.h"
 
 #include "common/PluginMarket/PluginMarketClient.h"
@@ -163,11 +168,16 @@ void PluginMarketController::openPage()
 	// 5 天前没有这个行为）。有数据就直接用缓存；只有"还没拿到过"时才去取。
 	// 先显示**手上已有的**（上次拿到的快照/结果），别等网络；再后台拉最新的。
 	// 用户的要求："先显示快照，然后后台慢慢拉" —— 数据到达后 registryLoaded 会整体替换并更新状态。
+	// 先把手上的数据铺出来：有上次结果就直接用；没有就读插件包自带的快照（毫秒级）。
+	// 然后后台慢慢拉最新的 —— 界面从不等待网络。
 	if (!m_all.isEmpty()) {
 		setBusy(false);
 		setStatus(qtTrId("plugin_loaded_offline"));
 	}
-	refresh();   // 后台拉：不阻塞界面（busy 只影响状态行）
+	else {
+		loadLocalSnapshot();
+	}
+	refresh();
 }
 
 void PluginMarketController::closePage()
@@ -263,6 +273,39 @@ void PluginMarketController::restartServer()
 	m_client->restartServer();
 }
 
+bool PluginMarketController::loadLocalSnapshot()
+{
+	// 快照随插件包发布在 resources/server/harness/profiles/web/node_modules/dshmarket/data/
+	// （顶层是 { name, count, categories, plugins: [...] }，与 registry 接口的 registry.plugins 不同）。
+	const QString appDir = QCoreApplication::applicationDirPath();
+	const QStringList candidates = {
+		appDir + QStringLiteral("/resources/server/harness/profiles/web/node_modules/dshmarket/data/registry-snapshot.json"),
+		appDir + QStringLiteral("/resources/server/node_modules/dshmarket/data/registry-snapshot.json"),
+		appDir + QStringLiteral("/../misc/ReleaseBuild/bin/resources/server/harness/profiles/web/node_modules/dshmarket/data/registry-snapshot.json"),
+	};
+
+	for (const QString& path : candidates)
+	{
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly))
+			continue;
+		const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+		if (!doc.isObject())
+			continue;
+		const QJsonArray plugins = doc.object().value(QStringLiteral("plugins")).toArray();
+		if (plugins.isEmpty())
+			continue;
+
+		m_all = PluginMarketModel::parsePlugins(plugins);
+		m_haveRegistry = true;
+		setBusy(false);
+		setStatus(qtTrId("plugin_loaded_offline"));   // 快照 ⇒ 离线
+		rebuild();
+		qInfo().noquote() << "[Market] 先读本地快照" << m_all.size() << "个插件 ·" << path;
+		return true;
+	}
+	return false;
+}
 void PluginMarketController::rebuild()
 {
 	// 市场列表：过滤 + 分页（都在 PluginMarketModel 里）
