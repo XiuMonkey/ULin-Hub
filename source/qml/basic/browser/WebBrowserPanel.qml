@@ -18,12 +18,26 @@ Item {
     // 打开面板时的首页（空 = 显示提示，等用户输入）
     property string startUrl: ""
 
+    // 地址也可以**由外面给**（扩展面板）：PanelDock 把 Dock.activeViewUrl 活绑到 startUrl，
+    // 切块/换面板时这条 handler 负责真正导航。用户自己在地址栏敲的仍走 navigate()。
+    onStartUrlChanged: openExternal(startUrl)
+
     function navigate(text) {
         // 规范化（判 scheme / 补 https:// / 拼搜索词 / 百分号编码）全在 C++：
         // source/src/common/util/UrlInput.cpp，QML 面是单例 `UrlInput`（见 main.cpp 的注册）。
         // 返回空串 = "这行不该导航"（空输入/纯空白），直接不动，别去加载空 URL。
         const target = UrlInput.normalize(text)
         if (target.length === 0)
+            return
+        view.url = target
+    }
+
+    // 程序化打开（扩展面板 / 宿主给的地址）：**不经过 UrlInput 的输入规整** —— 那是给"人敲进来的
+    // 半截地址"准备的（补 https://、把空格拼成搜索词）。扩展给的是完整 URL，规整反而会改坏它
+    // （例如无 scheme 的 127.0.0.1:port/... 会被补成 https）。空串 = 不导航（用户自己开的块）。
+    function openExternal(address) {
+        const target = String(address === undefined || address === null ? "" : address)
+        if (target.length === 0 || target === view.url.toString())
             return
         view.url = target
     }
@@ -142,8 +156,5 @@ Item {
         }
     }
 
-    Component.onCompleted: {
-        if (startUrl.length > 0)
-            view.url = startUrl
-    }
+    Component.onCompleted: openExternal(startUrl)   // 创建时就带地址（扩展面板绑上来的那份）
 }

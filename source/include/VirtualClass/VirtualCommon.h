@@ -118,10 +118,14 @@ public:
 	virtual int UnmountOwner(const char* owner) = 0;
 };
 
-// VirtualPanelHost —— 让扩展**顶替**面板坞某个块的**后端**（当前只落地终端块）。
+// VirtualPanelHost —— 面板坞（右栏）的两个接缝：
+//   ① **顶替**某个块的**后端**（当前只落地终端块）；
+//   ② **开一块面板**（末尾追加的 OpenPanelUrl：扩展给地址，宿主用内置 browser 视图渲染）。
 // 与 VirtualUiHost 的分工：UiHost 是"往宿主对象下面**追加**自己的 QML"；本接口是"把某个块背后
 // 干活的那个对象换成扩展的" —— **界面仍是宿主的**：终端块照旧由宿主 TerminalPanel + WebEngine +
 // xterm.js 渲染（底色跟主题走），扩展只提供喂给页面的传输对象，**不用自带 QML**。
+// ②同样是"界面归宿主"：一块浏览器视图 + 地址栏，扩展只交 URL，因此它能把**插件自己的 GUI 页面**
+// （插件经 webServer 自 serve 的 HTML）拼进右栏，而不必为每个插件写 QML。
 // 实现类 = 同一个 HostUi 单例（登记名 kUiHost）：登记存在它身上，TerminalPanel 建 QWebChannel 时
 // 取出来注册给页面；页面（宿主 qrc）对后端的调用契约见 EXTENSION_DEV §11.7。
 // 没登记时一切照旧（终端走内置 TerminalBridge + 服务端引擎）。
@@ -142,6 +146,23 @@ public:
 	virtual void ClearPanelBackend(const QString& owner, const QString& kind) = 0;
 	// 该 kind 当前是否已被顶替（扩展自省 / 宿主界面提示用）
 	virtual bool HasPanelBackend(const QString& kind) = 0;
+
+	// ---- 以下两条为【末尾追加】：让扩展在右栏**开一块面板**（与上面的"顶替后端"是两件事）----
+	// 顶替后端 = 界面还是宿主的、只换背后干活的对象；开面板 = 宿主给一块**内置 browser 视图**，
+	// 扩展只交出地址（典型形态：DSH 插件自己 serve 的 GUI 页面，见 EXTENSION_DEV §11.8）。
+	// 扩展因此不写 QML、不碰 WebEngine：面板外观、地址栏、前进后退全是宿主的。
+	//
+	// ⚠️ ABI：纯虚方法只能**末尾**追加。旧扩展（按旧头编的）不会调这两条，装在新宿主上照常工作；
+	//    反过来"按新头编的扩展 + 旧宿主"会在 vtable 外调用而崩 —— 壳与扩展要**一起发**，
+	//    扩展侧本就是 include 宿主 source/include 重新编译（绝不链接宿主 .lib）。
+	//
+	// owner = 扩展安装目录名：宿主按它记账，卸载扩展时整批撤（HostUi::releasePanelBackends 那条路）。
+	// url 必须是完整地址（含 scheme）：宿主视图会绕过地址栏的输入规整直接加载。
+	// title 可空 —— 空则用内置块名（"网页浏览 N"）。
+	// 两条都只在 GUI 线程调；OpenPanelUrl 会立即追加并激活该块（与用户点启动器同一条路径）。
+	virtual bool OpenPanelUrl(const QString& owner, const QString& url, const QString& title) = 0;
+	// 关掉该 owner 开的所有面板（按 owner 认，绝不碰用户自己开的块）；返回关掉的块数。
+	virtual int CloseOwnedPanels(const QString& owner) = 0;
 };
 
 Q_DECLARE_INTERFACE(VirtualMain, "com.ulinhub.VirtualWindow/1.0")   // IID 里的 VirtualWindow 是历史名，别跟着类名改

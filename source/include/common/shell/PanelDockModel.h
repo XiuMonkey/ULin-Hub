@@ -23,6 +23,9 @@
 //   · close() 后活动索引**只在越界时**收敛（`activeIndex >= count ⇒ count-1`）：关掉活动块
 //     前面那块时索引不动 ⇒ 选中的是"原来的下一块"，这也是既有行为；
 //   · showHome()（⌂）只切显示，块全部保留；
+//   · openUrl()（扩展面板）与 open("browser") 是同一条路径，只多记 owner/url/标题：编号规则、
+//     追加即激活、离开主界面都不变；closeOwned(owner) 按 owner 从后往前关，空 owner（用户自己开的
+//     块）永远不批量关；
 //   · 通知语义与 QML 属性一致：值没变就不发通知（QML 赋同值不会发 changed，PanelDock 的
 //     内容重放动画正是挂在两个属性的 changed 上 —— 多发一次就会多播一次动画）。
 //
@@ -59,6 +62,9 @@ class PanelDockModel : public QAbstractListModel
 		Q_PROPERTY(QString activeViewPath READ activeViewPath NOTIFY activeViewChanged)
 		Q_PROPERTY(bool activeViewBlockScoped READ activeViewBlockScoped NOTIFY activeViewChanged)
 		Q_PROPERTY(QString activeViewDetail READ activeViewDetail NOTIFY activeViewChanged)
+		// 活动块的**初始地址**（扩展面板用，见 openUrl）：空 = 这个块没有预设地址（用户自己开的
+		// 浏览器块就是空，面板照旧显示"输入网址"的空态）。视图侧调用方是 WebBrowserPanel.startUrl。
+		Q_PROPERTY(QString activeViewUrl READ activeViewUrl NOTIFY activeViewChanged)
 	// 启动器目录（三种块的中文名与说明只有这一份，QML 不再拼）
 	Q_PROPERTY(QVariantList launcherItems READ launcherItems CONSTANT)
 
@@ -94,6 +100,7 @@ public:
 	QString activeViewPath() const;
 	bool activeViewBlockScoped() const;
 	QString activeViewDetail() const;
+	QString activeViewUrl() const;
 	QVariantList launcherItems() const;
 
 	// 宿主能力：本构建带不带 Qt WebEngine（vcxproj 的 webenginequick + main.cpp 的
@@ -104,6 +111,13 @@ public:
 
 	// 开一个块：追加 + 激活 + 离开主界面
 	Q_INVOKABLE void open(const QString& kind);
+	// 开一个**带地址的浏览器块**（扩展面板，见 VirtualPanelHost::OpenPanelUrl）：与 open("browser")
+	// 走同一条路径（同类编号 / 追加即激活 / 离开主界面），只多记 owner + url + 可选标题。
+	// owner 为空或 url 为空 ⇒ 拒绝（返回 false）：用户自己开的块 owner 恒为空，绝不能被扩展误认。
+	Q_INVOKABLE bool openUrl(const QString& owner, const QString& url, const QString& title);
+	// 关掉该 owner 开的全部块（从后往前关，逐次走 close() 的收敛逻辑）；返回关掉的数量。
+	// ⚠️ owner 为空时直接返回 0 —— 空 owner 是"用户自己开的块"，不能批量关。
+	Q_INVOKABLE int closeOwned(const QString& owner);
 	// 关第 index 个块（越界忽略）；关光了回主界面，活动索引收敛到有效值
 	Q_INVOKABLE void close(int index);
 	// 切到第 index 个块（越界忽略；切换同时离开主界面）
@@ -128,12 +142,17 @@ private:
 		QString kind;
 		QString title;
 		QString id;    // 稳定 id（见 activeBlockId）；只增不重用
+		QString url;   // 扩展面板的初始地址；用户自己开的块为空（见 activeViewUrl）
+		QString owner; // 开这个块的扩展（安装目录名）；空 = 用户自己开的（见 closeOwned）
 	};
 
 	explicit PanelDockModel(QObject* parent = nullptr);
 
 	void setActiveIndex(int index);
 	void setHomeVisible(bool visible);
+	// open() 与 openUrl() 的共同路径：同类编号 → 追加 → 激活 → 离开主界面。
+	// customTitle 非空则用它当块名（扩展面板），否则 kindLabel(kind) + " N"。
+	void appendBlock(const QString& kind, const QString& url, const QString& owner, const QString& customTitle);
 
 	QVector<Block> m_blocks;
 	int m_activeIndex = -1;              // -1 = 没有活动块（与搬家前 `activeIndex: -1` 同义）

@@ -101,6 +101,14 @@ QString PanelDockModel::activeViewDetail() const
 	return viewFor(activeKind(), m_webEngineAvailable).detail;
 }
 
+QString PanelDockModel::activeViewUrl() const
+{
+	// 只有扩展面板记了地址；用户自己开的块恒为空（面板显示"输入网址"的空态）
+	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
+		return QString();
+	return m_blocks.at(m_activeIndex).url;
+}
+
 void PanelDockModel::setWebEngineAvailable(bool available)
 {
 	if (m_webEngineAvailable == available)
@@ -125,6 +133,40 @@ QVariantList PanelDockModel::launcherItems() const
 
 void PanelDockModel::open(const QString& kind)
 {
+	appendBlock(kind, QString(), QString(), QString());
+}
+
+bool PanelDockModel::openUrl(const QString& owner, const QString& url, const QString& title)
+{
+	// 空 owner / 空 url 一律拒绝：前者会与"用户自己开的块"混成一批（closeOwned 就会误伤），
+	// 后者打开来是一块空面板（用户看不出这是扩展开的东西）。
+	if (owner.isEmpty() || url.isEmpty())
+		return false;
+
+	appendBlock(QStringLiteral("browser"), url, owner, title);
+	return true;
+}
+
+int PanelDockModel::closeOwned(const QString& owner)
+{
+	// 空 owner 是"用户自己开的块"：批量关它们不是本方法该干的事（也不该由扩展触发）。
+	if (owner.isEmpty())
+		return 0;
+
+	// 从后往前关：close() 只收敛活动索引、不重排块，倒序走不会跳块。
+	int closed = 0;
+	for (int index = m_blocks.size() - 1; index >= 0; --index) {
+		if (m_blocks.at(index).owner != owner)
+			continue;
+		close(index);
+		++closed;
+	}
+	return closed;
+}
+
+void PanelDockModel::appendBlock(const QString& kind, const QString& url, const QString& owner,
+	const QString& customTitle)
+{
 	// 同类计数：标题在**开块这一刻**定下来（关块不重排，见头文件）
 	int seq = 0;
 	for (const Block& block : m_blocks) {
@@ -132,10 +174,14 @@ void PanelDockModel::open(const QString& kind)
 			++seq;
 	}
 
+	// 扩展面板自带标题时用它（同类的编号照算，但不进块名）
+	const QString title = customTitle.isEmpty()
+		? kindLabel(kind) + QLatin1Char(' ') + QString::number(seq + 1)
+		: customTitle;
+
 	const int row = m_blocks.size();
 	beginInsertRows(QModelIndex(), row, row);
-	m_blocks.append(Block{ kind, kindLabel(kind) + QLatin1Char(' ') + QString::number(seq + 1),
-		QStringLiteral("blk-%1").arg(m_nextBlockSeq++) });
+	m_blocks.append(Block{ kind, title, QStringLiteral("blk-%1").arg(m_nextBlockSeq++), url, owner });
 	endInsertRows();
 	emit countChanged();
 

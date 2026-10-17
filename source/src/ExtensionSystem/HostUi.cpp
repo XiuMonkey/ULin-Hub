@@ -1,5 +1,7 @@
 #include "ExtensionSystem/HostUi.h"
 
+#include "common/shell/PanelDockModel.h"
+
 #include <QDebug>
 #include <QFileInfo>
 #include <QQmlComponent>
@@ -251,5 +253,37 @@ int HostUi::releasePanelBackends(const QString& owner)
 			++it;
 		}
 	}
+
+	// 同一个 owner 开出来的面板也一起关：卸载扩展后右栏留一块点不动的页面没有意义，
+	// 而且它的地址（插件自 serve 的页面）在插件退场后就是 404。放在这里是因为
+	// ClientExtension::remove 已经把"按 owner 整批撤"的活儿都收在这条路上。
+	const int panels = closeOwnedPanelsFor(owner);
+	if (panels > 0)
+		qInfo().noquote() << QStringLiteral("[HostUi] %1 的面板已随扩展卸载关闭（%2 块）").arg(owner).arg(panels);
 	return removed;
+}
+
+bool HostUi::OpenPanelUrl(const QString& owner, const QString& url, const QString& title)
+{
+	if (owner.isEmpty() || url.isEmpty()) {
+		qWarning().noquote() << QStringLiteral("[HostUi] OpenPanelUrl 拒绝：owner 或 url 为空（owner=%1）").arg(owner);
+		return false;
+	}
+
+	const bool opened = PanelDockModel::instance().openUrl(owner, url, title);
+	qInfo().noquote() << QStringLiteral("[HostUi] OpenPanelUrl %1 -> %2（%3）")
+		.arg(owner, url, opened ? QStringLiteral("已开") : QStringLiteral("拒绝"));
+	return opened;
+}
+
+int HostUi::CloseOwnedPanels(const QString& owner)
+{
+	return closeOwnedPanelsFor(owner);
+}
+
+int HostUi::closeOwnedPanelsFor(const QString& owner)
+{
+	if (owner.isEmpty())   // 空 owner = 用户自己开的块，不批量关（与 PanelDockModel::closeOwned 同一条判据）
+		return 0;
+	return PanelDockModel::instance().closeOwned(owner);
 }

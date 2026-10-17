@@ -12,6 +12,9 @@
 //   ④ 顶替（VirtualPanelHost）：扩展登记某个块（当前只有 "terminal"）的**后端**改由它的对象担任，
 //      界面仍是宿主的 —— 终端块照旧由 TerminalPanel 渲染，只是页面接上的对象换了。按 kind 只记一份，
 //      卸载时 releasePanelBackends 撤。
+//   ⑤ 开面板（VirtualPanelHost，末尾追加）：扩展给一个 URL，宿主在右栏开一块**内置 browser 视图**
+//      （地址栏 / 前进后退 / 主题全归宿主），用于把"插件自己 serve 的 GUI 页面"拼进来。块记在
+//      PanelDockModel 上（owner + url），本类不另存一份；卸载扩展时按 owner 整批关。
 //
 // 名字契约（稳定，加名字要跟版本一起发）：shell / titleBar / topBar / sidebar / composer
 //   · topBar 的根是 Row（位置器）⇒ 注入进去**自动排在末尾**（= 旧控件壳 layout->addWidget 的手感）
@@ -49,6 +52,10 @@ public:
 	bool SetPanelBackend(const QString& owner, const QString& kind, QObject* backend) override;
 	void ClearPanelBackend(const QString& owner, const QString& kind) override;
 	bool HasPanelBackend(const QString& kind) override;
+	// 末尾追加的两条：扩展在右栏开一块面板（宿主用内置 browser 视图渲染，扩展只交 URL）。
+	// 实现在 HostUi.cpp，登记直接落到 PanelDockModel —— 本类不另存一份块状态。
+	bool OpenPanelUrl(const QString& owner, const QString& url, const QString& title) override;
+	int CloseOwnedPanels(const QString& owner) override;
 
 	// ---------- QML 面 ----------
 	QStringList names() const;
@@ -66,6 +73,10 @@ public:
 	Q_INVOKABLE QObject* panelBackend(const QString& kind) const;
 	// 卸载扩展时整批撤（ClientExtension::remove 那条路上调，与 ReleaseTakeoversFor 并列）
 	Q_INVOKABLE int releasePanelBackends(const QString& owner);
+
+	// 扩展卸载时清掉它自己开的 panel；原来只在 private 里 ⇒ 扩展编译会报"不是 HostUi 的成员"。
+	// releasePanelBackends 内部也走它（见 HostUi.cpp），所以对扩展暴露是安全的。
+	int closeOwnedPanelsFor(const QString& owner);
 
 signals:
 	void namesChanged();
@@ -89,6 +100,9 @@ private:
 
 	QString mountIntoImpl(const QString& owner, const QString& hostItem, const QString& url, QObject* context);
 	void dropAt(int index);
+	// 按 owner 关扩展面板（VirtualPanelHost::CloseOwnedPanels 与卸载都走这条）；
+	// 空 owner 直接返回 0 —— 那是用户自己开的块
+
 
 	QHash<QString, QPointer<QObject>> m_items;   // 名字 → 宿主对象（QML item）
 	QVector<Mounted> m_mounted;                  // 注入项记账

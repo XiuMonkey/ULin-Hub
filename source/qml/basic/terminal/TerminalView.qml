@@ -1,7 +1,7 @@
 // 终端网格视图：把 TerminalVtModel（→ TerminalVt → libvterm）的网格逐格画出来。
 //
 // 分层：本文件**只画**，不解析、不联网。要画什么全从 model 拿：
-//   · model.rows(first, last) —— 一段行（结构化；为空时退回 rowsJson），行内是"同样式合并后的段" [文本, fg, bg, flags]；
+//   · model.rowSegments(first, last) —— 一段行（结构化；为空时退回 rowsJson），行内是"同样式合并后的段" [文本, fg, bg, flags]；
 //   · model.dirtyRowsChanged(rows) —— 哪几行变了（只重画那几行，别整屏重建）；
 //   · model.cursorRow/cursorCol/cursorVisible —— 光标（闪烁在 QML 侧）；
 //   · model.state/statusText —— 顶部状态行（连接中/只读/错误都靠它）。
@@ -127,7 +127,7 @@ Item {
         if (!model)
             return
         // 优先拿 C++ 的结构化数据（QVariantList），解析不再放 QML（分层：逻辑在 C++）。
-        var parsed = model.rows(first, last)
+        var parsed = model.rowSegments(first, last)
         if (!parsed || parsed.length === 0) {
             // 兜底：结构化返回为空就退回旧路 —— 保证"分层优化"永远不会把终端变成空白屏。
             var json = model.rowsJson(first, last)
@@ -203,8 +203,8 @@ Item {
     }
 
     // 网格尺寸变化（面板拉伸/字体变化）：先告诉模型，再整屏重取
-    onGridColsChanged: pushGridSize()
-    onGridRowsChanged: pushGridSize()
+    onGridColsChanged: { pushGridSize(); reloadAll() }
+    onGridRowsChanged: { pushGridSize(); reloadAll() }
     onFontSizeChanged: pushGridSize()
     // 首帧常见路径：属性没"变化"（一直是 0）、尺寸是后来才出来的 —— 宽度一变就再算一次
     onCellWidthChanged: pushGridSize()

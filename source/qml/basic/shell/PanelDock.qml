@@ -286,6 +286,17 @@ Item {
                 Loader {
                     anchors.fill: parent
                     source: Style.url(Dock.activeViewPath)
+
+                    // 扩展面板（VirtualPanelHost::OpenPanelUrl）的地址存在块记录里，这里**活绑**给面板
+                    // 的 startUrl —— 与 blockScopedComp 把 blockId 绑给终端同一个手法：切到另一块同类
+                    // 视图时 Loader 不重建，靠活绑定把新地址推下去。
+                    // 用户自己开的浏览器块 URL 是空串 ⇒ openExternal 直接返回，行为与从前一致。
+                    // ⚠️ 防御：<exe>/ui/ 下的旧风格包可能还是老版 WebBrowserPanel.qml（没有
+                    //    openExternal/startUrl），这时什么都不推，比抛 TypeError 好。
+                    onLoaded: {
+                        if (item && typeof item.openExternal === "function")
+                            item.startUrl = Qt.binding(function () { return Dock.activeViewUrl })
+                    }
                 }
             }
 

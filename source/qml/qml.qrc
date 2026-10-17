@@ -57,6 +57,7 @@
         <file>widgets/IconButton.qml</file>
         <file>widgets/PageOverlay.qml</file>
         <file>widgets/PanelGrip.qml</file>
+        <file>widgets/PillButton.qml</file>
         <file>widgets/SearchField.qml</file>
         <file>widgets/Toast.qml</file>
     </qresource>

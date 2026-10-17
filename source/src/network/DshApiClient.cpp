@@ -209,7 +209,6 @@ void DshApiClient::startAuthHandshake()
 				return;
 			}
 
-			qWarning().noquote() << "[DshApiClient] 认证失败 HTTP status=" << status;   // 状态码只进日志
 			failAuthQueue(QStringLiteral("auth"), qtTrId("server_auth_failed"));
 			emit transportError(QStringLiteral("auth"), qtTrId("server_auth_failed"));
 			return;
@@ -549,7 +548,9 @@ void DshApiClient::post(const QString& path, const QJsonObject& body, std::funct
 		return;
 	}
 
-	if (!m_authenticated && !m_launchToken.isEmpty()) {  // 认证没就绪时直发必然 401，先挂起等握手完成后补发
+	// 只要还没认证就排队 —— 原来额外要求 m_launchToken 非空，可引擎刚启动时 token 还没到，
+	// 那时条件为假 ⇒ 直接发 ⇒ 必然 401（实测终端与插件市场都栽在这里）。
+	if (!m_authenticated) {
 		static constexpr int kMaxQueuedCalls = 256;
 		if (m_authQueue.size() >= kMaxQueuedCalls) {
 			qWarning().noquote() << "[DshApi] 认证未就绪、挂起队列已满，上限=" << kMaxQueuedCalls;   // 上限只进日志
@@ -603,8 +604,14 @@ void DshApiClient::onReplyFinished()
 	m_pending.erase(it);
 
 	if (reply->error() != QNetworkReply::NoError) {
+		// 独立语句：打 HTTP 状态码 + 响应正文。401 的正文会说明服务端要哪种凭据（别插进下面的 << 链里）。
+		if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
+		    const int probeStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		    const QString probeBody = QString::fromUtf8(reply->readAll()).left(400);
+		    qWarning().noquote() << "[DshApi] HTTP status=" << probeStatus << " body=" << probeBody;
+		}
 		qWarning().noquote() << "[DshApi] HTTP transport error path=" << pending.path
-			<< " rpcId=" << rpcId << " error=" << reply->errorString();
+			<< " rpcId=" << rpcId << " url=" << reply->url().toString() << " error=" << reply->errorString();
 		if (pending.onError) {
 			pending.onError(RpcError{ QStringLiteral("transport"), reply->errorString(), });
 		}
