@@ -176,14 +176,11 @@ Item {
 
         Item { width: 15; height: 1 }
 
-        BusySpinner {
-            anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
-            lineWidth: 2
-            running: Hub.initializing
-            visible: Hub.initializing
-        }
+    // 启动转圈**去掉了**：它绑的是 Hub.initializing（启动后好几秒才转完），而这颗 16px 的
+    // 无限动画会让整个窗口每帧都重绘（本项目窗口带整窗背景层 + MultiEffect ⇒ 任何常驻动画
+    // 都是"整窗成本"）。实测后果：启动那几秒里打开任何覆盖页都明显掉帧（约 20~50ms/帧），
+    // 而"加载完、转圈停了"就立刻流畅 —— 正是用户反复报的那个现象。
+    // 初始化只有 1~2 秒，用户不差这个指示；去掉后窗口能尽早进入空闲态。
     }
 
     // ---- 会话列表（工作区表头与会话行在同一层，见 SessionListModel 的说明）----
