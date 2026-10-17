@@ -437,9 +437,10 @@ Item {
                 id: statusText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                // 限宽：左边给按钮留 160px（原来左右都锚在 parent 上 ⇒ 文案一长就压到按钮）。
-                // 只保留右边锚定，宽度取「文字宽」与「可用宽」的较小值，超出用尾部省略号。
-                width: Math.min(implicitWidth, Math.max(0, parent.width - 160))
+                // 限宽：左边界锚到翻页行（pagerRow）右侧 —— 文案再长也不会压住"上一页/下一页"，
+                // 右边界到卡片右边，超出部分尾部省略号。
+                anchors.left: pagerRow.right
+            anchors.leftMargin: 16
                 horizontalAlignment: Text.AlignRight
                 text: Hub.plugins.status
                 elide: Text.ElideRight
