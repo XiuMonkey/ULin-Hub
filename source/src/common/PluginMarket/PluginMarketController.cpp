@@ -75,10 +75,6 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 		// 装完必须重启内置服务端，新插件才会被加载；稍后自动重试拉市场数据。
 		// 重启本身是宿主行为：这里只发信号（接线层同步接住 ⇒ 与原 m_server->restart() 同时机）。
 		emit serverRestartRequested();
-		// 预热提前到 400ms：用户点开市场时（通常 >1s）数据已经在手里 ⇒ 打开走"有缓存"那条
-	// （实测首次打开要取数，取数期间 busy=true ⇒ 转圈在转 ⇒ 整窗每帧 33ms；有缓存时 16.4ms）。
-	// 1800ms 那次保留作兜底：启动早期引擎可能还没起来，第一次请求会失败。
-	QTimer::singleShot(400, this, [this] { refresh(); });
 	QTimer::singleShot(1800, this, [this] { if (!m_haveRegistry) refresh(); });
 	});
 
