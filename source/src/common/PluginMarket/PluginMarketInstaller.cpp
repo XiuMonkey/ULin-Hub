@@ -13,7 +13,9 @@ namespace
 {
 	// 自动安装的市场包版本（与 registry 快照保持一致）
 	const char* const kMarketPackage = "dshmarket";
-	const char* const kMarketVersion = "1.9.0";
+	// 1.9.0 是早先写死的版本，而 npm 上的 latest 已经是 1.66.32（2026-10 查）。
+	// 这里仍显式钉住一个具体版本（分发要可控），只是钉到当前最新；升级时改这一行即可。
+	const char* const kMarketVersion = "1.66.32";
 	const char* const kMarketPackageJson =
 		"/resources/server/harness/profiles/web/node_modules/dshmarket/package.json";
 	const char* const kNodeRelativePath = "/resources/server/node.exe";
