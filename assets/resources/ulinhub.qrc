@@ -45,11 +45,7 @@
              这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
              660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见
              misc/tools/extract-xterm.README.txt（@xterm/xterm 6.0.0 + addon-fit 0.11.0，MIT）。
-             页面由 qrc:/ULinHub/Terminal/terminal.html 加载，页面自己**不发任何网络请求**，
-             帧与输入都走 QWebChannel ↔ qmlbridge/TerminalBridge。 -->
-        <file alias="Terminal/terminal.html">Terminal/terminal.html</file>
-        <file alias="Terminal/xterm.browser.js">Terminal/xterm.browser.js</file>
-        <file alias="Terminal/addon-fit.browser.js">Terminal/addon-fit.browser.js</file>
-        <file alias="Terminal/xterm.css">Terminal/xterm.css</file>
+             （原 WebEngine + xterm.js 页面已随自绘终端接入而删除）
+             （现在终端由 TerminalVt + TerminalView 自绘，不再有页面与 QWebChannel）-->
     </qresource>
 </RCC>
