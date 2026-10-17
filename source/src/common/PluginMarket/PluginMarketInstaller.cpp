@@ -18,7 +18,11 @@ namespace
 		"/resources/server/harness/profiles/web/node_modules/dshmarket/package.json";
 	const char* const kNodeRelativePath = "/resources/server/node.exe";
 	const char* const kHarnessRelativePath = "/resources/server/harness";
-	const char* const kPnpmEntryRelativePath = "/resources/server/node_modules/pnpm/bin/pnpm.cjs";
+	// 随包发布的 pnpm：实测这份 npm 装出来的包是 artifacts/exe 布局，bin/pnpm.cjs 指向的
+	// dist/pnpm.mjs 是个坏 stub（跑 --version 直接抛异常），真正能跑的是 artifacts/exe/dist/pnpm.mjs
+	// （验证过：11.21.0，exit 0）。所以优先用它，退而求其次才是传统入口。
+	const char* const kPnpmEntryRelativePath = "/resources/server/node_modules/pnpm/artifacts/exe/dist/pnpm.mjs";
+	const char* const kPnpmEntryFallbackRelativePath = "/resources/server/node_modules/pnpm/bin/pnpm.cjs";
 }
 
 PluginMarketInstaller::PluginMarketInstaller(QObject* parent)
@@ -44,7 +48,10 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 	const QString dshHome = appDir + QLatin1String(kHarnessRelativePath);
 
 	// 确保 pnpm 可用：如果 PATH 里没有 pnpm，就创建一个本地 shim
-	const QString pnpmEntry = QDir::toNativeSeparators(appDir + QLatin1String(kPnpmEntryRelativePath));
+	QString pnpmEntryPath = appDir + QLatin1String(kPnpmEntryRelativePath);
+	if (!QFile::exists(pnpmEntryPath))
+		pnpmEntryPath = appDir + QLatin1String(kPnpmEntryFallbackRelativePath);
+	const QString pnpmEntry = QDir::toNativeSeparators(pnpmEntryPath);
 	const QString binDir = QDir::toNativeSeparators(dshHome + QStringLiteral("/.desktop-bin"));
 	QDir().mkpath(binDir);
 	const QString pnpmCmdPath = binDir + QStringLiteral("/pnpm.cmd");
