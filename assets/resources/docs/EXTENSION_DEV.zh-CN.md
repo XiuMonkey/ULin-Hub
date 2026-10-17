@@ -343,11 +343,20 @@ AttachedPlugin/
 {
   "Name": "PluginTranspiler",    // 安装目录名 = <exe>/clientExtensions/<Name>/
   "Type": "ClientExtension",     // 或 ClientExtensionDebug
-  "Version": "0.1.0",            // 可选
+  // ---- 扩展身份三件套（2026-10-16 新增；宿主**目前只登记，不消费**）----
+  "ID": "plugin_transpiler",     // 标识符，约定**小写 + 下划线**（与 Name 的安装目录名不是一回事）
+  "version": "0.1.0",            // 扩展**自身**版本（与 ABIVersion 的界面契约版本不同）
+  "dependence": [],              // 依赖的其它扩展 ID 数组；本版不解析依赖顺序、不校验存在性
+  "platform": "windows",         // 适用平台（为跨平台做准备）：字符串或数组都认（["windows","linux"]）
   "ABIVersion": 3,                    // 可选：只影响 QML 部分；与宿主不符 ⇒ 该扩展的 ui/ 不落盘，DLL 照旧
   "Entry": "ui/Extension.qml"    // 可选，缺省即此（纯 QML 扩展的入口；DLL 扩展也可以不用它）
 }
 ```
+
+> **`ID` / `version` / `dependence` 三个字段现在只是"登记"**：装载器（`ExtensionLoader::readDescriptor`）会把它们读进
+> 描述结构并在启动日志里打一行（`descriptor Name=… Type=… ABIVersion=… ID=… version=… dependence=[…]`），
+> **不参与任何判定** —— 不校验依赖是否存在、不按依赖排序装载、不影响 DLL 与 `ui/` 的落盘。
+> 三个字段都可省略（省略时日志显示 `(none)` / 空列表）；`Version`（大写 V）不是本约定，请用 `version`。
 
 > `Subtype` 字段（`QQuickSupport` / `QQuickExtension`）与 `.ext` 形式的 Qt Quick 运行时包 **已于 2026-10-01 退役**：
 > 宿主自己就是 QML 壳、Qt Quick 随宿主部署，装载器不再读这个字段，也不再按它做分流与预检。
@@ -460,7 +469,7 @@ Item {
 
 | 契约 | 载体 | 现在 | 不一致时 |
 |---|---|---|---|
-| C++ 插件面 | `VirtualClass/VirtualCommon.h` 的虚接口 | `VirtualConnectionManager` / `VirtualTheme` / `VirtualTranslation` / `VirtualApiSink`（+ 目标形态的 `VirtualUiHost`） | 方法只许**末尾追加**；DLL 与宿主版本不匹配时 `qobject_cast` 失败即视为不实现 |
+| C++ 插件面 | `VirtualClass/VirtualCommon.h` 的虚接口 | `VirtualConnectionManager` / `VirtualTheme` / `VirtualTranslation` / `VirtualApiSink` / `VirtualUiHost` / `VirtualPanelHost` | 方法只许**末尾追加**；DLL 与宿主版本不匹配时 `qobject_cast` 失败即视为不实现 |
 | 宿主界面契约 | `pack.json` 的 `uiAbi`（皮肤包）/ 客户端扩展 `regulation.json5` 的 `ABIVersion` | **3**（`kStylePackUiAbi`） | 皮肤包 ⇒ 整包拒载回退内置；扩展 ⇒ **只装 DLL，不落该扩展的 `ui/`**（DLL 部分照旧） |
 
 ### 11.6 最小示例（`extensions/PluginTranspiler` 就是活样例）
@@ -506,3 +515,95 @@ ui->MountInto("PluginTranspiler", "sidebar.extDock", "<自己的>/ui/EntryButton
 > （`VirtualConnectionManager`），`extensions/CodexBackend` 是活样例。
 > 副作用提醒：给扩展按钮**另起 owner**（PanelAnimDemo 用 `<扩展名>/panel` 给面板）——
 > `UnmountOwner` 是按 owner 整批删的，入口按钮与面板共用一个 owner 会把按钮一起摘掉。
+
+### 11.7 顶替面板坞的块后端（`VirtualPanelHost`，2026-10-15 加的接缝）
+
+§11.3 的注入是"往宿主对象下面**追加**"。若要的是**替换** —— 比如让终端块不再走内置的
+服务端引擎，改用扩展自己的（本地）终端 —— 走另一条接口 `VirtualPanelHost`
+（`kUiHost` → `HostUi` 单例，与 §11.3 的注入共用同一个宿主面）。
+
+**它换的是"后端"，不是"界面"**：终端块照旧由宿主的 `TerminalPanel` + WebEngine + xterm.js 渲染
+（底色跟主题走），扩展只提供页面背后那个对象 —— **扩展不用写任何 QML**。宿主把该对象原样注册到
+这个块的 `QWebChannel` 上（id `ulinterm`），页面直连它。
+
+```cpp
+// attachHost() 里直接调即可 —— 它只往 HostUi 写一条登记、不碰宿主 QML 对象，没有 §11.3 的
+// "等 registerItem" 时序问题。⚠️ 但必须赶在该块的面板被创建之前：面板只在创建时取一次后端。
+auto* panels = qobject_cast<VirtualPanelHost*>(DshHost::findObject(DshHostIndex::kUiHost));
+if (panels) {
+    panels->SetPanelBackend(extensionDirName(),   // owner：撤的时候认它
+                            "terminal",            // kind：当前只有 "terminal" 落地
+                            m_backend);            // 你的后端对象（契约见下表）
+}
+// detachHost() 里撤（也可以不写 —— 宿主卸载扩展时会按 owner 整批撤，见第 3 条）
+panels->ClearPanelBackend(extensionDirName(), "terminal");
+```
+
+**后端对象的契约** —— 就是宿主页面 `qrc:/ULinHub/Terminal/terminal.html` 认的那套，与宿主
+`TerminalBridge` 的"页面面"同构。每个调用都带 `blockId`：同一个对象可能被多个终端块的面板注册，
+页面按自己的块过滤上行信号。
+
+| 方向 | 成员 | 说明 |
+|---|---|---|
+| 页面 → 后端 | `pageHello()` | 页面刚接上信道；可空实现 |
+| | `start(blockId, sessionId)` | 这个块开始用终端了（`sessionId` 由宿主给，只是参考信息） |
+| | `pageReady(blockId)` | 页面已建好 xterm，可以喂帧了 |
+| | `pageGone(blockId)` | 页面要销毁/换绑（切块、收右栏）—— **别在这里关终端** |
+| | `write(blockId, data)` | 键盘 / 粘贴的原始串 |
+| | `resize(blockId, cols, rows)` | addon-fit 量出来的网格尺寸 |
+| | `ack(blockId)` | 上一帧已写进 xterm（背压放行） |
+| | `log(blockId, message)` | 页面里的诊断串（页面 console 不落盘） |
+| | `closeBlock(blockId)` | 关块（页签 ✕）—— 真该收尾的地方 |
+| 后端 → 页面 | `frameReady(blockId, kind, sequence, text)` | `kind = "snapshot"`（页面先 reset 再写）或 `"output"` |
+| | `statusChanged(blockId, state, statusText, readOnly, title)` | 状态行；`state == "attached"` 时页面清掉提示层 |
+
+槽用 `Q_INVOKABLE` 就够（不必是 `signals`），但两个上行信号**必须**是信号（页面 `connect` 它们）。
+对象要自带 `objectName = "ulinterm"`：宿主按它的 `objectName` 注册；空着宿主会替它设。
+
+三条容易踩的**页面侧**约定（后端实现者必读）：
+
+- **一个对象服务多个块**：信道对象是按面板注册的，但同一个后端对象会被多个终端块的面板用到 ——
+  这就是每个调用都带 `blockId` 的原因。**按块存状态**（会话表），别用单例字段。
+- **`ack` 是背压，不是可选项**：页面 `term.write` 是异步的，写完才回 `ack`。后端应当"发一帧、
+  等 ack、再发下一帧"；如果只顾自己推，`dir /s` 这类能一次性产生几十兆输出。若不想实现背压，
+  至少要**有界**地丢/排队，别无限攒。
+- **推给页面的 `text` 必须是合法 UTF-8 字符串**（QWebChannel 传的是字符串，不是字节）。
+  自己产生字节流的后端（如本地 PTY）要注意：**字节流会在任意位置被切开**，跨帧的多字节序列
+  必须自己续上，否则汉字会变成 `U+FFFD`。
+
+顶替后的行为：
+
+| 项 | 顶替后 |
+|---|---|
+| 启动器里那条"终端" | **保留**（还是"终端"，点了照常开一个终端块） |
+| 块的内容 | 宿主的 `TerminalPanel`（**不变**），只是信道上的对象换成了扩展的后端 |
+| 界面 / 配色 | 宿主的（暗色纯黑、亮色 3% 灰，跟 `Theme.isDark` 走）—— 扩展不参与 |
+| 对 WebEngine 的依赖 | **仍在**（页面是宿主渲染的）。想彻底脱开 WebEngine 就得自带界面，那走 §11.3 注入 + 自己画 |
+| 关块（页签 ✕） | 宿主照常调 `Terminal.closeBlock`，桥按后端转给你的 `closeBlock(blockId)` |
+
+四条约定：
+
+1. **按 kind 只记一份后端。** 后登记者取得该 kind，前一份被顶掉；所以 `ClearPanelBackend`
+   认 owner —— 旧扩展卸载时不会把新扩展顶上去的登记清掉。
+2. **登记时机是启动期**（`attachHost()`）：面板只在创建时读一次后端，晚了它已经接上内置桥。
+3. **卸载不用自己兜底**：宿主在 `ClientExtension::remove` 那条路上按 owner 整批撤
+   （`HostUi::releasePanelBackends`，与 `ReleaseTakeoversFor` 并列）。
+4. ⚠️ 顶替的是**块后端**，不动启动器条目与块标题。想让用户完全看不到宿主的终端入口，那是改
+   界面副本 `<exe>/ui/basic/shell/PanelDock.qml` 的事，与扩展无关。
+
+**接缝插在哪儿（宿主侧的分层）**：`kind → 视图` 的映射表在 C++
+（`PanelDockModel::viewFor`：逻辑路径 + 要不要当前块 + 兜底文案，与中文块名 `kindLabel()` 同层），
+QML（`PanelDock.qml`）只按那组值装机 —— 路由表达式里没有任何 kind 字符串，**也不看后端登记**
+（后端是"页面接谁"的事，与"装哪个视图"无关）。宿主侧只有两处读这份登记：`TerminalPanel.qml`
+创建时取一次、交给 `Terminal.registerOn(channel, backend)`，以及 `TerminalBridge` 把
+`pageGone` / `closeBlock` 转给后端。
+
+**活样例**：`<ULin>\LocalTerminal`（VS 工程，宿主仓库的兄弟目录）—— 最小可跑的后端顶替：
+`src/LocalTerminalPlugin.cpp` 登记、`src/LocalTerminalBackend.h/.cpp` 是后端对象本体
+（每块一个会话）、`src/ConPtyProcess.h/.cpp` 用 `CreatePseudoConsole` 起本地终端。
+
+**为什么是加接缝而不是让扩展硬顶**：面板坞的块由 C++ 模型决定（`launcherItems` 是 CONSTANT），
+"页面接谁"由宿主 QML 在 `Component.onCompleted` 里注册信道时定，且终端这条链路没进
+`ConnectionManager` 的登记表 —— "接管信号 / 抢 QWebChannel 注册"都够不着它。
+`VirtualPanelHost` 把"块后端由谁提供"变成一个**显式的可登记点**：宿主改一处，扩展不必猜对象、
+不必抢时机。
