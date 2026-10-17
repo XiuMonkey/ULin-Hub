@@ -31,8 +31,10 @@ Item {
     // 页面文件（Style.url("basic/...")）
     property url source
     property real cardRadius: Theme.radius.popup
-    property bool cardShadow: true
-
+    // 动画期间先关阴影：卡片带 MultiEffect 阴影时，展开/收起每帧都要重渲染源面（实测 +4~8ms/帧，
+    // 与转圈叠加时是相乘关系 ⇒ 一起把整窗重绘推到 ~50ms/帧）。稳定后再开，肉眼无差别。
+    // 注意：不能直接改上面的默认值，否则**静止**状态也没阴影了 ⇒ 用 overlayAnimating 门控。
+    property bool cardShadow: !overlayAnimating
     // 页面装载完成时抛出去（有的页要接它的信号，例如 closeRequested）
     signal pageLoaded(var page)
 
