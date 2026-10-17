@@ -5,6 +5,8 @@
 // terminal/follow 的 snapshot/output 帧原样交给 TerminalSession 的 TerminalVtModel（→ TerminalVt），
 // 由 TerminalView.qml 逐格画。页面/xterm.js 那条路已经退役。
 
+#include <QClipboard>
+#include <QGuiApplication>
 #include "qmlbridge/TerminalBridge.h"
 
 #include "common/terminal/TerminalVt.h"
@@ -686,8 +688,12 @@ void TerminalSession::onBackendHostExit(int code)
 // 所以 attachBackend 里要先把 m_cols/m_rows 清零，保证第一次一定发出去）。
 void TerminalSession::pushByteFaceGrid()
 {
-	const int cols = m_wantCols > 0 ? m_wantCols : (m_vt ? m_vt->cols() : 80);
-	const int rows = m_wantRows > 0 ? m_wantRows : (m_vt ? m_vt->rows() : 24);
+	// 视图还没量出网格时**不要**推 80x24：一推 PTY 就会按 80 列起 shell，之后缩到真实列宽
+	// 时已经输出的长行不会重排 => 画面上就是"不换行、被切掉"。等视图量出来再推（会走下面那次）。
+	if (m_wantCols <= 0 || m_wantRows <= 0)
+	    return;
+	const int cols = m_wantCols;
+	const int rows = m_wantRows;
 	if (cols < 2 || rows < 1)
 		return;
 	if (cols == m_cols && rows == m_rows)
@@ -1414,6 +1420,17 @@ void TerminalBridge::start(const QString& blockId, const QString& sessionId)
 		session->start(sessionId);
 }
 
+void TerminalBridge::pasteFromClipboard(const QString& blockId)
+{
+	const QString text = QGuiApplication::clipboard()->text();
+	if (text.isEmpty())
+		return;
+	// 终端粘贴 = 把文本当键盘输入写进去（换行统一成 \r，shell 才当回车）。
+	QString normalized = text;
+	normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+	normalized.replace(QLatin1Char('\n'), QLatin1Char('\r'));
+	write(blockId, normalized);
+}
 void TerminalBridge::write(const QString& blockId, const QString& data)
 {
 	if (TerminalSession* session = findSession(blockId))

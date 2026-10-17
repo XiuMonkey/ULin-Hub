@@ -300,7 +300,10 @@ public:
 	Q_INVOKABLE void pageHello();                                       // deprecated（页面接上信道的回喊）
 	Q_INVOKABLE void pageGone(const QString& blockId);                  // deprecated（用 viewGone）
 	Q_INVOKABLE void start(const QString& blockId, const QString& sessionId);   // 仍用：引擎 mount 入口
-	Q_INVOKABLE void write(const QString& blockId, const QString& data);        // deprecated（用 flushInput）
+	Q_INVOKABLE void write(const QString& blockId, const QString& data);
+
+	// 系统剪贴板 -> write()（终端粘贴）。Ctrl+V / Ctrl+Shift+V 走这里；没有它终端粘不了东西。
+	Q_INVOKABLE void pasteFromClipboard(const QString& blockId);        // deprecated（用 flushInput）
 	Q_INVOKABLE void resize(const QString& blockId, int cols, int rows);        // deprecated（用 applyGridSize）
 	Q_INVOKABLE void ack(const QString& blockId);                       // deprecated（自绘路径没有背压）
 	Q_INVOKABLE void log(const QString& blockId, const QString& message);

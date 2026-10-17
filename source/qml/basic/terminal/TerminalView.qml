@@ -203,11 +203,21 @@ Item {
     }
 
     // 网格尺寸变化（面板拉伸/字体变化）：先告诉模型，再整屏重取
-    onGridColsChanged: { pushGridSize(); reloadAll() }
-    onGridRowsChanged: { pushGridSize(); reloadAll() }
+    onGridColsChanged: { gridPushTimer.restart(); reloadAll() }
+    onGridRowsChanged: { gridPushTimer.restart(); reloadAll() }
     onFontSizeChanged: pushGridSize()
     // 首帧常见路径：属性没"变化"（一直是 0）、尺寸是后来才出来的 —— 宽度一变就再算一次
     onCellWidthChanged: pushGridSize()
+
+    // 防抖：布局收敛期间 gridCols 会连续变（实测 50ms 内 35->39 连跳 5 次），
+    // 每跳一次就 pushGridSize() 等于连续 resize PTY 五次 => shell 输出被打断，画面只剩前几行。
+    Timer {
+        id: gridPushTimer
+        interval: 150
+        running: false
+        repeat: false
+        onTriggered: pushGridSize()
+    }
 
     function pushGridSize() {
         // gridCols/gridRows 为 0 = 还没有真实布局（见上面的夹取理由）
@@ -276,6 +286,12 @@ Item {
     Keys.onPressed: (event) => {
         if (!root.model) {
             event.accepted = false
+            return
+        }
+        // 粘贴：Ctrl+V / Ctrl+Shift+V（Ctrl+C 仍留给 shell 当 中断，复制以后走 Ctrl+Shift+C）。
+        if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+            Terminal.pasteFromClipboard(root.blockId)
+            event.accepted = true
             return
         }
         event.accepted = true
