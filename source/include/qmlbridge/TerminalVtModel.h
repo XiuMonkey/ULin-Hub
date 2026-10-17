@@ -58,6 +58,11 @@ public:
 	//   [[[文本, fg, bg, flags], ...], ...]
 	// 文本为空串 = 宽字符的续格，渲染必须跳过这一格（宽字符首格占两格）。
 	// 越界行给空数组（渲染画成空行）。一次调用返回多行是刻意为之：整屏重画只走一次 QML↔C++ 边界。
+	// 按行给"同样式合并后的段"，**结构化**返回（不经 JSON 文本）：
+	// 每项 = 一行；行内每项 = [文本, fg, bg, flags]。QML 侧因此不需要 JSON.parse（那属于越界逻辑）。
+	// ⚠️ 返回空列表时调用方应退回 rowsJson（见 TerminalView.reloadRows 的兜底）。
+	Q_INVOKABLE QVariantList rows(int first, int last) const;
+
 	Q_INVOKABLE QString rowsJson(int first, int last) const;
 
 	// ---- QML 面：键盘 ----

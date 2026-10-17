@@ -6,6 +6,7 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>   // rows() 兼容对象内带 rows 数组的形状
 #include <QtGlobal>
 
 #include <cstring>
@@ -209,6 +210,33 @@ void TerminalVtModel::setGridSize(int rows, int cols)
 // ------------------------------------------------------------------
 // 网格读取：按行给"同样式合并后的段"
 // ------------------------------------------------------------------
+
+QVariantList TerminalVtModel::rows(int first, int last) const
+{
+	// 结构化的同一份数据：**复用 rowsJson 的合并逻辑**（段合并只此一份，别复制），
+	// 只是把序列化成文本换成在 C++ 里直接给出 QVariantList（省掉每帧一次文本编解码）。
+	//
+	// ⚠️ 兼容两种顶层形状：直接是数组，或者对象里带一个 rows 数组 —— 上一版只认数组，
+	//    形状不符时 doc.array() 拿到空 ⇒ 终端整屏空白（已回过退一次 ✗）。这里两种都认，
+	//    仍拿不到就返回空列表，由 QML 侧兜底退回 rowsJson。
+	const QByteArray raw = rowsJson(first, last).toUtf8();
+	if (raw.isEmpty())
+		return {};
+	const QJsonDocument doc = QJsonDocument::fromJson(raw);
+	if (doc.isArray())
+		return doc.array().toVariantList();
+	if (doc.isObject())
+	{
+		const QJsonObject obj = doc.object();
+		for (const char* key : { "rows", "r", "data", "items" })
+		{
+			const QJsonValue value = obj.value(QLatin1String(key));
+			if (value.isArray())
+				return value.toArray().toVariantList();
+		}
+	}
+	return {};
+}
 
 QString TerminalVtModel::rowsJson(int first, int last) const
 {

@@ -126,10 +126,15 @@ Item {
     function reloadRows(first, last) {
         if (!model)
             return
-        var json = model.rowsJson(first, last)
-        if (!json || json.length === 0)
-            return
-        var parsed = JSON.parse(json)
+        // 优先拿 C++ 的结构化数据（QVariantList），解析不再放 QML（分层：逻辑在 C++）。
+        var parsed = model.rows(first, last)
+        if (!parsed || parsed.length === 0) {
+            // 兜底：结构化返回为空就退回旧路 —— 保证"分层优化"永远不会把终端变成空白屏。
+            var json = model.rowsJson(first, last)
+            if (!json || json.length === 0)
+                return
+            parsed = JSON.parse(json)
+        }
         var next = rows.slice()   // 浅拷贝：只换脏的那几项，别让所有行都重新绑定
         for (var i = 0; i < parsed.length; ++i) {
             var rowIndex = first + i
