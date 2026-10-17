@@ -24,8 +24,6 @@ Item {
     // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停，
     // 理由与实测见 widgets/PageOverlay.qml 里 overlayAnimating 的注释。
     property bool overlayAnimating: false
-    // 转圈"展开动画期间不转"用的标记：页面出现 450ms 后置位（见下方 BusySpinner）
-    property bool spinnerRevealSettled: false
 
     // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
     // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
@@ -64,13 +62,9 @@ Item {
                     lineWidth: 2
                     // 卡片正在展开/收回时先停：转圈会让整窗每帧重绘（实测 +10ms/帧），
                     // 叠在动画上就是"加载中的打开动画明显更卡"。由 PageOverlay 绑过来。
-                    // 展开动画期间**一律不转**：不看 overlayAnimating（那条链路经过 PageOverlay 的
-                    // 运行时绑定，实测按住不可靠），改成页面出现后 450ms 内自己压住 —— 450ms 覆盖
-                    // 卡片展开动画（Theme.motion.slow 一档），之后照常按 busy 转。
-                    property bool revealSettled: false
-                    Timer { interval: 450; running: true; onTriggered: page.spinnerRevealSettled = true }
-                    running: Hub.plugins.busy && page.spinnerRevealSettled
-                    visible: Hub.plugins.busy && page.spinnerRevealSettled
+                    // 精确条件：展开/收起动画期间（PageOverlay 把 t 的区间绑到页面根的 overlayAnimating）不转
+                    running: Hub.plugins.busy && !page.overlayAnimating
+                    visible: Hub.plugins.busy && !page.overlayAnimating
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
