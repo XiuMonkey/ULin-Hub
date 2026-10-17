@@ -47,7 +47,8 @@ $ErrorActionPreference = 'Stop'
 
 # Default to the directory containing this script, so it can be run from anywhere.
 if (-not $Path) {
-    # 脚本现在住在 misc\tools 下，默认统计**仓库根**（往上两级）。原来默认是脚本自身目录，
+    # This script lives in misc/tools, so default to the repository root (two levels up).
+    $Path = if ($PSScriptRoot) { (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path } else { (Get-Location).Path }
     # 那时它必须放在仓库根才能用 —— 这就是"路径问题"。
     $Path = if ($PSScriptRoot) { (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path } else { (Get-Location).Path }
 }
