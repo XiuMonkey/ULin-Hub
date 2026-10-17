@@ -6,8 +6,10 @@
 // 段顺序即"思考、工具调用、回复交错出现"的真实顺序（旧壳 StreamSegment 的语义）。
 //
 // 注：旧壳的 Agent 消息是**没有气泡**的裸文本；这里按你的要求统一成圆角气泡（有意偏离原版）。
+// 但"气泡怎么立住"仍按原版：**不画描边**，用原版那层极淡的外阴影（shadowSubtle）给层次 —— 见下面 bubble 的注。
 
 import QtQuick
+import QtQuick.Effects
 import ULinHub 1.0
 import "../../widgets"
 
@@ -19,6 +21,32 @@ Item {
 
     implicitHeight: bubble.implicitHeight
 
+    // 柔和外阴影：原版 Agent 消息单元画的不是描边，而是 `shadowSubtle`（AgentMessageUnit.cpp:1011）
+    // 那层几乎看不见的晕 —— 真机像素实测原版气泡左缘是 #FAFBFD→#F8F9FB→#F4F5F7→#ECEDEF 的四段渐隐，
+    // 本版原来是一条 #E5E7EB 硬线（2 物理px），这就是"边框太深/太实"的主因。
+    // 做法：拿一块同形状的实心矩形当 MultiEffect 的源，气泡本体（下面那层、不透明）正好盖住它，
+    // 于是只露出晕开的一圈，不会多画任何颜色；参数与 Card 同一档（= 原版 CardShadow{8,2,*12}）。
+    Rectangle {
+        id: shadowShape
+
+        anchors.left: parent.left
+        width: bubble.width
+        height: bubble.implicitHeight
+        radius: bubble.radius
+        color: Theme.color.panelBg
+        visible: false   // 只做 MultiEffect 的源（与 widgets/Card.qml 的 surface 同一套写法）
+    }
+
+    MultiEffect {
+        anchors.fill: shadowShape
+        source: shadowShape
+        shadowEnabled: true
+        shadowColor: Theme.color.shadowSubtle
+        shadowBlur: Math.min(1.0, Theme.shadow.cardBlur / 32)   // shadowBlur 是 0..1，按 32px 满值线性映射
+        shadowVerticalOffset: Theme.shadow.cardDy
+        autoPaddingEnabled: true
+    }
+
     Rectangle {
         id: bubble
 
@@ -28,8 +56,8 @@ Item {
         implicitHeight: inner.implicitHeight + 2 * Theme.spacing.buttonPadY
         radius: Theme.radius.card
         color: Theme.color.panelBg
-        border.width: 1
-        border.color: Theme.color.border
+        // 无描边：原版 `#agentBubble` / `#agentUnit` 只有 `background: {{panelBg}} + border-radius: 12px`
+        // （chat.qss），一条 border 都没有 —— 层次由上面那层柔和阴影给，不靠线。
 
         Column {
             id: inner

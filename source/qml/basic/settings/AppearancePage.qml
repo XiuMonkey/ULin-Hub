@@ -110,7 +110,9 @@ Item {
             background: Rectangle {
                 color: Theme.color.inputBg
                 border.width: 1
-                border.color: comboHover.hovered ? Theme.color.scrollbarHover : Theme.color.scrollbar
+                // 静息 2026-10-17 改：scrollbar(#D1D5DB ≈17% 灰) → inputBorder(10% 黑)，
+                // 对齐官方 DSH `--dsw-alias-border-l2` 的取法；悬停仍深一档（克制的中性灰）。
+                border.color: comboHover.hovered ? Theme.color.scrollbarHover : Theme.color.inputBorder
                 radius: Theme.radius.control
             }
 

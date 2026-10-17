@@ -5,7 +5,7 @@
   "cardBg": "#1F2937",
   "hoverBg": "#374151",
   "activeBg": "#414F6B",
-  "border": "#374151",
+  "border": "rgba(255,255,255,0.06)",
   "textPrimary": "#F9FAFB",
   "textSecondary": "#9CA3AF",
   "accent": "#4C8BF5",

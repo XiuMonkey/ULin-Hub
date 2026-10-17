@@ -488,10 +488,12 @@ Item {
                                 background: Rectangle {
                                     color: Theme.color.inputBg
                                     border.width: 1
-                                    // 悬停略深一档；聚焦（键盘走查）用 textSecondary，都是中性灰
+                                    // 悬停略深一档；聚焦（键盘走查）用 textSecondary，都是中性灰。
+                                    // 静息原为 scrollbar(#D1D5DB ≈17% 灰)，2026-10-17 改 inputBorder(10% 黑)：
+                                    // 对齐官方 DSH `--dsw-alias-border-l2`。
                                     border.color: providerCombo.activeFocus
                                         ? Theme.color.textSecondary
-                                        : (providerHover.hovered ? Theme.color.scrollbarHover : Theme.color.scrollbar)
+                                        : (providerHover.hovered ? Theme.color.scrollbarHover : Theme.color.inputBorder)
                                     radius: Theme.radius.control
                                 }
 
@@ -757,9 +759,11 @@ Item {
                                             return Theme.color.border
                                         if (imageInputBox.checked)
                                             return Theme.color.textPrimary
+                                        // 未勾选的静息描边原为 scrollbarHover(#9CA3AF ≈33% 灰，是本页最深的一条线)，
+                                        // 2026-10-17 改 inputBorder(10% 黑)：官方 DSH 的控件 ring 就在这一档。
                                         return (imageInputBox.hovered || imageInputBox.visualFocus)
                                             ? Theme.color.textSecondary
-                                            : Theme.color.scrollbarHover
+                                            : Theme.color.inputBorder
                                     }
 
                                     Text {

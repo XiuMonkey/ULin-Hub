@@ -72,7 +72,9 @@ Item {
         // 高度由内部两行（代码区 + 滚动条行）算出来，不再手工加减
         implicitHeight: body.implicitHeight + 2 * Theme.spacing.labelGap
         radius: Theme.radius.control
-        color: Theme.color.inputBg
+        // 底色 = 原版 `#codeBlockView { background: {{hoverBg}} }` 的灰面（不是近白的 inputBg）：
+        // 灰面自己就有层次，描边只是收个边；换成近白底后描边被迫当"唯一的层次线索"，看着就"太深"。
+        color: Theme.color.hoverBg
         border.width: 1
         border.color: Theme.color.border
         clip: true

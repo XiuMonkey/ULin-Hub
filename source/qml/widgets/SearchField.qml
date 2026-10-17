@@ -28,7 +28,10 @@ TextField {
         radius: Theme.radius.input
         color: Theme.color.inputBg
         border.width: 1
-        border.color: root.activeFocus ? Theme.color.accent : Theme.color.inputBorder
+        // 输入类控件：静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`；
+        // 聚焦仍给一条克制可见的中性灰（textSecondary），保住键盘走查的可见性 ——
+        // 官方是靠 2px focus ring，这里 1px 中性灰是同等的克制替代。
+        border.color: root.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
     }
 
     IconButton {

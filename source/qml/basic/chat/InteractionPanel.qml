@@ -133,9 +133,9 @@ Item {
                     width: column.width
                     implicitHeight: qcol.implicitHeight + 20
                     radius: Theme.radius.card
-                    color: Theme.color.inputBg
-                    border.width: 1
-                    border.color: Theme.color.border
+                    // 原版 `#interactionPanel QFrame#questionCard { background: {{hoverBg}}; border-radius: 10px }`
+                    // —— 只有灰面 + 圆角，没有描边；本版原来在灰面/白面上又加了一条 #E5E7EB 硬线，去掉。
+                    color: Theme.color.hoverBg
 
                     readonly property var options: modelData.options ? modelData.options : []
 
@@ -259,7 +259,9 @@ Item {
                                 radius: Theme.radius.input
                                 color: Theme.color.panelBg
                                 border.width: 1
-                                border.color: customEdit.activeFocus ? Theme.color.accent : Theme.color.inputBorder
+                                // 输入类控件：静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`；
+                                // 聚焦保留克制可见的中性灰 textSecondary
+                                border.color: customEdit.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
                             }
                         }
                     }

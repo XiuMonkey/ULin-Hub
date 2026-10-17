@@ -18,8 +18,8 @@ Item {
         implicitHeight: content.contentHeight + 2 * Theme.spacing.buttonPadY
         radius: Theme.radius.panel
         color: Theme.color.userBubbleBg
-        border.width: 1
-        border.color: Theme.color.border
+        // 无描边：原版 sidebar/chat.qss 的 `#userUnit` 只有 `background-color + border-radius: 12px`，
+        // 一条 border 都没有（见 build/temp/ui-texture/original-borders.txt）。气泡靠 userBubbleBg 的面自己立住。
 
         // 量宽度专用：Text 的 implicitWidth 是"不换行时的自然宽度"，
         // 而 TextEdit 在宽度定下来之前**不提供可用的 implicitWidth/Height**（上一版把行高算成 0 就栽在这）。
