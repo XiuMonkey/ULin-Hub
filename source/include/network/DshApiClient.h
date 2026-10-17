@@ -407,6 +407,12 @@ private:
 	void failAuthQueue(const QString& code, const QString& message);
 
 private:
+public:
+	// 给同进程的其它 HTTP 客户端复用**同一个管理器**：鉴权是 cookie（launch token 握手后写进
+	// 这个管理器的 cookie jar），各用各的 NAM 就拿不到那个 cookie ⇒ 例如插件市场会被回 'host need authentication'。
+	QNetworkAccessManager* networkAccessManager() const { return m_nam; }
+
+private:
 	QNetworkAccessManager* m_nam = nullptr;
 	QWebSocket* m_stream = nullptr;         // /api/remote.mux（0.1.5 唯一的一条流通道）
 	QUrl m_baseUrl;

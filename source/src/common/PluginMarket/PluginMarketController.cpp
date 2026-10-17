@@ -133,8 +133,11 @@ void PluginMarketController::startMarketInstall()
 }
 
 void PluginMarketController::updateBaseUrl() {
-	if (m_api)
+	if (m_api) {
 		m_client->setBaseUrl(m_api->baseUrl());
+		// 关键：复用同一个 NAM ⇒ 带上宿主完成 launch token 握手后得到的鉴权 cookie。
+		m_client->setNetworkAccessManager(m_api->networkAccessManager());
+	}
 }
 
 void PluginMarketController::setBusy(bool busy)

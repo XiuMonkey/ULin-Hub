@@ -21,6 +21,11 @@ public:
 
 	void setBaseUrl(const QUrl& url);
 
+
+	// 复用宿主 api 客户端的 QNetworkAccessManager：鉴权 cookie 在它的 cookie jar 里（各用各的 NAM 会拿不到 ⇒ host need authentication）。
+
+	void setNetworkAccessManager(QNetworkAccessManager* nam);
+
 	// 各接口路径（也用于让调用方识别失败来源）
 	static QString registryPath();
 	static QString installedPath();

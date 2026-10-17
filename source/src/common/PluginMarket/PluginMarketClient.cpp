@@ -33,6 +33,15 @@ namespace
 	}
 }
 
+void PluginMarketClient::setNetworkAccessManager(QNetworkAccessManager* nam)
+{
+	if (!nam || nam == m_nam)
+		return;
+	QNetworkAccessManager* old = m_nam;
+	m_nam = nam;
+	if (old)
+		old->deleteLater();
+}
 PluginMarketClient::PluginMarketClient(QObject* parent)
 	: QObject(parent)
 	, m_nam(new QNetworkAccessManager(this))
