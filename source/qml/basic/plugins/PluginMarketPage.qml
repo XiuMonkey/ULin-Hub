@@ -407,6 +407,7 @@ Item {
             implicitHeight: 40
 
             Row {
+                id: pagerRow
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
