@@ -101,6 +101,17 @@ Item {
         cursorOn = true
     }
 
+    // ---- 底色：**铺满整个视图**（含四周留白、最后一行之下的空隙）----
+    // 不这么铺的话，底色只由"每行 Canvas"画出来：行宽 = 面板宽 − 2×padding、行数 = 网格行数，
+    // 于是四周留一圈面板底色、底部还空一条 —— 观感就是"终端没铺满面板"。
+    // 这一层在**面板裁切层之内**（PanelBar.body 用 MultiEffect + mask 按卡片圆角裁过下缘两角），
+    // 所以它铺到边角时会被面板的圆角切掉，自然贴合；视图自己**不加**圆角/阴影（否则与面板重复）。
+    Rectangle {
+        anchors.fill: parent
+        color: root.defaultBg
+        z: -1
+    }
+
     function rgbOf(value) {
         // 0xRRGGBB → "#rrggbb"
         return "#" + ("000000" + (value >>> 0).toString(16)).slice(-6)
