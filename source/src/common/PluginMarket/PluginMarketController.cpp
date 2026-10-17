@@ -138,6 +138,10 @@ void PluginMarketController::updateBaseUrl() {
 		// 关键：复用同一个 NAM ⇒ 带上宿主完成 launch token 握手后得到的鉴权 cookie。
 		m_client->setNetworkAccessManager(m_api->networkAccessManager());
 		m_client->setAuthToken(m_api->launchToken());   // 引擎认宿主靠 ?token=（新版市场 401 时必需）
+		// 等认证就绪再发：实测「市场请求先发 ⇒ 401，6 秒后 auth cookie 才到手」。每 400ms 重试，最多 ~10s。
+		static int sAuthRetry = 0;
+		if (m_api && !m_api->authenticated() && ++sAuthRetry <= 25) { QTimer::singleShot(400, this, [this] { refresh(); }); return; }
+		if (m_api && m_api->authenticated()) sAuthRetry = 0;
 	}
 }
 

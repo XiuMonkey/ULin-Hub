@@ -59,6 +59,8 @@ public:
 	QUrl baseUrl() const;
 	// 启动令牌；认证握手靠它换 /api 的 cookie。接管态下恒为空
 	QString launchToken() const { return m_takenover ? QString() : m_launchToken; }
+	// 认证是否就绪（launch token 握手拿到 session cookie 之后）；市场接口在未就绪时发出去必 401。
+	bool authenticated() const { return m_authenticated; }
 
 	// 打开 mux 上的逻辑流；接管态下忽略（流由扩展负责）
 	void openStreams();
