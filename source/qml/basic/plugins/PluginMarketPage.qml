@@ -64,7 +64,7 @@ Item {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: Hub.plugins.busy
-                    text: Hub.plugins.statusText.length > 0 ? Hub.plugins.statusText : qsTrId("plugin_loading")
+                    text: Hub.plugins.statusText.length > 0 ? Hub.plugins.statusText : "加载中…"
                     color: Theme.color.textTertiary
                     font.family: "Microsoft YaHei UI"
                     font.pixelSize: Theme.font.small
