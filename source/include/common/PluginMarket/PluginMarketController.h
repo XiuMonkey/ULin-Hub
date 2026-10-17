@@ -125,4 +125,7 @@ private:
 	int m_pageCount = 1;
 	bool m_busy = false;
 	bool m_open = false;
+	// 是否已经拿到过一次 registry（打开市场时据此决定要不要重取：启动 1.8s 已预热过，
+	// 打开时再取一次只会在数据回来时触发模型 reset + 委托批量重建 ⇒ 打开后 1.5s 卡一下）。
+	bool m_haveRegistry = false;
 };

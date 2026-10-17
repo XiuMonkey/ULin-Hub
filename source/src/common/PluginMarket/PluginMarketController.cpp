@@ -23,6 +23,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 	connect(m_client, &PluginMarketClient::registryLoaded, this,
 		[this](const QJsonArray& plugins, const QString& source) {
 			m_all = PluginMarketModel::parsePlugins(plugins);
+			m_haveRegistry = true;   // 之后打开市场直接用这份，不再重取（见 openPage）
 			setBusy(false);
 
 			// 三种来源的文案与旧壳一致（快照 / 缓存 / 实时）
@@ -146,7 +147,13 @@ void PluginMarketController::openPage()
 
 	m_open = true;
 	emit openChanged();
-	refresh();
+
+	// ⚠️ 打开时**不要无条件** refresh()：启动后 1.8 秒已经预热过一次（见构造函数里的 singleShot），
+	// 再刷一次只是把同一个查询重发一遍 —— 数据 1.5 秒后回来时 models 整体 reset、ListView 一次性
+	// 建出十几张卡 ⇒ 正好在"打开后 1.5 秒"卡一下（实测单帧 51ms，用户体感就是打开不流畅，且
+	// 5 天前没有这个行为）。有数据就直接用缓存；只有"还没拿到过"时才去取。
+	if (!m_haveRegistry)
+		refresh();
 }
 
 void PluginMarketController::closePage()
