@@ -10,7 +10,7 @@ The first baseline intentionally keeps the existing Qt Widgets UI and build beha
 - `assets/` — application resources, translations, themes, and bundled server files
 - `assets/resources/server/` — Node runtime, server dependencies, harness configuration, and launch-root data
 - `extensions/` — client extension sources and examples (CodexBackend, PluginTranspiler)
-- `tests/` — C++ unit tests
+- `misc/legacy-tests/` — C++ unit tests
 - `misc/tools/` — build, packaging, and diagnostic scripts
 
 ## Build

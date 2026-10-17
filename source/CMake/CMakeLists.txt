@@ -211,23 +211,23 @@ if(ULINHUB_BUILD_TESTS)
 
 	# 清单与 ULin Hub.Tests.vcxproj 一致：只编被测到的那部分源码，不是整个 app
 	set(ULINHUB_TEST_SOURCES
-		"${ULINHUB_ROOT}/../tests/UnitTestMain.cpp"
-		"${ULINHUB_ROOT}/../tests/TestDshEventParser.cpp"
-		"${ULINHUB_ROOT}/../tests/TestCodeHighlighter.cpp"
-		"${ULINHUB_ROOT}/../tests/TestHistoryManager.cpp"
-		"${ULINHUB_ROOT}/../tests/TestMarkdownPreprocess.cpp"
-		"${ULINHUB_ROOT}/../tests/TestThunk.cpp"
-		"${ULINHUB_ROOT}/../tests/TestSessionCatalog.cpp"
-		"${ULINHUB_ROOT}/../tests/TestPluginMarketModel.cpp"
-		"${ULINHUB_ROOT}/../tests/TestModelSelection.cpp"
-		"${ULINHUB_ROOT}/../tests/TestDshApiClient.cpp"
-		"${ULINHUB_ROOT}/../tests/TestSessionPrefetcher.cpp"
-		"${ULINHUB_ROOT}/../tests/TestSettingsStore.cpp"
-		"${ULINHUB_ROOT}/../tests/TestClientSettings.cpp"
-		"${ULINHUB_ROOT}/../tests/TestLogger.cpp"
-		"${ULINHUB_ROOT}/../tests/TestTranslationManager.cpp"
-		"${ULINHUB_ROOT}/../tests/TestServerManager.cpp"
-		"${ULINHUB_ROOT}/../tests/TestClientExtension.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/UnitTestMain.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestDshEventParser.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestCodeHighlighter.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestHistoryManager.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestMarkdownPreprocess.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestThunk.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestSessionCatalog.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestPluginMarketModel.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestModelSelection.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestDshApiClient.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestSessionPrefetcher.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestSettingsStore.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestClientSettings.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestLogger.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestTranslationManager.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestServerManager.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestClientExtension.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/Thunk.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/DllCaller.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/ComCaller.cpp"
@@ -255,7 +255,7 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/src/ExtensionSystem/ExtensionRegistry.cpp")
 
 	# 测试类头文件带 Q_OBJECT，交给 AUTOMOC
-	file(GLOB ULINHUB_TEST_HEADERS CONFIGURE_DEPENDS "${ULINHUB_ROOT}/../tests/*.h")
+	file(GLOB ULINHUB_TEST_HEADERS CONFIGURE_DEPENDS "${ULINHUB_ROOT}/../misc/legacy-tests/*.h")
 
 	# include/ 下的头也要交给 AUTOMOC，但**只列测试目标真正编译了 .cpp 的那些**。
 	#

@@ -44,3 +44,6 @@ assets/StyleExample/Bg-Genshin-Keqing.zip
 
 # pnpm 装插件市场时的工作目录（不该进仓库）
 .pnpm-store/
+
+# 测试工程构建产物（归档在 misc/legacy-tests）
+misc/legacy-tests/*/x64/
