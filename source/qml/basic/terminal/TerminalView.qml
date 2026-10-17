@@ -1,7 +1,7 @@
 // 终端网格视图：把 TerminalVtModel（→ TerminalVt → libvterm）的网格逐格画出来。
 //
 // 分层：本文件**只画**，不解析、不联网。要画什么全从 model 拿：
-//   · model.rowsJson(first, last) —— 一段行，行内是"同样式合并后的段" [文本, fg, bg, flags]；
+//   · model.rows(first, last) —— 一段行（结构化；为空时退回 rowsJson），行内是"同样式合并后的段" [文本, fg, bg, flags]；
 //   · model.dirtyRowsChanged(rows) —— 哪几行变了（只重画那几行，别整屏重建）；
 //   · model.cursorRow/cursorCol/cursorVisible —— 光标（闪烁在 QML 侧）；
 //   · model.state/statusText —— 顶部状态行（连接中/只读/错误都靠它）。

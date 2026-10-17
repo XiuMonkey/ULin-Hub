@@ -22,8 +22,6 @@ Item {
     implicitHeight: 600
 
     // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停，
-    // 理由与实测见 widgets/PageOverlay.qml 里 overlayAnimating 的注释。
-    property bool overlayAnimating: false
 
     // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
     // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
@@ -57,9 +55,8 @@ Item {
                 spacing: Theme.spacing.buttonGap
 
                 // 加载指示用**静态**文字，不用转圈（这是本轮实测的结论，不是偷懒）：
-                //   转圈 = 常驻无限动画 ⇒ 窗口每帧整窗重绘（本项目窗口带整窗背景层 + MultiEffect）
-                //   ⇒ 只要它在转，加载期间整窗就是 ~30ms/帧；而"按时间门控"要么盖住建卡阶段
-                //   （卡不如/要延迟 450ms），要么在 139ms 后放开（正好撞上建卡 ⇒ 又卡）。
+                // 理由：转圈是常驻无限动画 ⇒ 每帧整窗重绘 ⇒ 加载期间整窗 ~30ms/帧；按时间门控
+                // 又必然要么盖住建卡（变卡）要么延迟（450ms）。静态文字立刻可见且永不重绘。
                 //   静态文字两项都满足：**立刻可见**（无延迟）、**永不重绘**（无掉帧）。
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
