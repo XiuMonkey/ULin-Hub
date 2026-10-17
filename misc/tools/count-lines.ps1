@@ -50,7 +50,6 @@ if (-not $Path) {
     # This script lives in misc/tools, so default to the repository root (two levels up).
     $Path = if ($PSScriptRoot) { (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path } else { (Get-Location).Path }
     # 那时它必须放在仓库根才能用 —— 这就是"路径问题"。
-    $Path = if ($PSScriptRoot) { (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path } else { (Get-Location).Path }
 }
 
 # Optional documentation / markup files.
