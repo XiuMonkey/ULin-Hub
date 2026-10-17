@@ -27,8 +27,8 @@
 #   1) 源文件清单：.vcxproj 手工列举，这里用 GLOB + CONFIGURE_DEPENDS 自动收集，
 #      避免新增 .cpp 时「只加了一边」。反过来说，新增文件时 .vcxproj 仍需手工补。
 #   2) Qt 定位：.vcxproj 里硬编码 D:\Qt\...；这里走 find_package + CMAKE_PREFIX_PATH
-#      （QTDIR 环境变量优先，约定与 misc/misc/tools/release-translations.ps1 一致）。
-#   3) 翻译（misc/misc/tools/release-translations.ps1）未接入 CMake：.qm 已进 qrc，
+#      （QTDIR 环境变量优先，约定与 misc/tools/release-translations.ps1 一致）。
+#   3) 翻译（misc/tools/release-translations.ps1）未接入 CMake：.qm 已进 qrc，
 #      这个 CMake 目标照样能拿到内置的中英语言包。跑 CMake 构建时若改了
 #      translations/*.ts，需要手动跑一次那个脚本再重新构建（qrc 才会带上新包）。
 # ==================================================================
@@ -44,7 +44,7 @@ project(ULinHub
 # 源码根目录（本文件位于 <root>/CMake/ 下）
 get_filename_component(ULINHUB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 
-# Qt 定位：QTDIR 优先（与 misc/misc/tools/release-translations.ps1 的约定一致），
+# Qt 定位：QTDIR 优先（与 misc/tools/release-translations.ps1 的约定一致），
 # 也可以直接 -DCMAKE_PREFIX_PATH=<Qt 安装目录>。
 if(DEFINED ENV{QTDIR} AND NOT "$ENV{QTDIR}" STREQUAL "")
 	list(APPEND CMAKE_PREFIX_PATH "$ENV{QTDIR}")
@@ -63,7 +63,7 @@ set(QT_FIND_PRIVATE_MODULES ON)
 #
 # Qml/Quick：QML 壳（docs/ui-qml-migration-plan.md）跑在 QQmlApplicationEngine 上，必须显式链。
 # QuickControls2/Layouts/Effects 等按 M2 起用到时再加（那些既有 C++ 库也有各自的 QML 模块，
-# 发行版还要把 Qt 的 qml/ 目录部署到 exe 同目录 —— 见 misc/tools/run-qml-shell.ps1 的说明）。
+# 发行版还要把 Qt 的 qml/ 目录部署到 exe 同目录 —— 见 misc/tools/deploy-qml-runtime.ps1 的说明）。
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Network WebSockets Qml Quick)
 
 # 打开 AUTOMOC / AUTOUIC / AUTORCC 并把 C++ 标准等默认值设好。

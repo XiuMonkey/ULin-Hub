@@ -227,7 +227,7 @@ Item {
 
                 TextEdit {
                     id: editor
-                    objectName: "composerEditor"   // 供离屏试装台定位（见 misc/tools/qml-harness.py）
+                    objectName: "composerEditor"   // 供离屏试装台定位
                     // 宽度：超高时右侧让出滚动条厚度（文字换行宽度因此窄一点，但不会被滚动条压住）；
                     // 未超高时全额宽度（滚动条此时根本不画）。
                     width: editorView.width - (editorView.needsScroll
