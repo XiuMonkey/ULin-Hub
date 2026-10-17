@@ -167,8 +167,8 @@ namespace
 		// 于是"细窄 + 留白"只改观感 —— 拖拽/点轨道的几何仍由框架按 contentItem（= thickness）算。
 		map.insert(QStringLiteral("scrollbarHandleWidth"), 6);
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
-		map.insert(QStringLiteral("editorMinHeight"), 38);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 + 7 余量
-		map.insert(QStringLiteral("editorMaxHeight"), 336);         // kEditorMaxHeight
+		map.insert(QStringLiteral("editorMinHeight"), 48);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 = 21，再留 27 的余量（用户两次各要"高 10px"：28 → 38 → 48）
+		map.insert(QStringLiteral("editorMaxHeight"), 140);         // 编辑区高度上限：8 行（行高实测 17）+ editorPadTop 4 = 140；超过就由外层 Flickable 滚动 + AppScrollBar
 		map.insert(QStringLiteral("dropdownArrowWidth"), 18);       // #settingsLanguageCombo::drop-down 宽度
 		map.insert(QStringLiteral("comboMinWidth"), 200);           // #settingsLanguageCombo min-width
 		map.insert(QStringLiteral("checkbox"), 18);                 // chat #interactionPanel QCheckBox::indicator

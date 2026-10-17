@@ -4,8 +4,9 @@
 //   ① 细阴影卡片（圆角 Theme.radius.composer=16；1px composerBorder；MultiEffect 阴影取
 //      Theme.shadow.inputBlur/inputDy = 8/2，与 Card 的 cardBlur/cardDy 同一档，克制不发光）
 //   ② 卡片内容列（左右统一 cardPadH=16、上 cardPadTop=12、下 cardPadBottom=12、段间距 cardGap=8）：
-//        ├ 输入框（13px；左右内边距=cardPadH、上=editorPadTop 4、下 0；高 28–336、超出靠内部滚动、
-//        │  无可见滚动条）—— 文字左上角内缩 16/16，与卡片左边距同列
+//        ├ 输入框（13px；左右内边距=cardPadH、上=editorPadTop 4、下 0；高 48–140 =
+//        │  editorMinHeight–editorMaxHeight，单行最小、多行跟内容长；到上限后由外层 Flickable
+//        │  滚动，右侧出现 AppScrollBar，**未超高时不画**）—— 文字左上角内缩 16/16，与卡片左边距同列
 //        └ #inputControlRow（高 = 发送键 32）：左 chip（24px 配角）、右发送键（32×32 圆钮），
 //          两者各贴一边、行内垂直居中；chip 文字与编辑器文字同列，圆钮右缘与编辑器文字右缘同列
 //   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；上沿离卡片下沿 statsGap(4px)、
@@ -161,59 +162,129 @@ Item {
             anchors.topMargin: root.cardPadTop
             spacing: root.cardGap
 
-            TextEdit {
-                id: editor
-                objectName: "composerEditor"   // 供离屏试装台定位（见 misc/tools/qml-harness.py）
+            // ---- 编辑区：高度内容驱动（单行 = editorMinHeight、多行跟内容长、封顶 editorMaxHeight），
+            //      封顶之后靠 Flickable 滚动 + **只在超高时**出现 AppScrollBar ----
+            // 为什么要一层 Flickable：TextEdit 自己那套"光标可见就内部挪一下"没有对外暴露 contentY，
+            // 挂不了滚动条；把它放进 Flickable、让 TextEdit 的高度等于全文高度，滚动就归 Flickable 管。
+            Flickable {
+                id: editorView
                 width: parent.width
-                // 内边距：左右 = cardPadH（与卡片左右内边距同列）/ 上 4 / 下 0
-                leftPadding: root.cardPadH
-                rightPadding: root.cardPadH
-                topPadding: Theme.spacing.editorPadTop
-                bottomPadding: 0
-                textFormat: TextEdit.PlainText
-                wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
-                selectByMouse: true
-                persistentSelection: true
-                color: Theme.color.textPrimary
-                selectionColor: Theme.color.selectionBg
-                selectedTextColor: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
-                // 13px（Theme.font.body）：与 widgets/SearchField.qml 的输入文字同档。
-                // 原来取 lead(16) 比全应用正文大 3px，输入区显得"字很大"；现在整条输入区的字号是
-                // 13（正文/chip 之上）→ 12（chip、菜单说明、统计行）→ 11（▾、分组标签）三档相邻，
-                // 主次靠**颜色**（textPrimary / textSecondary / textTertiary）拉开，不靠字号断层。
-                font.pixelSize: Theme.font.body
-                // 高度自适应：28–336（原版 kEditorMinHeight 40 / kEditorMaxHeight 336；单行时收到 28）。
-                // ⚠️ TextEdit 的 implicitHeight 是只读的（原版也是 setFixedHeight 而非设 implicit），
-                // 所以这里给 height 赋值。
-                height: Math.min(Math.max(contentHeight + topPadding, Theme.size.editorMinHeight),
+                // 高度：内容 + 上下内边距，夹在 [editorMinHeight, editorMaxHeight] 之间
+                // ⇒ 单行 = min（用户说的"再高 10px"落在这个 token 上：38 → 48）；
+                //    多行跟着内容长；到 max 就不再长（此时进入滚动）。
+                // 行高实测：13px "Microsoft YaHei UI" 每行 17 逻辑 px（editorMaxHeight=140 ⇒ 8 行 + 上内边距 4）。
+                height: Math.min(Math.max(editor.contentHeight + editor.topPadding + editor.bottomPadding,
+                                          Theme.size.editorMinHeight),
                                  Theme.size.editorMaxHeight)
-                // 无可见滚动条：超出靠编辑器内部滚动
-                Text {
-                    anchors.left: parent.left
-                    // 占位符与正文同列同基线：直接引用编辑器自己的内边距/字体，改一处不会跑偏
-                    anchors.leftMargin: editor.leftPadding
-                    anchors.top: parent.top
-                    anchors.topMargin: editor.topPadding
-                    visible: editor.text.length === 0
-                    text: qsTrId("chat_input_placeholder")
-                    // 占位符再弱一档（textCaption），与 widgets/SearchField.qml 的 placeholder 同色
-                    color: Theme.color.textCaption
-                    font.family: editor.font.family
-                    font.pixelSize: editor.font.pixelSize
+                contentWidth: width
+                contentHeight: editor.height
+                clip: true
+                // 关掉拖拽 flick：编辑区里按住鼠标是**选文字**，不能让 Flickable 抢走鼠标；
+                // 滚轮不受 interactive 影响（Flickable 自己处理滚轮），滚动条照常可拖。
+                interactive: false
+                boundsBehavior: Flickable.StopAtBounds
+
+                // 只有"内容超高"时才需要给滚动条让出宽度（未超高时不减，单行的换行宽度与改动前一致）。
+                // 判据直接用几何：contentHeight 比可视高度大 ⇒ 一定滚得动，与 ScrollBar 的 AsNeeded 同义。
+                readonly property bool needsScroll: contentHeight > height + 0.5
+
+                // 滚动条：挂在 Flickable 上（框架负责摆到右缘、按 position/size 定长度）。
+                // policy 用 AsNeeded：内容没超高就不画，不会常驻一条占位。
+                ScrollBar.vertical: AppScrollBar {
+                    id: editorScrollBar
+                    objectName: "composerScrollBar"   // 供离屏试装台定位（同 composerEditor 的约定）
+                    policy: editorView.needsScroll ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                 }
 
-                onTextChanged: {
-                    commandMenu.dismissed = false     // 一敲字就重新参与候选（Esc/点外面收起后不要赖着不走）
-                    commandMenu.syncVisibility()      // Popup 只能显式开关（见 commandMenu 上的说明）
-                    // 刚打出 `/` 时懒拉一次命令表：会话切换时宿主已拉过，这里兜"开着会话时新注册了命令"
-                    if (text === "/")
-                        Hub.commands.refresh(Hub.currentSessionId)
+                // 光标跑出可视区时把内容滚过去（TextEdit 现在高度等于全文高度 ⇒ 它自己不滚了，
+                // 光标可见性归这里管）。上沿/下沿各留 4px（editorPadTop）免得光标贴着边。
+                function ensureCursorVisible() {
+                    if (!needsScroll)
+                        return
+                    const r = editor.cursorRectangle
+                    const maxY = Math.max(0, contentHeight - height)
+                    if (r.y < contentY)
+                        contentY = Math.max(0, r.y - Theme.spacing.editorPadTop)
+                    else if (r.y + r.height > contentY + height)
+                        contentY = Math.min(maxY, r.y + r.height - height + Theme.spacing.editorPadTop)
                 }
 
-                Keys.onPressed: (event) => {
-                    if (root.handleKey(event))
-                        event.accepted = true
+                // 高度变化（换行/删行）后光标可能落到可视区外：跟着滚一把
+                onHeightChanged: ensureCursorVisible()
+
+                // 滚轮：编辑区自己滚内容（**不吞事件**：真的滚了才改 contentY，滚不动时什么也不做）。
+                // 显式写一个 WheelHandler 而不是只靠 Flickable 内建行为：interactive 关掉后靠它更稳，
+                // 也不会和"按住拖选文字"抢鼠标（拖拽仍归 TextEdit）。
+                WheelHandler {
+                    onWheel: (event) => {
+                        const maxY = Math.max(0, editorView.contentHeight - editorView.height)
+                        if (maxY <= 0)
+                            return
+                        editorView.contentY = Math.min(maxY, Math.max(0,
+                            editorView.contentY - event.angleDelta.y / 2))
+                    }
+                }
+
+                TextEdit {
+                    id: editor
+                    objectName: "composerEditor"   // 供离屏试装台定位（见 misc/tools/qml-harness.py）
+                    // 宽度：超高时右侧让出滚动条厚度（文字换行宽度因此窄一点，但不会被滚动条压住）；
+                    // 未超高时全额宽度（滚动条此时根本不画）。
+                    width: editorView.width - (editorView.needsScroll
+                                               ? Theme.size.scrollbarThickness : 0)
+                    // 内边距：左右 = cardPadH（与卡片左右内边距同列）/ 上 4 / 下 0
+                    leftPadding: root.cardPadH
+                    rightPadding: root.cardPadH
+                    topPadding: Theme.spacing.editorPadTop
+                    bottomPadding: 0
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                    selectByMouse: true
+                    persistentSelection: true
+                    color: Theme.color.textPrimary
+                    selectionColor: Theme.color.selectionBg
+                    selectedTextColor: Theme.color.textPrimary
+                    font.family: "Microsoft YaHei UI"
+                    // 13px（Theme.font.body）：与 widgets/SearchField.qml 的输入文字同档。
+                    // 原来取 lead(16) 比全应用正文大 3px，输入区显得"字很大"；现在整条输入区的字号是
+                    // 13（正文/chip 之上）→ 12（chip、菜单说明、统计行）→ 11（▾、分组标签）三档相邻，
+                    // 主次靠**颜色**（textPrimary / textSecondary / textTertiary）拉开，不靠字号断层。
+                    font.pixelSize: Theme.font.body
+                    // 高度 = 全文高度（不再自己夹 min/max）：夹取与滚动都在外层 editorView 上，
+                    // 这样超高时滚动条才有东西可滚。
+                    // ⚠️ TextEdit 的 implicitHeight 是只读的（原版也是 setFixedHeight 而非设 implicit），
+                    // 所以这里给 height 赋值。
+                    height: contentHeight + topPadding + bottomPadding
+                    // 光标移动（打字/方向键/点选）后跟着滚
+                    onCursorRectangleChanged: editorView.ensureCursorVisible()
+
+                    // 占位符（空文本时画）：与正文同列同基线
+                    Text {
+                        anchors.left: parent.left
+                        // 占位符与正文同列同基线：直接引用编辑器自己的内边距/字体，改一处不会跑偏
+                        anchors.leftMargin: editor.leftPadding
+                        anchors.top: parent.top
+                        anchors.topMargin: editor.topPadding
+                        visible: editor.text.length === 0
+                        text: qsTrId("chat_input_placeholder")
+                        // 占位符再弱一档（textCaption），与 widgets/SearchField.qml 的 placeholder 同色
+                        color: Theme.color.textCaption
+                        font.family: editor.font.family
+                        font.pixelSize: editor.font.pixelSize
+                    }
+
+                    onTextChanged: {
+                        commandMenu.dismissed = false     // 一敲字就重新参与候选（Esc/点外面收起后不要赖着不走）
+                        commandMenu.syncVisibility()      // Popup 只能显式开关（见 commandMenu 上的说明）
+                        // 刚打出 `/` 时懒拉一次命令表：会话切换时宿主已拉过，这里兜"开着会话时新注册了命令"
+                        if (text === "/")
+                            Hub.commands.refresh(Hub.currentSessionId)
+                    }
+
+                    Keys.onPressed: (event) => {
+                        if (root.handleKey(event))
+                            event.accepted = true
+                    }
                 }
             }
 
