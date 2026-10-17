@@ -311,6 +311,146 @@ int main(int argc, char** argv)
 		check(typed == "echo\r", "连打 \"echo\" + Enter → " + hexdump(typed) + "（实际 " + hexdump(typed) + "）");
 	}
 
+	// ⑤ 光标位置的写入隔离（用户报的"用箭头移动后再输入会跳到前面/盖住已打印输出"）。
+	//    真机上出问题的根因是"PTY 的 cols 与本地 VT 的 cols 不是一个数"，但这条用例守的是**核心不变量**：
+	//    在 VT 里，一个可打印字符只能写到**光标所在的那一格**，别的格子一格都不能动。
+	//    只要这条不变量在，剩下的就只是"两边尺寸对齐"的接线问题。
+	{
+		std::printf("\n光标定位写入（箭头移动后继续输入，只动光标那一格）\n");
+		TerminalVt vt(6, 20);
+		vt.reset();
+		vt.takeDirtyRows();
+
+		// 一屏"提示符 + 两行已打印输出 + 提示符"，模拟 shell 的画面
+		const char screen[] = "PS> abcdef\r\noutput-line-1\r\noutput-line-2\r\nPS> 0123";
+		vt.feed(screen, static_cast<int>(sizeof(screen) - 1));
+		vt.takeDirtyRows();
+
+		// 先给整屏拍快照（每格的文本 + 宽度），后面逐格比较
+		const auto snapshot = [&vt]() {
+			std::vector<std::pair<std::string, int>> cells;
+			for (int row = 0; row < vt.rows(); ++row)
+			{
+				const TermCell* line = vt.viewRow(row);
+				for (int col = 0; col < vt.cols(); ++col)
+					cells.emplace_back(rowText(line + col, 1), static_cast<int>(line[col].width));
+			}
+			return cells;
+		};
+		const std::vector<std::pair<std::string, int>> before = snapshot();
+
+		// 光标此刻在最后一行 "PS> 0123" 之后：row=3, col=11
+		const int rowBefore = vt.cursorViewRow();
+		const int colBefore = vt.cursorCol();
+
+		// 模拟用户按 4 次 ←（shell 回显 ESC[D），再敲 "XY"
+		const char lefts[] = "\x1b[D\x1b[D\x1b[D\x1b[D";
+		vt.feed(lefts, static_cast<int>(sizeof(lefts) - 1));
+		vt.takeDirtyRows();
+		check(vt.cursorViewRow() == rowBefore && vt.cursorCol() == colBefore - 4,
+			"4 次 ESC[D：光标仍在本行、左移 4 格");
+
+		vt.feed("XY", 2);
+		vt.takeDirtyRows();
+		const std::vector<std::pair<std::string, int>> after = snapshot();
+
+		// 只有 (rowBefore, colBefore-4) 与 (rowBefore, colBefore-3) 这两格变成 X / Y
+		int changed = 0;
+		bool onlyCursorCellsChanged = true;
+		bool xAtCursor = false;
+		bool yAtCursor = false;
+		for (int row = 0; row < vt.rows(); ++row)
+		{
+			for (int col = 0; col < vt.cols(); ++col)
+			{
+				const size_t index = static_cast<size_t>(row) * static_cast<size_t>(vt.cols())
+					+ static_cast<size_t>(col);
+				if (after[index] == before[index])
+					continue;
+				++changed;
+				if (row == rowBefore && col == colBefore - 4 && after[index].first == "X")
+					xAtCursor = true;
+				else if (row == rowBefore && col == colBefore - 3 && after[index].first == "Y")
+					yAtCursor = true;
+				else
+					onlyCursorCellsChanged = false;
+			}
+		}
+		check(xAtCursor, "第一个字符 X 落在光标那一格");
+		check(yAtCursor, "第二个字符 Y 落在光标右边那一格");
+		check(changed == 2, "整屏只有 2 格变化（实际 " + std::to_string(changed) + "）");
+		check(onlyCursorCellsChanged, "已打印的输出行一格都没动");
+
+		// 覆盖"不可修改的输出"这件事：把输出行逐字比对一遍（只读区不该被写）
+		bool outputIntact = true;
+		for (int row = 1; row <= 2; ++row)
+		{
+			std::string line;
+			const TermCell* cells = vt.viewRow(row);
+			for (int col = 0; col < vt.cols(); ++col)
+				if (cells[col].width != 0)
+					line += rowText(cells + col, 1);
+			while (!line.empty() && line.back() == ' ')
+				line.pop_back();
+			if (line != (row == 1 ? "output-line-1" : "output-line-2"))
+				outputIntact = false;
+		}
+		check(outputIntact, "两行已打印输出原样（没被输入覆盖）");
+
+		// 光标跑到行首再输入：只能动第 0 格，绝不"跳到上一行"
+		vt.feed("\r", 1);
+		vt.takeDirtyRows();
+		check(vt.cursorViewRow() == rowBefore && vt.cursorCol() == 0, "回车后光标回到本行行首（不跨行）");
+		vt.feed("Z", 1);
+		vt.takeDirtyRows();
+		check(rowText(vt.viewRow(rowBefore) + 0, 1) == "Z", "行首输入落在第 0 格");
+	}
+
+	// ⑥ 列边界 / 自动折行 / 宽字符（宽字符占两格，续格必须 width=0）
+	{
+		std::printf("\n列边界与宽字符\n");
+		TerminalVt vt(4, 10);
+		vt.reset();
+		vt.takeDirtyRows();
+
+		// 写满最后一行前先清干净：直接从第 0 行写 10 个字符
+		vt.feed("0123456789", 10);
+		vt.takeDirtyRows();
+		check(vt.cursorCol() == 9, "写满 10 列后光标停在第 10 格（末列挂起）");
+		vt.feed("A", 1);
+		vt.takeDirtyRows();
+		check(rowText(vt.viewRow(1) + 0, 10).substr(0, 1) == "A" && vt.cursorCol() == 1,
+			"第 11 个字符折到下一行第 0 格，光标跟进到第 2 格");
+		check(rowText(vt.viewRow(0) + 0, 10) == "0123456789", "第一行 10 格内容没被写坏");
+
+		// 宽字符：在末列放不下时必须整体折行，且首格 width=2、续格 width=0
+		TerminalVt wide(4, 10);
+		wide.reset();
+		wide.takeDirtyRows();
+		wide.feed("abcdefgh", 8);            // 占 0..7，剩下 8、9 两格
+		wide.feed("\xe4\xb8\xad", 3);        // "中"（宽 2）正好占 8、9
+		wide.takeDirtyRows();
+		const TermCell* wideRow = wide.viewRow(0);
+		check(wideRow[8].width == 2, "宽字符首格 width=2");
+		check(wideRow[9].width == 0, "宽字符续格 width=0");
+		wide.feed("\xe6\x96\x87", 3);        // "文"（宽 2）在末列放不下 ⇒ 折到下一行
+		wide.takeDirtyRows();
+		const TermCell* nextRow = wide.viewRow(1);
+		check(nextRow[0].width == 2 && nextRow[1].width == 0, "放不下的宽字符整体折到下一行");
+		check(wide.cursorViewRow() == 1 && wide.cursorCol() == 2, "折行后光标在下一行第 3 格");
+
+		// 改尺寸后折行要重排（面板拉伸时每帧都可能发生）
+		TerminalVt reflow(4, 20);
+		reflow.reset();
+		reflow.takeDirtyRows();
+		reflow.feed("ABCDEFGHIJ", 10);
+		reflow.takeDirtyRows();
+		reflow.setSize(4, 5);                // 20 列缩到 5 列：10 个字符要折成两行
+		reflow.takeDirtyRows();
+		check(rowText(reflow.viewRow(0) + 0, 5) == "ABCDE", "缩窄后第 1 行 = ABCDE");
+		check(rowText(reflow.viewRow(1) + 0, 5) == "FGHIJ", "缩窄后第 2 行 = FGHIJ");
+	}
+
 	// ④ 期望内容
 	std::string joined;
 	for (const std::string& line : lines)

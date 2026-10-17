@@ -330,8 +330,12 @@ void TerminalSession::mountFromList()
 void TerminalSession::createTerminal(const QString& shellPath)
 {
 	m_terminalId = newId();
-	m_cols = qMin(80, m_maxCols);
-	m_rows = qMin(24, m_maxRows);
+	// 建终端时就按**视图量出来的**网格建（m_wantCols/m_wantRows 由 applyGridSize 推过来）。
+	// 以前写死 80×24：面板实际只有 32 列时，PTY 与本地 VT 的 cols 就不一致 —— shell 按 80 折行、
+	// VT 按 32 折行，光标行列随后错位，表现正是"用箭头移动后再输入会跳到行前/盖住已打印输出"。
+	// 没有视图尺寸时（还没绑视图）才退回 80×24。
+	m_cols = qMin(m_wantCols > 0 ? m_wantCols : 80, m_maxCols);
+	m_rows = qMin(m_wantRows > 0 ? m_wantRows : 24, m_maxRows);
 
 	const QString terminalId = m_terminalId;
 	qInfo().noquote() << "[Terminal] terminal/create block=" << m_blockId << "id=" << terminalId

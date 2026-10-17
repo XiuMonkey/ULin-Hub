@@ -198,6 +198,14 @@ Item {
         if (!model || gridCols < 2 || gridRows < 1)
             return
         model.resizeGrid(gridRows, gridCols)
+        // 把"视图量出来的网格"也推给桥：**引擎/PTY 的 cols 必须与本地 VT 是同一个数**。
+        // 不一致时 shell 按它的宽度折行、VT 按另一个宽度折行，光标行列随后错位 ——
+        // 表现正是"用箭头移动后再输入会跳到行前/盖住已打印输出"（2026-10-17 用户报的那条）。
+        // ⚠️ 参数顺序是 (blockId, cols, rows)，与 TerminalSession::resize(cols, rows) /
+        //    terminal/resize 的 args{cols, rows} 一致；而 resizeGrid 是 (rows, cols)。别弄反。
+        // ⚠️ 也**不能**用 `typeof Terminal !== "undefined"` 来防"没有桥"：QML 单例不是 JS 全局，
+        //    typeof 恒为 "undefined"，那样这行永远不执行（踩过）。
+        Terminal.applyGridSize(root.blockId, gridCols, gridRows)
     }
 
     // ---- 光标闪烁 ----
