@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{EE1DB5C4-0470-4300-BE36-20BAF765B893}</ProjectGuid>
+    <Keyword>QtVS_v304</Keyword>
+    <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0</WindowsTargetPlatformVersion>
+    <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt_defaults.props')">
+    <Import Project="$(QtMsBuild)\qt_defaults.props" />
+  </ImportGroup>
+  <!-- 目录重组后 $(SolutionDir) 指向 source/，这里把输出钉回仓库根的 x64\，
+       免得 VS 的输出跟着解决方案搬进 source\x64\（多个脚本与既有习惯都按 <repo>\x64\ 走）。
+       不经解决方案直接编工程时 $(SolutionDir) 为空，"..\x64\" 相对工程目录仍是 <repo>\x64\。 -->
+  <PropertyGroup Label="OutputPaths">
+    <OutDir>$(SolutionDir)..\x64\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)ULin Hub\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
+    <QtInstall>6.11.2_msvc2022_64</QtInstall>
+    <QtModules>core;gui;widgets;network;websockets;qml;quick;webenginequick</QtModules>
+    <QtBuildConfig>debug</QtBuildConfig>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
+    <QtInstall>6.11.2_msvc2022_64</QtInstall>
+    <QtModules>core;gui;widgets;network;websockets;qml;quick;webenginequick</QtModules>
+    <QtBuildConfig>release</QtBuildConfig>
+  </PropertyGroup>
+  <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
+    <Message Importance="High" Text="QtMsBuild: could not locate qt.targets, qt.props; project may not build correctly." />
+  </Target>
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <!-- 让 exe 从 dependence\ 子目录解析 Qt / MSVC 运行库（私有程序集）。
+       Windows 的加载器默认**不搜索 exe 的子目录**，靠这一段声明才会去找；
+       DLL 清单在 source\dependence.manifest。加/换 DLL 时两处都要改。 -->
+  <ItemDefinitionGroup>
+    <Manifest>
+      <AdditionalManifestFiles>$(ProjectDir)dependence.deps.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+    </Manifest>
+    <!-- 每次构建后把运行库收进 dependence\：那个私有程序集要求「清单与 dll 必须同在」，
+         漏一个就是启动即失败（SxS），所以不能靠手工记得。缺 dll 时脚本只告警、不让构建失败。 -->
+    <PostBuildEvent>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\misc\tools\make-dependence.ps1" -Target "$(OutDir)." -Config $(Configuration)</Command>
+      <Message>把运行库收进 dependence\（私有程序集）</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Disabled</Optimization>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>MaxSpeed</Optimization>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\common\util\ConnectionManager.cpp" />
+    <QtRcc Include="..\assets\resources\ulinhub.qrc" />
+    <!-- QML 壳的资源（source/qml/）。单独一份 qrc：一份 QML 目录 = 一个自洽的界面子树 -->
+    <QtRcc Include="qml\qml.qrc" />
+    <ClCompile Include="src\common\platform\win\NativeWindowFilter.cpp" />
+    <ClCompile Include="src\qmlbridge\WindowBridge.cpp" />
+    <ClCompile Include="src\common\appearance\StyleResolver.cpp" />
+    <ClCompile Include="src\qmlbridge\ThemeBridge.cpp" />
+    <ClCompile Include="src\common\session\SessionListModel.cpp" />
+    <ClCompile Include="src\qmlbridge\QmlBridge.cpp" />
+    <ClCompile Include="src\qmlbridge\ThemeController.cpp" />
+    <ClCompile Include="src\common\session\MessageListModel.cpp" />
+    <ClCompile Include="src\common\session\ChatController.cpp" />
+    <ClCompile Include="src\common\session\ToolsFilter.cpp" />
+    <ClCompile Include="src\common\util\MarkdownSegmenter.cpp" />
+    <ClCompile Include="src\common\settings\SettingsController.cpp" />
+    <ClCompile Include="src\common\PluginMarket\PluginMarketController.cpp" />
+    <ClCompile Include="src\common\session\CommandController.cpp" />
+    <ClCompile Include="src\qmlbridge\ExtensionManagerController.cpp" />
+    <ClCompile Include="src\common\util\UrlInput.cpp" />
+    <ClCompile Include="src\qmlbridge\UrlInputBridge.cpp" />
+    <ClCompile Include="src\common\shell\PanelDockModel.cpp" />
+    <ClCompile Include="src\qmlbridge\PanelBarLayout.cpp" />
+    <!-- 右栏「终端」块的接线层（QML 单例 Terminal）：协议状态 + 网格模型的入口 -->
+    <ClCompile Include="src\qmlbridge\TerminalBridge.cpp" />
+    <!-- 终端网格的 QML 桥：按行暴露 TerminalVt 的网格 + 脏行通知 + 键盘编码（视图是 TerminalView.qml） -->
+    <ClCompile Include="src\qmlbridge\TerminalVtModel.cpp" />
+    <!-- 终端 VT 核心：把引擎给的字节流解析成网格。不依赖 Qt，见 include/common/terminal/TerminalVt.h -->
+    <ClCompile Include="src\common\terminal\TerminalVt.cpp" />
+    <ClCompile Include="src\common\layout\PanelBarMetrics.cpp" />
+    <!-- 内嵌的 VT 解析器（见 3rdparty\libvterm\README.md）。9 个编译单元全是 C99，上游文件零改动，
+         所以工程侧要替它们做四件事（都是实测过的，别凭印象改）：
+         ① CompileAsC —— 免得被工程级的 ConformanceMode / stdcpp17 带过去当 C++ 编（C99 会因隐式转换报错）；
+         ② SDLCheck=false —— /sdl 会把两处警告抬成**错误**：parser.c:53 的 C4996（strncpy 弃用）、
+            parser.c:183 的 C4703（string_start 可能未初始化）。实测 /WX- 撤不掉这个升级，只能关 /sdl；
+         ③ _CRT_SECURE_NO_WARNINGS —— 关掉 /sdl 后 C4996 退回普通警告，再用这个宏清掉；
+         ④ TreatWarningAsError=false —— state.c:319/326 还有 size_t→int 的 C4267 普通警告，别让日后的 /WX 挡住。 -->
+    <ClCompile Include="3rdparty\libvterm\src\encoding.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\keyboard.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\mouse.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\parser.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\pen.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\screen.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\state.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\unicode.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\vterm.c">
+      <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <QtMoc Include="include\core\ServerManager.h" />
+    <QtMoc Include="include\core\ClientRuntime.h" />
+    <ClCompile Include="src\network\DshApiClient.cpp" />
+    <ClCompile Include="src\network\DshEventParser.cpp" />
+    <ClCompile Include="src\core\ServerManager.cpp" />
+    <ClCompile Include="src\core\ClientRuntime.cpp" />
+    <ClCompile Include="src\core\main.cpp" />
+    <ClCompile Include="src\ExtensionSystem\HostExports.cpp" />
+    <ClCompile Include="src\common\util\CodeHighlighter.cpp" />
+    <ClCompile Include="src\common\util\CommonRegistry.cpp" />
+    <ClCompile Include="src\common\util\MarkdownPreprocess.cpp" />
+    <ClCompile Include="src\common\appearance\InteractionHandler.cpp" />
+    <ClCompile Include="src\common\session\SessionCatalog.cpp" />
+    <ClCompile Include="src\common\session\SessionService.cpp" />
+    <ClCompile Include="src\common\settings\SettingsStore.cpp" />
+    <ClCompile Include="src\common\settings\ClientSettings.cpp" />
+    <ClCompile Include="src\common\session\AgentPresetService.cpp" />
+    <ClCompile Include="src\common\PluginMarket\PluginMarketClient.cpp" />
+    <ClCompile Include="src\common\PluginMarket\PluginMarketModel.cpp" />
+    <ClCompile Include="src\common\PluginMarket\PluginMarketInstaller.cpp" />
+    <ClCompile Include="src\common\session\ModelSelectionService.cpp" />
+    <ClCompile Include="src\common\appearance\TranslationManager.cpp" />
+    <ClCompile Include="src\network\SessionPrefetcher.cpp" />
+    <ClCompile Include="src\common\appearance\ThemeManager.cpp" />
+    <ClCompile Include="src\common\appearance\CardShadow.cpp" />
+    <ClCompile Include="src\common\util\Logger.cpp" />
+    <ClCompile Include="src\ExtensionSystem\DshNamedPipeBridge.cpp" />
+    <ClCompile Include="src\ExtensionSystem\DllCaller.cpp" />
+    <ClCompile Include="src\ExtensionSystem\ComCaller.cpp" />
+    <ClCompile Include="src\ExtensionSystem\Thunk.cpp" />
+    <ClCompile Include="src\ExtensionSystem\ExtensionLoader.cpp" />
+    <ClCompile Include="src\ExtensionSystem\HostUi.cpp" />
+    <ClCompile Include="src\ExtensionSystem\ClientExtension.cpp" />
+    <ClCompile Include="src\ExtensionSystem\ExtensionRegistry.cpp" />
+    <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp" />
+    <None Include="..\assets\resources\config\highlight-rules.json" />
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny@2x.png" />
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny-dark@2x.png" />
+    <None Include="..\assets\resources\icons\ulin-hub-icon.png" />
+    <None Include="..\assets\resources\icons\ulin-hub.ico" />
+    <ResourceCompile Include="..\assets\resources\ulin-hub.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="include\common\util\CommonRegistry.h" />
+    <QtMoc Include="include\network\DshApiClient.h" />
+    <QtMoc Include="include\ExtensionSystem\DshNamedPipeBridge.h" />
+    <QtMoc Include="include\network\SessionPrefetcher.h" />
+    <QtMoc Include="include\common\PluginMarket\PluginMarketClient.h" />
+    <QtMoc Include="include\common\PluginMarket\PluginMarketInstaller.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="include\common\util\ConnectionManager.h" />
+    <ClInclude Include="include\network\DshEventParser.h" />
+    <ClInclude Include="include\ExtensionSystem\ExtensionLoader.h" />
+    <ClInclude Include="include\ExtensionSystem\DllCaller.h" />
+    <ClInclude Include="include\ExtensionSystem\ComCaller.h" />
+    <ClInclude Include="include\ExtensionSystem\Thunk.h" />
+    <ClInclude Include="include\ExtensionSystem\ClientExtension.h" />
+    <ClInclude Include="include\ExtensionSystem\ExtensionRegistry.h" />
+    <ClInclude Include="include\ExtensionSystem\ExtensionInstallTask.h" />
+    <ClInclude Include="include\common\util\CodeHighlighter.h" />
+    <ClInclude Include="include\common\appearance\InteractionHandler.h" />
+    <ClInclude Include="include\common\appearance\CardShadow.h" />
+    <ClInclude Include="include\common\appearance\UiAbi.h" />
+    <ClInclude Include="include\VirtualClass\VirtualCommon.h" />
+    <ClInclude Include="include\VirtualClass\VirtualApiTakeover.h" />
+    <QtMoc Include="include\ExtensionSystem\HostUi.h" />
+    <ClInclude Include="include\ExtensionSystem\HostExports.h" />
+    <ClInclude Include="include\ExtensionSystem\DshHostPlugin.h" />
+    <ClInclude Include="include\common\util\HostIndex.h" />
+    <ClInclude Include="include\common\util\Logger.h" />
+    <ClInclude Include="include\common\session\SessionCatalog.h" />
+    <ClInclude Include="include\common\session\SessionService.h" />
+    <ClInclude Include="include\common\settings\SettingsStore.h" />
+    <ClInclude Include="include\common\settings\ClientSettings.h" />
+    <ClInclude Include="include\common\session\AgentPresetService.h" />
+    <ClInclude Include="include\common\PluginMarket\PluginMarketModel.h" />
+    <ClInclude Include="include\common\session\ModelSelectionService.h" />
+    <QtMoc Include="include\common\appearance\ThemeManager.h" />
+    <QtMoc Include="include\common\appearance\TranslationManager.h" />
+    <!-- QML 壳的窗口桥与 token：QML 单例注册要 moc -->
+    <QtMoc Include="include\qmlbridge\WindowBridge.h" />
+    <QtMoc Include="include\qmlbridge\ThemeBridge.h" />
+    <QtMoc Include="include\common\appearance\StyleResolver.h" />
+    <QtMoc Include="include\common\session\SessionListModel.h" />
+    <QtMoc Include="include\qmlbridge\QmlBridge.h" />
+    <QtMoc Include="include\qmlbridge\ThemeController.h" />
+    <QtMoc Include="include\common\session\MessageListModel.h" />
+    <QtMoc Include="include\common\session\ChatController.h" />
+    <QtMoc Include="include\common\session\ToolsFilter.h" />
+    <QtMoc Include="include\common\settings\SettingsController.h" />
+    <QtMoc Include="include\common\PluginMarket\PluginMarketController.h" />
+    <QtMoc Include="include\common\session\CommandController.h" />
+    <QtMoc Include="include\qmlbridge\ExtensionManagerController.h" />
+    <!-- 面板坞块列表 / 地址栏规范化 / 右栏宽度钳制：QML 单例注册都要 moc -->
+    <QtMoc Include="include\common\shell\PanelDockModel.h" />
+    <QtMoc Include="include\qmlbridge\UrlInputBridge.h" />
+    <QtMoc Include="include\qmlbridge\PanelBarLayout.h" />
+    <QtMoc Include="include\qmlbridge\TerminalBridge.h" />
+    <QtMoc Include="include\qmlbridge\TerminalVtModel.h" />
+    <ClInclude Include="include\common\layout\PanelBarMetrics.h" />
+    <ClInclude Include="include\common\util\UrlInput.h" />
+    <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
+    <ClInclude Include="include\common\util\MarkdownSegmenter.h" />
+    <ClInclude Include="include\common\terminal\TerminalVt.h" />
+    <ClInclude Include="3rdparty\libvterm\include\vterm.h" />
+    <ClInclude Include="3rdparty\libvterm\include\vterm_keycodes.h" />
+    <ClInclude Include="3rdparty\libvterm\src\vterm_internal.h" />
+    <ClInclude Include="3rdparty\libvterm\src\rect.h" />
+    <ClInclude Include="3rdparty\libvterm\src\utf8.h" />
+    <None Include="3rdparty\libvterm\src\fullwidth.inc" />
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.inc" />
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.tbl" />
+    <None Include="3rdparty\libvterm\src\encoding\uk.inc" />
+    <None Include="3rdparty\libvterm\LICENSE" />
+    <None Include="3rdparty\libvterm\README.md" />
+    <None Include="3rdparty\libvterm\VENDOR.sha256" />
+    <QtTranslation Include="..\assets\translations\ulinhub_en.ts" />
+  </ItemGroup>
+  <!-- QtTranslation 的 BuildAction **必须保持 false**（即不参与构建）。
+       合法取值只有 lupdate / lrelease / lupdate_lrelease / false
+       （见 QtMsBuild\translation\qttranslation.xml），而 qttranslation.targets 的判据是
+       "BuildAction 字面包含 lupdate / lrelease"。所以写成 true 是无效值，它**什么都不触发**
+       —— 之前那句"设成 true 就会跑 lupdate/lrelease"是误解。
+       ⚠️ 绝不能改成 lupdate / lupdate_lrelease：本项目是 ID-based（qtTrId），
+       语言包由 tools\release-translations.ps1 生成，.ts 里只维护译文（不写 <source>）；
+       跑一次 lupdate 会把译文回标成 type="unfinished"，lrelease 随即把它们丢弃
+       —— 结果是语言包整片失效、界面满屏 key。
+       下面的 <QtTranslation> 条目只用于在 IDE 里能打开这份 .ts，不产生任何构建动作。 -->
+  <ItemDefinitionGroup>
+    <QtTranslation>
+      <BuildAction>false</BuildAction>
+    </QtTranslation>
+  </ItemDefinitionGroup>
+  <!-- .qm 的发布不走 PostBuildEvent：Qt VS Tools 的 QtTranslation 目标不负责拷贝产物，
+       而客户端从 exe 同目录的 translations/ 加载（见 TranslationManager.cpp）。
+       发布用 tools\release-translations.ps1（跑 lrelease 到 x64\<Config>\translations），
+       理由与用法写在该脚本头部。 -->
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
+    <Import Project="$(QtMsBuild)\qt.targets" />
+  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

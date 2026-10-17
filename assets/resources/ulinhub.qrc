@@ -1,0 +1,51 @@
+<RCC>
+    <qresource prefix="ULinHub">
+        <!-- 顶层素材按用途分了目录：icons/（图标与标识）、buttons/（发送/停止圆钮）、
+             config/（highlight-rules.json）。prefix 仍是 ULinHub，resource 路径即"目录/文件名"
+             ⇒ QML/C++ 里的引用要写全 qrc:/ULinHub/icons/…、qrc:/ULinHub/config/…（无 alias）。
+             留在顶层的 ulin-hub.rc 是 Windows 资源脚本，不进 qrc。 -->
+        <!-- 输入卡的发送/停止圆钮：成对提供，调用方按 Theme.isDark 选（IconButton.qml 里写明的约定，
+             与上面的 ulin-hub-icon(-dark) 同一套命名）。两套几何逐像素相同、只有两种颜色对调：
+             浅色 = 深灰圆 #343A42 + 白图形；暗色 = 白圆 #FFFFFF + 深灰图形。
+             ⚠️ 千万别把两套搞混 —— 白圆贴在白面板上会整个消失，只剩图形浮着。 -->
+        <file>buttons/enter-btn.png</file>
+        <file>buttons/enter-btn-dark.png</file>
+        <file>buttons/stop-btn.png</file>
+        <file>buttons/stop-btn-dark.png</file>
+        <file>icons/ulin-hub-logo-tiny@2x.png</file>
+        <file>icons/ulin-hub-logo-tiny-dark@2x.png</file>
+        <file>icons/ulin-hub-icon.png</file>
+        <file>icons/ulin-hub-icon-dark.png</file>
+        <file>icons/setting-icon.png</file>
+        <file>icons/plugin-icon.png</file>
+        <file>icons/theme-icon.png</file>
+        <file>icons/extension-icon.png</file>
+        <file>config/highlight-rules.json</file>
+        <file alias="styles/theme-light.json">styles/theme-light.json</file>
+        <file alias="styles/theme-dark.json">styles/theme-dark.json</file>
+        <!-- 样式表：一个文件 = 一个界面/表面，文件名就是它负责的那个界面，
+             加载顺序见 ThemeManager.cpp 的 kModules（顺序即级联顺序）。
+             每个文件头部都写明「归属」，改某个界面时只动它自己那个文件。 -->
+        <!-- 内置语言包：随程序内置，启动时释放到外部 translations\ 目录
+             （存在则不覆盖），用户可就地改而无需重新编译。
+             由 tools\release-translations.ps1 从 translations\ulinhub_*.ts 生成。
+             源码里只有 key（qtTrId），没有任何语言"免翻译"，内置这两份
+             只是保证开箱即有中英可用；其它语言从外部目录补充即可。 -->
+        <file alias="translations/ulinhub_zh_CN.qm">translations/ulinhub_zh_CN.qm</file>
+        <file alias="translations/ulinhub_en.qm">translations/ulinhub_en.qm</file>
+        <!-- 内置插件：工具过滤器（按会话隐藏模型可见的工具，见
+             resources/ToolsFilterPlugin/）。编译进 exe 是为了让内置插件不依赖
+             发布目录里的散装文件；首次启动服务端时由
+             ServerManager::ensureBuiltinPlugins() 调用 ExtensionLoader 安装到
+             <DSH_HOME>/profiles/web/node_modules/ 下。 -->
+        <file alias="ToolsFilterPlugin/package.json">ToolsFilterPlugin/package.json</file>
+        <file alias="ToolsFilterPlugin/index.js">ToolsFilterPlugin/index.js</file>
+        <file alias="ToolsFilterPlugin/example.ToolsFilterConfig.json">ToolsFilterPlugin/example.ToolsFilterConfig.json</file>
+        <!-- 右栏「终端」块的页面与它的渲染引擎（Qt WebEngine 里跑 xterm.js）。
+             这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
+             660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见
+             misc/tools/extract-xterm.README.txt（@xterm/xterm 6.0.0 + addon-fit 0.11.0，MIT）。
+             （原 WebEngine + xterm.js 页面已随自绘终端接入而删除）
+             （现在终端由 TerminalVt + TerminalView 自绘，不再有页面与 QWebChannel）-->
+    </qresource>
+</RCC>

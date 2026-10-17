@@ -1,0 +1,41 @@
+#pragma once
+
+// 按 highlight-rules.json 的规则给代码块做语法高亮；初始化时一次性加载规则并缓存结果。
+
+#include <QHash>
+#include <QMutex>
+#include <QRegularExpression>
+#include <QString>
+#include <QVector>
+
+class CodeHighlighter
+{
+public:
+	static CodeHighlighter& instance();
+
+	// 从 JSON 文件加载高亮规则；重复调用会先清空旧规则
+	bool loadFromFile(const QString& filePath);
+
+	// 对代码进行高亮，返回可直接交给 RichText（Text/TextEdit）的 HTML；
+	// 返回值自带 <pre> 包裹，否则调用方的 RichText 会把换行与缩进折叠掉
+	QString highlight(const QString& language, const QString& code) const;
+
+	void clearCache();
+
+private:
+	CodeHighlighter() = default;
+
+	struct Rule
+	{
+		QRegularExpression regex;
+		QString color;
+		bool bold = false;
+		bool italic = false;
+	};
+
+	QHash<QString, QVector<Rule>> m_rules;
+	mutable QHash<QString, QString> m_cache;
+	// 高亮会被渲染 worker 线程并发调用，规则/缓存读写统一加锁；用递归锁是因为
+	// loadFromFile 持锁期间会调用同样加锁的 clearCache()。
+	mutable QRecursiveMutex m_mutex;
+};

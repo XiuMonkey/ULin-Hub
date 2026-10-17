@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#0f172a"/>
+  <text x="60" y="80" font-family="Segoe UI, sans-serif" font-size="42" font-weight="700" fill="#f8fafc">本地 SVG 渲染测试</text>
+  <text x="60" y="122" font-family="Segoe UI, sans-serif" font-size="22" fill="#94a3b8">无图像模型参与 · headless 浏览器光栅化</text>
+  <line x1="120" y1="580" x2="1120" y2="580" stroke="#334155" stroke-width="3"/>
+  <rect x="160" y="400" width="90" height="180" rx="10" fill="#38bdf8"/>
+  <rect x="290" y="320" width="90" height="260" rx="10" fill="#22d3ee"/>
+  <rect x="420" y="450" width="90" height="130" rx="10" fill="#818cf8"/>
+  <rect x="550" y="240" width="90" height="340" rx="10" fill="#a78bfa"/>
+  <rect x="680" y="360" width="90" height="220" rx="10" fill="#f472b6"/>
+  <rect x="810" y="200" width="90" height="380" rx="10" fill="#fb923c"/>
+  <rect x="940" y="300" width="90" height="280" rx="10" fill="#4ade80"/>
+  <g font-family="Segoe UI, sans-serif" font-size="20" fill="#cbd5e1" text-anchor="middle">
+    <text x="205" y="615">Mon</text>
+    <text x="335" y="615">Tue</text>
+    <text x="465" y="615">Wed</text>
+    <text x="595" y="615">Thu</text>
+    <text x="725" y="615">Fri</text>
+    <text x="855" y="615">Sat</text>
+    <text x="985" y="615">Sun</text>
+  </g>
+</svg>

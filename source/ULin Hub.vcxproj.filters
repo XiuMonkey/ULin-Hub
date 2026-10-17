@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="..\assets\resources">
+      <UniqueIdentifier>{ba98fbe9-5229-47e8-a9df-4a5e7e64ff74}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="..\assets\translations">
+      <UniqueIdentifier>{b77b7005-935f-4c90-9a67-0b17c2dfe161}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\common\appearance">
+      <UniqueIdentifier>{8e9f52e7-588a-4a8f-96e4-f0c305e00373}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\common\PluginMarket">
+      <UniqueIdentifier>{c6457437-e951-4915-99f4-54d6808c01a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\common\session">
+      <UniqueIdentifier>{d4df84bb-d0db-444a-831b-9b3427cf916d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\common\settings">
+      <UniqueIdentifier>{3cefba76-1d9b-4363-a5a1-d65fed0ffd43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\common\util">
+      <UniqueIdentifier>{398417ff-c127-4d9f-80e7-73656f100898}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\core">
+      <UniqueIdentifier>{170eaf9d-0ad6-434c-b26d-94f95e656d54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\ExtensionSystem">
+      <UniqueIdentifier>{f53c1c6d-3782-48a2-ab5b-416fac10b347}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\network">
+      <UniqueIdentifier>{d4e52ece-d1fb-492a-aab9-73aa676d06e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\viewmodel">
+      <UniqueIdentifier>{5e478cc6-a51a-4332-8b90-3321b1a9cc8d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\VirtualClass">
+      <UniqueIdentifier>{0aad2c3a-78c8-4ad1-9e91-4b283d498364}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="qml">
+      <UniqueIdentifier>{e6f3adb2-e6c9-4ac8-a085-2161f7d303ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\appearance">
+      <UniqueIdentifier>{2c729aac-d850-42c2-9457-61794f6a5a00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\PluginMarket">
+      <UniqueIdentifier>{52329574-dc5f-4e36-929d-75bf988d1ce7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\session">
+      <UniqueIdentifier>{2f2ef461-1666-4c11-b08f-a7e227c9b549}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\settings">
+      <UniqueIdentifier>{863c6826-825f-4891-a8b2-fc45fdb610be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\util">
+      <UniqueIdentifier>{1cbb66a8-a589-4f98-8a8f-ce306f78be80}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core">
+      <UniqueIdentifier>{032c04c8-3d79-4cca-8e81-4e295bd8bc72}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ExtensionSystem">
+      <UniqueIdentifier>{f01932ce-6709-4a19-b357-fb42670a767b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\network">
+      <UniqueIdentifier>{663e8e98-e4bb-494d-9c5a-2859868a061b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\viewmodel">
+      <UniqueIdentifier>{0da4c455-2315-4db7-80a7-4f19a3a9ae8f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\include">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\src">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\libvterm\src\encoding">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\common\terminal">
+      <UniqueIdentifier>{b1a7c0de-4f01-4a10-8c01-000000000005}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\common\util\ConnectionManager.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\platform\win\NativeWindowFilter.cpp">
+      <Filter>src\common\platform\win</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\WindowBridge.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\appearance\StyleResolver.cpp">
+      <Filter>src\common\appearance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\ThemeBridge.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\SessionListModel.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\QmlBridge.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\ThemeController.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\MessageListModel.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\ChatController.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\ToolsFilter.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\util\MarkdownSegmenter.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\settings\SettingsController.cpp">
+      <Filter>src\common\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\PluginMarket\PluginMarketController.cpp">
+      <Filter>src\common\PluginMarket</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\ExtensionManagerController.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+    <ClCompile Include="src\network\DshApiClient.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\network\DshEventParser.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ServerManager.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\ClientRuntime.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\main.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\HostExports.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\util\CodeHighlighter.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\util\CommonRegistry.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\util\MarkdownPreprocess.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\appearance\InteractionHandler.cpp">
+      <Filter>src\common\appearance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\SessionCatalog.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\SessionService.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\settings\SettingsStore.cpp">
+      <Filter>src\common\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\settings\ClientSettings.cpp">
+      <Filter>src\common\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\AgentPresetService.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\PluginMarket\PluginMarketClient.cpp">
+      <Filter>src\common\PluginMarket</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\PluginMarket\PluginMarketModel.cpp">
+      <Filter>src\common\PluginMarket</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\PluginMarket\PluginMarketInstaller.cpp">
+      <Filter>src\common\PluginMarket</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\session\ModelSelectionService.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\appearance\TranslationManager.cpp">
+      <Filter>src\common\appearance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\network\SessionPrefetcher.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\appearance\ThemeManager.cpp">
+      <Filter>src\common\appearance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\appearance\CardShadow.cpp">
+      <Filter>src\common\appearance</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\util\Logger.cpp">
+      <Filter>src\common\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\DshNamedPipeBridge.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\DllCaller.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ComCaller.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\Thunk.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ExtensionLoader.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\HostUi.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ClientExtension.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ExtensionRegistry.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\encoding.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\keyboard.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\mouse.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\parser.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\pen.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\screen.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\state.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\unicode.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdparty\libvterm\src\vterm.c">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\terminal\TerminalVt.cpp">
+      <Filter>src\common\terminal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\qmlbridge\TerminalVtModel.cpp">
+      <Filter>src\qmlbridge</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\network\DshEventParser.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ExtensionLoader.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\DllCaller.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ComCaller.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\Thunk.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ClientExtension.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ExtensionRegistry.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ExtensionInstallTask.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\util\CodeHighlighter.h">
+      <Filter>include\common\util</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\appearance\InteractionHandler.h">
+      <Filter>include\common\appearance</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\appearance\CardShadow.h">
+      <Filter>include\common\appearance</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\appearance\UiAbi.h">
+      <Filter>include\common\appearance</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VirtualClass\VirtualCommon.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\VirtualClass\VirtualApiTakeover.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\HostExports.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\DshHostPlugin.h">
+      <Filter>include\ExtensionSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\util\HostIndex.h">
+      <Filter>include\common\util</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\util\Logger.h">
+      <Filter>include\common\util</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\session\SessionCatalog.h">
+      <Filter>include\common\session</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\session\SessionService.h">
+      <Filter>include\common\session</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\settings\SettingsStore.h">
+      <Filter>include\common\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\settings\ClientSettings.h">
+      <Filter>include\common\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\session\AgentPresetService.h">
+      <Filter>include\common\session</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\PluginMarket\PluginMarketModel.h">
+      <Filter>include\common\PluginMarket</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\session\ModelSelectionService.h">
+      <Filter>include\common\session</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\platform\win\NativeWindowFilter.h">
+      <Filter>include\common\platform\win</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\util\MarkdownSegmenter.h">
+      <Filter>include\common\util</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\include\vterm.h">
+      <Filter>3rdparty\libvterm\include</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\include\vterm_keycodes.h">
+      <Filter>3rdparty\libvterm\include</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\vterm_internal.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\rect.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdparty\libvterm\src\utf8.h">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </ClInclude>
+    <ClInclude Include="include\common\terminal\TerminalVt.h">
+      <Filter>src\common\terminal</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="include\core\ServerManager.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\core\ClientRuntime.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\util\CommonRegistry.h">
+      <Filter>include\common\util</Filter>
+    </QtMoc>
+    <QtMoc Include="include\network\DshApiClient.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\ExtensionSystem\DshNamedPipeBridge.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\network\SessionPrefetcher.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\PluginMarket\PluginMarketClient.h">
+      <Filter>include\common\PluginMarket</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\PluginMarket\PluginMarketInstaller.h">
+      <Filter>include\common\PluginMarket</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\util\ConnectionManager.h">
+      <Filter>include\common\util</Filter>
+    </QtMoc>
+    <QtMoc Include="include\ExtensionSystem\HostUi.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\appearance\ThemeManager.h">
+      <Filter>include\common\appearance</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\appearance\TranslationManager.h">
+      <Filter>include\common\appearance</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\WindowBridge.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\ThemeBridge.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\appearance\StyleResolver.h">
+      <Filter>include\common\appearance</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\session\SessionListModel.h">
+      <Filter>include\common\session</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\QmlBridge.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\ThemeController.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\session\MessageListModel.h">
+      <Filter>include\common\session</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\session\ChatController.h">
+    <QtMoc Include="include\common\session\ToolsFilter.h">
+      <Filter>include\common\session</Filter>
+    </QtMoc>
+      <Filter>include\common\session</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\settings\SettingsController.h">
+      <Filter>include\common\settings</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\PluginMarket\PluginMarketController.h">
+      <Filter>include\common\PluginMarket</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\ExtensionManagerController.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+    <QtMoc Include="include\qmlbridge\TerminalVtModel.h">
+      <Filter>include\qmlbridge</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <QtRcc Include="..\assets\resources\ulinhub.qrc">
+      <Filter>..\assets\resources</Filter>
+    </QtRcc>
+    <QtRcc Include="qml\qml.qrc">
+      <Filter>qml</Filter>
+    </QtRcc>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\assets\resources\ulin-hub.rc">
+      <Filter>..\assets\resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtTranslation Include="..\assets\translations\ulinhub_en.ts">
+      <Filter>..\assets\translations</Filter>
+    </QtTranslation>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\assets\resources\config\highlight-rules.json">
+      <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny@2x.png">
+      <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="..\assets\resources\icons\ulin-hub-logo-tiny-dark@2x.png">
+      <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="..\assets\resources\icons\ulin-hub-icon.png">
+      <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="..\assets\resources\icons\ulin-hub.ico">
+      <Filter>..\assets\resources</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\fullwidth.inc">
+      <Filter>3rdparty\libvterm\src</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.inc">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\DECdrawing.tbl">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\src\encoding\uk.inc">
+      <Filter>3rdparty\libvterm\src\encoding</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\LICENSE">
+      <Filter>3rdparty\libvterm</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\README.md">
+      <Filter>3rdparty\libvterm</Filter>
+    </None>
+    <None Include="3rdparty\libvterm\VENDOR.sha256">
+      <Filter>3rdparty\libvterm</Filter>
+    </None>
+  </ItemGroup>
+</Project>

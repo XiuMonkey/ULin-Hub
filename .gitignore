@@ -1,0 +1,50 @@
+# Visual Studio
+Count-Lines.ps1
+.vs/
+.workbuddy/
+DevLog/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Build output
+x64/
+ReleaseBuild/
+build/
+Debug/
+Release/
+ULin Hub/
+ULin Hub.Tests/
+test extension/
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.obj
+*.o
+*.log
+
+# Qt generated files
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Compiled translation binaries (rebuild from translations/*.ts)
+assets/resources/translations/*.qm
+
+# Node runtime dependencies (recreated from the lockfile; Node runtime is retained)
+assets/resources/server/node_modules/
+# 引擎 node.exe 也不再进 git（85.5MB，发布时另行下载/打包）
+assets/resources/server/node.exe
+
+build_smoke/
+
+# StyleExample 的整包 zip（185 MB，含壁纸）：不进仓库。要入库就删掉下面这行。
+assets/StyleExample/Bg-Genshin-Keqing.zip
+
+# pnpm 装插件市场时的工作目录（不该进仓库）
+.pnpm-store/
+
+# 测试工程构建产物（归档在 misc/legacy-tests）
+misc/legacy-tests/*/x64/

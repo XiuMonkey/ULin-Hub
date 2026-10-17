@@ -1,0 +1,63 @@
+<RCC>
+    <!-- QML 壳的资源 = 内置风格包（见 docs/ui-qml-migration-plan.md §2.4）。
+         目录：basic/（结构，引用 Hub.settings 等）、skin/（纯视觉，原 appearance/）、
+         widgets/（通用控件）；包根只留入口 Main.qml 与清单 pack.json / metrics.json。
+         ⚠️ 这里列的文件会在首启被释放到 <exe>/ui/（ThemeManager::ensureStylePack）；
+            释放规则是"增量同步"：用户改过的文件不动，内置更新过的会覆盖。 -->
+    <!-- 面板坞：PanelGrip（三个点抓手）/ DockDropHint（拖回时的落点提示）-->
+    <qresource prefix="/qml">
+        <file>basic/chat/Composer.qml</file>
+        <file>basic/chat/InteractionPanel.qml</file>
+        <file>basic/chat/ToolsFilterPanel.qml</file>
+        <file>basic/chat/MessageListView.qml</file>
+        <file>basic/chat/ModelSelectorChip.qml</file>
+        <file>basic/extensions/ExtensionManagerPage.qml</file>
+        <file>basic/plugins/PluginMarketPage.qml</file>
+        <file>basic/settings/AgentPresetPage.qml</file>
+        <file>basic/settings/AppearancePage.qml</file>
+        <file>basic/settings/ModelListPage.qml</file>
+        <file>basic/settings/ServerPage.qml</file>
+        <file>basic/settings/SettingsPage.qml</file>
+        <file>basic/shell/ConversationPlaceholder.qml</file>
+        <file>basic/browser/WebBrowserPanel.qml</file>
+        <file>basic/panel/PanelBar.qml</file>
+        <file>basic/shell/PanelDock.qml</file>
+        <file>basic/shell/DockDropHint.qml</file>
+        <!-- 右栏整体"拿起来"跟着光标走 / 脱离成**无边框**独立窗口（自绘标题栏与四边缩放；
+             内容是 reparent 进去的同一份 PanelBar）-->
+        <file>basic/panel/PanelBarWindow.qml</file>
+        <file>basic/shell/PanelPlaceholder.qml</file>
+        <file>basic/shell/Shell.qml</file>
+        <!-- 终端：Panel 是面板坞那个块，View 是宿主自绘的网格渲染（TerminalVtModel → TerminalVt） -->
+        <file>basic/terminal/TerminalPanel.qml</file>
+        <file>basic/terminal/TerminalView.qml</file>
+        <file>basic/session/SessionBar.qml</file>
+        <file>basic/topbar/TopBar.qml</file>
+        <file>Main.qml</file>
+        <file>metrics.json</file>
+        <file>pack.json</file>
+        <file>skin/chat/AgentBubble.qml</file>
+        <file>skin/chat/CodeBlock.qml</file>
+        <file>skin/chat/MenuRow.qml</file>
+        <file>skin/chat/SystemNotice.qml</file>
+        <file>skin/chat/UserBubble.qml</file>
+        <file>skin/settings/FieldBox.qml</file>
+        <file>skin/shell/ThemeSwitchOverlay.qml</file>
+        <file>skin/session/SessionRow.qml</file>
+        <file>skin/session/WorkspaceHeader.qml</file>
+        <file>skin/window/Backdrop.qml</file>
+        <file>skin/window/TitleBar.qml</file>
+        <file>widgets/ActionButton.qml</file>
+        <file>widgets/AppPopup.qml</file>
+        <file>widgets/AppScrollBar.qml</file>
+        <file>widgets/AppToolTip.qml</file>
+        <file>widgets/BusySpinner.qml</file>
+        <file>widgets/Card.qml</file>
+        <file>widgets/Collapsible.qml</file>
+        <file>widgets/IconButton.qml</file>
+        <file>widgets/PageOverlay.qml</file>
+        <file>widgets/PanelGrip.qml</file>
+        <file>widgets/SearchField.qml</file>
+        <file>widgets/Toast.qml</file>
+    </qresource>
+</RCC>

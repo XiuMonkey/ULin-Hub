@@ -1,0 +1,8 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="ULin Hub.vcxproj" Id="ee1db5c4-0470-4300-be36-20baf765b893" />
+  <Project Path="..\tests\ULin Hub.Tests.vcxproj" Id="3106656d-9873-4a31-b265-cd2b3499fb55" />
+</Solution>
+

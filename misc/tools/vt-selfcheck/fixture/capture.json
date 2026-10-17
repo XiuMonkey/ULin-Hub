@@ -1,0 +1,168 @@
+{
+ "cols": 100,
+ "rows": 26,
+ "snapshot": {
+  "type": "snapshot",
+  "sequence": 28,
+  "screen": "PS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root>\u001b[1C\u001b[93mWrite-Host \u001b[36m\"=== ULin Hub terminal probe ===\" \u001b[90m-ForegroundColor \u001b[37mCyan\r\n\u001b[91m读取或写入历史记录文件“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”时出错: 对路径“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”的访问被拒绝。\r\nưm\u001b[96m=== ULin Hub terminal probe ===\r\n\u001b[0mPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> \u001b[97m1\u001b[90m..\u001b[97m8 \u001b[37m| \u001b[93mForEach-Object \u001b[37m{ \u001b[93mWrite-Host \u001b[37m(\u001b[36m\"line {0,-3}\" \u001b[90m-f \u001b[92m$_\u001b[37m) \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" RED \" \u001b[90m-ForegroundColor \u001b[37mRed \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" GREEN \" \u001b[90m-ForegroundColor \u001b[37mGreen \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" BLUE\" \u001b[90m-ForegroundColor \u001b[37mBlue }\r\n\r\n\u001b[91m读取或写入历史记录文件“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”时出错: 对路径“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”的访问被拒绝。\r\n不会在本会话中再报告该错误。请考虑通过以下命令使用其他路径:\r\n    Set-PSReadLineOption -HistorySavePath <Path>\r\n或者使用以下命令不保存历史记录:\r\n    Set-PSReadLineOption -HistorySaveStyle SaveNothing\r\nưm\u001b[0mline 1   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 2   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 3   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 4   \u001b[91mRED  \u001b[92mGREEN \u001b[94m BLUE\r\n\u001b[0mline 5   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 6   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 7   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mline 8   \u001b[91mRED  \u001b[92mGREEN  \u001b[94mBLUE\r\n\u001b[0mPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> \u001b[93mWrite-Host \u001b[36m\"中文测 试：命令行终端?\" \u001b[90m-ForegroundColor \u001b[37mYellow\r\n\u001b[93m中文测试：命令行终端?\r\n\u001b[0mPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root>\u001b[1C\u001b[93mGet-Location\r\n\r\n\u001b[0mPath\r\n----\r\nC:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root\r\n\r\n\r\nPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> \u001b[?1004h",
+  "info": {
+   "id": "ef7d5bc5-bf3f-4530-873e-edc2de4d4995",
+   "shell": {
+    "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE",
+    "name": "powershell",
+    "args": [
+     "-NoLogo"
+    ]
+   },
+   "title": "powershell",
+   "cwd": "C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root",
+   "cols": 100,
+   "rows": 26,
+   "state": "running",
+   "exitCode": null,
+   "controllerId": "56742615-a41b-44d5-a754-9782e6848a04"
+  }
+ },
+ "live": [
+  {
+   "type": "output",
+   "sequence": 1,
+   "data": "\u001b[?9001h\u001b[?1004h"
+  },
+  {
+   "type": "output",
+   "sequence": 2,
+   "data": "\u001b[?25l\u001b[2J\u001b[m\u001b[HPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root>\u001b[1C\u001b]0;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE\u0007\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 3,
+   "data": "\u001b[?25l"
+  },
+  {
+   "type": "output",
+   "sequence": 4,
+   "data": "\u001b[93mWrite-Host \u001b[36m\"=== ULin Hub terminal probe ===\" \u001b[90m-ForegroundColor \u001b[37mCyan\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 5,
+   "data": "\u001b[m\u001b[91m\r\n读取或写入历史记录文件“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”时出错: 对路径“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”的访问被拒绝。\r\nưm"
+  },
+  {
+   "type": "output",
+   "sequence": 6,
+   "data": "\u001b[m\u001b[38;5;14m=== ULin Hub terminal probe ==="
+  },
+  {
+   "type": "output",
+   "sequence": 7,
+   "data": "\u001b[m\r\n"
+  },
+  {
+   "type": "output",
+   "sequence": 8,
+   "data": "PS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> "
+  },
+  {
+   "type": "output",
+   "sequence": 9,
+   "data": "\u001b[?25l"
+  },
+  {
+   "type": "output",
+   "sequence": 10,
+   "data": "\u001b[97m1\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 11,
+   "data": "\u001b[m\u001b[?25l"
+  },
+  {
+   "type": "output",
+   "sequence": 12,
+   "data": "\u001b[7;80H> \u001b[97m1\u001b[90m..\u001b[97m8 \u001b[37m| \u001b[93mForEach-Object \u001b[37m{ \u001b[93mWrite-Host \u001b[37m(\u001b[36m\"line {0,-3}\" \u001b[90m-f \u001b[92m$_\u001b[37m) \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" RED \" \u001b[90m-ForegroundColor \u001b[37mRed \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" GREEN \" \u001b[90m-ForegroundColor \u001b[37mGreen \u001b[90m-NoNewline\u001b[37m; \u001b[93mWrite-Host \u001b[36m\" BLUE\" \u001b[90m-ForegroundColor \u001b[37mBlue }\u001b[91m\u001b[11;1H读取或写入历史记录文件“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”时出错: 对路径“C:\\Users\\Playe\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt”的访问被拒绝。\r\n不会在本会话中再报告该错误。请考虑通过以下命令使用其他路径:\r\n    Set-PSReadLineOption -HistorySavePath <Path>\r\n或者使用以下命令不保存历史记录:\r\n    Set-PSReadLineOption -HistorySaveStyle SaveNothing\r\nưm\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 13,
+   "data": "\u001b[mline 1   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 2   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 3   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 4   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN "
+  },
+  {
+   "type": "output",
+   "sequence": 14,
+   "data": "\u001b[m\u001b[38;5;12m BLUE\u001b[m\r\nline 5   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 6   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 7   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nline 8   \u001b[38;5;9mRED  \u001b[38;5;10mGREEN  \u001b[38;5;12mBLUE\u001b[m\r\nPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> "
+  },
+  {
+   "type": "output",
+   "sequence": 15,
+   "data": "\u001b[?25l"
+  },
+  {
+   "type": "output",
+   "sequence": 16,
+   "data": "\u001b[93mWrite-Host \u001b[36m\"中文测 "
+  },
+  {
+   "type": "output",
+   "sequence": 17,
+   "data": "\u001b[m\r\n\u001b[93m\u001b[25;82HWrite-Host \u001b[36m\"中文测 试：命令行终端?\" \u001b[90m-ForegroundColor \u001b[37mYellow\u001b[K\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 18,
+   "data": "\u001b[m\r\n\u001b[38;5;11m中文测试：命令行终端?"
+  },
+  {
+   "type": "output",
+   "sequence": 19,
+   "data": "\u001b[m\r\nPS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root>\u001b[1C"
+  },
+  {
+   "type": "output",
+   "sequence": 20,
+   "data": "\u001b[?25l"
+  },
+  {
+   "type": "output",
+   "sequence": 21,
+   "data": "\u001b[93mGet-Location\u001b[?25h"
+  },
+  {
+   "type": "output",
+   "sequence": 22,
+   "data": "\u001b[m\r\n"
+  },
+  {
+   "type": "output",
+   "sequence": 23,
+   "data": "\n"
+  },
+  {
+   "type": "output",
+   "sequence": 24,
+   "data": "Path\u001b[72X\r"
+  },
+  {
+   "type": "output",
+   "sequence": 25,
+   "data": "\n----\r"
+  },
+  {
+   "type": "output",
+   "sequence": 26,
+   "data": "\nC:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root\r"
+  },
+  {
+   "type": "output",
+   "sequence": 27,
+   "data": "\n\n\n"
+  },
+  {
+   "type": "output",
+   "sequence": 28,
+   "data": "PS C:\\Users\\Playe\\Documents\\ULin\\ULin Hub\\build\\temp\\terminal-probe\\launch-root> "
+  }
+ ]
+}

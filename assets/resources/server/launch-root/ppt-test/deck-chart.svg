@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#FFFFFF"/>
+  <g stroke="#E2E8F0" stroke-width="2">
+    <line x1="90" y1="90" x2="1140" y2="90"/>
+    <line x1="90" y1="222" x2="1140" y2="222"/>
+    <line x1="90" y1="355" x2="1140" y2="355"/>
+    <line x1="90" y1="487" x2="1140" y2="487"/>
+  </g>
+  <line x1="90" y1="620" x2="1140" y2="620" stroke="#CBD5E1" stroke-width="3"/>
+  <g font-family="Segoe UI, sans-serif" font-size="20" fill="#94A3B8" text-anchor="end">
+    <text x="72" y="97">100</text>
+    <text x="72" y="229">75</text>
+    <text x="72" y="362">50</text>
+    <text x="72" y="494">25</text>
+    <text x="72" y="627">0</text>
+  </g>
+  <g>
+    <rect x="126" y="381" width="46" height="239" rx="6" fill="#0EA5E9"/>
+    <rect x="182" y="461" width="46" height="159" rx="6" fill="#CBD5E1"/>
+    <rect x="301" y="291" width="46" height="329" rx="6" fill="#0EA5E9"/>
+    <rect x="357" y="419" width="46" height="201" rx="6" fill="#CBD5E1"/>
+    <rect x="476" y="329" width="46" height="291" rx="6" fill="#0EA5E9"/>
+    <rect x="532" y="387" width="46" height="233" rx="6" fill="#CBD5E1"/>
+    <rect x="651" y="207" width="46" height="413" rx="6" fill="#0EA5E9"/>
+    <rect x="707" y="344" width="46" height="276" rx="6" fill="#CBD5E1"/>
+    <rect x="826" y="154" width="46" height="466" rx="6" fill="#0EA5E9"/>
+    <rect x="882" y="302" width="46" height="318" rx="6" fill="#CBD5E1"/>
+    <rect x="1001" y="111" width="46" height="509" rx="6" fill="#0EA5E9"/>
+    <rect x="1057" y="249" width="46" height="371" rx="6" fill="#CBD5E1"/>
+  </g>
+  <g font-family="Segoe UI, sans-serif" font-size="22" fill="#64748B" text-anchor="middle">
+    <text x="177" y="660">1月</text>
+    <text x="352" y="660">2月</text>
+    <text x="527" y="660">3月</text>
+    <text x="702" y="660">4月</text>
+    <text x="877" y="660">5月</text>
+    <text x="1052" y="660">6月</text>
+  </g>
+  <g font-family="Segoe UI, sans-serif" font-size="20" fill="#475569">
+    <rect x="90" y="34" width="18" height="18" rx="4" fill="#0EA5E9"/>
+    <text x="118" y="50">本期</text>
+    <rect x="190" y="34" width="18" height="18" rx="4" fill="#CBD5E1"/>
+    <text x="218" y="50">上期</text>
+  </g>
+</svg>
