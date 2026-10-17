@@ -44,8 +44,16 @@ void ClientRuntime::start()
 	// 退出时关闭 API 流：服务端据此释放会话写句柄。缺了这一步，下一次启动用同一会话发消息
 	// 会被 SessionAlreadyOwnedError 拒掉（共享退出钩子只做 ClientExtension::shutdownForExit）。
 	connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
+		m_exiting = true;   // 先挂标记：下面杀进程会同步触发 finished，别让它被当成"启动失败"
 		if (m_api)
 			m_api->closeStreams();
+		// 紧接着必须把内置引擎带走，否则 node 变孤儿：它继续占着会话的写句柄，下次启动
+		// 终端 / 命令全报 session/writer-held（本机日志里刷了一整天）。顺序不能反 ——
+		// 先让服务端收到"流关了"，再结束它的进程（stopForExit: terminate → 杀进程树 → waitForFinished）。
+		// ⚠️ 别指望 ServerManager 的析构：它是静态单例链上的一环，要等 QApplication 拆完才轮到，
+		//    那时太晚；崩溃/强杀更是走不到。所以这里显式调，与 job 的那层保险叠加。
+		if (m_server)
+			m_server->stopForExit();
 		});
 
 	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流（与旧壳 ULinHub::installServer 同一条路）
@@ -62,6 +70,8 @@ void ClientRuntime::start()
 		});
 
 	connect(m_server, &ServerManager::finished, this, [this](int exitCode, QProcess::ExitStatus) {
+		if (m_exiting)   // 退出路径自己杀的，不是故障：报"启动失败"只会给下次排查添噪声
+			return;
 		if (m_server && m_server->isRestarting())
 			return;
 		if (m_api && !m_api->isConnected()) {

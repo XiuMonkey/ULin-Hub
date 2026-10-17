@@ -109,4 +109,6 @@ private:
 	QString m_status;
 	QString m_serverState;
 	bool m_initializing = true;
+	// 正在退出：服务端"finished"信号是退出路径自己杀出来的，别再当成"启动失败"报警
+	bool m_exiting = false;
 };

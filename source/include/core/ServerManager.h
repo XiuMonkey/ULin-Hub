@@ -1,6 +1,10 @@
 #pragma once
 
 // 内置 DSH 服务端进程的生命周期：拉起 / 重启 / 移交给下一个窗口。
+//
+// 退出保证（见 ServerManager.cpp 文件末尾的说明）：node 子进程挂在带 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+// 的 Job Object 上，本进程无论怎么没了（正常退出 / 崩溃 / 被强杀）内核都会连带杀掉它；正常退出那条
+// 另外走 aboutToQuit → stopForExit()，先 terminate 再按 PID 杀整棵进程树。
 
 #include <QObject>
 #include <QProcess>
@@ -21,6 +25,10 @@ public:
 
 	// 后端接管：停掉内置进程并置接管标记；幂等，重复接管是常态
 	void stopForTakeover();
+
+	// 正常退出（aboutToQuit）调用：结束内置引擎并关掉 Job Object 句柄。幂等，重复调用是常态。
+	// 只动本进程自己起的那个 PID / 那个 job 里的进程，绝不按镜像名去杀 node。
+	void stopForExit();
 
 	// 接管态跨窗口存活，故标记做进程级静态；接管态下 start()/restart() 为 no-op
 	static void setTakenover(bool takenover);
@@ -56,8 +64,25 @@ private:
 	void handleServerErrorOutput();
 	void handleServerFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
+	// ---- 内置引擎的"退出必带走"保障（Windows 上靠 Job Object，其它平台只剩 aboutToQuit）----
+	// 结束内置引擎：先 terminate()，再杀整棵进程树，最后 waitForFinished 等它真的没了；reason 只进日志。
+	// 重启 / 接管 / 退出 / 析构四条路都走它，行为因此一致。
+	void stopBundledServer(const QString& reason);
+	// 建 KillOnJobClose 的 Job Object（只建一次；建失败不致命，日志里会记一条，退出时只剩 aboutToQuit 兜底）
+	bool ensureExitJob();
+	// 把刚起的 node 拉进 job：它之后自己起的子进程（终端 shell / MCP 服务…）会自动继承同一条规则
+	void adoptIntoExitJob(qint64 pid);
+	// TerminateJobObject：job 里所有进程一起结束；没有 job 时返回 false 交给 taskkill /T
+	bool terminateExitJob();
+	// 关句柄 ⇒ KILL_ON_JOB_CLOSE 触发，把还活着的（比如 TerminateJobObject 之后又冒出来的）一并带走
+	void closeExitJob();
+
 	QProcess* m_serverProcess = nullptr;
 	QString m_dshHome;
 	bool m_restarting = false;
 	QUrl m_baseUrl;
+	// Job Object 句柄。void* 而非 HANDLE：头文件里不拖进 windows.h（其它平台这里是空的）
+	void* m_exitJob = nullptr;
+	// takeProcess() 把进程移交出去后就不能关 job 了（关句柄会连带杀掉别人接手的那棵进程树）
+	bool m_processHandedOff = false;
 };

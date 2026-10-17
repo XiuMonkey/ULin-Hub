@@ -17,6 +17,16 @@
 #include <QSaveFile>
 #include <QUrlQuery>
 
+#ifdef Q_OS_WIN
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#endif
+
 namespace
 {
 	// 合法才算数：必须能解析且带 host，否则退回空 QUrl 交给调用方走内置服务端
@@ -161,6 +171,33 @@ namespace
 	// 文件作用域静态而非成员：接管态须跨 ServerManager 实例存活（旧壳每窗口一份、切主题会新建）；
 	// 用成员的话，新实例的 start() 会把内置进程重新拉起（见 DshApiClient::Takenover）
 	bool g_backendTakenover = false;
+
+	// 内置引擎自己会起子进程（终端 shell、MCP 服务…），只杀 node 本身会留孙子。
+	// taskkill /T 按**PID** 连坐子树 —— 绝不按镜像名（用户可能自己跑着 DSH，那条以前踩过）。
+	// 只在 Job Object 建不出来/加不进去时用：那是兜底里的兜底。
+#ifdef Q_OS_WIN
+	bool killProcessTree(qint64 pid, int waitMs)
+	{
+		if (pid <= 0)
+			return false;
+
+		const QString systemRoot = qEnvironmentVariable("SystemRoot");
+		const QString taskkillPath = systemRoot + QStringLiteral("/System32/taskkill.exe");
+		QProcess killer;
+		killer.setProgram(QFile::exists(taskkillPath) ? taskkillPath : QStringLiteral("taskkill"));
+		killer.setArguments(QStringList{ QStringLiteral("/PID"), QString::number(pid),
+			QStringLiteral("/T"), QStringLiteral("/F") });
+		killer.setProcessChannelMode(QProcess::MergedChannels);
+		killer.start();
+		if (!killer.waitForStarted(waitMs))
+			return false;
+
+		const bool finished = killer.waitForFinished(waitMs);
+		const int exitCode = finished ? killer.exitCode() : -1;
+		qInfo().noquote() << QStringLiteral("[ServerManager] taskkill /PID %1 /T /F -> exit=%2").arg(pid).arg(exitCode);
+		return finished && exitCode == 0;
+	}
+#endif
 }
 
 ServerManager::ServerManager(QObject* parent)
@@ -170,10 +207,15 @@ ServerManager::ServerManager(QObject* parent)
 
 ServerManager::~ServerManager()
 {
-	if (m_serverProcess && m_serverProcess->state() != QProcess::NotRunning) {
-		m_serverProcess->kill();
-		m_serverProcess->waitForFinished(2000);
-	}
+	// 正常退出走 aboutToQuit → stopForExit()；这里兜的是"没人显式调过就析构"的路径（测试、异常拆除）。
+	// ⚠️ 但它靠不住，也不该被当成主路径：本应用的持有链是 QmlBridge（函数内 static）→ ClientRuntime
+	// → ServerManager，析构发生在 main() 返回之后、QApplication 已经拆完的时候（每次退出日志里那句
+	// "QObject::startTimer: current thread's event dispatcher has already been destroyed" 就是那时打的）——
+	// 走到这儿已经太晚；崩溃 / 任务管理器强杀 / 调试器停止更是一步都走不到。
+	// 真正保证"应用没了 node 也跟着没"的是 Job Object（见 ensureExitJob()）。
+	stopBundledServer(QStringLiteral("对象析构"));
+	if (!m_processHandedOff)   // 进程已移交下一窗口：关 job 会连带杀掉别人接手的进程树
+		closeExitJob();
 }
 
 void ServerManager::start(const QUrl& initialBaseUrl, QProcess* initialServerProcess)
@@ -218,9 +260,9 @@ void ServerManager::restart()
 
 	m_restarting = true;
 
-	if (m_serverProcess && m_serverProcess->state() != QProcess::NotRunning) {
-		m_serverProcess->kill();
-		m_serverProcess->waitForFinished(2000);
+	if (m_serverProcess) {
+		// 杀整棵树而不是只杀 node：终端 shell / MCP 子进程也是内置引擎起的，重启时要一起换掉
+		stopBundledServer(QStringLiteral("重启内置引擎"));
 		delete m_serverProcess;
 		m_serverProcess = nullptr;
 	}
@@ -255,8 +297,7 @@ void ServerManager::stopForTakeover()
 	if (m_serverProcess->state() != QProcess::NotRunning) {
 		qInfo().noquote() << QStringLiteral("[ServerManager] 接管：停掉内置 DSH 进程 pid=")
 			<< m_serverProcess->processId();
-		m_serverProcess->kill();
-		m_serverProcess->waitForFinished(2000);
+		stopBundledServer(QStringLiteral("接管"));
 	}
 	else {
 		qInfo().noquote() << QStringLiteral("[ServerManager] 接管：内置 DSH 进程已退出，只做清理");
@@ -264,6 +305,172 @@ void ServerManager::stopForTakeover()
 
 	delete m_serverProcess;
 	m_serverProcess = nullptr;
+}
+
+void ServerManager::stopForExit()
+{
+	// 正常关闭这一条：内置引擎必须跟着走。放在 aboutToQuit 里（而不是只靠析构）是因为析构太晚 ——
+	// 单例对象要等 QApplication 拆完才轮到它，而 node 一旦活过那一刻就成了孤儿，继续占着会话写句柄
+	// （症状：下次启动 commands/list / 发消息全报 session/writer-held）。
+	stopBundledServer(QStringLiteral("应用退出"));
+	// 关句柄再兜一层：KILL_ON_JOB_CLOSE 会把 job 里可能残留的（含 node 自己起的子进程）一起带走。
+	// 只关**我们这个** job 的句柄，别人的 node（用户自己跑的 DSH 等）不在里面。
+	closeExitJob();
+}
+
+// 结束内置引擎的唯一实现：重启 / 接管 / 退出 / 析构四条路共用，行为因此一致（幂等）。
+//  1) 先礼：terminate()。
+//  2) 后兵：整棵进程树一起杀（job 里全都在 → TerminateJobObject；job 不可用 → taskkill /T）。
+//  3) 收尾：waitForFinished 等它真的没了，再把结果写进日志。
+void ServerManager::stopBundledServer(const QString& reason)
+{
+	if (!m_serverProcess)
+		return;
+
+	const qint64 pid = m_serverProcess->processId();
+	if (m_serverProcess->state() == QProcess::NotRunning) {
+		qInfo().noquote() << QStringLiteral("[ServerManager] %1：内置引擎已不在运行（PID %2），无需结束")
+			.arg(reason).arg(pid);
+		return;
+	}
+
+	// 1) 先礼。注意 Windows 上 QProcess::terminate() 只是给"有顶层窗口"的进程 PostMessage(WM_CLOSE)，
+	//    而内置引擎是 Qt 用 CREATE_NO_WINDOW 拉起的无窗口控制台进程 —— 它收不到，等下去纯属白等 2 秒，
+	//    所以 Windows 上跳过宽限期直接进第 2 步（其它平台 terminate 是 SIGTERM，node 会真的处理，给 2 秒）。
+	m_serverProcess->terminate();
+#ifdef Q_OS_WIN
+	constexpr int kTerminateGraceMs = 0;
+#else
+	constexpr int kTerminateGraceMs = 2000;
+#endif
+	if (kTerminateGraceMs > 0 && m_serverProcess->waitForFinished(kTerminateGraceMs)) {
+		qInfo().noquote() << QStringLiteral("[ServerManager] %1：内置引擎已按 terminate 正常退出（PID %2）")
+			.arg(reason).arg(pid);
+		return;
+	}
+
+	// 2) 后兵：杀进程树。job 里有 node 和它起的全部子进程，TerminateJobObject 一把清；
+	//    job 建不出来/加不进去时才退回 taskkill /T /F（按 PID 点名，不碰别人的 node）。
+	bool stopped = false;
+	if (terminateExitJob())
+		stopped = m_serverProcess->waitForFinished(2000);
+#ifdef Q_OS_WIN
+	if (!stopped) {
+		killProcessTree(pid, 2000);
+		stopped = m_serverProcess->waitForFinished(2000);
+	}
+#endif
+	if (!stopped && m_serverProcess->state() != QProcess::NotRunning) {
+		// 最后一条：进程自己的 kill()（TerminateProcess）。到这儿说明上面都没生效，别再不声不响地退出。
+		m_serverProcess->kill();
+		stopped = m_serverProcess->waitForFinished(2000);
+	}
+
+	if (stopped)
+		qInfo().noquote() << QStringLiteral("[ServerManager] %1，已结束内置引擎（PID %2，含进程树）")
+			.arg(reason).arg(pid);
+	else
+		qWarning().noquote() << QStringLiteral("[ServerManager] %1：内置引擎（PID %2）2 秒内没能结束")
+			.arg(reason).arg(pid);
+}
+
+// Job Object：Windows 上唯一能覆盖"本进程非正常消失"的机制 —— 句柄一关（正常退出 / 崩溃 / 被强杀），
+// 内核把 job 里的进程全部终止。父进程死了子进程照样活的默认语义就靠它掰过来。
+bool ServerManager::ensureExitJob()
+{
+	if (m_exitJob)
+		return true;
+
+#ifdef Q_OS_WIN
+	HANDLE job = ::CreateJobObjectW(nullptr, nullptr);
+	if (!job) {
+		qWarning().noquote() << QStringLiteral(
+			"[ServerManager] 建 Job Object 失败（退出时只剩 aboutToQuit 兜底）: %1")
+			.arg(qt_error_string(static_cast<int>(::GetLastError())));
+		return false;
+	}
+
+	// KILL_ON_JOB_CLOSE：job 的最后一个句柄关闭时（= 本进程没了，句柄随之释放）终止 job 内所有进程
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+	info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+	if (!::SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+		qWarning().noquote() << QStringLiteral(
+			"[ServerManager] Job Object 设 KILL_ON_JOB_CLOSE 失败（退出时只剩 aboutToQuit 兜底）: %1")
+			.arg(qt_error_string(static_cast<int>(::GetLastError())));
+		::CloseHandle(job);
+		return false;
+	}
+
+	m_exitJob = job;
+	qInfo().noquote() << QStringLiteral(
+		"[ServerManager] 已建 KillOnJobClose 的 Job Object：本进程无论怎么退出（含崩溃 / 被强杀），"
+		"内核都会连带终止内置引擎");
+	return true;
+#else
+	// 非 Windows 没有 job：退出清理全靠 aboutToQuit → stopBundledServer() 这条路
+	return false;
+#endif
+}
+
+void ServerManager::adoptIntoExitJob(qint64 pid)
+{
+	if (pid <= 0 || !ensureExitJob())
+		return;
+
+#ifdef Q_OS_WIN
+	// PROCESS_SET_QUOTA | PROCESS_TERMINATE 是 AssignProcessToJobObject 要求的最小权限组合
+	HANDLE process = ::OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+		FALSE, static_cast<DWORD>(pid));
+	if (!process) {
+		qWarning().noquote() << QStringLiteral(
+			"[ServerManager] 打不开内置引擎进程（PID %1），它没进 job，退出时只能靠 aboutToQuit: %2")
+			.arg(pid).arg(qt_error_string(static_cast<int>(::GetLastError())));
+		return;
+	}
+
+	if (::AssignProcessToJobObject(static_cast<HANDLE>(m_exitJob), process)) {
+		qInfo().noquote() << QStringLiteral("[ServerManager] 内置引擎已加入 Job Object（PID %1）").arg(pid);
+	}
+	else {
+		// 常见原因：本进程已被外部塞进一个不允许嵌套的 job（Win7 / 某些 CI）。不是致命错误 ——
+		// aboutToQuit 那条照样会杀，只是崩溃/强杀时没了系统级保险。
+		qWarning().noquote() << QStringLiteral(
+			"[ServerManager] 内置引擎（PID %1）加不进 Job Object，退出时只能靠 aboutToQuit: %2")
+			.arg(pid).arg(qt_error_string(static_cast<int>(::GetLastError())));
+	}
+
+	::CloseHandle(process);
+#else
+	Q_UNUSED(pid);
+#endif
+}
+
+bool ServerManager::terminateExitJob()
+{
+#ifdef Q_OS_WIN
+	if (!m_exitJob)
+		return false;
+
+	if (!::TerminateJobObject(static_cast<HANDLE>(m_exitJob), 1)) {
+		qWarning().noquote() << QStringLiteral("[ServerManager] TerminateJobObject 失败: %1")
+			.arg(qt_error_string(static_cast<int>(::GetLastError())));
+		return false;
+	}
+	return true;
+#else
+	return false;
+#endif
+}
+
+void ServerManager::closeExitJob()
+{
+#ifdef Q_OS_WIN
+	if (!m_exitJob)
+		return;
+
+	::CloseHandle(static_cast<HANDLE>(m_exitJob));
+	m_exitJob = nullptr;
+#endif
 }
 
 void ServerManager::setTakenover(bool takenover)
@@ -286,8 +493,12 @@ QProcess* ServerManager::takeProcess()
 {
 	QProcess* process = m_serverProcess;
 	m_serverProcess = nullptr;
-	if (process)
+	if (process) {
 		process->setParent(nullptr);
+		// 移交出去之后这个实例就不能再关 job 了：关句柄 = KILL_ON_JOB_CLOSE 会把接手方要用的进程树杀掉。
+		// （目前没有调用点，留着是为了不让 API 变成陷阱。）
+		m_processHandedOff = true;
+	}
 	return process;
 }
 
@@ -724,6 +935,9 @@ void ServerManager::launchBundledServer(const QString& nodePath, const QString& 
 
 	m_serverProcess->start(nodePath, QStringList{ entryPath, dshEntry, QStringLiteral("web"),
 		QStringLiteral("--port"), QStringLiteral("0") });
+	// 进程是 start() 里同步创建的（Windows 上 CreateProcess 就在 start() 内完成，所以这里 processId() 已有值）。
+	// 立刻拉进 job：之后 node 自己起的子进程都会继承 job 成员身份，父进程怎么死内核都能一起收掉。
+	adoptIntoExitJob(m_serverProcess->processId());
 	qInfo().noquote() << QStringLiteral("[ServerManager] bundled server process started");
 }
 
