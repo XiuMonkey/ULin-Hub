@@ -5,8 +5,10 @@
 // 分层规矩（领域归位 2026-10-15，全仓通用）：
 //   · common/**    = 领域与纯逻辑（解析、策略、状态机、模型本体）：不 import QML 概念，能脱离 QML 引擎单测。
 //   · qmlbridge/** = 只做接线：属性/信号、Q_INVOKABLE 转发、QAbstractListModel 的角色名映射，**不放算法**。
-//   留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge、PanelBarLayout（只转发）；
-//   带逻辑的模型与控制器（SessionListModel / CommandController / SettingsController / PanelDockModel /
+//   留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge；
+//   （右侧栏宽度的三条公式曾在本目录留过一个只转发的 PanelBarLayout 单例，2026-10-18 已归位到
+//    Shell.qml —— 它唯一消费者就是那份 QML，见那边的 conversationMinWidth/maxWidth/clampWidth。）
+//   带逻辑的模型与控制器（SessionListModel / CommandController / SettingsController / PanelBarDockModel /
 //   PluginMarketController / StyleResolver）已搬去 common/**，算法在那边、QML 面在这里。
 //
 // ⚠️ 本类的职责被刻意收窄成**只有接线**（2026-10-10 拆分，之前叫 ShellController）：
@@ -149,6 +151,19 @@ public:
 	Q_INVOKABLE void clearAllSessions();
 
 	// ---- 会话收发 ----
+	// ---- 图片附件（转发 ChatController）----
+	Q_PROPERTY(QVariantList pendingAttachments READ pendingAttachments NOTIFY pendingAttachmentsChanged)
+	// 任一附件字节到位就 +1：QML 把它放进 Image.source 的表达式里触发重取
+	Q_PROPERTY(int attachmentRevision READ attachmentRevision NOTIFY attachmentRevisionChanged)
+	QVariantList pendingAttachments() const;
+	int attachmentRevision() const { return m_attachmentRevision; }
+
+	Q_INVOKABLE void addAttachments(const QVariantList& urls);
+	// 原生文件对话框（避免依赖 QtQuick.Dialogs 部署）
+	Q_INVOKABLE void chooseImageFiles();
+	Q_INVOKABLE void removeAttachment(int index);
+	Q_INVOKABLE QString attachmentSource(const QString& attachmentId);
+
 	Q_INVOKABLE void sendPrompt(const QString& text);
 	Q_INVOKABLE void cancelPrompt();
 
@@ -192,6 +207,8 @@ signals:
 	void panelBarOpenChanged();
 	void interactionChanged();
 	void olderChanged();
+void pendingAttachmentsChanged();
+void attachmentRevisionChanged();
 	void olderPrepended();
 	void sessionCreateFailed(const QString& message);  // 新建会话失败（QML 用 Toast 显示：statusText 只在初始化遮罩里可见）
 
@@ -205,6 +222,7 @@ private:
 	void wireChat();
 
 	ClientRuntime* m_runtime = nullptr;
+	int m_attachmentRevision = 0;
 	ChatController* m_chat = nullptr;
 	ThemeController* m_theme = nullptr;
 	ToolsFilter* m_toolsFilter = nullptr;

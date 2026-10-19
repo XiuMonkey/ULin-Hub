@@ -80,7 +80,7 @@ public:
 	void flushViewModelInput();
 
 	// ---- 扩展后端（两条面：字节面默认 / 页面面兼容层）----
-	// 自绘路径没有页面了，但**后端缝**要留着：SetPanelBackend 给的对象成为本块的字节来源。
+	// 自绘路径没有页面了，但**后端缝**要留着：SetBlockBackend 给的对象成为本块的字节来源。
 	//
 	// **选面规则（唯一判据，别在别处再判一遍）**：先把后端当 QObject 问 `apiVersion` 属性 ——
 	//   · 有且 >= 2 ⇒ **字节面**（默认，薄），本类按下面的字节面契约接线；
@@ -260,7 +260,7 @@ public:
 	// 把终端后端的"要注册的对象"注册到 QWebChannel 上（QML 侧的 WebChannel 对象）。**必须**从 C++ 注册，
 	// 别在 QML 里写 `registeredObjects: [Terminal]`：那是个 JS 数组字面量，C++ 注册的 QML 单例在这个位置
 	// 是"类型包装"，转 QObject* 得到 null（实测日志：`Cannot register null object to WebChannel`）。
-	// transport 非空 = 该块后端被扩展顶替（HostUi::panelBackend("terminal")），注册它、页面直连它；
+	// transport 非空 = 该块后端被扩展顶替（HostUi::blockBackend("terminal")），注册它、页面直连它；
 	// 空 = 用内置的本桥。返回是否注册成功。
 	// ⚠️ 自绘终端（TerminalVt/TerminalView）没有 QWebChannel，**没有调用方** —— 新增接线别再写在这里，
 	//    写 bindBackend（同一个 attachTransport 实现）。
@@ -286,7 +286,7 @@ public:
 	// ---- 自绘路径的**扩展后端缝**（替代页面时代的 registerOn）----
 	// 背景：registerOn 要一个 QWebChannel，自绘面板没有页面了 ⇒ 它没有调用方 ⇒ m_transport 永远是空
 	// ⇒ 扩展给了后端宿主也不知道。本方法就是那条缝的新入口：
-	//   · transport 非空 ⇒ 它成为"终端块后端"（SetPanelBackend 登记的那个对象），本桥与它按页面面交互
+	//   · transport 非空 ⇒ 它成为"终端块后端"（SetBlockBackend 登记的那个对象），本桥与它按页面面交互
 	//     （契约见 TerminalSession::attachBackend 的注释）；
 	//   · transport 为空 ⇒ 撤销、退回内置桥（引擎 terminal/*）。
 	// 幂等：同一个后端反复接不重复动作；面板每次就绪都能调。
@@ -337,7 +337,7 @@ private:
 	DshApiClient* m_api = nullptr;
 	QHash<QString, TerminalSession*> m_sessions;
 	QSet<QWebChannel*> m_channels;   // 已注册过的 WebChannel（每个面板一个；同一个桥可注册到多个）
-	// 被扩展顶替时的替代后端（HostUi::panelBackend("terminal")）：
+	// 被扩展顶替时的替代后端（HostUi::blockBackend("terminal")）：
 	// 自绘路径下它**直接当字节来源**（默认字节面：它的 hostData 喂进各块的 VT；页面面：frameReady），
 	// 不再有页面直连它。
 	QPointer<QObject> m_transport;

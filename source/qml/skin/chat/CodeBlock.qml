@@ -1,8 +1,13 @@
-// 代码块单元（旧壳 CodeBlockView 的既定规则原样保留）：
-//   * 代码围栏是**独立单元**、不是正文的一部分；
-//   * 上方一行语言标签 + 复制按钮；
-//   * **不换行**，横向可滚动；
-//   * 语法高亮由 C++ 侧 CodeHighlighter 生成 RichText（D3 的"无头复用"）。
+// 代码块单元：按 DSH 官方版 md code-block 规格复刻
+// （`dsh-client-ui-primitives/lib/markdown/CodeBlock.module.css`）：
+//   * 整块 = 一个圆角容器 `--dsw-radius-lg`(16)，底色 `--dsw-alias-markdown-code-block`
+//     （light #F9FAFB / dark #1B1B1C）；**没有描边** —— 官方层次全靠底色，不靠线；
+//   * 顶部 banner：padding 9px 14px、11px/18px 等宽字语言标签 + 右侧复制键
+//     （banner 底色 markdown-code-block-banner，比块体只差一档，刻意做得几乎看不见）；
+//   * 正文 padding 16px、字号 `--dsw-font-markdown-code-block` = 11px/19px 等宽。
+//
+// 与官方唯一的刻意差异：官方 `white-space: pre-wrap; word-break: break-all`（长行折行），
+// 这里保留**不换行 + 横向滚动**（旧壳行为，也是这个文件原先专门修过的一个点）。
 //
 // ⚠️ 横向滚动条**不能用 Flickable 的附加属性**（`ScrollBar.horizontal`）：它是覆盖层，
 // 画在 Flickable 底边上，而 Flickable 底边 = 文字底部时就会压住最后一行（用户实测：文字结束 y=158、
@@ -10,7 +15,6 @@
 //     [ 代码区（Flickable，高度=内容高，封顶 420） ]
 //     [ 6px 间隙 ]
 //     [ 滚动条一行（仅超宽时出现） ]
-// 这样滚动条与文字不在同一块区域里，**任何情况下都不可能压住文字**。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -27,65 +31,80 @@ Item {
     // 代码内容是否比可视宽度宽（决定要不要那一行滚动条）
     readonly property bool overflowX: scroller.contentWidth > scroller.width + 1
 
-    implicitHeight: header.implicitHeight + frame.implicitHeight + Theme.spacing.labelGap
+    // 官方圆角 16（--dsw-radius-lg）。取 pill（16）而不是 control（12）：control 这一档
+    // 现在是官方 md(12) 给按钮/输入框用的，代码块在官方是**大一档**的 lg。
+    readonly property int blockRadius: Theme.radius.pill
+    readonly property int bannerHeight: 34
+    readonly property int bodyPadding: 16
 
-    // 语言标签行
-    Item {
-        id: header
-        anchors.left: parent.left
-        anchors.right: parent.right
-        implicitHeight: 20
+    // 新 token 带兜底：老风格包里没有这两个键时退回近义的既有 token，不至于整块渲染失败
+    readonly property color blockBg: Theme.color.codeBlockBg || Theme.color.inputBg
+    readonly property color bannerBg: Theme.color.codeBlockBannerBg || Theme.color.panelBg
 
-        Text {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.language.length > 0 ? root.language : "code"
-            color: Theme.color.textCaption
-            font.family: "Consolas"
-            font.italic: true
-            font.pixelSize: Theme.font.small
-        }
+    implicitHeight: frame.implicitHeight
 
-        IconButton {
-            id: copyButton
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            boxSize: 20
-            glyphSize: Theme.font.small
-            glyph: "⧉"
-            tooltip: qsTrId("common_copy")
-            onClicked: {
-                codeView.selectAll()
-                codeView.copy()
-                codeView.deselect()
-            }
-        }
-    }
-
-    // 代码本体：不换行 + 横向滚动
     Rectangle {
         id: frame
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: header.bottom
-        anchors.topMargin: Theme.spacing.labelGap
-        // 高度由内部两行（代码区 + 滚动条行）算出来，不再手工加减
-        implicitHeight: body.implicitHeight + 2 * Theme.spacing.labelGap
-        radius: Theme.radius.control
-        // 底色 = 原版 `#codeBlockView { background: {{hoverBg}} }` 的灰面（不是近白的 inputBg）：
-        // 灰面自己就有层次，描边只是收个边；换成近白底后描边被迫当"唯一的层次线索"，看着就"太深"。
-        color: Theme.color.hoverBg
-        border.width: 1
-        border.color: Theme.color.border
+        implicitHeight: banner.height + contentBody.implicitHeight
+        radius: root.blockRadius
+        color: root.blockBg
         clip: true
 
-        Column {
-            id: body
+        // ---- banner ----
+        Rectangle {
+            id: banner
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: Theme.spacing.labelGap
-            anchors.rightMargin: Theme.spacing.labelGap
+            height: root.bannerHeight
+            radius: root.blockRadius
+            color: root.bannerBg
+
+            Text {
+                anchors.left: parent.left
+                anchors.leftMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.language.length > 0 ? root.language : "text"
+                color: Theme.color.textPrimary
+                font.family: "Consolas"
+                font.pixelSize: Theme.font.small      // 11px（官方 banner 11/18）
+            }
+
+            IconButton {
+                id: copyButton
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                boxSize: 22
+                glyphSize: Theme.font.caption
+                glyph: "⧉"
+                tooltip: qsTrId("common_copy")
+                onClicked: {
+                    codeView.selectAll()
+                    codeView.copy()
+                    codeView.deselect()
+                }
+            }
+
+            // banner 下沿的细分隔线（官方 banner 与块体只差一档底色，靠这条线收口）
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.color.border
+            }
+        }
+
+        Column {
+            id: contentBody
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: banner.bottom
+            anchors.leftMargin: root.bodyPadding
+            anchors.rightMargin: root.bodyPadding
             anchors.topMargin: Theme.spacing.labelGap
             spacing: 6   // 文字与滚动条之间的呼吸间隙
 
@@ -114,7 +133,7 @@ Item {
                     selectionColor: Theme.color.selectionBg
                     selectedTextColor: Theme.color.textPrimary
                     font.family: "Consolas"
-                    font.pixelSize: Theme.font.caption
+                    font.pixelSize: Theme.font.small      // 11px（官方 --dsw-font-markdown-code-block）
                 }
             }
 
@@ -140,6 +159,9 @@ Item {
                 when: !hbar.pressed
                 restoreMode: Binding.RestoreBindingOrValue
             }
+
+            // 底部留白（官方 pre 的 padding 16px 的下半截；上面由 topMargin 给了一部分）
+            Item { width: 1; height: Theme.spacing.labelGap }
         }
     }
 }

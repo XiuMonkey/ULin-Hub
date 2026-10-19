@@ -21,7 +21,8 @@ public:
 	enum Role
 	{
 		KindRole = Qt::UserRole + 1,   // "user" | "agent" | "system"
-		TextRole,                      // 用户/系统消息的纯文本
+		TextRole,
+		ImagesRole,   // 该行携带的图片附件 [{id, mediaType}]（仅用户行）                      // 用户/系统消息的纯文本
 		SegmentsRole,                  // 有序段（QVariantList）
 		StreamingRole
 	};
@@ -38,7 +39,14 @@ public:
 	// 会话切换：整表清空（这里必须重置，因为换了会话）
 	void clear();
 
+	// 图片附件引用（用户消息）
+	struct ImageRef
+	{
+		QString attachmentId;
+		QString mediaType;
+	};
 	int appendUser(const QString& text);
+	int appendUserWithImages(const QString& text, const QVector<ImageRef>& images);
 	int appendSystem(const QString& text);
 	// 建一条空 Agent 消息（流式会往里填内容）；返回行号
 	int appendAgent();
@@ -53,6 +61,10 @@ public:
 	int lastAgentRow() const;
 	int lastRow() const { return m_rows.size() - 1; }
 	bool isEmpty() const { return m_rows.isEmpty(); }
+
+	// 换肤后调用：代码块的颜色是在切分时烘进 parts（html）里的（CodeHighlighter 按当前主题解析角色），
+	// 所以主题一变就得让这些单元重建 —— 清缓存 + 整表发一次 dataChanged（段是追加式的，不能 reset）。
+	void invalidateSegmentParts();
 
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;
@@ -81,6 +93,7 @@ private:
 		int kind = Agent;
 		QString text;
 		QVector<Segment> segments;
+		QVector<ImageRef> images;   // 仅用户行
 		QString toolResult;          // 最近的工具结果，附在 toolCall 段上显示
 		bool streaming = false;
 	};

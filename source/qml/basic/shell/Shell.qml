@@ -8,7 +8,7 @@ import QtQuick
 import QtQuick.Window
 import ULinHub 1.0
 import "../../widgets"
-// ui/shell 与 ui/sidebar、ui/topbar 是并列目录：QML 只按同目录/已 import 的目录解析组件名，
+// ui/shell 与 ui/session、ui/topbar 是并列目录：QML 只按同目录/已 import 的目录解析组件名，
 // 所以跨目录用裸组件名（SessionBar / TopBar）必须显式 import
 import "../session"
 import "../topbar"
@@ -31,7 +31,7 @@ Item {
     // ---------------- 落点提示（右栏整体拖出去 / 拖回来）----------------
     // 右栏（整个面板栏）的脱离/回附状态是下面那组 panelBar* 属性（panelBarDetached /
     // panelBarFloating / panelBarWin* …），本层只做"把壳层的坐标与右栏几何喂给窗口"这种接线。
-    // （"按块脱离"那条链已删除，状态也不再放在 common/shell/PanelDockModel 里。）
+    // （"按块脱离"那条链已删除，状态也不再放在 common/shell/PanelBarDockModel 里。）
     //
     // 落点提示的矩形与开关：矩形在**拖动开始时**算一次（拖动期间右栏可能已经收起，每帧重算会指错地方）；
     // 开关由正在拖的那个独立窗口推过来（拖动中主窗口收不到 hover，只能这样推）。
@@ -74,13 +74,13 @@ Item {
     // 它按屏幕坐标算；回附方向由独立窗口里的抓手按屏幕坐标算）。
     // 用**开着**的几何现算，不读 panelBar 的当前坐标：右栏收起时它在窗口右缘之外，
     // 脱离时它已经不在本窗口里 —— 两种情况下都读不到"它该在的位置"。
-    function dockSceneRect() {
+    function panelBarSceneRect() {
         return Qt.rect(shell.width - Theme.spacing.windowMargin - shell.panelBarEffW,
                        panelBarSlot.y, shell.panelBarEffW, panelBarSlot.height)
     }
     // 同一块矩形在**屏幕坐标**里：跨窗口判断（脱离方向够不够、独立窗口拖回来落没落进来）只能用屏幕坐标
     // —— 各自窗口的场景原点不是一个。抓手每次需要时**现算**（主窗口被搬动后属性绑定不会重算）。
-    function dockScreenRect() {
+    function panelBarScreenRect() {
         const xOpen = shell.width - Theme.spacing.windowMargin - shell.panelBarEffW
         const p = shell.mapToGlobal(xOpen, panelBarSlot.y)
         return Qt.rect(p.x, p.y, shell.panelBarEffW, panelBarSlot.height)
@@ -88,8 +88,8 @@ Item {
 
     // 松手落点判定（屏幕坐标 + ±dropSlack 容差）：跟手期间右栏没在槽位里，只能按"光标回没回到
     // 那块矩形"来判 —— 与独立窗口往回拖用的是同一条规则。
-    function insideDockZone(p) {
-        const r = dockScreenRect()
+    function insidePanelBarZone(p) {
+        const r = panelBarScreenRect()
         return p.x >= r.x - dropSlack && p.x <= r.x + r.width + dropSlack
                && p.y >= r.y - dropSlack && p.y <= r.y + r.height + dropSlack
     }
@@ -126,7 +126,7 @@ Item {
         // 窗口几何 = 右栏那块矩形**本身**（位置/尺寸逐像素一致）：不再为自绘标题栏多留一条高度、
         // 也不再上移 —— 副窗口的"标题栏"就是面板自己的头部行（见 PanelBarWindow.qml 的说明），
         // 于是右栏内容零跳变地落进窗口，而"这已经是一扇窗"由头部里那两颗窗口按钮看得出来。
-        const r = dockScreenRect()
+        const r = panelBarScreenRect()
         const w = Math.max(Math.round(r.width), Theme.size.panelBarMinWidth)
         const h = Math.max(Math.round(r.height), 240)
         const x = Math.round(r.x)
@@ -149,7 +149,7 @@ Item {
         beginDetachPreview(false)
         // reparent：同一份实例搬过去（终端/网页不会重开会话）
         panelBar.parent = panelBarWindow.panelSlot
-        console.log("[sidebar-drag] lift win " + w + "x" + h + " @" + x + "," + y
+        console.log("[panelBar-drag] lift win " + w + "x" + h + " @" + x + "," + y
                     + " cursor " + Math.round(p.x) + "," + Math.round(p.y))
     }
 
@@ -164,8 +164,8 @@ Item {
         // 落点提示：跟手全程都画着（画的就是"松手回哪儿"）。矩形只在空掉时重算一次
         // —— 跟手期间布局是冻的，每帧重算没必要（抓手那次 cancel 会把矩形清掉，这里自愈）。
         if (dropZone.width <= 0 || dropZone.height <= 0)
-            dropZone = dockSceneRect()
-        dropHintActive = insideDockZone(Qt.point(screenX, screenY))
+            dropZone = panelBarSceneRect()
+        dropHintActive = insidePanelBarZone(Qt.point(screenX, screenY))
     }
 
     // 跟手一帧：按光标跟一次，并按**物理**左键状态收尾（松手就定结局）。
@@ -184,13 +184,13 @@ Item {
     function finishPanelBarDrag(atScreenX, atScreenY) {
         if (!panelBarFloating)
             return
-        const over = insideDockZone(Qt.point(atScreenX, atScreenY))
+        const over = insidePanelBarZone(Qt.point(atScreenX, atScreenY))
         if (over) {
             // ① 落回右栏原区域 ⇒ 回附：内容 reparent 回槽位。
-            //    跟手期间没动过 rightInset ⇒ 布局从头到尾没变，这里只是把卡片放回原位。
+            //    跟手期间没动过 panelBarInset ⇒ 布局从头到尾没变，这里只是把卡片放回原位。
             panelBar.parent = panelBarSlot
             panelBarFloating = false
-            console.log("[sidebar-drag] drop in zone → 回附（布局未动过）")
+            console.log("[panelBar-drag] drop in zone → 回附（布局未动过）")
         }
         else {
             // ② 落在区域外 ⇒ **此刻**才确认脱离：窗口留在光标处、接上自绘标题栏（它本来就在），
@@ -198,7 +198,7 @@ Item {
             panelBarDetached = true
             panelBarFloating = false
             Hub.closePanelBar()
-            console.log("[sidebar-drag] drop outside → 独立窗口 @" + panelBarWindow.x + "," + panelBarWindow.y
+            console.log("[panelBar-drag] drop outside → 独立窗口 @" + panelBarWindow.x + "," + panelBarWindow.y
                         + " " + panelBarWindow.width + "x" + panelBarWindow.height)
         }
         endDetachPreview()
@@ -220,7 +220,7 @@ Item {
             Hub.openPanelBar()
         else
             Hub.closePanelBar()
-        console.log("[sidebar-detach] attach open=" + open)
+        console.log("[panelBar-detach] attach open=" + open)
     }
 
     // 面板头部那两颗窗口按钮（− 最小化 / □❐ 最大化-还原）的转发口：按钮只在副窗口态可见
@@ -238,9 +238,9 @@ Item {
 
     // 抓手正在拖（此时落点就是右栏自己）：提示跟着亮起来当"松手就不会跑"的反馈。
     // 由右栏标题行那只抓手的 `panelBarPreviewChanged` 推过来（拖动中主窗口收不到 hover，只能这样推）；
-    // 落点矩形按右栏**附着时**的几何现算（收起/脱离时读不到它的坐标，见 dockSceneRect）。
+    // 落点矩形按右栏**附着时**的几何现算（收起/脱离时读不到它的坐标，见 panelBarSceneRect）。
     function beginDetachPreview(over) {
-        dropZone = dockSceneRect()
+        dropZone = panelBarSceneRect()
         dropHintActive = over
     }
     function endDetachPreview() {
@@ -268,29 +268,42 @@ Item {
     // 宽度归壳层所有（面板只管画卡片）：拖柄改的是 panelBarW，默认值来自 token。
     // 正在拖：拖动期间必须**关掉**压窄动画，否则布局会追着光标慢慢爬
     property bool resizing: false
-    // 钳制策略（会话区保底 / 上限 / 夹取 / 拖动换算）全在 C++：公式在
-    // source/src/common/layout/PanelBarMetrics.cpp（自由函数、可脱离 QML 单测），
-    // QML 面是单例 `PanelBarLayout`（source/src/qmlbridge/PanelBarLayout.cpp，只转发）。
-    // 这里只负责把 token 与窗口尺寸喂进去，不再自己算公式
-    // （那几条都是"纯数值规则"，放 C++ 才能脱离窗口验证；拖动仍是 1:1，公式逐位等价）。
+    // 宽度策略就住在本文件：三条纯公式（会话区保底 / 上限 / 夹取）只吃"窗口宽 + 几个 token"，
+    // 唯一消费者也是这里（几个绑定 + 拖柄），没有第二个调用者 ⇒ 不绕 C++ 转发层，
+    // 跟着布局一起改、跟着 `<exe>/ui` 一起热改，不用为调一次手感重编 EXE。
+    // ⚠️ 公式只做四则运算 + Math.min/max，**不要**夹带"取整/取整到像素"：这套拖动是实测 1:1 跟手的，
+    //    依赖的就是"输入多少就算多少"。JS 的 number 与 C++ 的 double 同为 IEEE754 双精度，逐位一致。
+    // 具体 token 值仍归主题包（Theme.size / Theme.spacing / metrics.json），这里只有公式、不持默认值。
+    //
+    // 会话区保底宽度 = min(token 保底, 窗口宽 × 0.25)。
+    function conversationMinWidth(shellWidth, tokenMinConversationWidth) {
+        return Math.min(tokenMinConversationWidth, shellWidth * 0.25)
+    }
+    // 侧栏宽度上限：窗口 − 两侧留白 − 左侧栏 − 间距 − 会话区保底；但不低于最小宽度
+    // （窗口极小时上限会低于下限，夹取必须还能收敛到一个有效值）。
+    function maxWidth(shellWidth, minWidth, convMin, windowMargin, sessionBarWidth, panelGap) {
+        return Math.max(minWidth, shellWidth - 2 * windowMargin - sessionBarWidth - panelGap - convMin)
+    }
+    // 把宽度夹进 [minWidth, maxWidth]（窗口变小、或被拖到极端都不会越界）
+    function clampWidth(w, minW, maxW) {
+        return Math.max(minW, Math.min(w, maxW))
+    }
     readonly property real panelBarMinW: Theme.size.panelBarMinWidth
     // 会话区保底宽度：**按窗口比例兜底**（取 token 与 25% 窗口宽里更小的那个）。
     // 为什么不能死守 token 的 320：窗口不大时，固定 240 侧栏 + 320 之后留给右侧栏的额度
     // 可能比默认宽度 360 还小 ⇒ 面板一开局就顶在上限、只能往右（变窄）拖，往左没反应。
-    readonly property real panelBarConvMin: PanelBarLayout.conversationMinWidth(
-        width, Theme.size.minConversationWidth)
-    readonly property real panelBarMaxW: PanelBarLayout.maxWidth(width, panelBarMinW, panelBarConvMin,
+    readonly property real panelBarConvMin: conversationMinWidth(width, Theme.size.minConversationWidth)
+    readonly property real panelBarMaxW: maxWidth(width, panelBarMinW, panelBarConvMin,
         Theme.spacing.windowMargin, Theme.size.sessionBarWidth, Theme.spacing.panelGap)
     // 用户宽度（默认值也不能超过上限，否则同上）
     property real panelBarW: Math.min(Theme.size.sessionBarWidth, panelBarMaxW)
     // 生效宽度：用户值先按上下限夹一次（窗口变小、或被拖到极端都不会越界）
-    readonly property real panelBarEffW: PanelBarLayout.clampWidth(
-        panelBarW, panelBarMinW, panelBarMaxW)
+    readonly property real panelBarEffW: clampWidth(panelBarW, panelBarMinW, panelBarMaxW)
     readonly property real panelBarFull: panelBarEffW + Theme.spacing.panelGap
-    property real rightInset: Hub.panelBarOpen ? panelBarFull : 0
+    property real panelBarInset: Hub.panelBarOpen ? panelBarFull : 0
     // 缓动取 OutCubic（不做过冲）：压窄是"腾地方"，回弹会让人以为界面抖了一下。
     // ⚠️ 拖拽时 enabled=false：宽度是用户手指的位置，不能再去补间。
-    Behavior on rightInset {
+    Behavior on panelBarInset {
         enabled: !shell.resizing
         NumberAnimation {
             duration: Theme.motion.normal
@@ -299,18 +312,17 @@ Item {
     }
     // 归一化进度（0 = 收起，1 = 完全展开）：面板的位移/淡入跟着它走
     readonly property real panelBarT: panelBarFull > 0
-        ? Math.min(1, rightInset / panelBarFull) : 0
+        ? Math.min(1, panelBarInset / panelBarFull) : 0
 
-    // 拖拽换算：按下时的光标窗口 x / 当时宽度 + 当前光标窗口 x ⇒ 新宽度。
-    // 公式在 C++（PanelBarLayout.widthFromDrag），这里只把壳层的上下限喂进去；保留这层包装是因为
-    // 上下限是壳层的属性，调用点（拖柄）不该自己知道它们。
+    // 拖拽换算：按下时的光标窗口 x / 当时宽度 + 当前光标窗口 x ⇒ 新宽度，落手再夹一次。
+    // 保留这层包装（而不是让拖柄自己算）是因为上下限是壳层的属性，调用点（拖柄）不该自己知道它们。
     // 往左拖 ⇒ cursorX < pressX ⇒ 宽度变大。
     function widthFromDrag(pressX, pressWidth, cursorX) {
-        return PanelBarLayout.widthFromDrag(pressX, pressWidth, cursorX, panelBarMinW, panelBarMaxW)
+        return clampWidth(pressWidth - (cursorX - pressX), panelBarMinW, panelBarMaxW)
     }
     // 夹取入口（拖柄调它；QML 外部/扩展要设宽度也走它）
     function setPanelBarWidth(w) {
-        panelBarW = PanelBarLayout.clampWidth(w, panelBarMinW, panelBarMaxW)
+        panelBarW = clampWidth(w, panelBarMinW, panelBarMaxW)
     }
 
     // ---- 左侧：侧栏卡片 ----
@@ -326,6 +338,9 @@ Item {
         radius: Theme.radius.panel
         padding: 0
         shadowEnabled: true
+        // 侧栏底色跟官方 `--dsw-specific-sidebar-fill` 走（light #F9FAFB / dark #1B1B1C）：
+        // 官方侧栏比内容面**深一档**（dark）或**灰一档**（light），和内容面完全同色会糊成一片。
+        color: Theme.color.sessionBarBg || Theme.color.cardBg
         // 与旧壳对齐：sidebar.qss 的 `#sidebar` 只有 background + border-radius，**没有描边**；
         // 只有 `#topBar` 有 `border: 1px solid {{border}}`。少画这一条，壁纸皮肤下才不会多出一圈线。
         bordered: false
@@ -338,12 +353,12 @@ Item {
 
     // ---- 右侧：顶栏卡片 + 会话卡片 ----
     Item {
-        id: rightColumn
+        id: contentColumn
         anchors.left: sessionBarCard.right
         anchors.leftMargin: Theme.spacing.panelGap
         anchors.right: parent.right
-        // 右边距跟着右侧栏的展开量走 ⇒ 顶栏卡片与会话卡片一起被压窄（动画由 rightInset 的 Behavior 提供）
-        anchors.rightMargin: Theme.spacing.windowMargin + shell.rightInset
+        // 右边距跟着右侧栏的展开量走 ⇒ 顶栏卡片与会话卡片一起被压窄（动画由 panelBarInset 的 Behavior 提供）
+        anchors.rightMargin: Theme.spacing.windowMargin + shell.panelBarInset
         anchors.top: parent.top
         anchors.topMargin: Theme.spacing.contentSideInset
         anchors.bottom: parent.bottom
@@ -373,8 +388,8 @@ Item {
                 //   ② 没有副窗口 ⇒ 走原来的开合（Hub.togglePanelBar()）；
                 //   ③ 刚关完副窗口再点 ⇒ panelBarOpen 还是 false ⇒ toggle 走"打开"，
                 //      而内容这时已经附着回槽位 ⇒ "关闭后再点开默认是附着状态"，正是需求要的。
-                // ⚠️ "按块脱离"那一套（含 Dock.anyDetachedVisible / Dock.closeDetachedWindows()）
-                //    已随 PanelDockModel 的死代码清理一并删除（抓手改拖整个右栏了，见 PanelBar.qml），
+                // ⚠️ "按块脱离"那一套（含 PanelBarDock.anyDetachedVisible / PanelBarDock.closeDetachedWindows()）
+                //    已随 PanelBarDockModel 的死代码清理一并删除（抓手改拖整个右栏了，见 PanelBar.qml），
                 //    所以这条分支只看 panelBarDetached，不再经过那两个接口。
                 onPanelBarRequested: {
                     if (shell.panelBarDetached)
@@ -481,7 +496,7 @@ Item {
             opacity: shell.panelBarInWindow ? 1 : shell.panelBarT
             // 独立态（**确认脱离之后**）：三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
             sideDetached: shell.panelBarDetached
-            attachZoneProvider: shell.dockScreenRect
+            attachZoneProvider: shell.panelBarScreenRect
             // 面板自己标题行那颗 ✕：跟手/独立态下它也必须走"回附 + 关窗"（否就只收起主窗口那半边，
             // 内容留在副窗口里 = 状态自相矛盾）；附着态照旧只收起右栏。
             onCloseRequested: {
@@ -505,7 +520,7 @@ Item {
             }
 
             // 右栏内容：面板坞（主界面 + 块/页签；网页块内部才用 WebEngine）
-            PanelDock {
+            PanelBarDockView {
                 id: dock
                 anchors.fill: parent
             }
@@ -521,7 +536,7 @@ Item {
     }
 
     // （这里曾有"按块脱离"的接线：抓手把某个块拖出去成独立窗口。抓手现在拖的是**整个右栏**，
-    //   那条链连同 PanelDockModel 的 requestDetach/setDetachPreview/detachedBlocks 一起删了。）
+    //   那条链连同 PanelBarDockModel 的 requestDetach/setDetachPreview/detachedBlocks 一起删了。）
 
     // （这里曾有"一块一扇窗"的 Repeater + DetachedBlockWindow 委托：属于"按块脱离"，
     //   已随那条链一起删除。现在只有 PanelBarWindow 一扇副窗口，装的就是整个右栏。）
@@ -547,7 +562,7 @@ Item {
     //
     // ⚠️ 两条踩过的坑（都在真机拖拽日志里实测到，症状都是"只能往右拖一点、往左没反应"）：
     //   ① 可见性/可用性**绝对不能挂在 panelBarT 上**：宽度一变，panelBarFull 先更新、
-    //      rightInset 差一拍，T 会瞬时掉到 302/311≈0.97 ⇒ visible 抖成 false ⇒ MouseArea 抓取
+    //      panelBarInset 差一拍，T 会瞬时掉到 302/311≈0.97 ⇒ visible 抖成 false ⇒ MouseArea 抓取
     //      被取消，后续 move 全丢（日志：[drag-ev] move … → [drag-ev] canceled）。
     //      所以这里只认 Hub.panelBarOpen 这个稳定布尔量。
     //   ② 拖动期间位置要**冻结**：拖柄跟着面板走 = 在光标底下位移，同样会打断抓取。

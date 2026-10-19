@@ -1,6 +1,6 @@
 // 右侧栏（面板坞）：顶栏那颗 ◫ 开关；展开时把「顶栏卡片 + 会话卡片」一起压窄。
 //
-// 为什么"压窄"由 Shell 驱动、面板自己只做位移 + 淡入（见 Shell.qml 的 rightInset）：
+// 为什么"压窄"由 Shell 驱动、面板自己只做位移 + 淡入（见 Shell.qml 的 panelBarInset）：
 //   · 压窄是**布局**（顶栏与会话区必须一起变窄），只有父层能推动；
 //   · 面板是固定宽的卡片，滑动期间若改自己的 width，里面的文字每帧都要重排（白花 CPU 且会闪），
 //     只改 x/opacity 的话每帧就一次平移。
@@ -20,9 +20,9 @@ Item {
     // 内容注入点：外部子项落到 body 里（不是落到卡片根上）
     default property alias contentData: body.data
     // 头部标题
-    property string title: qsTrId("right_sidebar_title")
+    property string title: qsTrId("panelBar_title")
     // 没有注入内容时的占位
-    property string emptyHint: qsTrId("right_sidebar_empty_hint")
+    property string emptyHint: qsTrId("panelBar_empty_hint")
     // 关闭请求：Shell 接到 Hub.closePanelBar()
     signal closeRequested()
 
@@ -152,11 +152,23 @@ Item {
                     }
                 }
 
+                // 扩展停靠位（右栏）—— 扩展自绘的入口注入到这里，登记名 `panelBarDock.extDock`。
+                // 与 `sessionBar.extDock` 同构：一个 **Row（位置器）** ⇒ 扩展 QML 只给宽高、不写 x/y/anchors；
+                // 没有扩展注入时宽度为 0，标题照常占满。这里只做"提供一个位置"，不加任何方法。
+                Row {
+                    id: extDock
+                    anchors.right: headerButtons.left
+                    anchors.rightMargin: Theme.spacing.labelGap
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacing.labelGap
+                    Component.onCompleted: HostUi.registerItem("panelBarDock.extDock", extDock)
+                }
+
                 Text {
                     id: titleText
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.spacing.columnClearance
-                    anchors.right: headerButtons.left
+                    anchors.right: extDock.left
                     anchors.rightMargin: Theme.spacing.columnClearance
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.title
@@ -167,7 +179,7 @@ Item {
                     elide: Text.ElideRight
                 }
 
-                // 面板的「三个点」抓手：从 PanelDock.qml 的页签条搬到这里（需求 ②）。
+                // 面板的「三个点」抓手：从 PanelBarDockView.qml 的页签条搬到这里（需求 ②）。
                 //
                 // 为什么搬：原来它锚在页签条 `⌂` 右边 6px，而页签条 Flickable 锚在 `⌂` 右边 4px、
                 // **声明在后面 ⇒ 画在上层**，把只有 ~30px 宽的三点整个盖住了（用户看不见三点）。
@@ -184,7 +196,7 @@ Item {
                     anchors.horizontalCenter: header.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     // 三点**常驻**（需求 ①）：只要右栏这张卡片在显示，三个点就在。
-                    // 上一版那条 `!Dock.homeVisible && Dock.activeIndex >= 0 && !activeDetached` 是
+                    // 上一版那条 `!PanelBarDock.homeVisible && PanelBarDock.activeIndex >= 0 && !activeDetached` 是
                     // "按块脱离"时代的可见性（坞里没块就没得拖）—— 现在拖的是**整个右栏**，
                     // 与坞里有没有活动块无关，所以整条去掉（`enabled: visible` 照旧）。
                     visible: root.visible
@@ -218,7 +230,7 @@ Item {
                     // 「右栏附着时所在的屏幕矩形」：回附方向的落点判定基准。
                     // 由 Shell 注入（它才知道主窗口与壳层几何）；**现算**而不是缓存成属性 ——
                     // 主窗口被搬动/改尺寸后属性绑定不会重算（那是 C++ 侧改的窗口坐标）。
-                    // ⚠️ 这里必须用 root（本文件根 id）：上一轮从 PanelDock.qml 抄过来时写的是 `dock`，
+                    // ⚠️ 这里必须用 root（本文件根 id）：上一轮从 PanelBarDockView.qml 抄过来时写的是 `dock`，
                     //    未定义 ⇒ 整张 PanelBar 编译失败 ⇒ Shell 报 "Type PanelBar unavailable"，
                     //    表现是**整个窗口空白**（踩过一次）。
                     function attachZone() {

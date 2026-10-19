@@ -228,6 +228,9 @@
     <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
+    <ClCompile Include="src\ExtensionSystem\ExtensionToolHost.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
     <ClCompile Include="3rdparty\libvterm\src\encoding.c">
       <Filter>3rdparty\libvterm\src</Filter>
     </ClCompile>
@@ -285,6 +288,9 @@
       <Filter>src\core</Filter>
     </ClInclude>
     <ClInclude Include="include\ExtensionSystem\ExtensionInstallTask.h">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ExtensionSystem\ExtensionToolHost.h">
       <Filter>src\core</Filter>
     </ClInclude>
     <ClInclude Include="include\common\util\CodeHighlighter.h">
@@ -377,6 +383,9 @@
       <Filter>src\core</Filter>
     </QtMoc>
     <QtMoc Include="include\ExtensionSystem\DshNamedPipeBridge.h">
+      <Filter>src\core</Filter>
+    </QtMoc>
+    <QtMoc Include="include\ExtensionSystem\ExtensionToolHost.h">
       <Filter>src\core</Filter>
     </QtMoc>
     <QtMoc Include="include\network\SessionPrefetcher.h">

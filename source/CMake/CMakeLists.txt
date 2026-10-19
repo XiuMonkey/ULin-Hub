@@ -62,9 +62,11 @@ set(QT_FIND_PRIVATE_MODULES ON)
 # .vcxproj 上用的是 6.11.2_msvc2022_64。
 #
 # Qml/Quick：QML 壳（docs/ui-qml-migration-plan.md）跑在 QQmlApplicationEngine 上，必须显式链。
-# QuickControls2/Layouts/Effects 等按 M2 起用到时再加（那些既有 C++ 库也有各自的 QML 模块，
-# 发行版还要把 Qt 的 qml/ 目录部署到 exe 同目录 —— 见 misc/tools/deploy-qml-runtime.ps1 的说明）。
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Network WebSockets Qml Quick)
+# WebChannel：TerminalBridge.cpp 把桥注册到 QWebChannel（右栏终端的页面通道），vcxproj 侧
+# 由 webenginequick 带进来，CMake 侧必须显式声明，否则编到 TerminalBridge.cpp 就 C1083。
+# WebEngineQuick：main.cpp 在 QApplication 之前调 QtWebEngineQuick::initialize()（网页/终端块
+# 要真视图），同样必须显式列，否则链接期缺符号。
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Network WebSockets Qml Quick WebChannel WebEngineQuick)
 
 # 打开 AUTOMOC / AUTOUIC / AUTORCC 并把 C++ 标准等默认值设好。
 qt_standard_project_setup()
@@ -153,7 +155,9 @@ target_link_libraries(ulinhub PRIVATE
 	Qt6::Network
 	Qt6::WebSockets
 	Qt6::Qml
-	Qt6::Quick)
+	Qt6::Quick
+	Qt6::WebChannel
+	Qt6::WebEngineQuick)
 
 # Qt 私有头：src/ExtensionSystem/ExtensionLoader.cpp 用了
 # <QtCore/private/qzipreader_p.h>（解压 .ext 包），全项目仅此一处。
@@ -228,10 +232,13 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestTranslationManager.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestServerManager.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestClientExtension.cpp"
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestExtensionToolHost.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/Thunk.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/DllCaller.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/ComCaller.cpp"
 		"${ULINHUB_ROOT}/src/ExtensionSystem/ClientExtension.cpp"
+		"${ULINHUB_ROOT}/src/ExtensionSystem/DshNamedPipeBridge.cpp"
+		"${ULINHUB_ROOT}/src/ExtensionSystem/ExtensionToolHost.cpp"
 		"${ULINHUB_ROOT}/src/network/DshEventParser.cpp"
 		"${ULINHUB_ROOT}/src/common/util/CodeHighlighter.cpp"
 		"${ULINHUB_ROOT}/src/common/util/MarkdownPreprocess.cpp"
@@ -244,7 +251,6 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/src/common/settings/ClientSettings.cpp"
 		"${ULINHUB_ROOT}/src/common/util/Logger.cpp"
 		"${ULINHUB_ROOT}/src/common/appearance/TranslationManager.cpp"
-		"${ULINHUB_ROOT}/src/ui/TranslationUi.cpp"
 		"${ULINHUB_ROOT}/src/core/ServerManager.cpp"
 		# ServerManager.cpp 与 DshApiClient.cpp 都经 dshRegister 引用 ConnectionManager::instance()，
 		# 所以测试目标也必须编它，否则 LNK2019（理由同上一条）。
@@ -273,6 +279,8 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/include/network/SessionPrefetcher.h"
 		"${ULINHUB_ROOT}/include/common/appearance/TranslationManager.h"
 		"${ULINHUB_ROOT}/include/core/ServerManager.h"
+		"${ULINHUB_ROOT}/include/ExtensionSystem/DshNamedPipeBridge.h"
+		"${ULINHUB_ROOT}/include/ExtensionSystem/ExtensionToolHost.h"
 		"${ULINHUB_ROOT}/include/common/util/ConnectionManager.h"
 		"${ULINHUB_ROOT}/include/common/util/CommonRegistry.h")
 

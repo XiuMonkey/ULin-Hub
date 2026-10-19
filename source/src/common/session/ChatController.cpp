@@ -7,7 +7,14 @@
 
 #include "network/SessionCommands.h"
 
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
+#include <QTemporaryFile>
+#include <QUuid>
+#include <QUrl>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTimer>
@@ -119,6 +126,10 @@ ChatController::ChatController(DshApiClient* api, QObject* parent)
 	, m_api(api)
 	, m_messages(new MessageListModel(this))
 {
+	// 附件临时物统一落在 <exe>/temp/ulinhub-attachments（与引擎残留同一层管理）：
+	// 启动清一次，避免长期使用后无限堆积；消息里的图片缺失时会按需重新拉取。
+	QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/temp/ulinhub-attachments"))
+		.removeRecursively();
 	connect(m_messages, &QAbstractItemModel::modelReset, this, &ChatController::messagesChanged);
 	connect(m_messages, &QAbstractItemModel::rowsInserted, this, &ChatController::messagesChanged);
 
@@ -145,12 +156,160 @@ ChatController::ChatController(DshApiClient* api, QObject* parent)
 // 原来这段在 QML 单例里，会让"接线类"同时承担发送策略与自愈状态机 —— 那是业务，不是接线。
 // ------------------------------------------------------------------
 
+// ---- 图片附件 ----
+
+namespace {
+// 记录里的图片块：event.data.message.content[] = { type:"image", attachment:{attachmentId, mediaType} }
+QVector<MessageListModel::ImageRef> imagesFromContent(const QJsonObject& event)
+{
+	QVector<MessageListModel::ImageRef> images;
+	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
+	QJsonObject message = data.value(QStringLiteral("message")).toObject();
+	if (message.isEmpty())
+		message = data;
+	const QJsonArray blocks = message.value(QStringLiteral("content")).toArray();
+	for (const QJsonValue& value : blocks) {
+		const QJsonObject block = value.toObject();
+		if (block.value(QStringLiteral("type")).toString() != QLatin1String("image"))
+			continue;
+		const QJsonObject attachment = block.value(QStringLiteral("attachment")).toObject();
+		MessageListModel::ImageRef ref;
+		ref.attachmentId = attachment.value(QStringLiteral("attachmentId")).toString();
+		ref.mediaType = attachment.value(QStringLiteral("mediaType")).toString();
+		if (!ref.attachmentId.isEmpty())
+			images.append(ref);
+	}
+	return images;
+}
+} // namespace
+
+QVector<MessageListModel::ImageRef> ChatController::extractEventImages(const QJsonObject& event)
+{
+	return imagesFromContent(event);
+}
+
+void ChatController::addImageFiles(const QVariantList& urls)
+{
+	for (const QVariant& value : urls) {
+		const QString raw = value.toString();
+		const QUrl url = raw.startsWith(QLatin1String("file:")) ? QUrl(raw) : QUrl::fromLocalFile(raw);
+		const QString path = url.toLocalFile();
+		QFile file(path);
+		if (path.isEmpty() || !file.open(QIODevice::ReadOnly))
+			continue;
+		const QByteArray bytes = file.readAll();
+		if (bytes.isEmpty())
+			continue;
+		const QString suffix = QFileInfo(path).suffix().toLower();
+		QString mediaType;
+		if (suffix == QLatin1String("png"))
+			mediaType = QStringLiteral("image/png");
+		else if (suffix == QLatin1String("jpg") || suffix == QLatin1String("jpeg"))
+			mediaType = QStringLiteral("image/jpeg");
+		else if (suffix == QLatin1String("webp"))
+			mediaType = QStringLiteral("image/webp");
+		else if (suffix == QLatin1String("gif"))
+			mediaType = QStringLiteral("image/gif");
+		else
+			continue;   // 协议只接受这四种 image mediaType
+
+		const QString data = QString::fromLatin1(bytes.toBase64());
+		QVariantMap entry;
+		entry.insert(QStringLiteral("name"), QFileInfo(path).fileName());
+		entry.insert(QStringLiteral("mediaType"), mediaType);
+		entry.insert(QStringLiteral("data"), data);
+		// 预览走临时文件（超长 data URL 会让 QML 的 Image 解码失败）
+		const QString previewDir =
+			QCoreApplication::applicationDirPath() + QStringLiteral("/temp/ulinhub-attachments/previews");
+		QDir().mkpath(previewDir);
+		const QString previewPath = previewDir
+			+ QStringLiteral("/preview-")
+			+ QUuid::createUuid().toString(QUuid::WithoutBraces)
+			+ QLatin1Char('.')
+			+ (mediaType.endsWith(QLatin1String("jpeg")) ? QStringLiteral("jpg") : suffix);
+		QFile previewFile(previewPath);
+		QString preview;
+		if (previewFile.open(QIODevice::WriteOnly)) {
+			previewFile.write(bytes);
+			previewFile.close();
+			preview = QUrl::fromLocalFile(previewPath).toString();
+			qInfo().noquote() << "[Chat] preview ->" << previewPath;
+		} else {
+			qWarning().noquote() << "[Chat] preview write failed:" << previewPath;
+		}
+		entry.insert(QStringLiteral("preview"), preview);
+		m_pendingImages.append(entry);
+	}
+	if (!m_pendingImages.isEmpty()) {
+		qInfo().noquote() << "[Chat] pending images:" << m_pendingImages.size();
+		emit pendingAttachmentsChanged();
+	}
+}
+
+void ChatController::removePendingAttachment(int index)
+{
+	if (index < 0 || index >= m_pendingImages.size())
+		return;
+	m_pendingImages.removeAt(index);
+	emit pendingAttachmentsChanged();
+}
+
+void ChatController::clearPendingAttachments()
+{
+	if (m_pendingImages.isEmpty())
+		return;
+	m_pendingImages.clear();
+	emit pendingAttachmentsChanged();
+}
+
+QString ChatController::attachmentSource(const QString& attachmentId)
+{
+	if (attachmentId.isEmpty())
+		return QString();
+	const auto cached = m_attachmentSources.constFind(attachmentId);
+	if (cached != m_attachmentSources.constEnd())
+		return cached.value();
+	if (m_attachmentInFlight.contains(attachmentId) || m_sessionId.isEmpty() || !m_api)
+		return QString();
+
+	m_attachmentInFlight.insert(attachmentId);
+	m_api->callMethod(QStringLiteral("session/attachment"),
+		SessionCommands::sessionAttachment(m_sessionId, attachmentId),
+		[this, attachmentId](const QJsonObject& result) {
+			m_attachmentInFlight.remove(attachmentId);
+			const QJsonObject attachment = result.value(QStringLiteral("attachment")).toObject();
+			const QString mediaType = attachment.value(QStringLiteral("mediaType")).toString();
+			QByteArray bytes = QByteArray::fromBase64(result.value(QStringLiteral("data")).toString().toLatin1());
+			if (bytes.isEmpty())
+				return;
+			QString suffix = mediaType.section(QLatin1Char('/'), -1);
+			if (suffix == QLatin1String("jpeg"))
+				suffix = QStringLiteral("jpg");
+			const QString dir =
+				QCoreApplication::applicationDirPath() + QStringLiteral("/temp/ulinhub-attachments/attachments");
+			QDir().mkpath(dir);
+			const QString path = dir + QStringLiteral("/attach-") + attachmentId + QLatin1Char('.') + suffix;
+			QFile file(path);
+			if (!file.open(QIODevice::WriteOnly))
+				return;
+			file.write(bytes);
+			file.close();
+			m_attachmentSources.insert(attachmentId, QUrl::fromLocalFile(path).toString());
+			emit attachmentSourceReady(attachmentId);
+		},
+		[this, attachmentId](const DshApiClient::RpcError& error) {
+			m_attachmentInFlight.remove(attachmentId);
+			qWarning().noquote() << "[Chat] session/attachment failed:" << error.code << error.message;
+		});
+	return QString();
+}
+
 void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	const std::function<void()>& restartServer,
 	const std::function<void(const QString&)>& setStatusLine)
 {
 	const QString trimmed = text.trimmed();
-	if (trimmed.isEmpty() || sessionId.isEmpty() || !m_api)
+	if ((trimmed.isEmpty() && m_pendingImages.isEmpty()) || sessionId.isEmpty() || !m_api)
 		return;
 
 	// 会话 id 是入参（当前会话归宿主 qmlbridge），但本类内部的 m_sessionId 也得跟上：
@@ -167,12 +326,41 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 		return;
 	}
 
+	// 组装 image 部件与模型引用（发送后清空待发列表）
+	QJsonArray imageParts;
+	QVector<MessageListModel::ImageRef> imageRefs;
+	for (const QVariant& value : m_pendingImages) {
+		const QVariantMap entry = value.toMap();
+		QJsonObject part;
+		part.insert(QStringLiteral("type"), QStringLiteral("image"));
+		part.insert(QStringLiteral("mediaType"), entry.value(QStringLiteral("mediaType")).toString());
+		part.insert(QStringLiteral("data"), entry.value(QStringLiteral("data")).toString());
+		if (!entry.value(QStringLiteral("name")).toString().isEmpty())
+			part.insert(QStringLiteral("name"), entry.value(QStringLiteral("name")).toString());
+		imageParts.append(part);
+		MessageListModel::ImageRef ref;
+		ref.attachmentId = entry.value(QStringLiteral("id")).toString();
+		ref.mediaType = entry.value(QStringLiteral("mediaType")).toString();
+		imageRefs.append(ref);
+	}
+	if (!m_pendingImages.isEmpty()) {
+		m_pendingImages.clear();
+		emit pendingAttachmentsChanged();
+	}
+
 	beginTurn();  // 用户消息立即上屏（旧壳同语义：user/message 不重复画；applyStreamEvent 无此分支）
 	if (m_messages)
-		m_messages->appendUser(trimmed);
+		m_messages->appendUserWithImages(trimmed, imageRefs);
 
+	if (!qEnvironmentVariableIsEmpty("DSH_ULIN_ATTACH_PROBE")) {
+		const QJsonObject payload = SessionCommands::sessionPrompt(sessionId, trimmed, imageParts);
+		const QByteArray json = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+		qInfo().noquote() << "[Chat] prompt payload bytes:" << json.size()
+			<< "images:" << imageParts.size()
+			<< "preview:" << QString::fromUtf8(json).left(240);
+	}
 	m_api->callMethod(QStringLiteral("session/prompt"),
-		SessionCommands::sessionPrompt(sessionId, trimmed),
+		SessionCommands::sessionPrompt(sessionId, trimmed, imageParts),
 		[](const QJsonObject&) {},
 		[this, trimmed, sessionId, restartServer, setStatusLine](const DshApiClient::RpcError& error) {
 			// 与旧壳同一文案（chat_send_failed_fmt）；同时记一行，便于看清服务端拒绝的原因
@@ -393,8 +581,9 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 		if (isHiddenContextUserMessage(event))
 			return;
 		const QString text = extractEventText(event).trimmed();
-		if (!text.isEmpty())
-			m_messages->appendUser(text);
+		const QVector<MessageListModel::ImageRef> images = extractEventImages(event);
+		if (!text.isEmpty() || !images.isEmpty())
+			m_messages->appendUserWithImages(text, images);
 		return;
 	}
 

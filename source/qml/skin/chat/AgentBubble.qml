@@ -160,6 +160,8 @@ Item {
                                 selectionColor: Theme.color.selectionBg
                                 selectedTextColor: Theme.color.textPrimary
                                 font.family: "Microsoft YaHei UI"
+                                // 正文 13px（用户要"小一些"）：官方的 markdown base 是 14，
+                                // 但本版按用户口径收到 body 这一档，行距观感更紧凑。
                                 font.pixelSize: Theme.font.body
                                 // ⚠️ 这里不能写 lineHeight —— 那是 Text 专有属性，TextEdit 没有；
                                 //    写上会让整个 AgentBubble 变成 "Type AgentBubble unavailable"，

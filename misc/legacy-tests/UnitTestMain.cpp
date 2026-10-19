@@ -28,6 +28,7 @@
 #include "TestTranslationManager.h"
 #include "TestServerManager.h"
 #include "TestClientExtension.h"
+#include "TestExtensionToolHost.h"
 
 namespace
 {
@@ -137,6 +138,11 @@ int main(int argc, char* argv[])
 	{
 		TestClientExtension test;
 		runClass(&test, "TestClientExtension");
+	}
+
+	{
+		TestExtensionToolHost test;
+		runClass(&test, "TestExtensionToolHost");
 	}
 
 	return status;

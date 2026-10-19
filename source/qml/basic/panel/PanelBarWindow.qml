@@ -46,7 +46,7 @@ Window {
     readonly property alias panelSlot: slot
 
     // 任务栏/Alt+Tab 上显示的名字（窗口没有自绘标题栏，这是唯一的窗口名来源）
-    title: qsTrId("right_sidebar_title")
+    title: qsTrId("panelBar_title")
     // 无边框：系统标题栏/边框/按钮全不要，最小化/最大化/关闭与四边缩放都在本文件里自己做
     flags: Qt.Window | Qt.FramelessWindowHint
     // 显示条件：跟着光标走（拿起来）或已确认脱离（独立）。两态都由 Shell 给
@@ -403,7 +403,7 @@ Window {
     // host.panelBarInWindow 那条绑定完成。
     onClosing: (close) => {
         close.accepted = true
-        console.log("[sidebar-detach] window closing")
+        console.log("[panelBar-detach] window closing")
         win.closeWindow()
     }
 
@@ -415,7 +415,7 @@ Window {
         // 用 attachAuxWindow（**附加**窗口）：attachWindow 会把"主窗口"换成这扇窗，
         // WindowBridge 的窗口动作与可绑定属性都只认主窗口，换掉就是罪状级 bug。
         WindowBridge.attachAuxWindow(win)
-        console.log("[sidebar-detach] window created " + win.width + "x" + win.height
+        console.log("[panelBar-detach] window created " + win.width + "x" + win.height
                     + " at " + win.x + "," + win.y)
     }
 }

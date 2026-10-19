@@ -9,6 +9,7 @@
 // PanelDockModel / PluginMarketController / StyleResolver）搬去 common/**，本文件只留下接线与转调。
 
 #include "qmlbridge/QmlBridge.h"
+#include "ExtensionSystem/HostUi.h"
 
 #include "common/session/ChatController.h"
 #include "common/session/ToolsFilter.h"
@@ -60,7 +61,7 @@ void QmlBridge::init()
 	// 插件市场（M6）：HTTP 与解析走既有 PluginMarketClient / PluginMarketModel
 	m_plugins = new PluginMarketController(api, this);
 	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
-	m_extensions = new ExtensionManagerController(m_runtime->server(), this);
+	m_extensions = new ExtensionManagerController(m_runtime->server(), m_runtime->toolHost(), this);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
 	m_commands = new CommandController(api, this);
 	// 右栏「终端」块：会话对象由 TerminalBridge 按块 id 管，这里只把唯一的出站客户端交给它
@@ -184,6 +185,20 @@ void QmlBridge::wireChat()
 	connect(m_chat, &ChatController::olderChanged, this, &QmlBridge::olderChanged);
 	connect(m_chat, &ChatController::olderPrepended, this, &QmlBridge::olderPrepended);
 	connect(m_chat, &ChatController::catalogChanged, this, &QmlBridge::modelCatalogChanged);
+	// 扩展把产物（如截图）交给输入框：HostUi 只发信号，落到这里的待发附件列表
+	connect(&HostUi::instance(), &HostUi::composerFilesRequested, this, [this](const QStringList& paths) {
+		if (!m_chat || paths.isEmpty())
+			return;
+		QVariantList urls;
+		for (const QString& path : paths)
+			urls.append(QUrl::fromLocalFile(path).toString());
+		m_chat->addImageFiles(urls);
+	});
+	connect(m_chat, &ChatController::pendingAttachmentsChanged, this, &QmlBridge::pendingAttachmentsChanged);
+	connect(m_chat, &ChatController::attachmentSourceReady, this, [this](const QString&) {
+		++m_attachmentRevision;
+		emit attachmentRevisionChanged();
+	});
 }
 
 // ------------------------------------------------------------------
@@ -231,6 +246,8 @@ void QmlBridge::selectSession(const QString& sessionId)
 		return;
 
 	m_currentSessionId = sessionId;
+	if (DshApiClient* api = m_runtime->apiClient())
+		api->setCurrentSessionId(sessionId);   // 扩展经 VirtualMain 读
 
 	// 消息区换会话（清空 + 记住当前会话），再把跟随流切过去：首帧快照会由 ChatController 接收
 	m_chat->setSession(sessionId);
@@ -255,6 +272,41 @@ QString QmlBridge::currentSessionTitle() const
 // ------------------------------------------------------------------
 // 会话收发：转调 ChatController（发送策略/自愈都在那边）
 // ------------------------------------------------------------------
+
+QVariantList QmlBridge::pendingAttachments() const
+{
+	return m_chat ? m_chat->pendingAttachments() : QVariantList();
+}
+
+void QmlBridge::chooseImageFiles()
+{
+	const QStringList files = QFileDialog::getOpenFileNames(
+		nullptr, QStringLiteral("\u9009\u62e9\u56fe\u7247"), QString(),
+		QStringLiteral("\u56fe\u7247 (*.png *.jpg *.jpeg *.webp *.gif)"));
+	if (files.isEmpty())
+		return;
+	QVariantList urls;
+	for (const QString& file : files)
+		urls.append(QUrl::fromLocalFile(file).toString());
+	addAttachments(urls);
+}
+
+void QmlBridge::addAttachments(const QVariantList& urls)
+{
+	if (m_chat)
+		m_chat->addImageFiles(urls);
+}
+
+void QmlBridge::removeAttachment(int index)
+{
+	if (m_chat)
+		m_chat->removePendingAttachment(index);
+}
+
+QString QmlBridge::attachmentSource(const QString& attachmentId)
+{
+	return m_chat ? m_chat->attachmentSource(attachmentId) : QString();
+}
 
 void QmlBridge::sendPrompt(const QString& text)
 {

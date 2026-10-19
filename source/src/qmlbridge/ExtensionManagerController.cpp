@@ -3,6 +3,7 @@
 #include "common/util/ConnectionManager.h"
 #include "core/ServerManager.h"
 #include "ExtensionSystem/ClientExtension.h"
+#include "ExtensionSystem/ExtensionToolHost.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -13,9 +14,10 @@
 // 与旧壳 ExtensionManagerPopup 一一对应：
 //   populate() <-> populateList()、installFromFile() <-> installExtension()、pollInstall() <-> pollInstall()、
 //   removeSelected() <-> removeSelected()、cleanupResiduals() <-> cleanupResiduals()、refresh() <-> refresh()。
-ExtensionManagerController::ExtensionManagerController(ServerManager* server, QObject* parent)
+ExtensionManagerController::ExtensionManagerController(ServerManager* server, ExtensionToolHost* toolHost, QObject* parent)
 	: QObject(parent)
 	, m_server(server)
+	, m_toolHost(toolHost)
 {
 	m_installTimer = new QTimer(this);  // 与原版一致：100ms 轮询后台安装任务（非阻塞，主线程不卡）
 	m_installTimer->setInterval(100);
@@ -218,6 +220,9 @@ void ExtensionManagerController::pollInstall()
 	}
 
 	// 工具扩展：登记进 extensions.json；要重启服务端才生效（原版是无声自动重启，这里改成提示）
+	// Qt 侧立刻重扫：DLL 不必等服务端重启，重启后插件一连上管道就能调通。
+	if (m_toolHost)
+		m_toolHost->reload();
 	registry().registerInstalled(ext.pluginName);
 	populate();
 	setStatus(qtTrId("ext_install_success_fmt").arg(ext.pluginName));
@@ -245,6 +250,9 @@ bool ExtensionManagerController::removeSelected()
 	}
 
 	QString dirError;  // 工具扩展：目录删没删成功都清配置残留，否则 cordis.patch.yml 引用不存在的包
+	// 先卸 DLL 再删目录：Windows 上本进程还映射着 main.dll 时，删文件会失败
+	if (m_toolHost)
+		m_toolHost->unloadExtension(name);
 	const bool dirRemoved = registry().removeExtensionDirectory(name, &dirError);
 	const bool patchRemoved = ExtensionRegistry::removePatchEntry(registry().serverProfilePath(), name);
 	registry().unregisterInstalled(name);

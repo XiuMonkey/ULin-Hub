@@ -31,7 +31,10 @@ Item {
         visible: !root.shadowEnabled
         radius: root.radius
         color: root.color
-        border.width: root.bordered ? 1 : 0
+        // 官方所有"浮起面"的边不是 border，而是 `--dsw-elevation-stroke: 0 0 0 .5px` 的**半像素环**
+        // （见 dsh-client-ui-theme 的 gradient_shadow_text.css）。这里跟它同厚：0.5 逻辑px，
+        // 在 200% 缩放下正好 1 物理px —— 原来是 1 逻辑px = 2 物理px，卡片边缘看着比官方"硬一倍"。
+        border.width: root.bordered ? 0.5 : 0
         border.color: root.borderColor
     }
 

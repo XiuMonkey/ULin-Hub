@@ -31,6 +31,8 @@ class ChatController : public QObject
 {
 	Q_OBJECT
 	Q_PROPERTY(MessageListModel* messages READ messages CONSTANT)
+	// 待发图片：[{ name, mediaType, data(base64), preview(data URL) }]
+	Q_PROPERTY(QVariantList pendingAttachments READ pendingAttachments NOTIFY pendingAttachmentsChanged)
 	Q_PROPERTY(int messageCount READ messageCount NOTIFY messagesChanged)
 	Q_PROPERTY(bool streaming READ streaming NOTIFY streamingChanged)
 	// ---- 交互面板（M4b）：mux 上的 question/requested 与 approval/requested ----
@@ -108,6 +110,14 @@ public:
 
 	// QML 调用：提交提问答案（每项 {id, selected:[标签…], custom?}）；与旧壳的 answer 结构一致：
 	//   { sessionId, answer: { answers: [ {id, selected, custom?} ] } }
+	// ---- 图片附件（协议：session/prompt 的 image 部件；读回用 session/attachment）----
+	QVariantList pendingAttachments() const { return m_pendingImages; }
+	Q_INVOKABLE void addImageFiles(const QVariantList& urls);
+	Q_INVOKABLE void removePendingAttachment(int index);
+	Q_INVOKABLE void clearPendingAttachments();
+	// attachmentId -> file:// 源（异步取字节并落临时文件；首次返回空）
+	Q_INVOKABLE QString attachmentSource(const QString& attachmentId);
+
 	Q_INVOKABLE void submitAnswers(const QVariantList& answers);
 	// QML 调用：审批结果（true = allowed-once，false = rejected）
 	Q_INVOKABLE void respondApproval(bool allow);
@@ -126,6 +136,8 @@ public slots:
 
 signals:
 	void messagesChanged();
+	void pendingAttachmentsChanged();
+	void attachmentSourceReady(const QString& attachmentId);
 	void streamingChanged();
 	void turnFinished();
 	void statsLineChanged();
@@ -146,6 +158,7 @@ private:
 	void handleApprovalFrame(const QJsonObject& frame);
 	void rebuildFromRecords(const QJsonArray& records);
 	void applyHistoryEvent(const QJsonObject& event);
+	static QVector<MessageListModel::ImageRef> extractEventImages(const QJsonObject& event);
 	void applyStreamEvent(const QJsonObject& event);
 	// 回合收尾：无可见输出时补兜底提示，然后广播 turnFinished
 	void finishTurn();
@@ -168,6 +181,10 @@ private:
 		QString text;
 		QString toolName;
 	};
+
+	QVariantList m_pendingImages;
+	QHash<QString, QString> m_attachmentSources;
+	QSet<QString> m_attachmentInFlight;
 
 	DshApiClient* m_api = nullptr;
 	MessageListModel* m_messages = nullptr;

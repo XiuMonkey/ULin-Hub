@@ -201,13 +201,20 @@ namespace SessionCommands
 
 	// session/prompt -> args { request: { requestId, sessionId, mode, content } }；requestId 必填，由客户端铸 id、
 	// 服务端把它落到那条用户消息上。
-	inline QJsonObject sessionPrompt(const QString& sessionId, const QString& text)
+	// images：已构造好的图片部件 [{type:"image", mediaType, data(base64), name}]。
+	// 图片走**内联 base64**（协议 PromptContentPart 支持），不必先 upload。
+	inline QJsonObject sessionPrompt(const QString& sessionId, const QString& text,
+		const QJsonArray& images = QJsonArray())
 	{
 		QJsonArray content;
-		QJsonObject textPart;
-		textPart.insert(QStringLiteral("type"), QStringLiteral("text"));
-		textPart.insert(QStringLiteral("text"), text);
-		content.append(textPart);
+		if (!text.isEmpty()) {
+			QJsonObject textPart;
+			textPart.insert(QStringLiteral("type"), QStringLiteral("text"));
+			textPart.insert(QStringLiteral("text"), text);
+			content.append(textPart);
+		}
+		for (const QJsonValue& image : images)
+			content.append(image);
 
 		QJsonObject request;
 		request.insert(QStringLiteral("requestId"), QUuid::createUuid().toString(QUuid::WithoutBraces));
@@ -215,6 +222,17 @@ namespace SessionCommands
 		request.insert(QStringLiteral("mode"), QStringLiteral("queue"));
 		request.insert(QStringLiteral("content"), content);
 
+		QJsonObject args;
+		args.insert(QStringLiteral("request"), request);
+		return args;
+	}
+
+	// session/attachment -> args { request: { sessionId, attachmentId } }；回包 data 是 base64。
+	inline QJsonObject sessionAttachment(const QString& sessionId, const QString& attachmentId)
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("sessionId"), sessionId);
+		request.insert(QStringLiteral("attachmentId"), attachmentId);
 		QJsonObject args;
 		args.insert(QStringLiteral("request"), request);
 		return args;

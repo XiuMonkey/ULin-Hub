@@ -7,12 +7,12 @@
 //   · 块可以关（页签上的 ✕），关光了自动回主界面。
 //
 // 本文件是**纯 delegate**：块列表（增删、同类编号、活动索引收敛、关光了回主界面、kind 的中文名）
-// 全在 C++ 模型 source/src/common/shell/PanelDockModel.cpp，QML 面是单例 `Dock`；
+// 全在 C++ 模型 source/src/common/shell/PanelBarDockModel.cpp，QML 面是单例 `PanelBarDock`；
 // 这里只剩布局/绘制与那几个交互细节（✕ 的命中区、内容重放动画、内容路由）。
 //
 // ⚠️ 网页/终端块需要 Qt WebEngine：它是**运行时** QML 模块依赖（vcxproj 的 webenginequick +
 //    main.cpp 的 QtWebEngineQuick::initialize()）。缺了它这两个块会被降级成说明页，判定在
-//    C++ 侧（PanelDockModel::viewFor）—— 未 initialize 的构建里建 WebEngineView 是直接崩，
+//    C++ 侧（PanelBarDockModel::viewFor）—— 未 initialize 的构建里建 WebEngineView 是直接崩，
 //    不是报错，所以不能"先试后错"，判定权必须在决定装载之前。
 //
 // 子界面一律经 Style.url() 装载（本仓库的既有范式），**不用相对 import** —— 相对 import 拿不到
@@ -28,10 +28,10 @@ Item {
     // 块列表 / 显示状态都在模型里；这两个只读镜像**只为接信号**：
     // 值一变（开块、切块、回主界面）就重放一次内容动画。判定语义与搬家前一致 ——
     // 模型侧"值没变不发通知"，所以点当前块不会白播一次动画。
-    readonly property int activeIndex: Dock.activeIndex
-    readonly property bool homeVisible: Dock.homeVisible
+    readonly property int activeIndex: PanelBarDock.activeIndex
+    readonly property bool homeVisible: PanelBarDock.homeVisible
 
-    // （这里曾有 activeDetached：判断"当前块是否已脱离成独立窗口"，读 Dock.detachedBlocks。
+    // （这里曾有 activeDetached：判断"当前块是否已脱离成独立窗口"，读 PanelBarDock.detachedBlocks。
     //   那是"按块脱离"那条链的东西 —— 抓手现在拖的是**整个右栏**，链已删除。）
 
     // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
@@ -73,7 +73,7 @@ Item {
                 glyph: "⌂"
                 tooltip: "主界面"
                 selected: dock.homeVisible
-                onClicked: Dock.showHome()   // ⌂ 只切显示，块保留
+                onClicked: PanelBarDock.showHome()   // ⌂ 只切显示，块保留
             }
 
             // 块：横向排，多了可滚动
@@ -98,9 +98,9 @@ Item {
                     height: parent.height
                     spacing: 4
 
-                    // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 Dock.activeKind）
+                    // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 PanelBarDock.activeKind）
                     Repeater {
-                        model: Dock
+                        model: PanelBarDock
 
                         delegate: Rectangle {
                             id: block
@@ -117,11 +117,11 @@ Item {
                             height: row.height
                             width: Math.min(150, blockLabel.implicitWidth + 34)
                             radius: Theme.radius.small
-                            color: (!dock.homeVisible && block.index === Dock.activeIndex)
+                            color: (!dock.homeVisible && block.index === PanelBarDock.activeIndex)
                                    ? Theme.color.hoverBg : "transparent"
                             border.width: 1
                             // 当前块的那圈提示线走 inputBorder(10% 黑)：border 已收到 4%，当"选中提示"太浅
-                            border.color: (!dock.homeVisible && block.index === Dock.activeIndex)
+                            border.color: (!dock.homeVisible && block.index === PanelBarDock.activeIndex)
                                           ? Theme.color.inputBorder : "transparent"
 
                             Text {
@@ -163,10 +163,10 @@ Item {
                                         // 切块/收右栏只是解绑，终端进程继续跑 —— 所以只在这一条路上调它。
                                         // 后端被扩展顶替时也一样调：桥会把 closeBlock 转给扩展的后端
                                         Terminal.closeBlock(block.blockId)
-                                        Dock.close(block.index)
+                                        PanelBarDock.close(block.index)
                                     }
                                     else
-                                        Dock.activate(block.index)
+                                        PanelBarDock.activate(block.index)
                                 }
                             }
                         }
@@ -187,7 +187,7 @@ Item {
             width: parent.width
             // ⚠️ 夹 0 下界：这行原本是 `parent.height - tabStrip.height - 1`，而**首帧/尺寸未定**时
             //    父链（右栏卡片的 Column）还没有高度，算式会算出负数 —— 真机日志里出现过
-            //    `PanelDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
+            //    `PanelBarDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
             //    （启动器列、内容 Loader 都锚在它上面）会跟着变成负高；夹到 0 之后是"暂时没地方画
             //    内容"，可见行为与负高一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
             height: Math.max(0, parent.height - tabStrip.height - 1)
@@ -214,7 +214,7 @@ Item {
                 }
 
                 Repeater {
-                    model: Dock.launcherItems
+                    model: PanelBarDock.launcherItems
 
                     delegate: Rectangle {
                         id: launcherRow
@@ -256,7 +256,7 @@ Item {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: Dock.open(launcherRow.modelData.kind)
+                            onClicked: PanelBarDock.open(launcherRow.modelData.kind)
                         }
                     }
                 }
@@ -268,15 +268,15 @@ Item {
                 anchors.fill: parent
                 visible: !dock.homeVisible
 
-                // 内容路由：`kind → 视图` 的映射表在 C++（PanelDockModel::viewFor），这里只按 C++ 给的
+                // 内容路由：`kind → 视图` 的映射表在 C++（PanelBarDockModel::viewFor），这里只按 C++ 给的
                 // 那组值装机 —— 路由里不再出现任何 kind 字符串（与启动器表、中文块名同一条分层）。
                 // 活动块的那组值都绑在带通知的属性上，关掉活动块前面那块时会跟着重算，不会停在旧块上。
                 sourceComponent: {
-                    if (dock.homeVisible || Dock.activeIndex < 0)
+                    if (dock.homeVisible || PanelBarDock.activeIndex < 0)
                         return null
-                    if (Dock.activeViewPath.length === 0)
+                    if (PanelBarDock.activeViewPath.length === 0)
                         return placeholderComp  // 没有视图：未接入 or 缺运行时依赖（文案由 C++ 给）
-                    return Dock.activeViewBlockScoped ? blockScopedComp : plainComp
+                    return PanelBarDock.activeViewBlockScoped ? blockScopedComp : plainComp
                 }
             }
 
@@ -285,9 +285,9 @@ Item {
                 id: plainComp
                 Loader {
                     anchors.fill: parent
-                    source: Style.url(Dock.activeViewPath)
+                    source: Style.url(PanelBarDock.activeViewPath)
 
-                    // 扩展面板（VirtualPanelHost::OpenPanelUrl）的地址存在块记录里，这里**活绑**给面板
+                    // 扩展面板（kPanelBarDock 的 openUrl 写进块记录）的地址存在块记录里，这里**活绑**给面板
                     // 的 startUrl —— 与 blockScopedComp 把 blockId 绑给终端同一个手法：切到另一块同类
                     // 视图时 Loader 不重建，靠活绑定把新地址推下去。
                     // 用户自己开的浏览器块 URL 是空串 ⇒ openExternal 直接返回，行为与从前一致。
@@ -295,7 +295,7 @@ Item {
                     //    openExternal/startUrl），这时什么都不推，比抛 TypeError 好。
                     onLoaded: {
                         if (item && typeof item.openExternal === "function")
-                            item.startUrl = Qt.binding(function () { return Dock.activeViewUrl })
+                            item.startUrl = Qt.binding(function () { return PanelBarDock.activeViewUrl })
                     }
                 }
             }
@@ -309,11 +309,11 @@ Item {
                 id: blockScopedComp
                 Loader {
                     anchors.fill: parent
-                    source: Style.url(Dock.activeViewPath)
+                    source: Style.url(PanelBarDock.activeViewPath)
 
                     onLoaded: {
                         if (item)
-                            item.blockId = Qt.binding(function () { return Dock.activeBlockId })
+                            item.blockId = Qt.binding(function () { return PanelBarDock.activeBlockId })
                     }
                 }
             }
@@ -323,8 +323,8 @@ Item {
                 id: placeholderComp
                 PanelPlaceholder {
                     anchors.fill: parent
-                    title: Dock.activeTitle
-                    detail: Dock.activeViewDetail
+                    title: PanelBarDock.activeTitle
+                    detail: PanelBarDock.activeViewDetail
                 }
             }
         }

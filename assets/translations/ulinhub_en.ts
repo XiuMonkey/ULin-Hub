@@ -604,19 +604,19 @@
     <message id="settings_no_preset">
         <translation>(no preset available)</translation>
     </message>
-    <message id="sidebar_new_workspace">
+    <message id="sessionBar_new_workspace">
         <translation>New workspace</translation>
     </message>
-    <message id="sidebar_clear_sessions">
+    <message id="sessionBar_clear_sessions">
         <translation>Clear sessions</translation>
     </message>
-    <message id="sidebar_plugins">
+    <message id="sessionBar_plugins">
         <translation>Plugins</translation>
     </message>
-    <message id="sidebar_switch_theme">
+    <message id="sessionBar_switch_theme">
         <translation>Switch theme</translation>
     </message>
-    <message id="sidebar_ungrouped">
+    <message id="sessionBar_ungrouped">
         <translation>Ungrouped</translation>
     </message>
     <message id="toolfilter_group_toggle_tip">
@@ -670,14 +670,14 @@
     <message id="placeholder_session_hint">
         <translation>Pick one from the list on the left, or click ＋ to create one</translation>
     </message>
-    <message id="right_sidebar_title">
+    <message id="panelBar_title">
         <translation>Panel</translation>
     </message>
-    <message id="right_sidebar_empty_hint">
+    <message id="panelBar_empty_hint">
         <translation>Nothing here yet.
 Terminal, files and preview will show up in this panel.</translation>
     </message>
-    <message id="sidebar_no_sessions">
+    <message id="sessionBar_no_sessions">
         <translation>No sessions yet
 Click ＋ at the top right to create one</translation>
     </message>
@@ -699,8 +699,14 @@ Click ＋ at the top right to create one</translation>
     <message id="common_clear">
         <translation>Clear</translation>
     </message>
-    <message id="topbar_right_sidebar_tip">
-        <translation>Right sidebar</translation>
+    <message id="topbar_panelBar_tip">
+        <translation>Right panel</translation>
+    </message>
+    <message id="topbar_view_conversation">
+        <translation>Conversation</translation>
+    </message>
+    <message id="topbar_view_trace">
+        <translation>Trace</translation>
     </message>
     <message id="chat_session_busy_restarting">
         <translation>The previous process has not exited yet. Restarting the service and retrying…</translation>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN">
 <context>
@@ -563,7 +563,7 @@
         <translation>新会话将使用该预设；修改后对当前会话也会立即生效。</translation>
     </message>
     <message id="settings_server_address">
-        <translation>服务器地址</translation>
+        <translation>服务端地址</translation>
     </message>
     <message id="settings_server_address_hint">
         <translation>留空表示使用内置 DSH 服务；保存后需要重启服务生效。</translation>
@@ -604,19 +604,19 @@
     <message id="settings_no_preset">
         <translation>（无可用预设）</translation>
     </message>
-    <message id="sidebar_new_workspace">
+    <message id="sessionBar_new_workspace">
         <translation>新建工作区</translation>
     </message>
-    <message id="sidebar_clear_sessions">
+    <message id="sessionBar_clear_sessions">
         <translation>清空会话</translation>
     </message>
-    <message id="sidebar_plugins">
+    <message id="sessionBar_plugins">
         <translation>插件</translation>
     </message>
-    <message id="sidebar_switch_theme">
+    <message id="sessionBar_switch_theme">
         <translation>切换主题</translation>
     </message>
-    <message id="sidebar_ungrouped">
+    <message id="sessionBar_ungrouped">
         <translation>未分组</translation>
     </message>
     <message id="toolfilter_group_toggle_tip">
@@ -670,14 +670,14 @@
     <message id="placeholder_session_hint">
         <translation>在左侧列表里选一个，或点 ＋ 新建</translation>
     </message>
-    <message id="right_sidebar_title">
-        <translation>面板</translation>
+    <message id="panelBar_title">
+        <translation>右栏</translation>
     </message>
-    <message id="right_sidebar_empty_hint">
-        <translation>右侧栏还没有内容。
+    <message id="panelBar_empty_hint">
+        <translation>右栏还没有内容。
 终端、文件与预览会显示在这里。</translation>
     </message>
-    <message id="sidebar_no_sessions">
+    <message id="sessionBar_no_sessions">
         <translation>还没有会话
 点右上角 ＋ 新建</translation>
     </message>
@@ -699,8 +699,14 @@
     <message id="common_clear">
         <translation>清空</translation>
     </message>
-    <message id="topbar_right_sidebar_tip">
-        <translation>右侧栏</translation>
+    <message id="topbar_panelBar_tip">
+        <translation>右栏</translation>
+    </message>
+    <message id="topbar_view_conversation">
+        <translation>对话</translation>
+    </message>
+    <message id="topbar_view_trace">
+        <translation>轨迹</translation>
     </message>
     <message id="chat_session_busy_restarting">
         <translation>上一个进程还没退出，正在重启服务并重试…</translation>

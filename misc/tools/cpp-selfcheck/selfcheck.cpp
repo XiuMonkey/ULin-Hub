@@ -1,20 +1,23 @@
-// 搬家后的真 C++ 自检（不依赖 QML/引擎）：直接链接被测的 4 个 .cpp。
-// 覆盖：① UrlInput 规范化 ② PanelDockModel 的 open/close/activate/showHome + 视图表（kind → 视图）
-//       ③ PanelBarMetrics 的钳制/拖动公式（common/layout，自由函数）+ PanelBarLayout 转发层是否逐位一致。
+// 搬家后的真 C++ 自检（不依赖 QML/引擎）：直接链接被测的 .cpp。
+// 覆盖：① UrlInput 规范化 ② PanelBarDockModel 的 open/close/activate/showHome + 视图表（kind → 视图）
+//       ③ CodeHighlighter 的规则装载 + 别名归一。
 // 两个被测类都是"程序级唯一实例、刻意不析构"的单例（QML 单例注册要求活过引擎）⇒ 用 instance()。
 //
-// 路径已随"领域归位 2026-10-15"更新：模型搬去 common/**（PanelDockModel → common/shell），
-// 右栏宽度公式抽成 common/layout/PanelBarMetrics（自由函数），qmlbridge/PanelBarLayout 只剩转发。
-// 这正是能把它们搬出 QML 的理由：断言只需要 QtCore，不需要 QML 引擎。
+// 路径已随"领域归位 2026-10-15"更新：模型搬去 common/**（PanelBarDockModel → common/shell）。
+// 右侧栏宽度公式**不在本自检范围内**：2026-10-18 已归位到 QML（见下方 ③ 之前的说明）。
 
-#include "common/layout/PanelBarMetrics.h"
-#include "common/shell/PanelDockModel.h"
 #include "common/util/UrlInput.h"
-#include "qmlbridge/PanelBarLayout.h"
+#include "common/shell/PanelBarDockModel.h"
+#include "common/util/CodeHighlighter.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMetaObject>
+#include <QRegularExpression>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
@@ -63,10 +66,14 @@ static void urlCases()
 
 static void modelCases()
 {
-	std::printf("\n=== ② PanelDockModel（common/shell）===\n");
-	PanelDockModel& model = PanelDockModel::instance();
+	std::printf("\n=== ② PanelBarDockModel（common/shell）===\n");
+	PanelBarDockModel& model = PanelBarDockModel::instance();
+	// 自检模拟的是"带 WebEngine 的本构建"：main.cpp 启动时就是这么注入的。
+	// ⚠️ 少了这一行，viewFor 会把 browser/terminal 都降级成说明页，于是
+	//    "关前一块后活动块换成 T，视图跟着换"那条断言拿空 path 去比期望值 —— 恒 FAIL。
+	model.setWebEngineAvailable(true);
 	const auto title = [&model](int row) {
-		return model.data(model.index(row, 0), PanelDockModel::TitleRole).toString();
+		return model.data(model.index(row, 0), PanelBarDockModel::TitleRole).toString();
 	};
 	const auto count = [&model] { return model.rowCount(); };
 
@@ -97,13 +104,13 @@ static void modelCases()
 	check(count() == 1 && model.homeVisible(), QStringLiteral("⌂ 回主界面：homeVisible=true 且块保留"));
 
 	model.close(0);   // 收尾：把单例还原成"空 + 主界面"
-	check(PanelDockModel::kindLabel(QStringLiteral("browser")) == QStringLiteral("网页浏览"),
-	      QStringLiteral("中文块名在 C++ 侧"), PanelDockModel::kindLabel(QStringLiteral("browser")));
+	check(PanelBarDockModel::kindLabel(QStringLiteral("browser")) == QStringLiteral("网页浏览"),
+	      QStringLiteral("中文块名在 C++ 侧"), PanelBarDockModel::kindLabel(QStringLiteral("browser")));
 
 	// 视图表（kind → 视图）：路由的映射规则在 C++，QML 只按这组值装机，不再出现 kind 字符串
-	const PanelDockModel::ViewSpec browserView = PanelDockModel::viewFor(QStringLiteral("browser"), true);
-	const PanelDockModel::ViewSpec terminalView = PanelDockModel::viewFor(QStringLiteral("terminal"), true);
-	const PanelDockModel::ViewSpec filesView = PanelDockModel::viewFor(QStringLiteral("files"), true);
+	const PanelBarDockModel::ViewSpec browserView = PanelBarDockModel::viewFor(QStringLiteral("browser"), true);
+	const PanelBarDockModel::ViewSpec terminalView = PanelBarDockModel::viewFor(QStringLiteral("terminal"), true);
+	const PanelBarDockModel::ViewSpec filesView = PanelBarDockModel::viewFor(QStringLiteral("files"), true);
 	std::printf("    viewFor -> browser=[%s blockScoped=%d]  terminal=[%s blockScoped=%d]\n",
 	            browserView.path.toUtf8().constData(), browserView.blockScoped,
 	            terminalView.path.toUtf8().constData(), terminalView.blockScoped);
@@ -115,16 +122,16 @@ static void modelCases()
 	      QStringLiteral("files 没有视图 -> 走说明文案"), filesView.detail);
 
 	// 缺 WebEngine：只有依赖它的两个块降级成说明页（不能去建 WebEngineView），其余不受影响
-	const PanelDockModel::ViewSpec browserNoEngine = PanelDockModel::viewFor(QStringLiteral("browser"), false);
+	const PanelBarDockModel::ViewSpec browserNoEngine = PanelBarDockModel::viewFor(QStringLiteral("browser"), false);
 	check(browserNoEngine.path.isEmpty() && browserNoEngine.detail.contains(QStringLiteral("WebEngine")),
 	      QStringLiteral("缺 WebEngine -> browser 降级成说明页"), browserNoEngine.detail);
-	check(PanelDockModel::viewFor(QStringLiteral("files"), false).path == filesView.path,
+	check(PanelBarDockModel::viewFor(QStringLiteral("files"), false).path == filesView.path,
 	      QStringLiteral("缺 WebEngine 不影响 files"), filesView.path);
 
 	// 关掉活动块**前面**那块：索引不动但活动块换成原来的下一块（kind 也可能换）⇒ 视图那组值
 	// 必须一起通知。没有 activeViewChanged，QML 路由会停在旧视图上（这条是实测出来的坑）。
 	int viewSignals = 0;
-	QObject::connect(&model, &PanelDockModel::activeViewChanged, [&viewSignals] { ++viewSignals; });
+	QObject::connect(&model, &PanelBarDockModel::activeViewChanged, [&viewSignals] { ++viewSignals; });
 	model.showHome();
 	model.open(QStringLiteral("terminal"));   // [T]
 	model.open(QStringLiteral("browser"));    // [T, B]   active=1
@@ -139,48 +146,223 @@ static void modelCases()
 	check(model.activeKind() == QStringLiteral("terminal") && model.activeViewPath() == terminalView.path,
 	      QStringLiteral("关前一块后活动块换成 T，视图跟着换"), model.activeViewPath());
 
-	model.close(0);   // 收尾：还原成"空 + 主界面"
+	// ---- 插件界面块（启动器第四行）：与另外三个块同形，视图是浏览器面板，地址来自 pluginPageUrl ----
+	const QVariantList rows = model.launcherItems();
+	QStringList rowKinds;
+	for (const QVariant& row : rows)
+		rowKinds.append(row.toMap().value(QStringLiteral("kind")).toString());
+	check(rows.size() == 4 && rowKinds.contains(QStringLiteral("pluginUi")),
+	      QStringLiteral("启动器有四行且含插件界面"), rowKinds.join(QStringLiteral(",")));
+	const PanelBarDockModel::ViewSpec puView = PanelBarDockModel::viewFor(QStringLiteral("pluginUi"), true);
+	check(puView.path == QStringLiteral("basic/panelui/PluginUiPanel.qml"),
+	      QStringLiteral("插件界面块是原生面板（不是网页）"), puView.path);
+
+	// 原生面板不吃 pluginPageUrl：页面由面板里的按钮另开一块 browser 块
+	model.setPluginPageUrl(QStringLiteral("http://127.0.0.1:9/plugin/"));
+	model.open(QStringLiteral("pluginUi"));
+	check(model.activeViewUrl().isEmpty(),
+	      QStringLiteral("原生插件界面面板不吃 pluginPageUrl"), model.activeViewUrl());
 	model.close(0);
+	model.open(QStringLiteral("browser"));
+	check(model.activeViewUrl().isEmpty(),
+	      QStringLiteral("用户开的浏览器块也不受 pluginPageUrl 影响"), model.activeViewUrl());
+	model.close(0);
+	model.setPluginPageUrl(QString());
+	// ---- 带初始地址的块：openUrl 返回块 id / closeBlock 按 id 关 ----
+	// 语义：与 open("browser") 同一条路径，只多记一个初始地址并返回 id；模型不记"是谁开的"。
+	while (count() > 0)                      // 上面那组用例留下的块先清空，下面的绝对计数才好写
+		model.close(0);
+	model.showHome();
+	model.open(QStringLiteral("browser"));   // [U] 用户自己开的块（无初始地址）
+	const QString extAUrl = QStringLiteral("http://127.0.0.1:53232/plugin-ui/a/");
+	const QString extBUrl = QStringLiteral("http://127.0.0.1:53232/plugin-ui/b/");
+
+	const QString idA = model.openUrl(extAUrl, QStringLiteral("插件 A"));
+	check(!idA.isEmpty(), QStringLiteral("openUrl 返回块 id"), idA);
+	check(model.activeKind() == QStringLiteral("browser") && model.activeViewPath() == browserView.path,
+	      QStringLiteral("带地址的块就是 browser 块（不新增 kind）"), model.activeKind());
+	check(model.activeBlockId() == idA, QStringLiteral("返回的 id 就是活动块 id"), model.activeBlockId());
+	check(model.activeViewUrl() == extAUrl, QStringLiteral("activeViewUrl 跟着活动块"), model.activeViewUrl());
+	check(title(count() - 1) == QStringLiteral("插件 A"),
+	      QStringLiteral("给了标题就用它"), title(count() - 1));
+
+	check(model.openUrl(QString(), QStringLiteral("x")).isEmpty(),
+	      QStringLiteral("空 url 拒绝（开出来是空面板）"));
+	check(count() == 2, QStringLiteral("拒绝时不追加块"), QString::number(count()));
+
+	viewSignals = 0;
+	const QString idB = model.openUrl(extBUrl, QString());
+	check(viewSignals == 1, QStringLiteral("openUrl 与 open 同一节奏：activeViewChanged 只发 1 次"),
+	      QString::number(viewSignals));
+	check(title(count() - 1).startsWith(QStringLiteral("网页浏览")),
+	      QStringLiteral("空标题回落到内置块名 + 编号"), title(count() - 1));
+
+	const QStringList ids = model.blockIds();
+	check(ids.size() == 3 && ids.contains(idA) && ids.contains(idB),
+	      QStringLiteral("blockIds 按打开顺序给出全部 id"), ids.join(QStringLiteral(",")));
+
+	check(model.closeBlock(idA) && count() == 2, QStringLiteral("closeBlock 按 id 关"),
+	      QString::number(count()));
+	check(!model.closeBlock(idA), QStringLiteral("已关的 id 再关 = false（幂等）"));
+	check(model.activeViewUrl() == extBUrl,
+	      QStringLiteral("关掉前面那块后 activeViewUrl 跟着换（不串台）"), model.activeViewUrl());
+
+	check(model.closeBlock(idB) && count() == 1, QStringLiteral("关光后只剩用户块"), QString::number(count()));
+	check(model.activeViewUrl().isEmpty(),
+	      QStringLiteral("用户块的 activeViewUrl 恒为空（面板显示空态）"), model.activeViewUrl());
+
+	model.close(0);   // 收尾：还原成"空 + 主界面"
 	model.showHome();
 }
 
-static void sidebarCases()
+// ③ 已归位到 QML（2026-10-18）：右侧栏宽度那三条公式（会话区保底 / 上限 / 夹取）连同拖动换算
+//    搬回了 QML —— 它们唯一的消费者就是 Shell.qml，C++ 侧一个调用者都没有。
+//    现位置：source/qml/basic/shell/Shell.qml 的 conversationMinWidth / maxWidth / clampWidth
+//    （+ 壳层包装 widthFromDrag / setPanelBarWidth）。原来这里断言的 350、260、308 那几条只覆盖
+//    "min/max 组合是否写反"，真正的风险点（拖柄喂的是 panelBarEffW 还是 panelBarW、冻结位置的时序）
+//    一条也没覆盖，所以不另建 QML 侧测试基座，改为在那边靠真机跟手手感验收。
+//    ⚠️ 别为了"有断言"再把这几式搬回 C++：那会重新长出 common/layout + qmlbridge 转发层两套壳。
+
+// 读主题包里的字符串键（颜色都是字符串值）
+static QHash<QString, QString> loadPalette(const QString& path)
 {
-	std::printf("\n=== ③ PanelBarMetrics（common/layout，自由函数）+ PanelBarLayout 转发层 ===\n");
+	QHash<QString, QString> out;
+	QFile f(path);
+	if (!f.open(QIODevice::ReadOnly))
+		return out;
+	const QJsonObject obj = QJsonDocument::fromJson(f.readAll()).object();
+	for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+		if (it.value().isString())
+			out.insert(it.key(), it.value().toString());
+	}
+	return out;
+}
 
-	// ---- 算法本体：自由函数，没有 QObject、不碰 QML ----
-	const double convMin = PanelBarMetrics::conversationMinWidth(1232.0, 308.0);
-	const double maxW = PanelBarMetrics::maxWidth(1232.0, 260.0, convMin, 12.0, 311.0, 12.0);
-	const double dragLeft = PanelBarMetrics::widthFromDrag(100.0, 300.0, 50.0, 260.0, maxW);
-	const double dragRight = PanelBarMetrics::widthFromDrag(100.0, 300.0, 500.0, 260.0, maxW);
-	std::printf("    [PanelBarMetrics] convMin(1232,308)=%.1f  maxW=%.1f  dragL(50)=%.1f  dragR(500)=%.1f\n",
-	            convMin, maxW, dragLeft, dragRight);
-	check(qFuzzyCompare(convMin, 308.0), QStringLiteral("对话区保底 = min(token, 窗口*0.25)"), QString::number(convMin));
-	check(maxW >= 260.0, QStringLiteral("上限不低于最小宽度"), QString::number(maxW));
-	check(qFuzzyCompare(dragLeft, 350.0), QStringLiteral("往左拖 50 ⇒ 300->350（1:1）"), QString::number(dragLeft));
-	check(qFuzzyCompare(dragRight, 260.0), QStringLiteral("往右拖过头 ⇒ 夹在下限 260"), QString::number(dragRight));
-	check(qFuzzyCompare(PanelBarMetrics::clampWidth(10.0, 260.0, maxW), 260.0), QStringLiteral("低于下限夹到 min"));
-	check(qFuzzyCompare(PanelBarMetrics::clampWidth(9999.0, 260.0, maxW), maxW), QStringLiteral("超过上限夹到 max"));
+// ③ 语法高亮：规则文件的 PCRE2 兼容性 + 别名归一 + 几个"曾经踩过"的回归点。
+//    这些断言只依赖 QtCore（QRegularExpression 就是引擎本身），所以能放进这个纯 QtCore 自检里。
+static void highlightCases(const QString& repoRoot)
+{
+	std::printf("\n=== ③ CodeHighlighter（语法高亮规则 + 别名归一） ===\n");
 
-	// ---- QML 契约面：单例只转发 —— 与自由函数逐位比对（转发层少传/串了参数，这里会红）----
-	PanelBarLayout& layout = PanelBarLayout::instance();
-	const double bConvMin = layout.conversationMinWidth(1232.0, 308.0);
-	const double bMaxW = layout.maxWidth(1232.0, 260.0, bConvMin, 12.0, 311.0, 12.0);
-	const double bDragLeft = layout.widthFromDrag(100.0, 300.0, 50.0, 260.0, bMaxW);
-	const double bClamp = layout.clampWidth(9999.0, 260.0, bMaxW);
-	std::printf("    [PanelBarLayout 转发] convMin=%.1f  maxW=%.1f  dragL=%.1f  clamp(9999)=%.1f\n",
-	            bConvMin, bMaxW, bDragLeft, bClamp);
-	check(qFuzzyCompare(bConvMin, convMin) && qFuzzyCompare(bMaxW, maxW)
-	          && qFuzzyCompare(bDragLeft, dragLeft) && qFuzzyCompare(bClamp, maxW),
-	      QStringLiteral("单例与 PanelBarMetrics 逐位一致（qmlbridge 只转发）"));
+	const QString rulesPath = repoRoot + QStringLiteral("/assets/resources/config/highlight-rules.json");
+	CodeHighlighter& hl = CodeHighlighter::instance();
+	check(hl.loadFromFile(rulesPath), QStringLiteral("规则文件装载"), rulesPath);
+	check(hl.loadFromFile(rulesPath), QStringLiteral("重复装载不崩（先清空再读）"));
+
+	const auto hasSpan = [](const QString& html) { return html.contains(QLatin1String("<span style=\"color:")); };
+
+	// ---- 亮/暗两套语法色都来自主题包（规则里只写角色）----
+	const QHash<QString, QString> light = loadPalette(repoRoot + QStringLiteral("/assets/resources/styles/theme-light.json"));
+	const QHash<QString, QString> dark = loadPalette(repoRoot + QStringLiteral("/assets/resources/styles/theme-dark.json"));
+	check(!light.isEmpty() && !dark.isEmpty(), QStringLiteral("两个主题包都可读"));
+	check(light.contains(QStringLiteral("syntaxKeyword")) && dark.contains(QStringLiteral("syntaxKeyword")),
+	      QStringLiteral("主题包里有 syntax* 键"));
+	check(light.value(QStringLiteral("syntaxKeyword")) != dark.value(QStringLiteral("syntaxKeyword")),
+	      QStringLiteral("亮/暗语法关键字色不同"),
+	      light.value(QStringLiteral("syntaxKeyword")) + QStringLiteral(" vs ") + dark.value(QStringLiteral("syntaxKeyword")));
+
+	// 样例必须同时含"关键字 / 注释 / 内建"三类，否则断言取不到对应角色的色
+	const QString pyCode = QStringLiteral("# note\ndef f(x):\n    return print(len(x))\n");
+	hl.setThemeColors(light, false);
+	const QString lightHtml = hl.highlight(QStringLiteral("python"), pyCode);
+	check(lightHtml.contains(light.value(QStringLiteral("syntaxKeyword"))),
+	      QStringLiteral("亮色：关键字取亮色主题的 syntaxKeyword"), light.value(QStringLiteral("syntaxKeyword")));
+	check(lightHtml.contains(light.value(QStringLiteral("syntaxComment"))),
+	      QStringLiteral("亮色：注释取亮色主题的 syntaxComment"));
+
+	hl.setThemeColors(dark, true);
+	const QString darkHtml = hl.highlight(QStringLiteral("python"), pyCode);
+	check(darkHtml.contains(dark.value(QStringLiteral("syntaxKeyword"))),
+	      QStringLiteral("暗色：关键字取暗色主题的 syntaxKeyword"), dark.value(QStringLiteral("syntaxKeyword")));
+	check(darkHtml != lightHtml, QStringLiteral("换肤后同一段代码产出不同 HTML（缓存随主题失效）"));
+	check(!darkHtml.contains(light.value(QStringLiteral("syntaxKeyword"))),
+	      QStringLiteral("暗色结果里不含亮色色值"));
+
+	// 别名：fence 标签的写法千奇百怪，归一后必须落到同一套规则上
+	const QString pyCanonical = hl.highlight(QStringLiteral("python"), pyCode);
+	check(hasSpan(pyCanonical), QStringLiteral("python 有高亮"));
+	check(hl.highlight(QStringLiteral("py"), pyCode) == pyCanonical, QStringLiteral("别名 py -> python"));
+	check(hl.highlight(QStringLiteral("PY"), pyCode) == pyCanonical, QStringLiteral("别名大小写不敏感 PY -> python"));
+	check(hl.highlight(QStringLiteral("python title=demo"), pyCode) == pyCanonical,
+	      QStringLiteral("fence 带附加信息（只取第一个词）"));
+	check(hl.highlight(QStringLiteral("c++"), QStringLiteral("std::vector<int> v;"))
+	          == hl.highlight(QStringLiteral("cpp"), QStringLiteral("std::vector<int> v;")),
+	      QStringLiteral("别名 c++ -> cpp"));
+	check(hl.highlight(QStringLiteral("js"), QStringLiteral("const a = 1;"))
+	          == hl.highlight(QStringLiteral("typescript"), QStringLiteral("const a = 1;")),
+	      QStringLiteral("别名 js -> typescript（与官方一致：JS 家族共用 TS 语法）"));
+
+	// 回归：`<...>` 只该在 #include 里当文件头，不能把 std::vector<int> 的模板实参染成字符串
+	const QString cppHtml = hl.highlight(QStringLiteral("cpp"),
+		QStringLiteral("#include <vector>\nstd::vector<int> v;\n"));
+	check(cppHtml.contains(dark.value(QStringLiteral("syntaxKeyword"))),
+	      QStringLiteral("#include 走关键字色（预处理指令归 keyword）"));
+	check(!cppHtml.contains(dark.value(QStringLiteral("syntaxString"))),
+	      QStringLiteral("模板实参 <int> 不再被当成头文件字符串"));
+
+	// 未知语言 / 空语言：退回 default 规则，绝不抛、绝不空转
+	check(hasSpan(hl.highlight(QStringLiteral("no-such-lang"), QStringLiteral("x = 42"))),
+	      QStringLiteral("未知语言退回 default（仍有基础高亮）"));
+	check(hl.highlight(QString(), QStringLiteral("x = 42")) == hl.highlight(QStringLiteral("text"),
+		QStringLiteral("x = 42")), QStringLiteral("空语言 == text"));
+
+	// 高亮结果是"转义过的"，代码里的 < > & 不能原样进 RichText
+	const QString escaped = hl.highlight(QStringLiteral("cpp"), QStringLiteral("if (a < b && c > d) {}"));
+	check(escaped.contains(QLatin1String("&lt;")) && escaped.contains(QLatin1String("&amp;")),
+	      QStringLiteral("代码里的 < > & 被转义"));
+	check(escaped.startsWith(QLatin1String("<pre")), QStringLiteral("返回值自带 <pre> 包裹"));
+
+	// 主题包缺键时必须退到内置兜底表：这条断言防的是"高亮整片消失"（`<exe>/ui/` 旧主题包踩过）
+	hl.setThemeColors(QHash<QString, QString>(), true);
+	const QString plain = hl.highlight(QStringLiteral("python"), pyCode);
+	check(hasSpan(plain) && plain.contains(QLatin1String("#FAA2C1")),
+	      QStringLiteral("主题包缺键时退到内置兜底色（暗色 keyword #FAA2C1），高亮不消失"));
+	hl.setThemeColors(dark, true);   // 还原，避免影响后面的断言
+
+	// 规则文件体检：每条 pattern 都要能被 QRegularExpression 编译（否则该条永远不命中）
+	QFile f(rulesPath);
+	if (f.open(QIODevice::ReadOnly)) {
+		const QJsonObject langs = QJsonDocument::fromJson(f.readAll()).object()
+			.value(QStringLiteral("languages")).toObject();
+		int total = 0;
+		int invalid = 0;
+		int noRole = 0;
+		QString firstInvalid;
+		for (auto it = langs.constBegin(); it != langs.constEnd(); ++it) {
+			for (const QJsonValue& v : it.value().toArray()) {
+				const QJsonObject rule = v.toObject();
+				const QRegularExpression re(rule.value(QStringLiteral("pattern")).toString());
+				++total;
+				if (!re.isValid()) {
+					++invalid;
+					if (firstInvalid.isEmpty())
+						firstInvalid = it.key() + QStringLiteral(": ") + rule.value(QStringLiteral("pattern")).toString();
+				}
+				// 每条规则必须写角色（或显式 color 覆盖），否则渲染时不着色
+				if (rule.value(QStringLiteral("role")).toString().isEmpty()
+					&& rule.value(QStringLiteral("color")).toString().isEmpty())
+					++noRole;
+			}
+		}
+		std::printf("    [rules] 语言 %lld 个、规则 %d 条、PCRE2 编译失败 %d 条、缺角色 %d 条\n",
+		            static_cast<long long>(langs.size()), total, invalid, noRole);
+		check(total > 300, QStringLiteral("规则数量"), QString::number(total));
+		check(invalid == 0, QStringLiteral("全部规则都能被 PCRE2 编译"), firstInvalid);
+		check(noRole == 0, QStringLiteral("每条规则都写了角色"));
+	}
+	else {
+		check(false, QStringLiteral("规则文件可读"), rulesPath);
+	}
 }
 
 int main(int argc, char** argv)
 {
 	QCoreApplication app(argc, argv);
+	// 仓库根：selfcheck.exe 在 <repo>/build/cpp-selfcheck/，规则文件在 <repo>/assets/...
+	const QString repoRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/../../");
 	urlCases();
 	modelCases();
-	sidebarCases();
+	highlightCases(repoRoot);
 	std::printf("\n=== 合计：%s（失败 %d 项）===\n", g_fail == 0 ? "全部 PASS" : "有 FAIL", g_fail);
 	return g_fail == 0 ? 0 : 1;
 }

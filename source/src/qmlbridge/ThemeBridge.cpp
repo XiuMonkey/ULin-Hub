@@ -7,6 +7,7 @@
 #include "qmlbridge/ThemeBridge.h"
 
 #include "common/appearance/ThemeManager.h"
+#include "common/util/CodeHighlighter.h"
 
 #include <QColor>
 #include <QDebug>
@@ -139,7 +140,7 @@ namespace
 	QVariantMap defaultSize()
 	{
 		QVariantMap map;
-		map.insert(QStringLiteral("sessionBarWidth"), 240);            // Main.cpp kSidebarWidth
+		map.insert(QStringLiteral("sessionBarWidth"), 240);            // Main.cpp kSessionBarWidth
 		// 右侧栏（面板坞）宽度。⚠️ 新 token 必须**先在这里**登记：metrics.json 只是覆盖层，
 		// 未知键会被 overlayGroup 直接忽略 —— 只加 metrics.json 的话运行时读到 undefined，
 		// 表现是"面板不出现、压窄量算成 NaN"（踩过一次，日志/布局都正常但界面毫无反应）。
@@ -190,7 +191,7 @@ namespace
 	QVariantMap defaultShadow()
 	{
 		QVariantMap map;
-		map.insert(QStringLiteral("cardBlur"), 8);        // Main.cpp kSidebarShadow/kTopBarShadow = CardShadow::Spec{8, 2, 12}
+		map.insert(QStringLiteral("cardBlur"), 8);        // Main.cpp kSessionBarShadow/kTopBarShadow = CardShadow::Spec{8, 2, 12}
 		map.insert(QStringLiteral("cardDy"), 2);
 		map.insert(QStringLiteral("cardRadius"), 12);     // 必须等于 radius.panel（Main.cpp:134/176 setRadius(12)）
 		map.insert(QStringLiteral("inputBlur"), 8);       // 输入卡片阴影（原版 ChatInputWidget::shadowSpec = Spec{12,3,22}，收平到 Card 一档）
@@ -268,6 +269,10 @@ void ThemeBridge::rebuild()
 		}
 		m_color.insert(it.key(), parsed);
 	}
+
+	// 语法高亮的色值也走主题包（syntax* 键）：推给高亮器，换肤后代码块才能按新配色重渲染。
+	// 高亮器自己解析这些键（去掉 "syntax" 前缀 == 规则里的角色名），所以这里整包塞过去即可。
+	CodeHighlighter::instance().setThemeColors(palette, isDark());
 
 	m_radius = defaultRadius();  // 尺寸/圆角/字号/间距/阴影/动效：内置默认值 + metrics.json 覆盖
 	m_font = defaultFont();

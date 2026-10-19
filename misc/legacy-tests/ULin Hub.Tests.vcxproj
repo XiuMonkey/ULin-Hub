@@ -136,10 +136,13 @@
     <ClCompile Include="TestTranslationManager.cpp" />
     <ClCompile Include="TestServerManager.cpp" />
     <ClCompile Include="TestClientExtension.cpp" />
+    <ClCompile Include="TestExtensionToolHost.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\Thunk.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\DllCaller.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\ComCaller.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\ClientExtension.cpp" />
+    <ClCompile Include="..\source\src\ExtensionSystem\DshNamedPipeBridge.cpp" />
+    <ClCompile Include="..\source\src\ExtensionSystem\ExtensionToolHost.cpp" />
     <ClCompile Include="..\source\src\network\DshEventParser.cpp" />
     <ClCompile Include="..\source\src\common\util\CodeHighlighter.cpp" />
     <ClCompile Include="..\source\src\common\util\MarkdownPreprocess.cpp" />
@@ -175,8 +178,11 @@
     <QtMoc Include="TestTranslationManager.h" />
     <QtMoc Include="TestServerManager.h" />
     <QtMoc Include="TestClientExtension.h" />
+    <QtMoc Include="TestExtensionToolHost.h" />
     <QtMoc Include="..\source\include\network\DshApiClient.h" />
     <QtMoc Include="..\source\include\core\ServerManager.h" />
+    <QtMoc Include="..\source\include\ExtensionSystem\DshNamedPipeBridge.h" />
+    <QtMoc Include="..\source\include\ExtensionSystem\ExtensionToolHost.h" />
     <QtMoc Include="..\source\include\network\SessionPrefetcher.h" />
     <QtMoc Include="..\source\include\common\appearance\TranslationManager.h" />
     <QtMoc Include="..\source\include\common\util\CommonRegistry.h" />

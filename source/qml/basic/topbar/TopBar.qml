@@ -29,12 +29,12 @@ Item {
     // ---- 两行的高度 ----
     // 44 = 原来那一条顶栏的高度，标题与两颗图标按钮的垂直居中基准；**别改它**，
     // 改了标题/按钮会跟着整块高度一起沉。
-    // 下面那条胶囊行刻意做小（20 高、12px 字，比标题行小一号）：它是副信息，
-    // 早先按 26 高 + 12 底留白做出来顶栏 82，视觉上把整块撑得太高了（用户否掉的那版）。
+    // 下面那条视图切换行按官方分段控件收小（轨道高 28 = 标签 22 + 上下各 3）：
+    // 它仍是副信息，不能把顶栏撑回早期那版 82 的高度。
     readonly property int headerRowHeight: 44
-    readonly property int viewRowHeight: 20
+    readonly property int viewRowHeight: 22
     readonly property int viewRowBottomMargin: 8
-    implicitHeight: headerRowHeight + viewRowHeight + viewRowBottomMargin
+    implicitHeight: headerRowHeight + viewRowHeight + 6 + viewRowBottomMargin
 
     // 选中一颗：值真的变了才发信号（连点同一颗不产生事件，外面接命令时不会被重复触发）
     function selectView(view) {
@@ -79,7 +79,7 @@ Item {
             anchors.rightMargin: Theme.spacing.buttonGap
             anchors.verticalCenter: parent.verticalCenter
             glyph: "◫"
-            tooltip: qsTrId("topbar_right_sidebar_tip")
+            tooltip: qsTrId("topbar_panelBar_tip")
             selected: Hub.panelBarOpen
             onClicked: topBar.panelBarRequested()
         }
@@ -100,28 +100,21 @@ Item {
         }
     }
 
-    // 视图胶囊：对话 / 轨迹。
-    // 左缘与标题对齐（同为 columnClearance），两颗之间用 buttonGap —— 一排看过去是同一条竖线。
-    Row {
+    // 视图切换：对话 / 轨迹。
+    // 左缘与标题对齐（同为 columnClearance）—— 一排看过去是同一条竖线。
+    // 形状按官方 SegmentedControl（轨道 + 滑动指示器），见 widgets/SegmentedTabs.qml。
+    SegmentedTabs {
         id: viewRow
 
         anchors.left: parent.left
         anchors.leftMargin: Theme.spacing.columnClearance
         anchors.top: headerRow.bottom
-        spacing: Theme.spacing.buttonGap
-
-        PillButton {
-            text: qsTrId("topbar_view_conversation")
-            selected: topBar.activeView === "conversation"
-            pillHeight: topBar.viewRowHeight
-            onClicked: topBar.selectView("conversation")
-        }
-
-        PillButton {
-            text: qsTrId("topbar_view_trace")
-            selected: topBar.activeView === "trace"
-            pillHeight: topBar.viewRowHeight
-            onClicked: topBar.selectView("trace")
-        }
+        tabHeight: topBar.viewRowHeight
+        currentKey: topBar.activeView
+        model: [
+            { key: "conversation", label: qsTrId("topbar_view_conversation") },
+            { key: "trace", label: qsTrId("topbar_view_trace") }
+        ]
+        onSelected: (key) => topBar.selectView(key)
     }
 }

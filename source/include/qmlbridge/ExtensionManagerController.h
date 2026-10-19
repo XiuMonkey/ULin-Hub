@@ -35,6 +35,7 @@
 
 class QTimer;
 class ServerManager;
+class ExtensionToolHost;
 
 class ExtensionManagerController : public QObject
 {
@@ -49,8 +50,10 @@ class ExtensionManagerController : public QObject
 		Q_PROPERTY(QString restartHint READ restartHint NOTIFY restartHintChanged)
 
 public:
-	// server：用来取 dshHome()（工具扩展的 profile 就在它下面）与重启内置服务端
-	explicit ExtensionManagerController(ServerManager* server, QObject* parent = nullptr);
+	// server：用来取 dshHome()（工具扩展的 profile 就在它下面）与重启内置服务端；
+	// toolHost：工具扩展装/卸后要它 reload/unload（卸 DLL 释放文件占用、重扫描述符）
+	explicit ExtensionManagerController(ServerManager* server, ExtensionToolHost* toolHost,
+		QObject* parent = nullptr);
 	~ExtensionManagerController() override;
 
 	bool isOpen() const { return m_open; }
@@ -96,6 +99,7 @@ private:
 	void pollInstall();       // 100ms 定时器：非阻塞取后台安装结果（原版 pollInstall）
 
 	ServerManager* m_server = nullptr;
+	ExtensionToolHost* m_toolHost = nullptr;
 	ExtensionInstallTask m_installTask;
 	QTimer* m_installTimer = nullptr;
 

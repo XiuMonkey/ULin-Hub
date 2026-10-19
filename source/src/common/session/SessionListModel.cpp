@@ -68,7 +68,7 @@ void SessionListModel::rebuild()
 		Row header;
 		header.kind = QLatin1String(kWorkspaceKind);
 		header.workspaceId = key;
-		header.workspaceTitle = qtTrId("sidebar_ungrouped");
+		header.workspaceTitle = qtTrId("sessionBar_ungrouped");
 		header.sessionCount = ungrouped.size();
 		header.expanded = !m_collapsed.contains(key);
 		m_rows.append(header);

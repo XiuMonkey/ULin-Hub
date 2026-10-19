@@ -12,7 +12,7 @@
 //   尺寸/圆角/字号/动效 …… <exe>/styles/metrics.json（用户可改；缺失或键缺失就用内置默认值）
 //
 // QML 侧读法：Theme.color.cardBg / Theme.radius.card / Theme.font.title /
-//            Theme.spacing.columnClearance / Theme.size.sidebarWidth / Theme.motion.fast
+//            Theme.spacing.columnClearance / Theme.size.sessionBarWidth / Theme.motion.fast
 // 值都是 QVariantMap，QML 里用点号逐层取；reload() 后发 changed()，绑定自动重绑。
 
 #include <QObject>

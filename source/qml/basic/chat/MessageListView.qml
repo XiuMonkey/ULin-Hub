@@ -166,7 +166,8 @@ ListView {
             height: 30
             radius: Theme.radius.panel
             color: olderClick.hovered ? Theme.color.hoverBg : Theme.color.panelBg
-            border.width: 1
+            // 半像素环（官方 --dsw-elevation-stroke 的厚度）：1 逻辑px 在 200% 下是 2 物理px，偏硬
+            border.width: 0.5
             // 静息描边走 inputBorder(10% 黑) 而不是 border(4%)：官方 DSH 里"可点的胶囊/按钮"这一档
             // 用 `--dsw-alias-border-l2`，4% 太浅会看不出这里是个按钮。
             border.color: Theme.color.inputBorder
@@ -197,6 +198,7 @@ ListView {
         required property string kind
         required property string text
         required property var segments
+        required property var images
         required property bool streaming
 
         // 宽度下限 120：首帧 list.width 可能还是 0（布局未定），此时 Text 会按"一行一个字"排，
@@ -212,6 +214,7 @@ ListView {
             anchors.left: parent.left
             anchors.right: parent.right
             text: rowRoot.text
+            images: rowRoot.images
         }
 
         SystemNotice {

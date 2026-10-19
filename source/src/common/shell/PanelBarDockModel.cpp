@@ -1,6 +1,6 @@
-// 见 PanelDockModel.h：右栏面板坞的块（页签）列表。行为逐条对齐搬家前的 JS 数组。
+// 见 PanelBarDockModel.h：右栏面板坞的块（页签）列表。行为逐条对齐搬家前的 JS 数组。
 
-#include "common/shell/PanelDockModel.h"
+#include "common/shell/PanelBarDockModel.h"
 
 #include <QModelIndex>
 #include <QVariantMap>
@@ -9,39 +9,44 @@ namespace
 {
 	const char kKindTerminal[] = "terminal";
 	const char kKindBrowser[] = "browser";
+	// 插件数据块：一个插件的一份数据面的**原生**视图（扩展把内容 QML 注入到 panel 里的容器）。
+	// 与浏览器块的区别：这里没有 WebEngine，数据由扩展 C++ 取、QML 原生画。
+	const char kKindPluginData[] = "pluginData";
 
 	// 启动器一行（{ kind, label, hint }）；label 统一由 kindLabel() 给，中文名只有一份。
 	QVariantMap launcherRow(const QString& kind, const QString& hint)
 	{
 		QVariantMap item;
 		item.insert(QStringLiteral("kind"), kind);
-		item.insert(QStringLiteral("label"), PanelDockModel::kindLabel(kind));
+		item.insert(QStringLiteral("label"), PanelBarDockModel::kindLabel(kind));
 		item.insert(QStringLiteral("hint"), hint);
 		return item;
 	}
 }
 
-PanelDockModel& PanelDockModel::instance()
+PanelBarDockModel& PanelBarDockModel::instance()
 {
-	static PanelDockModel model;
+	static PanelBarDockModel model;
 	return model;
 }
 
-PanelDockModel::PanelDockModel(QObject* parent)
+PanelBarDockModel::PanelBarDockModel(QObject* parent)
 	: QAbstractListModel(parent)
 {
 }
 
-QString PanelDockModel::kindLabel(const QString& kind)
+QString PanelBarDockModel::kindLabel(const QString& kind)
 {
 	if (kind == QLatin1String(kKindBrowser))
 		return QStringLiteral("网页浏览");
 	if (kind == QLatin1String(kKindTerminal))
 		return QStringLiteral("终端");
+	if (kind == QLatin1String(kKindPluginData))
+		return QStringLiteral("插件数据");
 	return QStringLiteral("文件浏览");   // 与搬家前一致：未知 kind 兜底成"文件浏览"
 }
 
-PanelDockModel::ViewSpec PanelDockModel::viewFor(const QString& kind, bool webEngineAvailable)
+PanelBarDockModel::ViewSpec PanelBarDockModel::viewFor(const QString& kind, bool webEngineAvailable)
 {
 	// WebEngine 是浏览器/终端两个视图的运行期依赖：缺了就降级成说明页。
 	// ⚠️ 这里不能"先试后错" —— 未调 QtWebEngineQuick::initialize() 的构建里建 WebEngineView
@@ -59,57 +64,65 @@ PanelDockModel::ViewSpec PanelDockModel::viewFor(const QString& kind, bool webEn
 		return ViewSpec{ QStringLiteral("basic/browser/WebBrowserPanel.qml"), false, QString() };
 	if (kind == QLatin1String(kKindTerminal))
 		return ViewSpec{ QStringLiteral("basic/terminal/TerminalPanel.qml"), true, QString() };
+	// 插件数据块：宿主只提供外壳（标题 + 空态 + 一个名为 pluginData.host 的容器），
+	// 内容由扩展 MountInto 进来 —— 因此它不依赖 WebEngine。
+	if (kind == QLatin1String(kKindPluginData))
+		return ViewSpec{ QStringLiteral("basic/panelui/PluginDataPanel.qml"), false, QString() };
 
-	// files 与未知 kind 一样走占位页（文案与搬家前 PanelDock.qml 的 placeholderComp 逐字一致）
+	// files 与未知 kind 一样走占位页（文案与搬家前 PanelBarDockView.qml 的 placeholderComp 逐字一致）
 	return ViewSpec{ QString(), false,
 		QStringLiteral("文件浏览还没接入：需要挂上 api-workspace-files（workspaceFiles/*）做目录树与预览。") };
 }
 
-QString PanelDockModel::activeKind() const
+QString PanelBarDockModel::activeKind() const
 {
 	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
 		return QString();
 	return m_blocks.at(m_activeIndex).kind;
 }
 
-QString PanelDockModel::activeTitle() const
+QString PanelBarDockModel::activeTitle() const
 {
 	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
 		return QString();
 	return m_blocks.at(m_activeIndex).title;
 }
 
-QString PanelDockModel::activeBlockId() const
+QString PanelBarDockModel::activeBlockId() const
 {
 	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
 		return QString();
 	return m_blocks.at(m_activeIndex).id;
 }
 
-QString PanelDockModel::activeViewPath() const
+QString PanelBarDockModel::activeViewPath() const
 {
 	return viewFor(activeKind(), m_webEngineAvailable).path;
 }
 
-bool PanelDockModel::activeViewBlockScoped() const
+bool PanelBarDockModel::activeViewBlockScoped() const
 {
 	return viewFor(activeKind(), m_webEngineAvailable).blockScoped;
 }
 
-QString PanelDockModel::activeViewDetail() const
+QString PanelBarDockModel::activeViewDetail() const
 {
 	return viewFor(activeKind(), m_webEngineAvailable).detail;
 }
 
-QString PanelDockModel::activeViewUrl() const
+QString PanelBarDockModel::activeViewUrl() const
 {
-	// 只有扩展面板记了地址；用户自己开的块恒为空（面板显示"输入网址"的空态）
 	if (m_activeIndex < 0 || m_activeIndex >= m_blocks.size())
 		return QString();
-	return m_blocks.at(m_activeIndex).url;
+
+	const Block& block = m_blocks.at(m_activeIndex);
+	if (!block.url.isEmpty())          // openUrl 开出来的块：地址记在块上
+		return block.url;
+
+	return QString();                  // 用户自己开的浏览器块：空（面板显示空态）
 }
 
-void PanelDockModel::setWebEngineAvailable(bool available)
+void PanelBarDockModel::setWebEngineAvailable(bool available)
 {
 	if (m_webEngineAvailable == available)
 		return;
@@ -118,9 +131,9 @@ void PanelDockModel::setWebEngineAvailable(bool available)
 	emit activeViewChanged();   // 浏览器/终端会在"真视图 ⇄ 说明页"之间换一个
 }
 
-QVariantList PanelDockModel::launcherItems() const
+QVariantList PanelBarDockModel::launcherItems() const
 {
-	// 与搬家前 PanelDock.qml 里那张表逐字一致（顺序、文案都没动）
+	// 与搬家前 PanelBarDockView.qml 里那张表逐字一致（顺序、文案都没动）
 	QVariantList items;
 	items.append(launcherRow(QStringLiteral("terminal"),
 		QStringLiteral("在当前会话的工作目录里跑命令（引擎的 terminal 面）")));
@@ -128,44 +141,73 @@ QVariantList PanelDockModel::launcherItems() const
 		QStringLiteral("用 Qt WebEngine 在右栏看网页")));
 	items.append(launcherRow(QStringLiteral("files"),
 		QStringLiteral("浏览工作区文件（待接入 workspaceFiles）")));
+	items.append(m_extraLaunchers);   // 扩展登记的行追加在宿主内置三行之后
 	return items;
 }
 
-void PanelDockModel::open(const QString& kind)
+
+void PanelBarDockModel::registerLauncher(const QString& kind, const QString& label, const QString& hint)
 {
-	appendBlock(kind, QString(), QString(), QString());
-}
-
-bool PanelDockModel::openUrl(const QString& owner, const QString& url, const QString& title)
-{
-	// 空 owner / 空 url 一律拒绝：前者会与"用户自己开的块"混成一批（closeOwned 就会误伤），
-	// 后者打开来是一块空面板（用户看不出这是扩展开的东西）。
-	if (owner.isEmpty() || url.isEmpty())
-		return false;
-
-	appendBlock(QStringLiteral("browser"), url, owner, title);
-	return true;
-}
-
-int PanelDockModel::closeOwned(const QString& owner)
-{
-	// 空 owner 是"用户自己开的块"：批量关它们不是本方法该干的事（也不该由扩展触发）。
-	if (owner.isEmpty())
-		return 0;
-
-	// 从后往前关：close() 只收敛活动索引、不重排块，倒序走不会跳块。
-	int closed = 0;
-	for (int index = m_blocks.size() - 1; index >= 0; --index) {
-		if (m_blocks.at(index).owner != owner)
-			continue;
-		close(index);
-		++closed;
+	if (kind.isEmpty())
+		return;
+	for (const QVariant& v : m_extraLaunchers) {
+		if (v.toMap().value(QStringLiteral("kind")).toString() == kind)
+			return;   // 已登记：幂等
 	}
-	return closed;
+	QVariantMap row;
+	row.insert(QStringLiteral("kind"), kind);
+	row.insert(QStringLiteral("label"), label.isEmpty() ? kindLabel(kind) : label);
+	row.insert(QStringLiteral("hint"), hint);
+	m_extraLaunchers.append(row);
+	emit launcherItemsChanged();
 }
 
-void PanelDockModel::appendBlock(const QString& kind, const QString& url, const QString& owner,
-	const QString& customTitle)
+void PanelBarDockModel::unregisterLauncher(const QString& kind)
+{
+	for (int i = 0; i < m_extraLaunchers.size(); ++i) {
+		if (m_extraLaunchers.at(i).toMap().value(QStringLiteral("kind")).toString() == kind) {
+			m_extraLaunchers.removeAt(i);
+			emit launcherItemsChanged();
+			return;
+		}
+	}
+}
+
+void PanelBarDockModel::open(const QString& kind)
+{
+	appendBlock(kind, QString(), QString());
+}
+
+QString PanelBarDockModel::openUrl(const QString& url, const QString& title)
+{
+	// URL 为空 = 打开来是一块空面板，对调用方没有意义 ⇒ 拒绝（返回空串，什么也不开）
+	if (url.isEmpty())
+		return QString();
+
+	return appendBlock(QStringLiteral("browser"), url, title);
+}
+
+bool PanelBarDockModel::closeBlock(const QString& blockId)
+{
+	for (int index = 0; index < m_blocks.size(); ++index) {
+		if (m_blocks.at(index).id != blockId)
+			continue;
+		close(index);   // 与按索引关同一条收敛逻辑（活动索引越界才收敛、关光了回主界面）
+		return true;
+	}
+	return false;
+}
+
+QStringList PanelBarDockModel::blockIds() const
+{
+	QStringList ids;
+	ids.reserve(m_blocks.size());
+	for (const Block& block : m_blocks)
+		ids.append(block.id);
+	return ids;
+}
+
+QString PanelBarDockModel::appendBlock(const QString& kind, const QString& url, const QString& customTitle)
 {
 	// 同类计数：标题在**开块这一刻**定下来（关块不重排，见头文件）
 	int seq = 0;
@@ -180,16 +222,19 @@ void PanelDockModel::appendBlock(const QString& kind, const QString& url, const 
 		: customTitle;
 
 	const int row = m_blocks.size();
+	const QString id = QStringLiteral("blk-%1").arg(m_nextBlockSeq++);
 	beginInsertRows(QModelIndex(), row, row);
-	m_blocks.append(Block{ kind, title, QStringLiteral("blk-%1").arg(m_nextBlockSeq++), url, owner });
+	m_blocks.append(Block{ kind, title, id, url });
 	endInsertRows();
 	emit countChanged();
 
 	setActiveIndex(row);      // 追加即激活（新索引必然不同于旧值 ⇒ 一定会通知）
 	setHomeVisible(false);    // 并且离开主界面
+
+	return id;                // 谁开的谁拿 id，模型不记"是谁开的"
 }
 
-void PanelDockModel::close(int index)
+void PanelBarDockModel::close(int index)
 {
 	if (index < 0 || index >= m_blocks.size())
 		return;
@@ -214,7 +259,7 @@ void PanelDockModel::close(int index)
 		setHomeVisible(true);   // 关光了自动回主界面
 }
 
-void PanelDockModel::activate(int index)
+void PanelBarDockModel::activate(int index)
 {
 	if (index < 0 || index >= m_blocks.size())
 		return;
@@ -223,12 +268,12 @@ void PanelDockModel::activate(int index)
 	setHomeVisible(false);
 }
 
-void PanelDockModel::showHome()
+void PanelBarDockModel::showHome()
 {
 	setHomeVisible(true);
 }
 
-void PanelDockModel::setActiveIndex(int index)
+void PanelBarDockModel::setActiveIndex(int index)
 {
 	if (m_activeIndex == index)
 		return;
@@ -239,7 +284,7 @@ void PanelDockModel::setActiveIndex(int index)
 	emit activeViewChanged();
 }
 
-void PanelDockModel::setHomeVisible(bool visible)
+void PanelBarDockModel::setHomeVisible(bool visible)
 {
 	if (m_homeVisible == visible)
 		return;
@@ -248,12 +293,12 @@ void PanelDockModel::setHomeVisible(bool visible)
 	emit homeVisibleChanged();
 }
 
-int PanelDockModel::rowCount(const QModelIndex& parent) const
+int PanelBarDockModel::rowCount(const QModelIndex& parent) const
 {
 	return parent.isValid() ? 0 : m_blocks.size();
 }
 
-QVariant PanelDockModel::data(const QModelIndex& index, int role) const
+QVariant PanelBarDockModel::data(const QModelIndex& index, int role) const
 {
 	if (!index.isValid() || index.row() < 0 || index.row() >= m_blocks.size())
 		return QVariant();
@@ -271,7 +316,7 @@ QVariant PanelDockModel::data(const QModelIndex& index, int role) const
 	}
 }
 
-QHash<int, QByteArray> PanelDockModel::roleNames() const
+QHash<int, QByteArray> PanelBarDockModel::roleNames() const
 {
 	QHash<int, QByteArray> names;
 	names.insert(KindRole, "kind");

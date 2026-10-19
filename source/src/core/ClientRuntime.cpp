@@ -11,6 +11,7 @@
 #include "common/util/HostIndex.h"
 #include "core/ServerManager.h"
 #include "network/DshApiClient.h"
+#include "ExtensionSystem/ExtensionToolHost.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -45,6 +46,9 @@ void ClientRuntime::start()
 	// 会被 SessionAlreadyOwnedError 拒掉（共享退出钩子只做 ClientExtension::shutdownForExit）。
 	connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
 		m_exiting = true;   // 先挂标记：下面杀进程会同步触发 finished，别让它被当成"启动失败"
+		// 扩展工具管道先停：服务端一死，管道对端就没了；在途调用的回包也没人要了
+		if (m_toolHost)
+			m_toolHost->stop();
 		if (m_api)
 			m_api->closeStreams();
 		// 紧接着必须把内置引擎带走，否则 node 变孤儿：它继续占着会话的写句柄，下次启动
@@ -136,6 +140,17 @@ void ClientRuntime::start()
 	setStatus(qtTrId("server_starting"));
 	setServerState(QStringLiteral("starting"));
 	m_server->start();
+
+	// 扩展工具宿主：服务端插件（AttachedPlugin）注册工具、DLL 在本进程执行，中间是
+	// \\.\pipe\ulinhub-bridge。必须在 m_server->start() 之后 —— dshHome 在那里面才赋值；
+	// 而 profile 目录（extensions/ 与 node_modules/）就在它下面的 profiles/web。
+	m_toolHost = new ExtensionToolHost(this);
+	const QString profileDir = m_server->dshHome() + QStringLiteral("/profiles/web");
+	if (!m_toolHost->start(profileDir)) {
+		// 桥起不来只影响"扩展 DLL 工具"这一条线，别把整个壳拖死：记日志、状态行不动
+		qWarning().noquote() << "[Shell] extension tool host failed to start:"
+			<< m_toolHost->errorString();
+	}
 }
 
 void ClientRuntime::restartServer()

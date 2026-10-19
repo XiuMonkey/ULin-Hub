@@ -496,6 +496,23 @@ void DshApiClient::callMethodValue(const QString& method, const QJsonObject& pay
 	post(QStringLiteral("/api/") + method, body, std::move(onSuccess), std::move(onError));
 }
 
+// 同 callMethodValue，但 args 可以是数组（RPC 位置参数，如 settings/update(ns, patch, rev)）
+void DshApiClient::callMethodArgs(const QString& method, const QJsonValue& args,
+								  std::function<void(const QJsonValue& value)> onSuccess,
+								  std::function<void(const RpcError& error)> onError)
+{
+	const QString rpcId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	QJsonObject argsPayload;
+	argsPayload.insert(QStringLiteral("args"), args);
+	QJsonObject body;
+	body.insert(QStringLiteral("type"), QStringLiteral("client-request"));
+	body.insert(QStringLiteral("rpcId"), rpcId);
+	body.insert(QStringLiteral("method"), method);
+	body.insert(QStringLiteral("payload"), argsPayload);
+	qInfo().noquote() << "[DshApi] RPC(args) ->" << method << " rpcId=" << rpcId;
+	post(QStringLiteral("/api/") + method, body, std::move(onSuccess), std::move(onError));
+}
+
 // 通道 POST /api/$events/result；rpcId 就是帧里的 eventId
 void DshApiClient::respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess, std::function<void(const RpcError& error)> onError)
 {

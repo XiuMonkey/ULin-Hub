@@ -31,6 +31,22 @@ Item {
     // 扩展注入点：扩展用 HostUi.item("composer") 拿到本对象后 setParentItem 进来（见 HostExports.h 的名字契约）
     Component.onCompleted: HostUi.registerItem("composer", this)
 
+    // 拖放加附件：把图片文件拖进输入框即可（addImageFiles 会按扩展名筛掉非图片）
+    DropArea {
+        id: dropArea
+        anchors.fill: parent
+        keys: ["text/uri-list"]
+
+        onDropped: (drop) => {
+            if (!drop.hasUrls)
+                return
+            var urls = []
+            for (var i = 0; i < drop.urls.length; ++i)
+                urls.push(drop.urls[i])
+            Hub.addAttachments(urls)
+        }
+    }
+
     // 斜杠命令菜单句柄：菜单是 Popup，可视项挂在 Overlay 下、不在本项的 children 里，
     // 外部（离屏试装台、扩展）要读它的状态只能走这个转发。
     readonly property var commandMenuRef: commandMenu
@@ -146,11 +162,14 @@ Item {
             // 但输入卡与 Agent 气泡共用 panelBg（AgentBubble.qml），靠 panelBg 区分不开，
             // 所以给输入卡留一个专属键；皮肤不定义它时回退 panelBg（行为与原来完全一致）。
             color: Theme.color.composerBg || Theme.color.panelBg
-            border.width: 1
             // 聚焦态：只把描边换成**更深的灰**（Theme.color.textSecondary），不发光、不加阴影、不改高度。
             // 为什么不用 accent 蓝：输入区是常驻控件，蓝描边在整个界面里过于抢眼，也把"主色"用在了
             // 一个只需要"我在这儿"提示的地方；灰阶描边与静息态（composerBorder，10% 黑）同一族，只深一档。
-            border.color: editor.activeFocus ? Theme.color.textSecondary : Theme.color.composerBorder
+            // 静息：可见的细灰（白卡片在浅底上要能立住）；聚焦/拖入：浅灰 + 1px 不变粗
+            readonly property color restingBorder: Theme.isDark ? "#2E3034" : "#E3E5E9"
+            readonly property color activeBorder: Theme.isDark ? "#4A4D53" : "#C6CAD0"
+            border.color: (editor.activeFocus || dropArea.containsDrag) ? activeBorder : restingBorder
+            border.width: 1
         }
 
         // 真实内容（与 capsule 同尺寸；卡片本体不参与绘制）
@@ -166,6 +185,103 @@ Item {
             //      封顶之后靠 Flickable 滚动 + **只在超高时**出现 AppScrollBar ----
             // 为什么要一层 Flickable：TextEdit 自己那套"光标可见就内部挪一下"没有对外暴露 contentY，
             // 挂不了滚动条；把它放进 Flickable、让 TextEdit 的高度等于全文高度，滚动就归 Flickable 管。
+            // ---- 待发图片（缩略图 + 移除）----
+            Item {
+                id: pendingRow
+                width: parent.width
+                visible: Hub.pendingAttachments.length > 0
+                height: visible ? 54 : 0
+                clip: true
+
+                Row {
+                    x: root.cardPadH
+                    width: Math.max(0, parent.width - 2 * root.cardPadH)
+                    spacing: 8
+
+                Repeater {
+                    model: Hub.pendingAttachments
+
+                    Rectangle {
+                        required property var modelData
+                        required property int index
+                        width: 52
+                        height: 52
+                        radius: 8
+                        color: Theme.isDark ? "#232427" : "#F2F3F5"
+                        border.width: 1
+                        border.color: Theme.isDark ? "#3A3D42" : "#D8DBE0"
+                        clip: true
+
+                        // 圆角遮罩：clip 只能裁矩形，圆角处会露方角 ⇒ 用 MultiEffect mask
+                        Rectangle {
+                            id: thumbMask
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            radius: 7
+                            visible: false
+                            layer.enabled: true
+                        }
+
+                        Image {
+                            id: thumb
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            fillMode: Image.PreserveAspectCrop
+                            source: modelData.preview !== undefined ? modelData.preview : ""
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource: thumbMask
+                            }
+
+                            // 文件刚落盘时 QML 可能抢在写完之前读（实测差 5ms）⇒ 解码失败就带 cache-bust 重试一次
+                            property int retry: 0
+
+                            onStatusChanged: {
+                                if (status === Image.Error && retry < 3)
+                                    retryTimer.start()
+                            }
+
+                            Timer {
+                                id: retryTimer
+                                interval: 120
+                                repeat: false
+                                onTriggered: {
+                                    thumb.retry += 1
+                                    var base = modelData.preview !== undefined ? modelData.preview : ""
+                                    if (base !== "")
+                                        thumb.source = base + (base.indexOf("?") >= 0 ? "&" : "?") + "r=" + thumb.retry
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: 16
+                            height: 16
+                            radius: 8
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: 2
+                            color: Theme.color.overlayBg
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "\u2715"
+                                color: Theme.color.textPrimary
+                                font.pixelSize: 9
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Hub.removeAttachment(index)
+                            }
+                        }
+                    }
+                }
+                }
+            }
+
             Flickable {
                 id: editorView
                 width: parent.width
@@ -308,6 +424,39 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
                     onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
+                }
+
+                // 附件（图片）：原生文件对话框，多选
+                Rectangle {
+                    id: attachButton
+                    anchors.right: sendButton.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    radius: Theme.radius.small
+                    color: attachArea.containsMouse ? Theme.color.iconButtonHoverBg : "transparent"
+
+                    Image {
+                        // 图标走资源系统（assets/resources/icons → qrc:/ULinHub/icons/），
+                        // 与侧栏入口图标同一套路：源图超采样（144），显示 18 逻辑 px 下采样，
+                        // 不设 sourceSize —— 设小了会在 200% 缩放下被放大糊掉。
+                        anchors.centerIn: parent
+                        source: "qrc:/ULinHub/icons/attach-icon-144.png"
+                        width: 18
+                        height: 18
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        opacity: attachArea.containsMouse ? 1.0 : 0.92
+                    }
+
+                    MouseArea {
+                        id: attachArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Hub.chooseImageFiles()
+                    }
                 }
 
                 IconButton {

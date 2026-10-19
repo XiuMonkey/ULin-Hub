@@ -20,8 +20,11 @@
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
         <file>basic/browser/WebBrowserPanel.qml</file>
+        <!-- 通用网页窗口：扩展的网页兜底落点（宿主只给窗口，不认识插件） -->
+        <file>basic/browser/WebWindow.qml</file>
+                <file>basic/panelui/PluginDataPanel.qml</file>
         <file>basic/panel/PanelBar.qml</file>
-        <file>basic/shell/PanelDock.qml</file>
+        <file>basic/shell/PanelBarDockView.qml</file>
         <file>basic/shell/DockDropHint.qml</file>
         <!-- 右栏整体"拿起来"跟着光标走 / 脱离成**无边框**独立窗口（自绘标题栏与四边缩放；
              内容是 reparent 进去的同一份 PanelBar）-->
@@ -59,6 +62,8 @@
         <file>widgets/PanelGrip.qml</file>
         <file>widgets/PillButton.qml</file>
         <file>widgets/SearchField.qml</file>
+        <!-- 分段控件（顶栏 对话/轨迹）：官方 SegmentedControl 的轨道 + 滑动指示器 -->
+        <file>widgets/SegmentedTabs.qml</file>
         <file>widgets/Toast.qml</file>
     </qresource>
 </RCC>

@@ -32,6 +32,14 @@ void MessageListModel::clear()
 	emit countChanged();
 }
 
+int MessageListModel::appendUserWithImages(const QString& text, const QVector<ImageRef>& images)
+{
+	const int row = appendRow(User, text);
+	if (row >= 0 && row < m_rows.size())
+		m_rows[row].images = images;
+	return row;
+}
+
 int MessageListModel::appendUser(const QString& text) { return appendRow(User, text); }
 int MessageListModel::appendSystem(const QString& text) { return appendRow(System, text); }
 int MessageListModel::appendAgent() { return appendRow(Agent, QString()); }
@@ -149,6 +157,28 @@ void MessageListModel::touchRow(int row)
 	emit dataChanged(idx, idx, { SegmentsRole, TextRole });
 }
 
+void MessageListModel::invalidateSegmentParts()
+{
+	if (m_rows.isEmpty())
+		return;
+
+	bool touched = false;
+	for (Row& row : m_rows) {
+		for (Segment& segment : row.segments) {
+			if (!segment.partsReady)
+				continue;
+			segment.partsReady = false;
+			segment.parts.clear();
+			touched = true;
+		}
+	}
+	if (!touched)
+		return;
+
+	// ⚠️ 不能 beginResetModel：本模型的更新策略是"只发 dataChanged"，reset 会丢滚动位置与 delegate。
+	emit dataChanged(index(0, 0), index(m_rows.size() - 1, 0), { SegmentsRole });
+}
+
 int MessageListModel::rowCount(const QModelIndex& parent) const
 {
 	if (parent.isValid())
@@ -169,6 +199,16 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 		return row.text;
 	case SegmentsRole:
 		return segmentsFor(row);
+	case ImagesRole: {
+		QVariantList images;
+		for (const ImageRef& image : row.images) {
+			QVariantMap map;
+			map.insert(QStringLiteral("id"), image.attachmentId);
+			map.insert(QStringLiteral("mediaType"), image.mediaType);
+			images.append(map);
+		}
+		return images;
+	}
 	case StreamingRole:
 		return row.streaming;
 	default:
@@ -181,6 +221,7 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	QHash<int, QByteArray> names;
 	names.insert(KindRole, "kind");
 	names.insert(TextRole, "text");
+	names.insert(ImagesRole, "images");
 	names.insert(SegmentsRole, "segments");
 	names.insert(StreamingRole, "streaming");
 	return names;

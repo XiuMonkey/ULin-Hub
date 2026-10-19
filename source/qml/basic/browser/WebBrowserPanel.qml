@@ -18,7 +18,7 @@ Item {
     // 打开面板时的首页（空 = 显示提示，等用户输入）
     property string startUrl: ""
 
-    // 地址也可以**由外面给**（扩展面板）：PanelDock 把 Dock.activeViewUrl 活绑到 startUrl，
+    // 地址也可以**由外面给**（扩展面板）：PanelBarDock 把 PanelBarDock.activeViewUrl 活绑到 startUrl，
     // 切块/换面板时这条 handler 负责真正导航。用户自己在地址栏敲的仍走 navigate()。
     onStartUrlChanged: openExternal(startUrl)
 

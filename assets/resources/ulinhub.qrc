@@ -20,6 +20,7 @@
         <file>icons/plugin-icon.png</file>
         <file>icons/theme-icon.png</file>
         <file>icons/extension-icon.png</file>
+        <file>icons/attach-icon-144.png</file>
         <file>config/highlight-rules.json</file>
         <file alias="styles/theme-light.json">styles/theme-light.json</file>
         <file alias="styles/theme-dark.json">styles/theme-dark.json</file>

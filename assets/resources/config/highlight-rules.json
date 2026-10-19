@@ -1,498 +1,1728 @@
 {
+  "_readme": "语法高亮规则。引擎见 source/src/common/util/CodeHighlighter.cpp：对每个位置在所有规则里取\"最早命中、同位置最长者胜\"的一条，命中段套 <span style=\"color:...\">，其余原样转义。language 先经 aliases 归一（大小写不敏感、只取 fence 标签的第一个词），再查 languages；查不到就用 default。",
+  "_source": "配色 = DSH 官方版 Shiki 调色板（dsh-client-ui-theme 的 shiki.css，light/dark 两套取中间值）；语言/别名集对齐官方 @deepseek-ai/dsh-client-ui-primitives 的 LANG_ALIASES（官方用 Shiki 的 TextMate 语法，本版用等价的手写正则规则，见 docs/UI-OFFICIAL-ALIGNMENT.zh-CN.md）。",
+  "_generated": "⚠️ 本文件由 misc/tools/gen-highlight-rules.js 生成，不要手改；改词表请改那个脚本再重跑。",
+  "aliases": {
+    "typescript": "typescript",
+    "ts": "typescript",
+    "tsx": "typescript",
+    "mts": "typescript",
+    "cts": "typescript",
+    "javascript": "typescript",
+    "js": "typescript",
+    "jsx": "typescript",
+    "mjs": "typescript",
+    "cjs": "typescript",
+    "node": "typescript",
+    "json": "json",
+    "jsonc": "json",
+    "json5": "json",
+    "geojson": "json",
+    "python": "python",
+    "py": "python",
+    "python3": "python",
+    "py3": "python",
+    "shellscript": "shellscript",
+    "bash": "shellscript",
+    "sh": "shellscript",
+    "shell": "shellscript",
+    "zsh": "shellscript",
+    "ksh": "shellscript",
+    "console": "shellscript",
+    "shellsession": "shellscript",
+    "terminal": "shellscript",
+    "powershell": "powershell",
+    "ps1": "powershell",
+    "ps": "powershell",
+    "pwsh": "powershell",
+    "posh": "powershell",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "toml": "toml",
+    "ini": "ini",
+    "properties": "ini",
+    "cfg": "ini",
+    "conf": "ini",
+    "editorconfig": "ini",
+    "dotenv": "ini",
+    "env": "ini",
+    "sql": "sql",
+    "mysql": "sql",
+    "postgres": "sql",
+    "postgresql": "sql",
+    "sqlite": "sql",
+    "plsql": "sql",
+    "tsql": "sql",
+    "html": "html",
+    "htm": "html",
+    "vue": "html",
+    "svelte": "html",
+    "astro": "html",
+    "xhtml": "html",
+    "xml": "xml",
+    "svg": "xml",
+    "xsl": "xml",
+    "plist": "xml",
+    "rss": "xml",
+    "css": "css",
+    "scss": "scss",
+    "sass": "scss",
+    "less": "less",
+    "markdown": "markdown",
+    "md": "markdown",
+    "mdx": "markdown",
+    "mkd": "markdown",
+    "diff": "diff",
+    "patch": "diff",
+    "go": "go",
+    "golang": "go",
+    "rust": "rust",
+    "rs": "rust",
+    "java": "java",
+    "c": "c",
+    "h": "c",
+    "cpp": "cpp",
+    "c++": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "hpp": "cpp",
+    "hh": "cpp",
+    "hxx": "cpp",
+    "ipp": "cpp",
+    "csharp": "csharp",
+    "cs": "csharp",
+    "c#": "csharp",
+    "csx": "csharp",
+    "kotlin": "kotlin",
+    "kt": "kotlin",
+    "kts": "kotlin",
+    "swift": "swift",
+    "php": "php",
+    "ruby": "ruby",
+    "rb": "ruby",
+    "gemfile": "ruby",
+    "rake": "ruby",
+    "lua": "lua",
+    "r": "r",
+    "rscript": "r",
+    "dart": "dart",
+    "scala": "scala",
+    "dockerfile": "dockerfile",
+    "docker": "dockerfile",
+    "containerfile": "dockerfile",
+    "make": "make",
+    "makefile": "make",
+    "mk": "make",
+    "cmake": "cmake",
+    "proto": "proto",
+    "protobuf": "proto",
+    "proto3": "proto",
+    "graphql": "graphql",
+    "gql": "graphql",
+    "hcl": "hcl",
+    "tf": "hcl",
+    "terraform": "hcl",
+    "tfvars": "hcl",
+    "http": "http",
+    "rest": "http",
+    "bat": "bat",
+    "batch": "bat",
+    "cmd": "bat",
+    "dos": "bat",
+    "text": "default",
+    "txt": "default",
+    "plain": "default",
+    "plaintext": "default",
+    "log": "default",
+    "output": "default",
+    "csv": "default",
+    "tsv": "default"
+  },
   "languages": {
-    "c": [
-      {
-        "pattern": "\\b(if|else|for|while|do|return|break|continue|switch|case|default|struct|union|enum|typedef|static|extern|const|volatile|register|sizeof|int|char|float|double|void|long|short|unsigned|signed|true|false|NULL)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "#\\s*(include|define|ifdef|ifndef|endif|pragma|error|warning)\\b",
-        "color": "#c586c0",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "cpp": [
-      {
-        "pattern": "\\b(alignas|alignof|and|and_eq|asm|auto|bitand|bitor|bool|break|case|catch|char|char8_t|char16_t|char32_t|class|compl|concept|const|consteval|constexpr|constinit|const_cast|continue|co_await|co_return|co_yield|decltype|default|delete|do|double|dynamic_cast|else|enum|explicit|export|extern|false|float|for|friend|goto|if|inline|int|long|mutable|namespace|new|noexcept|not|not_eq|nullptr|operator|or|or_eq|private|protected|public|register|reinterpret_cast|requires|return|short|signed|sizeof|static|static_assert|static_cast|struct|switch|template|this|thread_local|throw|true|try|typedef|typeid|typename|union|unsigned|using|virtual|void|volatile|wchar_t|while|xor|xor_eq)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "#\\s*(include|define|ifdef|ifndef|endif|pragma|error|warning|import|module)\\b",
-        "color": "#c586c0",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "csharp": [
-      {
-        "pattern": "\\b(abstract|as|base|bool|break|byte|case|catch|char|checked|class|const|continue|decimal|default|delegate|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|virtual|void|volatile|while|async|await|var|record|init|get|set|value)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "@\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "java": [
-      {
-        "pattern": "\\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false|null|var|record|sealed|permits)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "@[A-Za-z_][A-Za-z0-9_]*",
-        "color": "#c586c0"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*[fFdD]?)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "go": [
-      {
-        "pattern": "\\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|true|false|iota|nil|append|cap|close|complex|copy|delete|imag|len|make|new|panic|print|println|real|recover)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "`[^`\\n]*`",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "rust": [
-      {
-        "pattern": "\\b(as|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while|async|await|dyn)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
-      },
-      {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
-      }
-    ],
     "python": [
       {
-        "pattern": "\\b(False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|print|len|range|type|str|int|float|bool|list|dict|set|tuple|object|super|self|__init__|__name__|__main__)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "'''[\\s\\S]*?(?:'''|$)",
+        "role": "string"
       },
       {
         "pattern": "#[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "\"\"\"[\\s\\S]*?\"\"\"",
-        "color": "#6a9955"
+        "pattern": "[rbfuRBFU]{1,2}(?=\"|')",
+        "role": "keyword"
       },
       {
-        "pattern": "'''[\\s\\S]*?'''",
-        "color": "#6a9955"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "\\b(?:True|False|None|NotImplemented|Ellipsis|__name__|__file__|__main__|self|cls)\\b",
+        "role": "constant"
       },
       {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*[jJ]?)\\b",
-        "color": "#b5cea8"
-      }
-    ],
-    "javascript": [
-      {
-        "pattern": "\\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|export|from|async|await|try|catch|finally|throw|true|false|null|undefined|typeof|instanceof|this|delete|in|of|yield|static|get|set|super)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "\\b(?:int|float|str|bool|bytes|bytearray|list|dict|set|frozenset|tuple|complex|object|type|range|slice|memoryview)\\b",
+        "role": "constant"
       },
       {
-        "pattern": "//[^\\n]*",
-        "color": "#6a9955"
+        "pattern": "\\b(?:and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|match|case|nonlocal|not|or|pass|raise|return|try|while|with|yield)\\b",
+        "role": "keyword"
       },
       {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
+        "pattern": "\\b(?:abs|all|any|bin|bool|callable|chr|dict|dir|divmod|enumerate|eval|exec|filter|float|format|frozenset|getattr|globals|hasattr|hash|help|hex|id|input|int|isinstance|issubclass|iter|len|list|locals|map|max|min|next|object|oct|open|ord|pow|print|property|range|repr|reversed|round|set|setattr|slice|sorted|staticmethod|str|sum|super|tuple|type|vars|zip)\\b",
+        "role": "function"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       },
       {
-        "pattern": "`[^`\\n]*`",
-        "color": "#ce9178"
-      },
-      {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
+        "pattern": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
       }
     ],
     "typescript": [
       {
-        "pattern": "\\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|implements|import|export|from|async|await|try|catch|finally|throw|true|false|null|undefined|typeof|instanceof|this|interface|type|enum|namespace|declare|readonly|public|private|protected|static|get|set|super|yield|delete|in|of|keyof|infer|is|never|unknown|any|string|number|boolean|void|symbol|bigint|object)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "/\\*\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
       },
       {
         "pattern": "//[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
+        "pattern": "`(?:[^`\\\\]|\\\\[\\s\\S])*`",
+        "role": "string"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
       },
       {
-        "pattern": "`[^`\\n]*`",
-        "color": "#ce9178"
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
       },
       {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
+        "pattern": "\\b(?:true|false|null|undefined|NaN|Infinity|this|super)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:string|number|boolean|any|unknown|never|void|object|symbol|bigint|Array|Record|Partial|Readonly|Promise|Map|Set|Date|RegExp|Error)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|as|async|await|break|case|catch|class|const|constructor|continue|debugger|declare|default|delete|do|else|enum|export|extends|finally|for|from|function|get|if|implements|import|in|instanceof|interface|is|keyof|let|namespace|new|of|private|protected|public|readonly|return|satisfies|set|static|switch|throw|try|type|typeof|var|while|yield)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:console|window|document|require|module|exports|process|globalThis|JSON|Math|Object|Array|String|Number|Boolean|Promise|Symbol|Reflect|Proxy|Map|Set|WeakMap|WeakSet|Date|RegExp|Error|parseInt|parseFloat|isNaN|setTimeout|setInterval|clearTimeout|clearInterval|fetch)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_$][A-Za-z0-9_$]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "(?<=\\.)[A-Za-z_$][A-Za-z0-9_$]*",
+        "role": "variable"
       }
     ],
-    "html": [
+    "shellscript": [
       {
-        "pattern": "<!--[\\s\\S]*?-->",
-        "color": "#6a9955"
+        "pattern": "#[^\\n]*",
+        "role": "comment"
       },
       {
-        "pattern": "</?[A-Za-z][A-Za-z0-9-]*(\\s+[A-Za-z_:][A-Za-z0-9_.:-]*\\s*=\\s*(\"[^\"]*\"|'[^']*'))*\\s*/?>",
-        "color": "#569cd6"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "\"[^\"]*\"",
-        "color": "#ce9178"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
       },
       {
-        "pattern": "'[^']*'",
-        "color": "#ce9178"
+        "pattern": "\\$\\{[^}\\n]*\\}",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\$[A-Za-z_][A-Za-z0-9_]*|\\$[0-9@#?$!*]",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[A-Za-z_][A-Za-z0-9_]*(?==)",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|in|function|return|exit|break|continue|local|export|readonly|declare|typeset|unset|shift|source|alias|set|trap|select|time|coproc)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:echo|printf|read|cd|pwd|ls|cp|mv|rm|mkdir|rmdir|touch|cat|head|tail|grep|sed|awk|find|xargs|sort|uniq|wc|cut|tr|chmod|chown|chgrp|ps|kill|killall|sleep|test|true|false|env|which|command|type|eval|exec|sudo|curl|wget|tar|gzip|gunzip|ssh|scp|rsync|git|node|npm|pnpm|python|pip|docker|make|cmake)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       }
     ],
-    "css": [
+    "powershell": [
       {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
+        "pattern": "<#[\\s\\S]*?(?:#>|$)",
+        "role": "comment"
       },
       {
-        "pattern": "#[A-Za-z_][A-Za-z0-9_-]*",
-        "color": "#d7ba7d"
+        "pattern": "#[^\\n]*",
+        "role": "comment"
       },
       {
-        "pattern": "\\.[A-Za-z_][A-Za-z0-9_-]*",
-        "color": "#d7ba7d"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "[A-Za-z-]+(?=\\s*:)",
-        "color": "#9cdcfe"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
       },
       {
-        "pattern": "#[0-9a-fA-F]{3,8}\\b",
-        "color": "#b5cea8"
+        "pattern": "\\$\\{[^}\\n]*\\}|\\$[A-Za-z_][A-Za-z0-9_:]*",
+        "role": "variable"
       },
       {
-        "pattern": "\\b(\\d+(\\.\\d+)?(px|em|rem|vh|vw|%|s|ms)?)\\b",
-        "color": "#b5cea8"
+        "pattern": "-\\[?[A-Za-z][A-Za-z0-9]*\\]?",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\[[A-Za-z][A-Za-z0-9_.]*\\]",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:$true|$false|$null|$_|$PSItem|$args|$input|$this|$HOME|$PWD)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:begin|break|catch|class|continue|data|define|do|dynamicparam|else|elseif|end|enum|exit|filter|finally|for|foreach|from|function|if|in|param|process|return|switch|throw|trap|try|until|using|var|while|workflow)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:Write-Host|Write-Output|Write-Error|Get-Item|Get-ChildItem|Set-Item|Remove-Item|New-Item|Copy-Item|Move-Item|Test-Path|Join-Path|Split-Path|Get-Content|Set-Content|Add-Content|Select-Object|Where-Object|ForEach-Object|Sort-Object|Measure-Object|Get-Process|Start-Process|Stop-Process|Invoke-Expression|Invoke-WebRequest|Start-Sleep|ConvertTo-Json|ConvertFrom-Json|Out-String|Out-File|Import-Module|Select-String)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Z][A-Za-z0-9]*-[A-Z][A-Za-z0-9]*\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       }
     ],
     "json": [
       {
-        "pattern": "\"(\\\\u[0-9a-fA-F]{4}|[^\"\\\\])*\"(?=\\s*:)",
-        "color": "#9cdcfe"
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
       },
       {
-        "pattern": "\"(\\\\u[0-9a-fA-F]{4}|[^\"\\\\])*\"",
-        "color": "#ce9178"
+        "pattern": "//[^\\n]*",
+        "role": "comment"
       },
       {
-        "pattern": "\\b(true|false|null)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"(?=\\s*:)",
+        "role": "variable"
       },
       {
-        "pattern": "-?\\b\\d+\\.?\\d*([eE][+-]?\\d+)?\\b",
-        "color": "#b5cea8"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|null)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       }
     ],
     "yaml": [
       {
         "pattern": "#[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "^\\s*-\\s+",
-        "color": "#d7ba7d"
+        "pattern": "(?:^|\\n)---[^\\n]*|(?:^|\\n)\\.\\.\\.[^\\n]*",
+        "role": "punct"
       },
       {
-        "pattern": "^\\s*[A-Za-z_][A-Za-z0-9_-]*(?=\\s*:)",
-        "color": "#9cdcfe"
+        "pattern": "(?:^|\\n)\\s*-\\s",
+        "role": "punct"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "(?:^|\\n)\\s*[A-Za-z_][A-Za-z0-9_.-]*(?=\\s*:)",
+        "role": "variable"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "&[A-Za-z0-9_-]+|\\*[A-Za-z0-9_-]+|![A-Za-z0-9_!-]+",
+        "role": "keyword"
       },
       {
-        "pattern": "\\b(true|false|null|yes|no|on|off)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|yes|no|on|off|~|True|False|Null|NULL|YES|NO)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\$\\([^)\\n]*\\)|\\$\\{[^}\\n]*\\}",
+        "role": "function"
       }
     ],
-    "bash": [
-      {
-        "pattern": "\\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|echo|export|source|cd|ls|mkdir|rm|cp|mv|sudo|apt|yum|npm|pnpm|node|python|python3|git|curl|wget|grep|sed|awk|cat|chmod|chown|tar|unzip|zip|kill|ps|top|htop|systemctl|docker|kubectl)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
+    "toml": [
       {
         "pattern": "#[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "'''[\\s\\S]*?(?:'''|$)",
+        "role": "string"
       },
       {
-        "pattern": "\\$[A-Za-z_][A-Za-z0-9_]*",
-        "color": "#9cdcfe"
+        "pattern": "(?:^|\\n)\\s*\\[\\[?[^\\]\\n]+\\]\\]?",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[A-Za-z_][A-Za-z0-9_.-]*(?=\\s*=)",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:true|false)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b\\d{4}-\\d{2}-\\d{2}(?:[T ]\\d{2}:\\d{2}(?::\\d{2})?)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       }
     ],
-    "powershell": [
+    "ini": [
       {
-        "pattern": "\\b(if|else|elseif|for|foreach|while|do|switch|function|return|param|begin|process|end|break|continue|try|catch|finally|throw|class|enum|filter|trap|until|in|not|and|or|true|false|null)\\b",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "[;#][^\\n]*",
+        "role": "comment"
       },
       {
-        "pattern": "#[^\\n]*",
-        "color": "#6a9955"
+        "pattern": "(?:^|\\n)\\s*\\[[^\\]\\n]+\\]",
+        "role": "keyword"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "(?:^|\\n)\\s*(?:export\\s+)?[A-Za-z_][A-Za-z0-9_.-]*(?=\\s*[=:])",
+        "role": "variable"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "\\$[A-Za-z_][A-Za-z0-9_]*",
-        "color": "#9cdcfe"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|null)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\$\\{[^}\\n]*\\}",
+        "role": "function"
       }
     ],
     "sql": [
       {
-        "pattern": "\\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|CREATE|TABLE|INDEX|VIEW|ALTER|DROP|AND|OR|NOT|NULL|IS|IN|EXISTS|BETWEEN|LIKE|AS|DISTINCT|UNION|ALL|CASE|WHEN|THEN|ELSE|END|PRIMARY|KEY|FOREIGN|REFERENCES|CONSTRAINT|DEFAULT|UNIQUE|CHECK)\\b",
-        "color": "#0000ff",
-        "bold": true
-      },
-      {
         "pattern": "--[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "'(?:[^'\\\\\\n]|'')*'",
+        "role": "string"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "\"(?:[^\"\\\\\\n]|\"\")*\"",
+        "role": "string"
       },
       {
-        "pattern": "\\b(\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
+        "pattern": "`[^`\\n]*`",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:SELECT|FROM|WHERE|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|ALTER|DROP|TABLE|VIEW|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|ON|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|AS|AND|OR|NOT|NULL|IS|IN|EXISTS|LIKE|BETWEEN|CASE|WHEN|THEN|ELSE|END|WITH|RECURSIVE|RETURNING|PRIMARY|KEY|FOREIGN|REFERENCES|CONSTRAINT|UNIQUE|DEFAULT|CHECK|AUTO_INCREMENT|BEGIN|COMMIT|ROLLBACK|TRANSACTION|IF|EXPLAIN|ANALYZE|VACUUM|TRUNCATE|GRANT|REVOKE|OVER|PARTITION|WINDOW|USING|NATURAL|ASC|DESC)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:select|from|where|insert|into|values|update|set|delete|create|alter|drop|table|view|index|join|left|right|inner|outer|full|cross|on|group|by|order|having|limit|offset|union|all|distinct|as|and|or|not|null|is|in|exists|like|between|case|when|then|else|end|with|recursive|returning|primary|key|foreign|references|constraint|unique|default|check|begin|commit|rollback|transaction|if|explain|analyze|vacuum|truncate|grant|revoke|over|partition|window|using|natural|asc|desc)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:INT|INTEGER|BIGINT|SMALLINT|TINYINT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL|BOOLEAN|BOOL|CHAR|VARCHAR|TEXT|BLOB|DATE|TIME|TIMESTAMP|DATETIME|INTERVAL|JSON|JSONB|UUID|SERIAL|BIGSERIAL|BYTEA|ARRAY)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:int|integer|bigint|smallint|tinyint|decimal|numeric|float|double|real|boolean|bool|char|varchar|text|blob|date|time|timestamp|datetime|interval|json|jsonb|uuid|serial|bigserial|bytea|array)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|NULLIF|CAST|CONVERT|NOW|CURRENT_DATE|CURRENT_TIMESTAMP|LOWER|UPPER|LENGTH|SUBSTRING|TRIM|ROUND|ABS|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|string_agg|jsonb_agg|array_agg|count|sum|avg|min|max|coalesce|now|lower|upper|length|substring|trim|round|abs)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "html": [
+      {
+        "pattern": "<!--[\\s\\S]*?(?:-->|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "<!DOCTYPE[^>\\n]*>|<!doctype[^>\\n]*>",
+        "role": "keyword"
+      },
+      {
+        "pattern": "(?:^|\\n)#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "<(?:/)?([A-Za-z][A-Za-z0-9:-]*)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_:][-A-Za-z0-9_:.]*(?==)",
+        "role": "variable"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "&[A-Za-z][A-Za-z0-9]*;|&#\\d+;|&#x[0-9a-fA-F]+;",
+        "role": "constant"
+      },
+      {
+        "pattern": "@[A-Za-z-]+|v-[A-Za-z-]+|:[A-Za-z-]+",
+        "role": "keyword"
+      }
+    ],
+    "xml": [
+      {
+        "pattern": "<!--[\\s\\S]*?(?:-->|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "<\\?[\\s\\S]*?(?:\\?>|$)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "<!DOCTYPE[^>\\n]*>",
+        "role": "keyword"
+      },
+      {
+        "pattern": "<(?:/)?([A-Za-z_:][A-Za-z0-9:._-]*)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_:][-A-Za-z0-9_:.]*(?==)",
+        "role": "variable"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "&[A-Za-z][A-Za-z0-9]*;|&#\\d+;|&#x[0-9a-fA-F]+;",
+        "role": "constant"
+      }
+    ],
+    "css": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "#[0-9a-fA-F]{3,8}\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "@[A-Za-z-]+",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "-{0,2}[A-Za-z-]+\\s*(?=:(?!:))",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[.#&][A-Za-z_][A-Za-z0-9_-]*|(?:^|\\n)\\s*[A-Za-z][A-Za-z0-9-]*(?=\\s*\\{)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\.\\d+|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|fr|ch|ex|pt|cm|mm|in|dpi)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "var\\(--[A-Za-z0-9_-]+\\)|calc\\([^)\\n]*\\)",
+        "role": "function"
+      }
+    ],
+    "scss": [
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "#[0-9a-fA-F]{3,8}\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "@[A-Za-z-]+",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "-{0,2}[A-Za-z-]+\\s*(?=:(?!:))",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[.#&][A-Za-z_][A-Za-z0-9_-]*|(?:^|\\n)\\s*[A-Za-z][A-Za-z0-9-]*(?=\\s*\\{)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\.\\d+|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|fr|ch|ex|pt|cm|mm|in|dpi)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\$[A-Za-z_][A-Za-z0-9_-]*",
+        "role": "function"
+      },
+      {
+        "pattern": "var\\(--[A-Za-z0-9_-]+\\)|calc\\([^)\\n]*\\)",
+        "role": "function"
+      }
+    ],
+    "less": [
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "#[0-9a-fA-F]{3,8}\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "@[A-Za-z-]+",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "-{0,2}[A-Za-z-]+\\s*(?=:(?!:))",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[.#&][A-Za-z_][A-Za-z0-9_-]*|(?:^|\\n)\\s*[A-Za-z][A-Za-z0-9-]*(?=\\s*\\{)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\.\\d+|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|vh|vw|vmin|vmax|%|s|ms|deg|fr|ch|ex|pt|cm|mm|in|dpi)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\$[A-Za-z_][A-Za-z0-9_-]*",
+        "role": "function"
+      },
+      {
+        "pattern": "var\\(--[A-Za-z0-9_-]+\\)|calc\\([^)\\n]*\\)",
+        "role": "function"
       }
     ],
     "markdown": [
       {
-        "pattern": "^#{1,6}\\s.*$",
-        "color": "#0000ff",
-        "bold": true
+        "pattern": "```[\\s\\S]*?(?:```|$)",
+        "role": "string"
       },
       {
-        "pattern": "`[^`\\n]*`",
-        "color": "#ce9178"
+        "pattern": "`[^`\\n]+`",
+        "role": "string"
       },
       {
-        "pattern": "\\*\\*[^*\\n]+\\*\\*",
-        "color": "#d7ba7d",
-        "bold": true
+        "pattern": "(?:^|\\n)\\s{0,3}#{1,6}[^\\n]*",
+        "role": "keyword"
       },
       {
-        "pattern": "\\*[^*\\n]+\\*",
-        "color": "#d7ba7d",
-        "italic": true
+        "pattern": "\\*\\*[^*\\n]+\\*\\*|__[^_\\n]+__",
+        "role": "keyword"
       },
       {
-        "pattern": "\\[([^\\]]+)\\]\\([^\\)]+\\)",
-        "color": "#569cd6"
+        "pattern": "(?:^|\\n)\\s{0,3}>[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s{0,3}(?:[-*+]|\\d+\\.)\\s",
+        "role": "punct"
+      },
+      {
+        "pattern": "!?\\[[^\\]\\n]*\\]\\([^)\\n]*\\)",
+        "role": "function"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s{0,3}(?:---+|\\*\\*\\*+|___+)\\s*(?=\\n|$)",
+        "role": "punct"
+      }
+    ],
+    "diff": [
+      {
+        "pattern": "(?:^|\\n)(?:diff --git|index |new file|deleted file|similarity index|rename )[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "(?:^|\\n)@@[^\\n]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "(?:^|\\n)\\+[^\\n]*",
+        "role": "string"
+      },
+      {
+        "pattern": "(?:^|\\n)-[^\\n]*",
+        "role": "keyword"
+      }
+    ],
+    "go": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "`[^`]*`",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|nil|iota)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr|any)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:append|cap|close|complex|copy|delete|imag|len|make|new|panic|print|println|real|recover)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      }
+    ],
+    "rust": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "#!?\\[[^\\]\\n]*\\]",
+        "role": "keyword"
+      },
+      {
+        "pattern": "r#*\"[^\"]*\"#*",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "b?'(?:[^'\\\\\\n]|\\\\.)'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|None|Some|Ok|Err|self|Self)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:bool|char|str|u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64|String|Vec|Option|Result|Box|Rc|Arc|HashMap|HashSet|BTreeMap)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:as|async|await|break|const|continue|crate|dyn|else|enum|extern|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|static|struct|super|trait|type|unsafe|use|where|while)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:println|eprintln|print|format|vec|panic|assert|assert_eq|assert_ne|todo|unimplemented|unreachable|dbg|write|writeln|include_str|include_bytes|env|concat|stringify)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*[!(]|::)",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "java": [
+      {
+        "pattern": "/\\*\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)'",
+        "role": "string"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|this|super)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:boolean|byte|char|short|int|long|float|double|void|String|Object|Integer|Long|Double|Float|Boolean|Character|Byte|Short|List|Map|Set|ArrayList|HashMap|HashSet|Optional|Stream)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|assert|break|case|catch|class|continue|default|do|else|enum|extends|final|finally|for|goto|if|implements|import|instanceof|interface|native|new|package|private|protected|public|record|return|sealed|static|strictfp|switch|synchronized|this|throw|throws|transient|try|var|volatile|while|yield|permits|non-sealed)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "kotlin": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)'",
+        "role": "string"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|this|super|it)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:Boolean|Byte|Char|Short|Int|Long|Float|Double|String|Any|Unit|Nothing|List|Map|Set|MutableList|MutableMap|Array|Pair|Triple|Sequence|Flow)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|actual|annotation|as|break|by|catch|class|companion|const|constructor|continue|crossinline|data|delegate|do|dynamic|else|enum|expect|external|field|file|final|finally|for|fun|get|if|import|in|infix|init|inline|inner|interface|internal|is|lateinit|noinline|object|open|operator|out|override|package|private|protected|public|reified|return|sealed|set|super|suspend|tailrec|throw|try|typealias|val|var|vararg|when|where|while)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "csharp": [
+      {
+        "pattern": "#\\s*include\\s*(?:<[^>\\n]+>|\"[^\"\\n]+\")",
+        "role": "keyword"
+      },
+      {
+        "pattern": "#\\s*(?:define|ifdef|ifndef|endif|pragma|error|warning|undef|include_next|elif|else)\\b[^\\n]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\\[\\[[^\\]\\n]*\\]\\]|\\b__attribute__\\s*\\(\\([^)\\n]*\\)\\)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|this|base)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:bool|byte|sbyte|char|decimal|double|float|int|uint|long|ulong|short|ushort|object|string|void|var|dynamic)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|as|async|await|base|break|case|catch|checked|class|const|continue|default|delegate|do|else|enum|event|explicit|extern|finally|fixed|for|foreach|get|goto|if|implicit|in|init|interface|internal|is|lock|namespace|new|operator|out|override|params|private|protected|public|readonly|record|ref|return|sealed|set|sizeof|stackalloc|static|struct|switch|throw|try|typeof|unchecked|unsafe|using|virtual|volatile|when|where|while|yield|nameof|partial|required)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:Console|Math|String|Convert|Task|List|Dictionary|IEnumerable|IList|IQueryable|Exception|Guid|DateTime|TimeSpan|Environment|File|Directory|Path)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      }
+    ],
+    "c": [
+      {
+        "pattern": "#\\s*include\\s*(?:<[^>\\n]+>|\"[^\"\\n]+\")",
+        "role": "keyword"
+      },
+      {
+        "pattern": "#\\s*(?:define|ifdef|ifndef|endif|pragma|error|warning|undef|include_next|elif|else)\\b[^\\n]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:NULL|true|false)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:void|char|short|int|long|float|double|signed|unsigned|size_t|ssize_t|ptrdiff_t|int8_t|int16_t|int32_t|int64_t|uint8_t|uint16_t|uint32_t|uint64_t|bool|_Bool|FILE)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:auto|break|case|const|continue|default|do|else|enum|extern|for|goto|if|inline|register|restrict|return|sizeof|static|struct|switch|typedef|union|volatile|while|_Static_assert|_Alignas|_Alignof|_Atomic|_Generic|_Noreturn|_Thread_local)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:printf|fprintf|sprintf|snprintf|scanf|fscanf|sscanf|malloc|calloc|realloc|free|memcpy|memmove|memset|memcmp|strlen|strcpy|strncpy|strcat|strncat|strcmp|strncmp|strchr|strrchr|strstr|strdup|fopen|fclose|fread|fwrite|fgets|fgetc|fputc|fflush|fseek|ftell|rewind|perror|exit|abort|assert|qsort|bsearch|toupper|tolower|isalpha|isdigit|isspace)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      }
+    ],
+    "cpp": [
+      {
+        "pattern": "#\\s*include\\s*(?:<[^>\\n]+>|\"[^\"\\n]+\")",
+        "role": "keyword"
+      },
+      {
+        "pattern": "#\\s*(?:define|ifdef|ifndef|endif|pragma|error|warning|undef|include_next|elif|else)\\b[^\\n]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\\[\\[[^\\]\\n]*\\]\\]|\\b__attribute__\\s*\\(\\([^)\\n]*\\)\\)",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:nullptr|true|false|NULL)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:void|bool|char|char8_t|char16_t|char32_t|wchar_t|short|int|long|float|double|signed|unsigned|size_t|ssize_t|ptrdiff_t|auto|std|string|wstring|vector|map|unordered_map|set|unordered_set|array|pair|tuple|optional|variant|unique_ptr|shared_ptr|weak_ptr|function|thread|mutex|istream|ostream|stringstream|ifstream|ofstream)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:alignas|alignof|and|and_eq|asm|atomic_cancel|atomic_commit|atomic_noexcept|bitand|bitor|break|case|catch|class|compl|concept|const|consteval|constexpr|constinit|const_cast|continue|co_await|co_return|co_yield|decltype|default|delete|do|dynamic_cast|else|enum|explicit|export|extern|false|for|friend|goto|if|inline|mutable|namespace|new|noexcept|not|not_eq|nullptr|operator|or|or_eq|private|protected|public|reflexpr|register|reinterpret_cast|requires|return|sizeof|static|static_assert|static_cast|struct|switch|template|this|thread_local|throw|true|try|typedef|typeid|typename|union|using|virtual|void|volatile|while|xor|xor_eq|override|final)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:std|cout|cin|cerr|endl|printf|malloc|free|memcpy|memset|strlen|push_back|emplace_back|size|empty|begin|end|find|insert|erase|clear|make_unique|make_shared|move|forward)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      }
+    ],
+    "php": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\$[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      },
+      {
+        "pattern": "#\\[[^\\]\\n]*\\]",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|TRUE|FALSE|NULL|__CLASS__|__FUNCTION__|__METHOD__|__LINE__|__FILE__)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:int|float|string|bool|array|object|callable|iterable|mixed|void|null|self|static|parent)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|and|array|as|break|callable|case|catch|class|clone|const|continue|declare|default|do|echo|else|elseif|empty|enddeclare|endfor|endforeach|endif|endswitch|endwhile|enum|eval|exit|extends|final|finally|fn|for|foreach|function|global|goto|if|implements|include|include_once|instanceof|insteadof|interface|isset|list|match|namespace|new|or|print|private|protected|public|readonly|require|require_once|return|static|switch|throw|trait|try|unset|use|var|while|xor|yield)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:strlen|count|explode|implode|array_map|array_filter|array_merge|in_array|sprintf|printf|print_r|var_dump|json_encode|json_decode|preg_match|preg_replace|str_replace|substr|trim|strtolower|strtoupper|file_get_contents|file_put_contents)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "ruby": [
+      {
+        "pattern": "=begin[\\s\\S]*?(?:=end|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": ":[A-Za-z_][A-Za-z0-9_]*[?!]?",
+        "role": "constant"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_]*|@@[A-Za-z_][A-Za-z0-9_]*|\\$[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:true|false|nil|self|__FILE__|__LINE__|__method__)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:alias|and|begin|break|case|class|def|defined?|do|else|elsif|end|ensure|for|if|in|module|next|not|or|redo|rescue|retry|return|super|then|undef|unless|until|when|while|yield|require|require_relative|attr_accessor|attr_reader|attr_writer|include|extend|prepend)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:puts|print|p|gets|raise|lambda|proc|loop|each|map|select|reject|reduce|inject|sort|sort_by|push|pop|shift|unshift|length|size|join|split|strip|to_s|to_i|to_sym|to_a|new|free)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*[?!]?(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "lua": [
+      {
+        "pattern": "--\\[(=*)\\[[\\s\\S]*?(?:\\]\\1\\]|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "--[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\\[(=*)\\[[\\s\\S]*?(?:\\]\\1\\]|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:true|false|nil)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:and|break|do|else|elseif|end|for|function|goto|if|in|local|not|or|repeat|return|then|until|while)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:print|pairs|ipairs|next|type|tostring|tonumber|error|assert|pcall|xpcall|require|setmetatable|getmetatable|rawget|rawset|table|string|math|io|os|coroutine)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "r": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:TRUE|FALSE|NULL|NA|NaN|Inf|T|F)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:if|else|repeat|while|function|for|in|next|break|return|library|require|source)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_.]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "(?<=\\$)[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "variable"
+      }
+    ],
+    "dart": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|null)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:int|double|num|String|bool|List|Map|Set|dynamic|void|Future|Stream|Object)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|as|assert|async|await|break|case|catch|class|const|continue|covariant|default|deferred|do|else|enum|export|extends|extension|external|factory|final|finally|for|Function|get|hide|if|implements|import|in|interface|is|late|library|mixin|new|on|operator|part|required|rethrow|return|sealed|set|show|static|super|switch|sync|this|throw|try|typedef|var|void|while|with|yield)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "scala": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)'",
+        "role": "string"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_.]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|null|None|Some|Nil)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:Int|Long|Double|Float|Boolean|Char|String|Unit|Any|Nothing|List|Seq|Map|Set|Option|Either|Future|Array)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:abstract|case|catch|class|def|do|else|enum|export|extends|final|finally|for|forSome|given|if|implicit|import|lazy|match|new|object|opaque|open|override|package|private|protected|return|sealed|super|then|throw|trait|try|type|val|var|while|with|yield|using|derives|end)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*[\\[(])",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "swift": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "@[A-Za-z_][A-Za-z0-9_]*",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:true|false|nil|self|Self|super)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:Int|Double|Float|Bool|String|Character|Array|Dictionary|Set|Optional|Any|Void|Result|Date|URL)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:associatedtype|class|deinit|enum|extension|fileprivate|func|import|init|inout|internal|let|open|operator|private|protocol|public|rethrows|static|struct|subscript|typealias|var|break|case|continue|default|defer|do|else|fallthrough|for|guard|if|in|repeat|return|switch|where|while|as|catch|is|throw|throws|try|async|await|actor|some|any)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "dockerfile": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*(?:FROM|RUN|CMD|LABEL|MAINTAINER|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL|AS)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\$\\{[^}\\n]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      },
+      {
+        "pattern": "--[a-z-]+",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "make": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "(?:^|\\n)[A-Za-z_][A-Za-z0-9_.]*\\s*(?=[:+?]?=)",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)[A-Za-z0-9_./$(){}-]+(?=\\s*:(?!=))",
+        "role": "function"
+      },
+      {
+        "pattern": "\\$[@<^?*$#%]|\\$\\([^)\\n]*\\)|\\$\\{[^}\\n]*\\}",
+        "role": "function"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:ifeq|ifneq|ifdef|ifndef|else|endif|include|define|endef|export|unexport|override)\\b",
+        "role": "keyword"
+      }
+    ],
+    "cmake": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\\$\\{[^}\\n]*\\}|\\$<[^>\\n]*>|\\$ENV\\{[^}\\n]*\\}",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:project|cmake_minimum_required|add_executable|add_library|add_subdirectory|target_link_libraries|target_include_directories|target_compile_definitions|target_compile_options|set|if|elseif|else|endif|foreach|endforeach|function|endfunction|macro|endmacro|include|find_package|install|option|message|list|string|file|configure_file|aux_source_directory|get_filename_component)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:PUBLIC|PRIVATE|INTERFACE|REQUIRED|COMPONENTS|STREQUAL|AND|OR|NOT|TRUE|FALSE|ON|OFF)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "proto": [
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:syntax|package|import|option|message|enum|service|rpc|returns|stream|repeated|optional|required|reserved|oneof|map|extend|extensions|group|weak|public)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:double|float|int32|int64|uint32|uint64|sint32|sint64|fixed32|fixed64|sfixed32|sfixed64|bool|string|bytes)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "graphql": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"\"\"[\\s\\S]*?(?:\"\"\"|$)",
+        "role": "string"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:query|mutation|subscription|fragment|on|type|interface|union|enum|input|scalar|schema|extend|directive|implements)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:Int|Float|String|Boolean|ID)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:include|skip|deprecated|specifiedBy)\\b",
+        "role": "function"
+      },
+      {
+        "pattern": "\\$[A-Za-z_][A-Za-z0-9_]*",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "hcl": [
+      {
+        "pattern": "#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "//[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "\\b(?:resource|data|variable|output|provider|module|terraform|locals|backend|required_providers)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*[A-Za-z_][A-Za-z0-9_-]*(?=\\s*=)",
+        "role": "variable"
+      },
+      {
+        "pattern": "\\b(?:true|false|null)\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      }
+    ],
+    "http": [
+      {
+        "pattern": "(?:^|\\n)(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\\s+\\S+",
+        "role": "keyword"
+      },
+      {
+        "pattern": "(?:^|\\n)HTTP/\\d(?:\\.\\d)?\\s+\\d{3}[^\\n]*",
+        "role": "constant"
+      },
+      {
+        "pattern": "(?:^|\\n)[A-Za-z-]+(?=:)",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)#[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\\{\\{[^}\\n]*\\}\\}",
+        "role": "function"
+      }
+    ],
+    "bat": [
+      {
+        "pattern": "(?:^|\\n)\\s*(?:rem\\b|REM\\b|::)[^\\n]*",
+        "role": "comment"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
+      },
+      {
+        "pattern": "%[A-Za-z_][A-Za-z0-9_]*%|![A-Za-z_][A-Za-z0-9_]*!",
+        "role": "variable"
+      },
+      {
+        "pattern": "(?:^|\\n)\\s*@?[A-Za-z]+\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:echo|set|if|else|for|in|do|call|goto|exit|copy|move|del|md|rd|cd|pushd|popd|dir|type|find|findstr|start|pause|rem|setlocal|endlocal|errorlevel|exist|defined|not)\\b",
+        "role": "keyword"
+      },
+      {
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
       }
     ],
     "default": [
       {
+        "pattern": "/\\*[\\s\\S]*?(?:\\*/|$)",
+        "role": "comment"
+      },
+      {
         "pattern": "//[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
         "pattern": "#[^\\n]*",
-        "color": "#6a9955"
+        "role": "comment"
       },
       {
-        "pattern": "/\\*[\\s\\S]*?\\*/",
-        "color": "#6a9955"
+        "pattern": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+        "role": "string"
       },
       {
-        "pattern": "\"[^\"\\n]*\"",
-        "color": "#ce9178"
+        "pattern": "'(?:[^'\\\\\\n]|\\\\.)*'",
+        "role": "string"
       },
       {
-        "pattern": "'[^'\\n]*'",
-        "color": "#ce9178"
+        "pattern": "\\b(?:true|false|null|undefined|nil|None|True|False|NULL|TRUE|FALSE)\\b",
+        "role": "constant"
       },
       {
-        "pattern": "`[^`\\n]*`",
-        "color": "#ce9178"
+        "pattern": "\\b(?:if|else|for|while|do|switch|case|break|continue|return|function|func|def|class|struct|enum|import|from|export|const|let|var|new|delete|try|catch|finally|throw|throws|public|private|protected|static|final|abstract|interface|extends|implements|in|of|is|and|or|not|async|await|yield|lambda|pass|raise|with|as)\\b",
+        "role": "keyword"
       },
       {
-        "pattern": "\\b(0[xX][0-9a-fA-F]+|\\d+\\.?\\d*)\\b",
-        "color": "#b5cea8"
+        "pattern": "\\b(?:0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?\\d+)?)(?:[uUlLfFnNiIjJ]+)?\\b",
+        "role": "constant"
+      },
+      {
+        "pattern": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()",
+        "role": "function"
       }
     ]
   }

@@ -25,6 +25,7 @@
 #include <functional>
 
 class DshApiClient;
+class ExtensionToolHost;
 class ServerManager;
 class QJsonArray;
 
@@ -40,6 +41,9 @@ public:
 
 	DshApiClient* apiClient() const { return m_api; }
 	ServerManager* server() const { return m_server; }
+	// 扩展工具宿主（命名管道 → DllCaller）：扩展管理页装/卸工具扩展时要它 reload/unload。
+	// 在内置服务端 start() 之后创建；接管态下同样存在（桥与后端是不是 DSH 无关）。
+	ExtensionToolHost* toolHost() const { return m_toolHost; }
 	// ⚠️ SessionCatalog 是**值成员**（它不是 QObject、没有 parent 机制），但所有权在语义上属于本类：
 	//    common/session/SessionListModel 只拿指针来读数（见那边的构造参数）。
 	SessionCatalog* catalog() { return &m_catalog; }
@@ -104,6 +108,7 @@ private:
 
 	ServerManager* m_server = nullptr;
 	DshApiClient* m_api = nullptr;
+	ExtensionToolHost* m_toolHost = nullptr;
 	SessionCatalog m_catalog;   // 值成员（见 catalog() 的说明）
 
 	QString m_status;

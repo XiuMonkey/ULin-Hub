@@ -3,14 +3,14 @@
 // 分层（领域归位 2026-10-15）：本文件在 common/shell/ —— **领域与纯逻辑层**（块列表的状态机本体：
 // 增删、同类编号、活动索引收敛、"关光了回主界面"都在这里）。它不 import 任何 QML 概念
 // （只用 QtCore 的 QAbstractListModel），可以脱离 QML 引擎单测（见 misc/tools/cpp-selfcheck 的 ②）。
-// QML 面（单例名 `Dock`、类型注册）在 src/core/main.cpp 与 qml/basic/shell/PanelDock.qml，
+// QML 面（单例名 `PanelBarDock`、类型注册）在 src/core/main.cpp 与 qml/basic/shell/PanelBarDockView.qml，
 // 那边只接线、不放算法。
 //
-// 面板坞（右栏顶部那些"块" = 页签）的模型 —— 从 basic/shell/PanelDock.qml 的 JS 数组搬来。
+// 面板坞（右栏顶部那些"块" = 页签）的模型 —— 从 basic/shell/PanelBarDockView.qml 的 JS 数组搬来。
 //
 // 为什么进 C++（与仓库既有分层一致）：块的增删、同类编号、活动索引收敛、"关光了回主界面"
 // 都是能被字符串/数字独立描述、脱离窗口就能断言的东西。留在 QML 里既没法单测，
-// 也会随风格包被拷一份出来（PanelDock.qml 是可被风格包覆盖的单元）。
+// 也会随风格包被拷一份出来（PanelBarDockView.qml 是可被风格包覆盖的单元）。
 //
 // 内容路由按同一条判据归位（2026-10-15 二改）：`kind → 视图` 的映射表在 viewFor()，与中文块名
 // kindLabel() 同层 —— QML 只按 C++ 给的那组值装机（url / 要不要当前块 / 兜底文案），
@@ -23,14 +23,13 @@
 //   · close() 后活动索引**只在越界时**收敛（`activeIndex >= count ⇒ count-1`）：关掉活动块
 //     前面那块时索引不动 ⇒ 选中的是"原来的下一块"，这也是既有行为；
 //   · showHome()（⌂）只切显示，块全部保留；
-//   · openUrl()（扩展面板）与 open("browser") 是同一条路径，只多记 owner/url/标题：编号规则、
-//     追加即激活、离开主界面都不变；closeOwned(owner) 按 owner 从后往前关，空 owner（用户自己开的
-//     块）永远不批量关；
-//   · 通知语义与 QML 属性一致：值没变就不发通知（QML 赋同值不会发 changed，PanelDock 的
+//   · openUrl() 与 open("browser") 是同一条路径，只多记一个初始地址并**返回块 id**：
+//     编号规则、追加即激活、离开主界面都不变；closeBlock(id) 按稳定 id 关（id 由 openUrl/open 产出）；
+//   · 通知语义与 QML 属性一致：值没变就不发通知（QML 赋同值不会发 changed，PanelBarDock 的
 //     内容重放动画正是挂在两个属性的 changed 上 —— 多发一次就会多播一次动画）。
 //
 // 进程内一份（右栏只有一份面板坞，块列表要跨"右栏开合 / 风格包重载"活着），
-// 因此做成 QML 单例（QML 名 `Dock`，注册见 main.cpp）。
+// 因此做成 QML 单例（QML 名 `PanelBarDock`，注册见 main.cpp）。
 
 #include <QAbstractListModel>
 #include <QByteArray>
@@ -39,7 +38,7 @@
 #include <QVariantList>
 #include <QVector>
 
-class PanelDockModel : public QAbstractListModel
+class PanelBarDockModel : public QAbstractListModel
 {
 	Q_OBJECT
 		Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
@@ -66,12 +65,12 @@ class PanelDockModel : public QAbstractListModel
 		// 浏览器块就是空，面板照旧显示"输入网址"的空态）。视图侧调用方是 WebBrowserPanel.startUrl。
 		Q_PROPERTY(QString activeViewUrl READ activeViewUrl NOTIFY activeViewChanged)
 	// 启动器目录（三种块的中文名与说明只有这一份，QML 不再拼）
-	Q_PROPERTY(QVariantList launcherItems READ launcherItems CONSTANT)
+	Q_PROPERTY(QVariantList launcherItems READ launcherItems NOTIFY launcherItemsChanged)
 
 public:
 	enum Role
 	{
-		KindRole = Qt::UserRole + 1,   // "terminal" | "browser" | "files"
+		KindRole = Qt::UserRole + 1,   // "terminal" | "browser" | "files" | "pluginUi"
 		TitleRole,
 		BlockIdRole                    // 稳定 id（"blk-1"…）；见 activeBlockId
 	};
@@ -84,7 +83,7 @@ public:
 		QString detail;
 	};
 
-	static PanelDockModel& instance();   // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
+	static PanelBarDockModel& instance();   // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
 
 	// kind 的中文名；未知 kind 与搬家前一样兜底成"文件浏览"
 	static QString kindLabel(const QString& kind);
@@ -102,6 +101,10 @@ public:
 	QString activeViewDetail() const;
 	QString activeViewUrl() const;
 	QVariantList launcherItems() const;
+	// 扩展登记自己的启动器行（宿主不预置任何插件专属入口）：kind 由扩展决定，
+	// 点开等价于 open(kind)，视图由 kind 决定（如 pluginData → 宿主的空壳面板）。
+	void registerLauncher(const QString& kind, const QString& label, const QString& hint);
+	void unregisterLauncher(const QString& kind);
 
 	// 宿主能力：本构建带不带 Qt WebEngine（vcxproj 的 webenginequick + main.cpp 的
 	// QtWebEngineQuick::initialize()，缺一都会在运行期崩而不是报错）。由 main.cpp 启动时注入。
@@ -111,13 +114,14 @@ public:
 
 	// 开一个块：追加 + 激活 + 离开主界面
 	Q_INVOKABLE void open(const QString& kind);
-	// 开一个**带地址的浏览器块**（扩展面板，见 VirtualPanelHost::OpenPanelUrl）：与 open("browser")
-	// 走同一条路径（同类编号 / 追加即激活 / 离开主界面），只多记 owner + url + 可选标题。
-	// owner 为空或 url 为空 ⇒ 拒绝（返回 false）：用户自己开的块 owner 恒为空，绝不能被扩展误认。
-	Q_INVOKABLE bool openUrl(const QString& owner, const QString& url, const QString& title);
-	// 关掉该 owner 开的全部块（从后往前关，逐次走 close() 的收敛逻辑）；返回关掉的数量。
-	// ⚠️ owner 为空时直接返回 0 —— 空 owner 是"用户自己开的块"，不能批量关。
-	Q_INVOKABLE int closeOwned(const QString& owner);
+	// 开一个**带初始地址的浏览器块**：与 open("browser") 走同一条路径（同类编号 / 追加即激活 /
+	// 离开主界面），只多记一个初始地址并**返回它的稳定 id**（"blk-N"；url 为空则拒绝，返回空串）。
+	// 调用方拿 id 就能用 closeBlock 关它 —— 谁开的谁记 id，模型不记"是谁开的"。
+	Q_INVOKABLE QString openUrl(const QString& url, const QString& title);
+	// 按稳定 id 关一块（不存在/已关 = 什么都不做，返回 false）。与 close(index) 同一条收敛逻辑。
+	Q_INVOKABLE bool closeBlock(const QString& blockId);
+	// 当前所有块的稳定 id（按打开顺序）。给"我这块还开着吗"这类判断用。
+	Q_INVOKABLE QStringList blockIds() const;
 	// 关第 index 个块（越界忽略）；关光了回主界面，活动索引收敛到有效值
 	Q_INVOKABLE void close(int index);
 	// 切到第 index 个块（越界忽略；切换同时离开主界面）
@@ -135,6 +139,7 @@ signals:
 	void homeVisibleChanged();
 	void activeChanged();
 	void activeViewChanged();
+	void launcherItemsChanged();
 
 private:
 	struct Block
@@ -142,18 +147,18 @@ private:
 		QString kind;
 		QString title;
 		QString id;    // 稳定 id（见 activeBlockId）；只增不重用
-		QString url;   // 扩展面板的初始地址；用户自己开的块为空（见 activeViewUrl）
-		QString owner; // 开这个块的扩展（安装目录名）；空 = 用户自己开的（见 closeOwned）
+		QString url;   // 初始地址（openUrl 写进来的）；用户自己开的块为空（见 activeViewUrl）
 	};
 
-	explicit PanelDockModel(QObject* parent = nullptr);
+	explicit PanelBarDockModel(QObject* parent = nullptr);
 
 	void setActiveIndex(int index);
 	void setHomeVisible(bool visible);
 	// open() 与 openUrl() 的共同路径：同类编号 → 追加 → 激活 → 离开主界面。
 	// customTitle 非空则用它当块名（扩展面板），否则 kindLabel(kind) + " N"。
-	void appendBlock(const QString& kind, const QString& url, const QString& owner, const QString& customTitle);
+	QString appendBlock(const QString& kind, const QString& url, const QString& customTitle);
 
+	QVariantList m_extraLaunchers;      // 扩展登记的启动器行
 	QVector<Block> m_blocks;
 	int m_activeIndex = -1;              // -1 = 没有活动块（与搬家前 `activeIndex: -1` 同义）
 	bool m_homeVisible = true;           // 开局是主界面（启动器）

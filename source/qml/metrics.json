@@ -1,22 +1,23 @@
 {
   "_readme": "A 层数值 token（圆角/字号/间距/尺寸/阴影/动效）。删除或写坏都不影响启动：缺的键用 ThemeBridge.cpp 的内置默认值补齐，未知键/未知分组会被忽略。",
+  "_source": "圆角/字号/阴影档位对齐 DSH 官方版 base CSS：--dsw-radius-xs4/sm8/md12/lg16/xl20/panel28；--dsw-elevation-soft(0 4px 16px 8, 0 0 24px 8)；滚动条 --dsh-scrollbar-width:5px；动效 .1s/.2s/.3s + cubic-bezier(.4,0,.2,1)。",
   "radius": {
     "window": 12,
     "panel": 12,
-    "card": 10,
-    "inner": 9,
-    "control": 8,
-    "input": 8,
-    "small": 6,
+    "card": 12,
+    "inner": 11,
+    "control": 12,
+    "input": 12,
+    "small": 8,
     "check": 5,
     "tiny": 4,
     "dot": 9,
     "chip": 12,
     "pill": 16,
     "popup": 16,
-    "menu": 12,
+    "menu": 16,
     "float": 20,
-    "composer": 16
+    "composer": 28
   },
   "font": {
     "title": 14,
@@ -67,8 +68,8 @@
     "minConversationWidth": 320,
     "sendButton": 32,
     "selectorChipHeight": 24,
-    "scrollbarThickness": 8,
-    "scrollbarHandleWidth": 6,
+    "scrollbarThickness": 5,
+    "scrollbarHandleWidth": 5,
     "scrollbarHandleMin": 20,
     "editorMinHeight": 48,
     "editorMaxHeight": 140,
@@ -90,19 +91,19 @@
   },
   "shadow": {
     "cardBlur": 8,
-    "cardDy": 2,
+    "cardDy": 3,
     "cardRadius": 12,
-    "inputBlur": 8,
-    "inputDy": 2,
-    "inputRadius": 16,
+    "inputBlur": 16,
+    "inputDy": 4,
+    "inputRadius": 28,
     "floatBlur": 24,
     "floatDy": 8,
     "floatRadius": 14,
     "topBarGap": 8
   },
   "motion": {
-    "fast": 120,
-    "normal": 180,
-    "slow": 260
+    "fast": 100,
+    "normal": 200,
+    "slow": 300
   }
 }

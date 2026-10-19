@@ -15,12 +15,12 @@ Item {
     // 有真实 handle ⇒ 可挂起/恢复/接管/交还。
     // 签名手写：带回参的信号要写全类型；接收端必须具名且**参数带类型标注**（未标注在元对象里是 QVariant，接不上）。
     Component.onCompleted: {
-        HostUi.registerItem("sidebar", this)
-        HostConnections.RegisterConnection("qml.sidebar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sessionBar, "handleSessionCreateFailed(QString)")
-        HostConnections.RegisterConnection("qml.sidebar.openSettings", sessionBar, "openSettingsRequested()", sessionBar, "handleOpenSettings()")
-        HostConnections.RegisterConnection("qml.sidebar.openPluginMarket", sessionBar, "openPluginMarketRequested()", sessionBar, "handleOpenPluginMarket()")
+        HostUi.registerItem("sessionBar", this)
+        HostConnections.RegisterConnection("qml.sessionBar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sessionBar, "handleSessionCreateFailed(QString)")
+        HostConnections.RegisterConnection("qml.sessionBar.openSettings", sessionBar, "openSettingsRequested()", sessionBar, "handleOpenSettings()")
+        HostConnections.RegisterConnection("qml.sessionBar.openPluginMarket", sessionBar, "openPluginMarketRequested()", sessionBar, "handleOpenPluginMarket()")
         // 清空会话与上面两条同一条路：默认处理器在本组件里，扩展可接管这条 index 换成自己的实现
-        HostConnections.RegisterConnection("qml.sidebar.clearSessions", sessionBar, "clearSessionsRequested()", sessionBar, "handleClearSessions()")
+        HostConnections.RegisterConnection("qml.sessionBar.clearSessions", sessionBar, "clearSessionsRequested()", sessionBar, "handleClearSessions()")
     }
     // 四条连接的默认处理器（没人接管时 = 宿主原本行为）
     function handleSessionCreateFailed(message: string) {
@@ -86,11 +86,12 @@ Item {
         anchors.topMargin: 4
         anchors.leftMargin: 10
         anchors.rightMargin: 10
-        text: qsTrId("sidebar_clear_sessions")
+        text: qsTrId("sessionBar_clear_sessions")
+        // 用回实心 danger 胶囊（用户要"颜色还原"：静息 dangerButtonBg、悬停 danger、白字）
         variant: "danger"
         // 语义已核对（旧壳 Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）：
         // 清本地会话数据 + 删服务端全部工作区 + 建一个新的默认会话。请求交给连接表，默认处理器是
-        // handleClearSessions（扩展可接管 "qml.sidebar.clearSessions"）。
+        // handleClearSessions（扩展可接管 "qml.sessionBar.clearSessions"）。
         onClicked: sessionBar.clearSessionsRequested()
     }
 
@@ -102,8 +103,10 @@ Item {
         anchors.topMargin: 4
         anchors.leftMargin: 10
         anchors.rightMargin: 10
-        text: qsTrId("sidebar_new_workspace")
-        variant: "primary"
+        text: qsTrId("sessionBar_new_workspace")
+        // elevated = 官方 secondary 面（buttonBg + 无描边 + textPrimary）；
+        // 不用 primary（近黑/近白实心）是因为两个全宽大胶囊并排时没有主次、也不像官方。
+        variant: "elevated"
         onClicked: Hub.createWorkspace()
     }
 
@@ -129,7 +132,7 @@ Item {
             boxSize: 32
             iconSize: 20
             iconSource: "qrc:/ULinHub/icons/plugin-icon.png"
-            tooltip: qsTrId("sidebar_plugins")
+            tooltip: qsTrId("sessionBar_plugins")
             onClicked: sessionBar.openPluginMarketRequested()
         }
         // 插件转译器的入口按钮**不在这里** —— 它归扩展自己（PluginTranspiler 自绘
@@ -140,7 +143,7 @@ Item {
             boxSize: 32
             iconSize: 20
             iconSource: "qrc:/ULinHub/icons/theme-icon.png"
-            tooltip: qsTrId("sidebar_switch_theme")
+            tooltip: qsTrId("sessionBar_switch_theme")
             onClicked: Hub.toggleTheme()
         }
         IconButton {
@@ -164,7 +167,7 @@ Item {
         anchors.verticalCenter: navColumn.verticalCenter
         spacing: 0
         // 扩展注入点（名字契约见 assets/resources/docs/EXTENSION_DEV.zh-CN.md §11.3）
-        Component.onCompleted: HostUi.registerItem("sidebar.extDock", extDock)
+        Component.onCompleted: HostUi.registerItem("sessionBar.extDock", extDock)
     }
 
     // 尾排：原版 addSpacing(15)（给扩展按钮留位）+ 初始化转圈
@@ -262,7 +265,7 @@ Item {
             visible: list.count === 0 && !Hub.initializing
             width: list.width - 2 * Theme.spacing.cardPadding
             horizontalAlignment: Text.AlignHCenter
-            text: qsTrId("sidebar_no_sessions")
+            text: qsTrId("sessionBar_no_sessions")
             color: Theme.color.textCaption
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption

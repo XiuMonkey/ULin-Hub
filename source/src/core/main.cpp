@@ -17,8 +17,7 @@
 #include "common/appearance/StyleResolver.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
-#include "common/shell/PanelDockModel.h"
-#include "qmlbridge/PanelBarLayout.h"
+#include "common/shell/PanelBarDockModel.h"
 #include "qmlbridge/UrlInputBridge.h"
 #include "common/session/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
@@ -94,13 +93,15 @@ int main(int argc, char* argv[])
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostUi", &HostUi::instance());
 	// 地址栏输入规范化（纯字符串规则在 common/util/UrlInput）：QML 侧 UrlInput.normalize(text)
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "UrlInput", &UrlInputBridge::instance());
-	// 右栏面板坞的块（页签）列表：QML 侧 Dock.open/close/activate/showHome + Repeater { model: Dock }
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Dock", &PanelDockModel::instance());
+	// 右栏面板坞的块（页签）列表：QML 侧 PanelBarDock.open/close/activate/showHome + Repeater { model: PanelBarDock }
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarDock", &PanelBarDockModel::instance());
+	// 同一个实例也登记给插件（kPanelBarDock，"对象直给"那条）：插件可以直接用模型的方法与信号，
+	// 与 VirtualBlockBackendHost 那两条虚接口并存（见 HostIndex.h 的说明）。
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kPanelBarDock, &PanelBarDockModel::instance());
+
 	// 面板坞的运行时能力：本构建带 WebEngine（上面已 QtWebEngineQuick::initialize()，vcxproj 也列了
 	// webenginequick）⇒ 网页/终端块给真视图。缺了它这两个块会降级成说明页，而不是去建 WebEngineView 崩掉。
-	PanelDockModel::instance().setWebEngineAvailable(true);
-	// 右侧栏宽度的钳制策略（纯数值规则）：QML 侧 PanelBarLayout.widthFromDrag(...) 等
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarLayout", &PanelBarLayout::instance());
+	PanelBarDockModel::instance().setWebEngineAvailable(true);
 	// 右栏「终端」块的接线层：QML 侧 Terminal.bindView(blockId)/closeBlock(...) 拿会话与网格模型。
 	// init(api) 已在 QmlBridge::init() 里调过（出站 RPC 只走那一个 DshApiClient）
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Terminal", &TerminalBridge::instance());

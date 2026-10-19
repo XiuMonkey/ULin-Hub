@@ -16,6 +16,7 @@
 #include <QPointer>
 #include <QRunnable>
 #include <QUrl>
+#include <QUrlQuery>
 #include <functional>
 
 // 接管的两半接口：本类实现 VirtualApiHost（插件调宿主），扩展实现 VirtualApiSink。
@@ -274,6 +275,40 @@ public:
 	// 真要做，得在 M4b 给 ShellController 加一条"只刷标题不动选择"的路，再来这里转发。
 	void ExternalRefreshSessionTitles() override;
 
+	// VirtualMain 末尾追加那条的**套壳实现**：原函数 baseUrl() 一行没动，这里只转一下，
+	// 让插件经 VirtualMain 就能拿到引擎地址（`dsh web --port 0`，真实端口只有宿主知道）。
+	QUrl ServerBaseUrl() override { return baseUrl(); }
+	// 【末尾追加】带令牌的启动地址：扩展跑插件 JS 时 fetch 要鉴权
+	QString CurrentSessionId() override { return m_currentSessionId; }
+	// 一行转发：把宿主已鉴权的连接交给扩展
+	QNetworkAccessManager* AuthenticatedHttp() override { return m_nam; }
+	// 通用 RPC：转发到 callMethodValue（数组端点也能拿到值）
+	void CallApi(const char* owner, const QString& method, const QJsonValue& args,
+				 std::function<void(const QJsonValue&)> done,
+				 std::function<void(const QString&, const QString&)> failed) override
+	{
+		Q_UNUSED(owner);
+		callMethodArgs(method, args, std::move(done),
+						[failed](const RpcError& e) {
+							if (failed)
+								failed(e.code, e.message);
+						});
+	}
+	// 实函数：宿主内部（QmlBridge）写，扩展经虚接口读
+	void setCurrentSessionId(const QString& id) { m_currentSessionId = id; }
+	QUrl ServerLaunchUrl() override
+	{
+		QUrl url = baseUrl();
+		if (url.isEmpty())
+			return url;
+		if (!launchToken().isEmpty()) {
+			QUrlQuery query;
+			query.addQueryItem(QStringLiteral("token"), launchToken());
+			url.setQuery(query);
+		}
+		return url;
+	}
+
 	// 铺遮罩 + 居中显示扩展的弹窗 / 收遮罩：QML 壳里对应 AppPopup + Scrim（见 docs/ui-qml-migration-plan.md
 	// §2.4.2 映射表：宿主应提供 Hub.showPopup(item)）。宿主侧**还没实现**，先按迁移计划 D1 留成无操作桩 ——
 	// 扩展自建的顶层窗口照常能显示，只是不吃宿主那层居中遮罩；真要做，在 ShellController 上开 showPopup/hidePopup 再转发过来。
@@ -286,6 +321,8 @@ public:
 
 	// 同 callMethod，但成功回调拿裸 JSON 值
 	void callMethodValue(const QString& method, const QJsonObject& payload, std::function<void(const QJsonValue& value)> onSuccess, std::function<void(const RpcError& error)> onError = {});
+	// 位置参数版（args 可为数组），用于 settings/update 这类方法
+	void callMethodArgs(const QString& method, const QJsonValue& args, std::function<void(const QJsonValue& value)> onSuccess, std::function<void(const RpcError& error)> onError = {});
 
 	// 应答 mux 上的审批/提问帧：rpcId 用帧里的，value 形如 {sessionId, approvalId, outcome}
 	void respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
@@ -421,6 +458,7 @@ private:
 	QHash<QString, PendingCall> m_pending;
 	QHash<QString, PendingCall> m_parsing;  // 响应体已在后台解析、待回投
 	QString m_launchToken;
+	QString m_currentSessionId;   // QmlBridge 写，扩展经 VirtualMain 读
 	QString m_authCookie;
 	bool m_authenticated = false;
 	bool m_authInFlight = false;

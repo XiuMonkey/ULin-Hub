@@ -7,12 +7,51 @@ Item {
     id: root
 
     property string text: ""
+    // [{ id, mediaType }]：消息里的图片附件（源由 Hub.attachmentSource 取）
+    property var images: []
 
     // 宽度上限与旧壳 UserMessageUnit 的 MaxWidth 语义一致：长消息不铺满整行
-    implicitHeight: bubble.implicitHeight
+    implicitHeight: bubble.implicitHeight + (imagesRow.visible ? imagesRow.height + 8 : 0)
+
+    // 图片：贴在气泡上方（右对齐，与气泡同缘）
+    Row {
+        id: imagesRow
+        anchors.right: parent.right
+        anchors.bottom: bubble.top
+        anchors.bottomMargin: 8
+        spacing: 6
+        visible: root.images.length > 0
+        height: visible ? 120 : 0
+
+        Repeater {
+            model: root.images
+
+            Rectangle {
+                required property var modelData
+                width: 120
+                height: 120
+                radius: Theme.radius.small
+                color: Theme.color.inputBg
+                clip: true
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    asynchronous: true
+                    fillMode: Image.PreserveAspectFit
+                    // Hub.attachmentRevision 是依赖项：字节到位后重取一次
+                    source: {
+                        var rev = Hub.attachmentRevision
+                        return rev >= 0 ? Hub.attachmentSource(modelData.id) : ""
+                    }
+                }
+            }
+        }
+    }
 
     Rectangle {
         id: bubble
+        anchors.bottom: parent.bottom
         anchors.right: parent.right
         width: content.width + 2 * Theme.spacing.cardPadding
         implicitHeight: content.contentHeight + 2 * Theme.spacing.buttonPadY
@@ -29,6 +68,7 @@ Item {
             text: root.text
             textFormat: Text.MarkdownText
             font.family: "Microsoft YaHei UI"
+            // 13px（用户要"小一些"）：与 Agent 正文同档，两个气泡的观感才一致
             font.pixelSize: Theme.font.body
         }
 

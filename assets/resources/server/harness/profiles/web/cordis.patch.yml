@@ -85,3 +85,8 @@
 - insert:
     - id: ToolsFilterPlugin
       name: 'ToolsFilterPlugin'
+
+# 演示：第三方插件（设置区 + JSON 数据面）
+- insert:
+    - id: dsh-plugin-appshot
+      name: 'dsh-plugin-appshot'

@@ -9,7 +9,7 @@
 namespace DshHostIndex
 {
 	inline constexpr const char* kMainWindow = "mainWindow";
-	// 2026-10-01 删：kSidebar / kTopBar / kMessageHost（当时的实现类是旧控件壳的 QWidget，已随 src/ui 删除）。
+	// 2026-10-01 删过一批：左/顶栏与消息区的 index（当时的实现类是旧控件壳的 QWidget，已随 src/ui 删除）。
 	// 2026-10-01 **恢复 + 扩容**：QML 时代的做法确定为"不做槽位，拿到宿主对象直接注入"
 	// （见 VirtualCommon.h 的 VirtualUiHost）—— 所以这几个名字回来了，含义变成**宿主 QML 对象的登记名**，
 	// 由对应的 QML 根在 Component.onCompleted 里用 HostUi.registerItem(名字, this) 登记：
@@ -18,10 +18,10 @@ namespace DshHostIndex
 	inline constexpr const char* kShell = "shell";
 	inline constexpr const char* kTitleBar = "titleBar";
 	inline constexpr const char* kTopBar = "topBar";
-	inline constexpr const char* kSidebar = "sidebar";
+	inline constexpr const char* kSessionBar = "sessionBar";
 	inline constexpr const char* kComposer = "composer";
 	// 扩展 UI 宿主单例（HostUi）：转成 VirtualUiHost* 拿上面这些对象、挂载/卸载扩展自己的 QML；
-	// 同一个单例也实现 VirtualPanelHost*（**顶替**面板坞某个块的**后端**，与"追加"相对），所以不再单列 index。
+	// 同一个单例也实现 VirtualBlockBackendHost*（**顶替**面板坞某个块的**后端**，与"追加"相对），所以不再单列 index。
 	inline constexpr const char* kUiHost = "uiHost";
 	// 样式表管理单例（ThemeManager），init() 末尾登记；插件转成 VirtualTheme* 调
 	// ExternalApplyToWindow / ExternalReloadStyles，以及末尾追加的 ExternalIsDarkMode /
@@ -38,6 +38,13 @@ namespace DshHostIndex
 	// Takenover / CompleteCall / FailCall。每次 attachHost() 里仍建议重新取（旧 QPointer 只会变空，不会变野）。
 	inline constexpr const char* kApiClient = "apiClient";
 	inline constexpr const char* kApiSink = "apiSink";
+	// 右栏面板坞的**块模型本体**（PanelBarDockModel；QML 里的 `PanelBarDock` 是同一个实例）。
+	// 这是"对象直接提供出去"那一条（三条合法方式里的第 1 条）：登记一次，插件拿到的就是模型本身 ——
+	// 能调它所有 Q_INVOKABLE（open / openUrl / closeBlock / blockIds / close / activate / showHome），
+	// 也能直接 connect 它的信号（countChanged / activeChanged / activeViewChanged）。
+	// 与 VirtualBlockBackendHost 的 OpenBlockUrl / CloseBlock 并存：那两条是"给函数套虚接口层"（第 2 条），
+	// 适合只要稳定 ABI、不想依赖模型类布局的扩展；需要看更多状态时直取模型即可。
+	inline constexpr const char* kPanelBarDock = "panelBarDock";
 	// 消息区宿主（MessageHost）那条 index 已于 2026-10-01 删除：MessageHost 是旧控件壳的类，
 	// M8 已随 src/ui 一起删除，index 也从没登记过。
 }

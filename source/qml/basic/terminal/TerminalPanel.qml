@@ -9,7 +9,7 @@
 // ③ 块关掉（切换/收栏）时通知桥解绑。
 //
 // ⚠️ 对外契约不变：`blockId`（模型给的稳定 id）、`sessionId`（默认跟当前会话）、以及**扩展后端那条缝**
-//    （HostUi::SetPanelBackend(owner, "terminal", backend)）。后端被扩展顶替时**还是装自绘视图**：
+//    （HostUi::SetBlockBackend(owner, "terminal", backend)）。后端被扩展顶替时**还是装自绘视图**：
 //    宿主按后端声明的 `apiVersion` 选面 —— >=2 走字节面（hostWrite/hostData，裸字节直通），
 //    否则走页面面（兼容层，deprecated）。两条面都由 TerminalSession 接进同一个 VT，本面板不区分。
 
@@ -22,7 +22,7 @@ pragma ComponentBehavior: Bound
 Item {
     id: root
 
-    // 块的稳定 id（模型给的，见 Dock.activeBlockId / delegate 的 blockId 角色）
+    // 块的稳定 id（模型给的，见 PanelBarDock.activeBlockId / delegate 的 blockId 角色）
     property string blockId: ""
     // 终端是**会话作用域**的：跟着当前会话走（换会话就改挂到那个会话的终端上）
     property string sessionId: Hub.currentSessionId
@@ -30,7 +30,7 @@ Item {
     // 被扩展顶替时的后端（空 = 内置引擎）。**不再"创建时读一次"**：自绘路径下由 Terminal.bindBackend
     // 把这条缝接上，而扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），
     // 所以下面有一个低频轮询兜底（见 syncBackend 的注释）。
-    readonly property var backend: HostUi.panelBackend("terminal")
+    readonly property var backend: HostUi.blockBackend("terminal")
 
     // ANSI 16 色（索引语义固定）：与 TerminalView 内置的默认表同值（两份是有意的 —— 视图那份是
     // "没有宿主时的默认"，这份是"宿主主题的现行值"）。
@@ -46,7 +46,7 @@ Item {
     function syncBackend() {
         // 直接调：attachTransport 自己就是幂等的（同一个后端不重复动作、null→null 也不动作），
         // 所以不需要在这里记"上次是谁"。这样"晚到"与"撤销"两个方向都被覆盖。
-        Terminal.bindBackend(HostUi.panelBackend("terminal"))
+        Terminal.bindBackend(HostUi.blockBackend("terminal"))
     }
 
     Timer {
@@ -70,7 +70,7 @@ Item {
         //    于是 start() 照旧跑一次（内置引擎）。等轮询接上后端后，会话改用后端、引擎那次失败不会影响画面。
         // 后端在场时仍要把"块属于哪个会话"告诉桥：字节面的 hostStart(blockId, sessionId) 要这个参数，
         // 而 bindSession 是**只记 id、不碰引擎**的旁路（不会建终端、不会发任何 terminal/*）。
-        if (HostUi.panelBackend("terminal") === null)
+        if (HostUi.blockBackend("terminal") === null)
             Terminal.start(root.blockId, root.sessionId)
         else
             Terminal.bindSession(root.blockId, root.sessionId)
@@ -111,7 +111,7 @@ Item {
         }
 
         Component.onDestruction: {
-            // 切块/收右栏都会走到这里：只解绑，**不关终端**（关块由 PanelDock 显式调 Terminal.closeBlock；
+            // 切块/收右栏都会走到这里：只解绑，**不关终端**（关块由 PanelBarDock 显式调 Terminal.closeBlock；
             // 后端被顶替时桥会把这两个调用都转给扩展的后端）
             if (root.blockId.length > 0)
                 Terminal.viewGone(root.blockId)

@@ -313,7 +313,7 @@ AttachedPlugin/
 **客户端扩展** —— 装进宿主进程 `<exe>/clientExtensions/<Name>/`，可以带原生 DLL、也可以带 QML。
 
 > ⚠️ **本节分"现状"与"目标形态"**。QML 那一半（扩展 QML 的装载与注入：
-> `HostUi` / `VirtualUiHost`）**已于 2026-10-01 实现**（§11.3 就是实现后的形态）。11.1 表里"扩展能拿到的宿主对象"那句仍是旧的：现在可挂对象是 `shell` / `titleBar` / `topBar` / `sidebar` / `sidebar.extDock` / `composer`。
+> `HostUi` / `VirtualUiHost`）**已于 2026-10-01 实现**（§11.3 就是实现后的形态）。11.1 表里"扩展能拿到的宿主对象"那句仍是旧的：现在可挂对象是 `shell` / `titleBar` / `topBar` / `sessionBar` / `sessionBar.extDock` / `composer`。
 
 ### 11.1 现状（已实现，可直接用）
 
@@ -323,7 +323,7 @@ AttachedPlugin/
 | DLL 装载 | `ClientExtension::loadAll()` / `loadOne()` | 启动时（`engine.load()` 之后）扫目录：没有 `regulation.json5` 的跳过；`main.dll` 优先，否则取目录里第一个 `*.dll`；`QPluginLoader` → `qobject_cast<DshHostPlugin*>` → `setHostIdentity(目录名)` → `attachHost()`。全程 **GUI 线程** |
 | 卸载 | `ClientExtension::remove()` | 先删判据（`regulation.json5`）⇒ 不再算已安装；dll 被占用则留残留，下次启动 `sweepPendingRemovals()` 清 |
 | 管理界面 | `Hub.extensions`（`ExtensionManagerController` + `basic/extensions/ExtensionManagerPage.qml`） | 两种来源：工具扩展（`profiles/web/extensions.json`）、客户端扩展（`<exe>/clientExtensions`） |
-| 扩展能拿到的宿主对象 | `DshHost::findObject` | `themeManager` / `translationNotifier` / `connectionManager` / `apiSink` 四个（旧控件壳时代的 `sidebar` / `topbar` / `mainWindow` 随 M8 删除，取到 **null**）。**界面注入点另走一套名字**（`VirtualUiHost::HostItem(...)`，非 `findObject`）：`shell` / `titleBar` / `topBar` / `sidebar` / `sidebar.extDock` / `composer`，2026-10-01 起已恢复登记，见 §11.3 的表 |
+| 扩展能拿到的宿主对象 | `DshHost::findObject` | `themeManager` / `translationNotifier` / `connectionManager` / `apiSink` 四个（旧控件壳时代的 `sidebar` / `topbar` / `mainWindow` 随 M8 删除，取到 **null**）。**界面注入点另走一套名字**（`VirtualUiHost::HostItem(...)`，非 `findObject`）：`shell` / `titleBar` / `topBar` / `sessionBar` / `sessionBar.extDock` / `composer`，2026-10-01 起已恢复登记，见 §11.3 的表 |
 
 ### 11.2 目标形态：包结构
 
@@ -387,8 +387,8 @@ QML 里可以**一比一对应**，因为 QML item 本身就是 `QObject`：
 ```cpp
 // 宿主：QML 根对象在 Component.onCompleted 里登记（HostUi 是 C++ 支撑的 QML 单例）
 HostUi.registerItem("topBar", this)     // TopBar.qml 的根
-HostUi.registerItem("sidebar", this)    // Sidebar.qml 的根
-HostUi.registerItem("sidebar.extDock", extDock)   // 侧栏底部图标行里的"扩展停靠位"（一个 Row）
+HostUi.registerItem("sessionBar", this)    // SessionBar.qml 的根
+HostUi.registerItem("sessionBar.extDock", extDock)   // 侧栏底部图标行里的"扩展停靠位"（一个 Row）
 HostUi.registerItem("shell", this)      // Shell.qml 的根
 HostUi.registerItem("titleBar", this); HostUi.registerItem("composer", this); …
 // 扩展（DLL）：QObject* obj = DshHost::findObject("topBar");
@@ -401,8 +401,9 @@ HostUi.registerItem("titleBar", this); HostUi.registerItem("composer", this); �
 | `shell` | `basic/shell/Shell.qml` | 自由 `Item` | 自己写 `anchors` / `x,y`（整屏叠加用） |
 | `titleBar` | `skin/window/TitleBar.qml` | 自由 `Item` | 同上 |
 | `topBar` | `basic/topbar/TopBar.qml` | `Row`（位置器） | **自动排在末尾**（= `addWidget` 的手感） |
-| `sidebar` | `basic/sidebar/Sidebar.qml` | 自由 `Item` | 自己写 `anchors`（贴底那排就是 `anchors.bottom`） |
-| `sidebar.extDock` | 同上（底部图标行里的一个 `Row`） | `Row`（位置器） | **自动排在末尾** —— 扩展的入口按钮走这里；**按钮与图标都归扩展**，宿主不画没装的扩展的入口。没有扩展注入时它是空的（宽度 0） |
+| `sessionBar` | `basic/session/SessionBar.qml` | 自由 `Item` | 自己写 `anchors`（贴底那排就是 `anchors.bottom`） |
+| `sessionBar.extDock` | 同上（底部图标行里的一个 `Row`） | `Row`（位置器） | **自动排在末尾** —— 扩展的入口按钮走这里；**按钮与图标都归扩展**，宿主不画没装的扩展的入口。没有扩展注入时它是空的（宽度 0） |
+| `panelBarDock.extDock` | `basic/panel/PanelBar.qml`（右栏标题行、窗口按钮左边的 `Row`） | `Row`（位置器） | 同上。**"功能面"类扩展入口走这里**（插件界面 / 面板类），会话级入口才用 `sessionBar.extDock`。2026-10-17 追加 |
 | `composer` | `basic/chat/Composer.qml` | 自由 `Item` | 同上 |
 
 **② 注入（DLL 侧）** —— 宿主只给两个原语，怎么挂由扩展自己决定：
@@ -469,7 +470,7 @@ Item {
 
 | 契约 | 载体 | 现在 | 不一致时 |
 |---|---|---|---|
-| C++ 插件面 | `VirtualClass/VirtualCommon.h` 的虚接口 | `VirtualConnectionManager` / `VirtualTheme` / `VirtualTranslation` / `VirtualApiSink` / `VirtualUiHost` / `VirtualPanelHost` | 方法只许**末尾追加**；DLL 与宿主版本不匹配时 `qobject_cast` 失败即视为不实现 |
+| C++ 插件面 | `VirtualClass/VirtualCommon.h` 的虚接口 | `VirtualConnectionManager` / `VirtualTheme` / `VirtualTranslation` / `VirtualApiSink` / `VirtualUiHost` / `VirtualBlockBackendHost` | 方法只许**末尾追加**；DLL 与宿主版本不匹配时 `qobject_cast` 失败即视为不实现 |
 | 宿主界面契约 | `pack.json` 的 `uiAbi`（皮肤包）/ 客户端扩展 `regulation.json5` 的 `ABIVersion` | **3**（`kStylePackUiAbi`） | 皮肤包 ⇒ 整包拒载回退内置；扩展 ⇒ **只装 DLL，不落该扩展的 `ui/`**（DLL 部分照旧） |
 
 ### 11.6 最小示例（`extensions/PluginTranspiler` 就是活样例）
@@ -480,7 +481,7 @@ extensions/PluginTranspiler/
 ├── main.cpp              attachHost()：
 │                           auto* ui = qobject_cast<VirtualUiHost*>(DshHost::findObject(DshHostIndex::kUiHost));
 │                           ui->MountInto("PluginTranspiler", "shell", "<自己的>/ui/PluginTranspiler.qml", this);
-├── ui/EntryButton.qml     入口按钮（自绘，注入 sidebar.extDock；required property var context）
+├── ui/EntryButton.qml     入口按钮（自绘，注入 sessionBar.extDock；required property var context）
 ├── ui/PluginTranspiler.qml  required property var context（required 属性由宿主 createWithInitialProperties 注入）；
 │                           面板只读宿主 Theme token（`import ULinHub 1.0`），不写死配色
 └── PluginTranspiler.vcxproj  MSBuild 构建 main.dll（POST_BUILD 把 regulation.json5 + ui/ 拷到部署目录）
@@ -488,10 +489,10 @@ extensions/PluginTranspiler/
 
 > 样例扩展 `extensions/QuickOrbit/` 于 2026-10-10 删除：它走的是"自己 `new QQuickView` 开独立窗口"的
 > 旧路，依赖的 `QQuickSupport` 运行时包与 `Subtype` 门控都已退役，且从没部署过 —— 要看真样例就看
-> `extensions/PluginTranspiler`（侧栏入口：扩展自绘按钮注入 `sidebar.extDock`）与 `extensions/CodexBackend`（后端接管 + 注入面板）。
+> `extensions/PluginTranspiler`（侧栏入口：扩展自绘按钮注入 `sessionBar.extDock`）与 `extensions/CodexBackend`（后端接管 + 注入面板）。
 
 **侧栏入口怎么接**：**按钮归扩展自己** —— 扩展自绘一颗入口按钮，注入宿主的侧栏停靠位
-`sidebar.extDock`（`Row`，位置器自动排布；所以扩展 QML **不写 x / y / anchors**，只给宽高）：
+`sessionBar.extDock`（`Row`，位置器自动排布；所以扩展 QML **不写 x / y / anchors**，只给宽高）：
 
 ```qml
 // <扩展>/ui/EntryButton.qml —— 入口连图标一起归扩展，宿主不画
@@ -505,21 +506,21 @@ Item {
 
 ```cpp
 // attachHost() 里（⚠️ 用 0ms 定时器延后，理由见 §11.3 的登记时机）
-ui->MountInto("PluginTranspiler", "sidebar.extDock", "<自己的>/ui/EntryButton.qml", bridge);
+ui->MountInto("PluginTranspiler", "sessionBar.extDock", "<自己的>/ui/EntryButton.qml", bridge);
 ```
 
 > **宿主不摆"未装扩展"的哑按钮**：插件转译器不是宿主的功能，停靠位在没有扩展注入时是空的。
-> 旧做法（宿主 `Sidebar.qml` 画一颗按钮 + 登记 `qml.sidebar.openPluginTranspiler`，扩展用
+> 旧做法（宿主 `SessionBar.qml` 画一颗按钮 + 登记 `qml.sessionBar.openPluginTranspiler`，扩展用
 > `TakeoverConnection` 接管、`ReleaseTakeover` 交还）**已于 2026-10-12 退役** —— 它会让宿主在
 > 扩展没装时露出一颗点了没反应的按钮。要接管宿主**既有**按钮 / 信号，机制本身仍在
 > （`VirtualConnectionManager`），`extensions/CodexBackend` 是活样例。
 > 副作用提醒：给扩展按钮**另起 owner**（PanelAnimDemo 用 `<扩展名>/panel` 给面板）——
 > `UnmountOwner` 是按 owner 整批删的，入口按钮与面板共用一个 owner 会把按钮一起摘掉。
 
-### 11.7 顶替面板坞的块后端（`VirtualPanelHost`，2026-10-15 加的接缝）
+### 11.7 顶替面板坞的块后端（`VirtualBlockBackendHost`，2026-10-15 加的接缝）
 
 §11.3 的注入是"往宿主对象下面**追加**"。若要的是**替换** —— 比如让终端块不再走内置的
-服务端引擎，改用扩展自己的（本地）终端 —— 走另一条接口 `VirtualPanelHost`
+服务端引擎，改用扩展自己的（本地）终端 —— 走另一条接口 `VirtualBlockBackendHost`
 （`kUiHost` → `HostUi` 单例，与 §11.3 的注入共用同一个宿主面）。
 
 **它换的是"后端"，不是"界面"**：终端块照旧由宿主的 `TerminalPanel` + WebEngine + xterm.js 渲染
@@ -529,14 +530,14 @@ ui->MountInto("PluginTranspiler", "sidebar.extDock", "<自己的>/ui/EntryButton
 ```cpp
 // attachHost() 里直接调即可 —— 它只往 HostUi 写一条登记、不碰宿主 QML 对象，没有 §11.3 的
 // "等 registerItem" 时序问题。⚠️ 但必须赶在该块的面板被创建之前：面板只在创建时取一次后端。
-auto* panels = qobject_cast<VirtualPanelHost*>(DshHost::findObject(DshHostIndex::kUiHost));
+auto* panels = qobject_cast<VirtualBlockBackendHost*>(DshHost::findObject(DshHostIndex::kUiHost));
 if (panels) {
-    panels->SetPanelBackend(extensionDirName(),   // owner：撤的时候认它
+    panels->SetBlockBackend(extensionDirName(),   // owner：撤的时候认它
                             "terminal",            // kind：当前只有 "terminal" 落地
                             m_backend);            // 你的后端对象（契约见下表）
 }
 // detachHost() 里撤（也可以不写 —— 宿主卸载扩展时会按 owner 整批撤，见第 3 条）
-panels->ClearPanelBackend(extensionDirName(), "terminal");
+panels->ClearBlockBackend(extensionDirName(), "terminal");
 ```
 
 **后端对象的契约** —— 就是宿主页面 `qrc:/ULinHub/Terminal/terminal.html` 认的那套，与宿主
@@ -583,17 +584,17 @@ panels->ClearPanelBackend(extensionDirName(), "terminal");
 
 四条约定：
 
-1. **按 kind 只记一份后端。** 后登记者取得该 kind，前一份被顶掉；所以 `ClearPanelBackend`
+1. **按 kind 只记一份后端。** 后登记者取得该 kind，前一份被顶掉；所以 `ClearBlockBackend`
    认 owner —— 旧扩展卸载时不会把新扩展顶上去的登记清掉。
 2. **登记时机是启动期**（`attachHost()`）：面板只在创建时读一次后端，晚了它已经接上内置桥。
 3. **卸载不用自己兜底**：宿主在 `ClientExtension::remove` 那条路上按 owner 整批撤
-   （`HostUi::releasePanelBackends`，与 `ReleaseTakeoversFor` 并列）。
+   （`HostUi::releaseBlockBackends`，与 `ReleaseTakeoversFor` 并列）。
 4. ⚠️ 顶替的是**块后端**，不动启动器条目与块标题。想让用户完全看不到宿主的终端入口，那是改
-   界面副本 `<exe>/ui/basic/shell/PanelDock.qml` 的事，与扩展无关。
+   界面副本 `<exe>/ui/basic/shell/PanelBarDockView.qml` 的事，与扩展无关。
 
 **接缝插在哪儿（宿主侧的分层）**：`kind → 视图` 的映射表在 C++
-（`PanelDockModel::viewFor`：逻辑路径 + 要不要当前块 + 兜底文案，与中文块名 `kindLabel()` 同层），
-QML（`PanelDock.qml`）只按那组值装机 —— 路由表达式里没有任何 kind 字符串，**也不看后端登记**
+（`PanelBarDockModel::viewFor`：逻辑路径 + 要不要当前块 + 兜底文案，与中文块名 `kindLabel()` 同层），
+QML（`PanelBarDockView.qml`）只按那组值装机 —— 路由表达式里没有任何 kind 字符串，**也不看后端登记**
 （后端是"页面接谁"的事，与"装哪个视图"无关）。宿主侧只有两处读这份登记：`TerminalPanel.qml`
 创建时取一次、交给 `Terminal.registerOn(channel, backend)`，以及 `TerminalBridge` 把
 `pageGone` / `closeBlock` 转给后端。
@@ -605,5 +606,226 @@ QML（`PanelDock.qml`）只按那组值装机 —— 路由表达式里没有任
 **为什么是加接缝而不是让扩展硬顶**：面板坞的块由 C++ 模型决定（`launcherItems` 是 CONSTANT），
 "页面接谁"由宿主 QML 在 `Component.onCompleted` 里注册信道时定，且终端这条链路没进
 `ConnectionManager` 的登记表 —— "接管信号 / 抢 QWebChannel 注册"都够不着它。
-`VirtualPanelHost` 把"块后端由谁提供"变成一个**显式的可登记点**：宿主改一处，扩展不必猜对象、
+`VirtualBlockBackendHost` 把"块后端由谁提供"变成一个**显式的可登记点**：宿主改一处，扩展不必猜对象、
 不必抢时机。
+
+### 11.8 在右栏开一块"带地址的块"（2026-10-17）
+
+用途：插件自己 serve 一个页面，把它开成右栏的一块块。那块与"网页浏览"是**同一块**
+（kind = `browser`、宿主的 `WebBrowserPanel`），所以外观/行为不需要任何新东西 ——
+需要只是"谁能请块模型追加一块带初始地址的块"。
+
+**分两层：底下原函数保持自然，上面套一层虚接口做加法。**
+
+| 层 | 内容 |
+|---|---|
+| 原函数（自然能力，与扩展无关） | `PanelBarDockModel::open(kind)`（原有）、`openUrl(url, title)` 返回块 id、`closeBlock(id)`、`blockIds()`。这些是"块模型本来就该有的事"（开一块带初始地址的浏览器块、按稳定 id 关、列出 id） |
+| 虚接口层（加法·纯转发） | `VirtualBlockBackendHost::OpenBlockUrl(url, title)` / `CloseBlock(blockId)` —— `HostUi` 的实现只调用上面两个原函数；`VirtualMain::ServerBaseUrl()` 的实现只 `return baseUrl();` |
+
+三条**合法**的提供方式，本版**前两条都已落地、第三条天然可用**，可并存：
+
+1. **把对象直接提供出去**：块模型本体登记为 `kPanelBarDock`（[HostIndex.h] 有完整说明）。扩展取到后
+   能调它**全部** `Q_INVOKABLE`（`open` / `openUrl` / `closeBlock` / `blockIds` / `close` / `activate` /
+   `showHome`），也能直接 `connect` 信号；
+2. **给函数套虚接口层**：`VirtualBlockBackendHost::OpenBlockUrl` / `CloseBlock`、`VirtualMain::ServerBaseUrl`
+   —— 实现只转发/套壳；
+3. **作为槽**：上面那些方法本来就是 `Q_INVOKABLE`，信号可 `connect`（第 1 条与第 3 条是同一批东西的两种用法）。
+
+非法的是：前三者能完成工作时，再刻意加一批"一看就是给扩展用的"函数。
+本版所有接口都属三种之内，且原函数没有为扩展改动过一行。
+
+**选哪条**：只要"开一块 / 关一块"，用第 2 条（虚接口）最小耦合；要看更多状态（活动块、块列表、
+信号）或想省掉转发层，直取 `kPanelBarDock` 的模型本体。
+
+```cpp
+// attachHost() 里（只碰 C++ 侧对象，没有"等 QML 登记"的时序问题）
+auto* panels = qobject_cast<VirtualBlockBackendHost*>(DshHost::findObject(DshHostIndex::kUiHost));
+if (!panels) { /* 宿主太旧：没有这个接口 */ return; }
+
+// 引擎地址（拼同源页面 URL 用；接管态下为空）
+QUrl base;
+if (auto* api = qobject_cast<VirtualMain*>(DshHost::findObject(DshHostIndex::kMainWindow)))
+    base = api->ServerBaseUrl();
+
+// 开一块：与用户点"网页浏览"同一条路径（同类编号 / 追加即激活 / 离开主界面）
+const QString blockId = panels->OpenBlockUrl(base.toString() + QStringLiteral("/plugin-ui/myplugin/"),
+                                             QStringLiteral("插件 A"));
+// blockId 由**调用方**记住（模型不记"是谁开的"）；关的时候原样传回：
+panels->CloseBlock(blockId);
+```
+
+| 成员 | 语义 |
+|---|---|
+| `OpenBlockUrl(url, title)` | 追加一块 browser 块并激活，返回 **块 id**（`"blk-N"`）；`url` 为空 ⇒ 返回空串，什么都不开；`title` 空 ⇒ 用内置块名"网页浏览 N" |
+| `CloseBlock(blockId)` | 按稳定 id 关（与按索引关同一条收敛逻辑）；id 不存在/已关 ⇒ `false` |
+| `ServerBaseUrl()` | 干净的引擎 `baseUrl`（无 query/fragment、不含启动令牌；接管态为空） |
+
+**入口就是启动器里的第四行"插件界面"（2026-10-17）**
+
+面板坞的启动器（没有活动块时那一页）现在有四行：终端 / 网页浏览 / 文件浏览 / **插件界面**。
+第四行点开是一块 `pluginUi` 块，**视图仍是宿主的浏览器面板**（地址栏/前进后退/主题全一样），
+初始地址取自块模型的 `pluginPageUrl` 数据属性 —— 扩展在装载期写一次：
+
+```cpp
+QObject* dock = DshHost::findObject(DshHostIndex::kPanelBarDock).data();   // 对象直给
+dock->setProperty("pluginPageUrl", QStringLiteral("http://127.0.0.1:8765/"));  // 纯数据，无函数
+```
+
+要点：
+
+1. **扩展不画入口**：入口是宿主启动器的一行（与另外三个块同形），扩展只提供"显示哪个页面"；
+2. `pluginPageUrl` 是 `Q_PROPERTY(... WRITE ...)`，写它是 `setProperty`，不是调新函数；
+3. 用户自己开的"网页浏览"块**不受** `pluginPageUrl` 影响（`activeViewUrl` 只在 `pluginUi` 块上回落它）；
+4. 若某个构建还需要"放进侧栏/标题行的按钮"那种入口，`panelBarDock.extDock` / `sessionBar.extDock`
+   两个停靠位仍在（`HostUi.registerItem` 登记名，注入方式见 §11.3）；挂载要用
+   `HostUi::namesChanged` 信号等停靠位出现，**别用 0ms 定时器**（装载期可能不触发，实测）。
+**插件设置落点（`pluginUi.settings`，2026-10-17）**
+
+生态里 13 个带界面的第三方插件，**10 个把界面挂在设置页**（`settings.section` / `settings.*`）。
+壳的"插件界面"面板（`basic/panelui/PluginUiPanel.qml`）里留了一个**设置区**，登记名
+`pluginUi.settings`（一个 `Column`）；扩展可以按 `adapters.json` 把"原来在设置页里的东西"
+搬到这个区里，一块插件一张卡片。
+
+```json
+// <扩展目录>/adapters.json
+{ "sections": [
+  { "plugin": "dsh-plugin-appshot", "slot": "settings.section", "title": "截图设置（appshot）",
+    "detail": "原位置：DSH 设置页分区。自带 JSON 数据面。", "actionLabel": "查看设置数据",
+    "api": "/plugins/appshot/config" }
+] }
+```
+
+扩展侧做三件事：读 `adapters.json` → 连 `HostUi::namesChanged` 等 `pluginUi.settings` 出现 →
+`MountInto(owner, "pluginUi.settings", "<扩展>/ui/PluginSettingSection.qml", bridge)`。
+`api` 非空时卡片带一个按钮，把它开成一块 browser 块看数据（下一步换成原生表单）。
+
+**取数是原生的（实测 2026-10-17）**
+
+卡片不再"开一块网页看 JSON"：`SectionBridge` 用 `QNetworkAccessManager` 直接 GET 插件的数据面，
+把 JSON 展平成 `rows`（key/value）交给 QML 原生渲染 —— 全程不碰 WebEngine。
+
+两个实测要点：
+
+1. **引擎地址要现取**：扩展装载时引擎往往还没打印 `dsh web:` 地址，所以 `refresh()` 里每次现取
+   `VirtualMain::ServerBaseUrl()`；取不到就自动重试（1.5s × 8）。
+2. **认证栅栏只挡住 SPA 根**：`GET /` 返回 **401**（要 `dsh-auth` cookie，扩展没有）；
+   而插件自己 `webServer.register` 的路由**不带 cookie 也能取**（前面 §11.8 已实测）。
+   ⇒ 取插件数据不需要令牌，取引擎 SPA 资源才需要。
+3. 数据面没装插件时是 **404**（`/dsh-time-machine/snapshots`、`/plugins/appshot/config` 实测）；
+   要看到真实行，得先把那个插件装进 profile。
+
+**公共落点表（2026-10-18）**
+
+原则：**落点是公共的，代码里没有插件特例**；一个插件界面"原来在哪、用什么渲染"由适配器声明。
+宿主提供三种能力，扩展按插件实际提供的东西选：
+
+| 插件提供的东西 | 落点 | 宿主能力 |
+|---|---|---|
+| JSON 数据面（`/plugins/x/...`） | 原生（键值 + 可编辑 + 台账） | `OpenBlockUrl` / 门户面板（QML） |
+| **自 serve 的 HTML 页面** | **网页窗口**（WebEngine 解析，前进/后退/刷新） | `OpenWebWindow(owner, url, title)`（2026-10-18 追加，通用） |
+| 只有 React 客户端半（无页面、无数据面） | 无解（如实标注） | — |
+
+适配器字段：`"web": "" | "engine" | "http(s)://…" | "/相对路径"`。
+
+实测结论（2026-10-18）：
+
+1. **插件自 serve 的页面**：可用。验证页 `http://127.0.0.1:8765/` 在 WebEngine 窗口里完整渲染。
+2. **`"web": "engine"`（引擎自带 SPA）**：**不可用** —— 窗口能开、页面能载，但 SPA 报
+   `web boot: window.__ModuleLoader__ bootstrap facade is missing`（`dsh web` 的启动壳只有 web 部署才有）；
+   所以别把 `engine` 当作万能兜底。
+3. `dsh-plugin-appshot` 属于第三种：默认热键是"左右 Ctrl 同时按"（无右 Ctrl 的键盘用不了，可改
+   `windowsHotkeys` / `shortcutMode`），截图结果要靠它的 React 客户端消费 `/pending` —— 我们既没有可用
+   页面、又无原生图片显示，所以本版只到"设置可读写"。
+
+**字段名怎么翻译（2026-10-18）**
+
+插件的数据面只给 `key`（`shortcutMode`）和 `value`（`double-ctrl`），**没有文案**。三层来源按优先级取：
+
+| 优先级 | 来源 | 说明 |
+|---|---|---|
+| 1 | `adapters.json` 的 `labels` / `values` | 我们自己写的词条，最准（`"soundEnabled": "提示音"`、`"shortcutMode#double-ctrl": "双击 Ctrl"`） |
+| 2 | **插件自带词条表** | 扫插件包 `dist/client.js`（及 `client.js` 等同位文件）里 `<标识符>: "<含中文的串>"` 的字面量表。实测：`dsh-electro-lab` 带（`languageAuto: "自动（跟随文档）"`），`dsh-plugin-appshot` 不带（它自己的界面就是英文硬编码） |
+| 3 | 内置词典 | `platform→平台`、`shortcutMode→快捷键方式`、`soundEnabled→提示音`、`animationEnabled→动画效果`、`windowsHotkeys→Windows 快捷键`…，值是布尔就显示 开/关，快捷键表显示成 `左 Ctrl / 右 Ctrl` |
+
+三个落地细节：
+
+1. 抽词条是**启发式**（正则扫字面量），所以 `adapters.json` 的词条永远优先，用来纠偏；
+2. 写回用的是**原始 key**、编辑框里是**原始 value**，只有显示层被翻译（不要把 `开` 发回服务端）；
+3. 有些插件用宿主的 locale 服务（`t$1("languageAuto")`，只有 key，文案在宿主侧）——这类我们拿不到表，会落到内置词典/原始 key。
+
+**设置项可写 + 落了没人接就隐藏（2026-10-18）**
+
+两件事都靠 `adapters.json` 的两个新字段：
+
+```json
+{ "plugin": "dsh-plugin-appshot", "slot": "settings.section", "title": "截图设置（appshot）",
+  "api": "/plugins/appshot/config",
+  "installDir": "dsh-plugin-appshot",   // 检测"装没装"：profile/node_modules/<这个>
+  "writable": true }                    // 允许在仪表盘里改（POST 合并补丁）
+```
+
+1. **隐藏**：`installDir` 对不上（没装）或数据面回 **404** ⇒ 该分区不出现在侧栏/仪表盘里；
+   整块都没有分区时侧栏的"插件设置"标题也一起隐藏（宿主面板按容器子项数决定）。
+2. **写回**：仪表盘卡片上的「编辑」→ 每行变成输入框 + 保存 → `POST <api>`，
+   body 是 `{"<key>": <value>}`（布尔/数字/JSON 会还原成真类型）。**写的是插件自己的接口**，
+   不拦截、不改插件代码；成功后立刻 GET 读回真实值。
+3. 引擎地址在装载期还没发布 ⇒ 读与写都会**排队重试**（1.5s × 8），用户的编辑不会丢。
+
+**插件数据块（`pluginData`）：原生选项卡，不是网页**
+
+点卡片上的「在新选项卡打开」会开一块 **`pluginData`** 块。它的外壳是宿主的
+`basic/panelui/PluginDataPanel.qml`（标题 + 空态 + 一个名为 **`pluginData.host`** 的容器），
+**内容由扩展注入**：
+
+```cpp
+// 1) 开块（模型自己的 Q_INVOKABLE，与"网页浏览"同一个 open(kind)）
+QMetaObject::invokeMethod(dock, "open", Q_ARG(QString, QStringLiteral("pluginData")));
+// 2) 等 pluginData.host 被登记（namesChanged）后注入原生视图
+ui->MountInto(owner, "pluginData.host", "<扩展>/ui/PluginDataView.qml", bridge);
+```
+
+视图里的数据由 `SectionBridge` 用 `QNetworkAccessManager` 取（**不经过 WebEngine**），
+展平成 rows 原生渲染；`刷新` 由用户触发，也支持自动重试等引擎地址就绪。
+
+**DSH slot → 我们壳里的落点（当前覆盖）**
+
+| DSH slot | 我们的落点 | 状态 |
+|---|---|---|
+| `settings.section` / `settings.*` / `plugins.*` | 插件界面面板的 `pluginUi.settings` 区 | ✅ 已通（`adapters.json`） |
+| `sidebar.right.pane.tab` | 右栏面板坞的块（`openUrl`） | ✅ 已通 |
+| `sidebar.footer.action` | 左栏 `sessionBar.extDock`（Row） | ✅ 已通（注入） |
+| `shell.overlay` / `conversation.composer` | `shell` / `composer` 注入点 | ✅ 已通（注入） |
+| `conversation.chat.node` / `tool.call.toolview` / 会话头 | — | ❌ 未映射（如实标注） |
+
+**插件侧要做什么**
+
+插件的 GUI 必须能以**独立页面**打开 —— 用 `ctx.webServer.register` 注册路由返回 HTML：
+
+```js
+export function apply(ctx) {
+  ctx.inject(['webServer'], (webCtx) => {
+    webCtx.effect(() => webCtx.webServer.register({
+      kind: 'exact',
+      path: '/plugin-ui/myplugin/',
+      handler: async (req, res) => {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><div id="root"></div><script src="/plugin-ui/myplugin/app.js"></script>');
+      },
+    }));
+  });
+}
+```
+
+三条**实测过**的约定（2026-10-17，引擎副本）：HTML/JS/CSS 都能发；与 `/api/*` 同源（页面可
+直接 `fetch`）；⚠️ 自定义路由**不在认证栅栏后面**（不带 cookie 也 200，鉴权得插件自己负责）。
+
+四条容易踩的：
+
+1. **URL 必须完整**（含 scheme）：宿主视图走"程序化打开"入口，故意不过 `UrlInput` 的输入规整；
+2. **谁开的谁记 id**：模型不记归属；块被用户点 ✕ 关掉后宿主不会通知你，要判断就 `blockIds()`；
+3. `openUrl` 与 `open` 同一条通知节奏（多一次 `activeViewChanged` 就多播一次内容重放动画）；
+4. 卸载扩展时自己 `CloseBlock`（宿主不按归属清块）。
+
+**生态现状（重要）**：第三方插件的 GUI 基本都是 `dsh.client` 的 React 客户端半（跑在 DSH web
+客户端的 slot 里，例如 `dsh-client-ui-scan2ebook` 的右栏 tab），**Qt 壳渲染不了**。能进这块的只有：
+①插件自 serve 的页面；②由扩展/宿主按插件数据重画的界面（②需要"页面 + 数据桥"，下一步）。

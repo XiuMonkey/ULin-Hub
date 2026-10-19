@@ -1,12 +1,15 @@
 #include "ExtensionSystem/HostUi.h"
 
-#include "common/shell/PanelDockModel.h"
+#include "common/shell/PanelBarDockModel.h"
+
 
 #include <QDebug>
 #include <QFileInfo>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QWindow>
+#include <QQuickWindow>
 #include <QQuickItem>
 #include <QUrl>
 #include <QVariantMap>
@@ -203,16 +206,16 @@ QVariantList HostUi::mounted() const
 	return rows;
 }
 
-bool HostUi::SetPanelBackend(const QString& owner, const QString& kind, QObject* backend)
+bool HostUi::SetBlockBackend(const QString& owner, const QString& kind, QObject* backend)
 {
 	if (kind.isEmpty())
 		return false;
 	if (!backend) {                  // 空后端 = 撤销，省得调用方自己判
-		ClearPanelBackend(owner, kind);
+		ClearBlockBackend(owner, kind);
 		return true;
 	}
 
-	PanelBackend& entry = m_panelBackends[kind];
+	BlockBackend& entry = m_blockBackends[kind];
 	entry.owner = owner;             // 按 kind 只记一份：后登记者取得该 kind，前一份被顶掉
 	entry.backend = backend;
 	qInfo().noquote() << QStringLiteral("[HostUi] %1: %2 块的后端改由扩展提供（%3）")
@@ -220,33 +223,33 @@ bool HostUi::SetPanelBackend(const QString& owner, const QString& kind, QObject*
 	return true;
 }
 
-void HostUi::ClearPanelBackend(const QString& owner, const QString& kind)
+void HostUi::ClearBlockBackend(const QString& owner, const QString& kind)
 {
-	const auto found = m_panelBackends.constFind(kind);
+	const auto found = m_blockBackends.constFind(kind);
 	// 只撤自己登记的：别的扩展顶上来之后，旧扩展的卸载不该把新登记清掉
-	if (found == m_panelBackends.constEnd() || found.value().owner != owner)
+	if (found == m_blockBackends.constEnd() || found.value().owner != owner)
 		return;
 
-	m_panelBackends.remove(kind);
+	m_blockBackends.remove(kind);
 }
 
-bool HostUi::HasPanelBackend(const QString& kind)
+bool HostUi::HasBlockBackend(const QString& kind)
 {
-	return m_panelBackends.constFind(kind) != m_panelBackends.constEnd();
+	return m_blockBackends.constFind(kind) != m_blockBackends.constEnd();
 }
 
-QObject* HostUi::panelBackend(const QString& kind) const
+QObject* HostUi::blockBackend(const QString& kind) const
 {
-	const auto found = m_panelBackends.constFind(kind);
-	return found == m_panelBackends.constEnd() ? nullptr : found.value().backend.data();
+	const auto found = m_blockBackends.constFind(kind);
+	return found == m_blockBackends.constEnd() ? nullptr : found.value().backend.data();
 }
 
-int HostUi::releasePanelBackends(const QString& owner)
+int HostUi::releaseBlockBackends(const QString& owner)
 {
 	int removed = 0;
-	for (auto it = m_panelBackends.begin(); it != m_panelBackends.end();) {
+	for (auto it = m_blockBackends.begin(); it != m_blockBackends.end();) {
 		if (it.value().owner == owner) {
-			it = m_panelBackends.erase(it);
+			it = m_blockBackends.erase(it);
 			++removed;
 		}
 		else {
@@ -254,36 +257,209 @@ int HostUi::releasePanelBackends(const QString& owner)
 		}
 	}
 
-	// 同一个 owner 开出来的面板也一起关：卸载扩展后右栏留一块点不动的页面没有意义，
-	// 而且它的地址（插件自 serve 的页面）在插件退场后就是 404。放在这里是因为
-	// ClientExtension::remove 已经把"按 owner 整批撤"的活儿都收在这条路上。
-	const int panels = closeOwnedPanelsFor(owner);
-	if (panels > 0)
-		qInfo().noquote() << QStringLiteral("[HostUi] %1 的面板已随扩展卸载关闭（%2 块）").arg(owner).arg(panels);
 	return removed;
+
 }
 
-bool HostUi::OpenPanelUrl(const QString& owner, const QString& url, const QString& title)
+// ---- VirtualBlockBackendHost 末尾追加那两条：纯转发，底下是块模型本来就有的方法 ----
+void HostUi::RegisterLauncher(const char* kind, const char* label, const char* hint)
 {
-	if (owner.isEmpty() || url.isEmpty()) {
-		qWarning().noquote() << QStringLiteral("[HostUi] OpenPanelUrl 拒绝：owner 或 url 为空（owner=%1）").arg(owner);
-		return false;
+	PanelBarDockModel::instance().registerLauncher(
+		QString::fromUtf8(kind ? kind : ""),
+		QString::fromUtf8(label ? label : ""),
+		QString::fromUtf8(hint ? hint : ""));
+}
+
+void HostUi::UnregisterLauncher(const char* kind)
+{
+	PanelBarDockModel::instance().unregisterLauncher(QString::fromUtf8(kind ? kind : ""));
+}
+
+void HostUi::OpenBlock(const char* kind)
+{
+	PanelBarDockModel::instance().open(QString::fromUtf8(kind ? kind : ""));
+}
+
+int HostUi::AttachFilesToComposer(const char* const* paths, int count)
+{
+	if (!paths || count <= 0)
+		return 0;
+	QStringList list;
+	for (int i = 0; i < count; ++i) {
+		const QString path = QString::fromUtf8(paths[i] ? paths[i] : "");
+		if (!path.isEmpty() && QFileInfo::exists(path))
+			list.append(path);
+	}
+	if (list.isEmpty())
+		return 0;
+	qInfo().noquote() << QStringLiteral("[HostUi] AttachFilesToComposer -> %1 个文件").arg(list.size());
+	emit composerFilesRequested(list);
+	return list.size();
+}
+
+QString HostUi::OpenBlockUrl(const QString& url, const QString& title)
+{
+	const QString blockId = PanelBarDockModel::instance().openUrl(url, title);
+	if (blockId.isEmpty()) {
+		qWarning().noquote() << QStringLiteral("[HostUi] OpenBlockUrl 拒绝：url 为空");
+		return blockId;
+	}
+	qInfo().noquote() << QStringLiteral("[HostUi] OpenBlockUrl -> %1（块 %2）").arg(url, blockId);
+	return blockId;
+}
+
+bool HostUi::CloseBlock(const QString& blockId)
+{
+	const bool closed = PanelBarDockModel::instance().closeBlock(blockId);
+	if (closed)
+		qInfo().noquote() << QStringLiteral("[HostUi] CloseBlock: 已关块 %1").arg(blockId);
+	return closed;
+}
+// ---------------- 顶层窗口（扩展的独立界面 / 网页兜底落点） ----------------
+
+QQmlEngine* HostUi::anyEngine() const
+{
+	for (auto it = m_items.constBegin(); it != m_items.constEnd(); ++it) {
+		if (QObject* item = it.value().data()) {
+			if (QQmlEngine* engine = qmlEngine(item))
+				return engine;
+		}
+	}
+	return nullptr;
+}
+
+QWindow* HostUi::mainWindow() const
+{
+	for (auto it = m_items.constBegin(); it != m_items.constEnd(); ++it) {
+		if (auto* item = qobject_cast<QQuickItem*>(it.value().data())) {
+			if (QWindow* window = item->window())
+				return window;
+		}
+	}
+	return nullptr;
+}
+
+QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const QVariantMap& initialProps, const QString& title)
+{
+	if (owner.isEmpty() || source.isEmpty()) {
+		qWarning("[HostUi] openWindow: owner / source 有空值，拒绝");
+		return QString();
 	}
 
-	const bool opened = PanelDockModel::instance().openUrl(owner, url, title);
-	qInfo().noquote() << QStringLiteral("[HostUi] OpenPanelUrl %1 -> %2（%3）")
-		.arg(owner, url, opened ? QStringLiteral("已开") : QStringLiteral("拒绝"));
-	return opened;
+	QQmlEngine* engine = anyEngine();
+	if (!engine) {
+		qWarning() << QStringLiteral("[HostUi] openWindow(%1): 还没有可用的 QML 引擎（宿主对象还没登记？）").arg(owner);
+		return QString();
+	}
+
+	CloseWindow(owner.toUtf8().constData());   // 同一 owner 只留一个窗口
+
+	auto* component = new QQmlComponent(engine, source, this);
+	if (component->isError()) {
+		qWarning().noquote() << QStringLiteral("[HostUi] openWindow(%1): 载入失败 %2\n%3")
+			.arg(owner, source.fileName(), component->errorString());
+		component->deleteLater();
+		return QString();
+	}
+
+	auto* windowContext = new QQmlContext(engine->rootContext(), this);
+	if (initialProps.contains(QStringLiteral("context")))
+		windowContext->setContextProperty(QStringLiteral("context"), initialProps.value(QStringLiteral("context")));
+
+	QObject* created = initialProps.isEmpty() ? component->create(windowContext)
+	                                          : component->createWithInitialProperties(initialProps, windowContext);
+	auto* window = qobject_cast<QQuickWindow*>(created);
+	if (!window) {
+		qWarning().noquote() << QStringLiteral("[HostUi] openWindow(%1): %2 载入/构造失败：%3")
+			.arg(owner, source.fileName(), component->errorString());
+		delete created;
+		windowContext->deleteLater();
+		component->deleteLater();
+		return QString();
+	}
+
+	if (!title.isEmpty())
+		window->setTitle(title);
+
+	WindowEntry entry;
+	entry.id = QStringLiteral("%1#window%2").arg(owner).arg(m_nextId++);
+	entry.owner = owner;
+	entry.window = window;
+	entry.context = windowContext;
+	m_windows.insert(owner, entry);
+
+	// 挂到主窗口上：① 始终浮在主窗口之上 ② 主窗口一关，这些窗口一起关
+	if (QWindow* main = mainWindow()) {
+		window->setTransientParent(main);
+		if (!m_mainHooked) {
+			m_mainHooked = true;
+			QObject::connect(main, &QWindow::visibleChanged, this, [this](bool visible) {
+				if (visible)
+					return;
+				for (const WindowEntry& entry : qAsConst(m_windows)) {
+					if (auto* w = qobject_cast<QWindow*>(entry.window.data()))
+						w->close();
+				}
+			});
+		}
+	}
+
+	// 用户点 × / 代码 close 都会走到这里：回收上下文与窗口对象
+	QObject::connect(window, &QWindow::visibleChanged, this, [this, owner, window](bool visible) {
+		if (visible)
+			return;
+		auto it = m_windows.find(owner);
+		if (it != m_windows.end() && it->window == window) {
+			if (it->context)
+				it->context->deleteLater();
+			m_windows.erase(it);
+		}
+		window->deleteLater();
+		qInfo().noquote() << QStringLiteral("[HostUi] 窗口已关闭：%1").arg(owner);
+	});
+
+	window->show();
+	window->raise();
+	window->requestActivate();
+	qInfo().noquote() << QStringLiteral("[HostUi] %1: 已开窗口 %2（%3）")
+		.arg(owner, entry.id, source.fileName());
+	return entry.id;
 }
 
-int HostUi::CloseOwnedPanels(const QString& owner)
+QString HostUi::OpenWindow(const char* ownerC, const char* urlC, QObject* context, const char* titleC)
 {
-	return closeOwnedPanelsFor(owner);
+	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");
+	const QString url = QString::fromUtf8(urlC ? urlC : "");
+	QVariantMap initial;
+	if (context)
+		initial.insert(QStringLiteral("context"), QVariant::fromValue(context));
+	return openWindowImpl(owner, QUrl(url), initial, QString::fromUtf8(titleC ? titleC : ""));
 }
 
-int HostUi::closeOwnedPanelsFor(const QString& owner)
+QString HostUi::OpenWebWindow(const char* ownerC, const char* urlC, const char* titleC)
 {
-	if (owner.isEmpty())   // 空 owner = 用户自己开的块，不批量关（与 PanelDockModel::closeOwned 同一条判据）
+	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");
+	const QString page = QString::fromUtf8(urlC ? urlC : "");
+	if (owner.isEmpty() || page.isEmpty()) {
+		qWarning("[HostUi] openWebWindow: owner / url 有空值，拒绝");
+		return QString();
+	}
+	// 通用兜底落点：宿主自带的 WebEngine 窗口去解析这个 URL（宿主不认识任何插件）
+	QVariantMap initial;
+	initial.insert(QStringLiteral("initialUrl"), page);
+	return openWindowImpl(owner, QUrl(QStringLiteral("qrc:/qml/basic/browser/WebWindow.qml")),
+		initial, QString::fromUtf8(titleC ? titleC : ""));
+}
+
+int HostUi::CloseWindow(const char* ownerC)
+{
+	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");
+	auto it = m_windows.find(owner);
+	if (it == m_windows.end() || !it->window)
 		return 0;
-	return PanelDockModel::instance().closeOwned(owner);
+	auto* window = qobject_cast<QWindow*>(it->window.data());
+	if (!window)
+		return 0;
+	window->close();   // visibleChanged(false) 负责回收
+	return 1;
 }
