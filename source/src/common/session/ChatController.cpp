@@ -1,6 +1,7 @@
 // 见 ChatController.h：事件流 -> 消息模型。
 #include "common/session/ChatController.h"
 #include "common/session/MessageListModel.h"
+#include "common/session/TraceModel.h"
 
 #include "network/DshApiClient.h"
 #include "network/DshEventParser.h"
@@ -20,24 +21,44 @@
 #include <QTimer>
 #include <QVariantMap>
 
+#include <algorithm>
+
 namespace
 {
 	constexpr int kStreamFlushMs = 50;
 	// 回合看门狗：这么久没有任何本会话事件就认为后端没在干活（典型：没配模型 / 会话 resume 失败）
 	constexpr int kTurnWatchdogMs = 15000;
 
-	// 隐藏的上下文注入（运行时快照/系统说明/目录）不是用户真正发的消息 —— 与旧壳同一判定
-	bool isHiddenContextUserMessage(const QJsonObject& event)
+	// 隐藏的上下文注入（运行时快照/系统说明/目录）不是用户真正发的消息 —— 与旧壳同一判定。
+	// 另外两类同样要藏（2026-10-20 用户反馈"父会话里看到子代理给父会话发的消息"）：
+	//   · source.kind = agent-message   （form = relay，带 senderSessionId）—— 子代理回传给父会话的话；
+	//   · source.kind = subagent-settled（form = notice）—— "后台子代理结束"通知。
+	// 它们是以 role=user 记进账本的（**给模型看的** inbox 注入），画成用户气泡会让人以为是自己在说话。
+	QJsonObject userMessageSource(const QJsonObject& event)
 	{
 		const QJsonObject data = event.value(QStringLiteral("data")).toObject();
 		QJsonObject message = data.value(QStringLiteral("message")).toObject();
 		if (message.isEmpty())
 			message = data;
-		const QString form = message.value(QStringLiteral("source")).toObject()
-			.value(QStringLiteral("form")).toString();
-		return form == QStringLiteral("snapshot")
+		return message.value(QStringLiteral("source")).toObject();
+	}
+
+	bool isPeerRelayUserMessage(const QJsonObject& event)
+	{
+		const QString kind = userMessageSource(event).value(QStringLiteral("kind")).toString();
+		return kind == QStringLiteral("agent-message")
+			|| kind == QStringLiteral("subagent-settled");
+	}
+
+	bool isHiddenContextUserMessage(const QJsonObject& event)
+	{
+		const QJsonObject source = userMessageSource(event);
+		const QString form = source.value(QStringLiteral("form")).toString();
+		if (form == QStringLiteral("snapshot")
 			|| form == QStringLiteral("instructions")
-			|| form == QStringLiteral("catalog");
+			|| form == QStringLiteral("catalog"))
+			return true;
+		return isPeerRelayUserMessage(event);
 	}
 
 	// 历史记录可能包一层 { event: {...} }
@@ -125,6 +146,7 @@ ChatController::ChatController(DshApiClient* api, QObject* parent)
 	: QObject(parent)
 	, m_api(api)
 	, m_messages(new MessageListModel(this))
+	, m_trace(new TraceModel(this))
 {
 	// 附件临时物统一落在 <exe>/temp/ulinhub-attachments（与引擎残留同一层管理）：
 	// 启动清一次，避免长期使用后无限堆积；消息里的图片缺失时会按需重新拉取。
@@ -443,8 +465,22 @@ void ChatController::setSession(const QString& sessionId)
 	m_sessionId = sessionId;
 	m_streaming = false;
 	m_turnActive = false;
+	m_turnRow = -1;   // 行号属于旧会话，必须作废
 	m_loggedEventTypes.clear();
 	m_messages->clear();
+	m_trace->clear();
+	// 翻页账本也是会话级的：不清的话，新会话若先来一帧空快照会被 onFollowSnapshot 的
+	// "空帧守卫"当成噪声丢掉，而且 m_cursor/hasMore 还是上一个会话的（子代理页签尤其容易踩）。
+	m_historyRecords = QJsonArray();
+	m_cursor = 0;
+	m_hasOlder = false;
+	m_loadingOlder = false;
+	emit olderChanged();
+	// 名册是会话级的：不先清掉的话，切到新会话的头几百毫秒里顶栏还挂着上一个会话的任务
+	if (!m_jobs.isEmpty()) {
+		m_jobs.clear();
+		emit jobsChanged();
+	}
 	emit streamingChanged();
 	emit messagesChanged();
 }
@@ -452,6 +488,74 @@ void ChatController::setSession(const QString& sessionId)
 int ChatController::messageCount() const
 {
 	return m_messages ? m_messages->rowCount() : 0;
+}
+
+// ------------------------------------------------------------------
+// 后台任务名册（对照官方 ui-jobs 的 ordered()：活的任务在前、按开始时间升序；已结束的按
+// 结束时间倒序。这里只摊平字段，状态文案/配色都在 QML（语言包按界面语言切换）。
+// ------------------------------------------------------------------
+void ChatController::onJobRoster(const QJsonArray& jobs)
+{
+	struct Row
+	{
+		bool live = false;
+		qint64 startedAt = 0;
+		qint64 finishedAt = 0;
+		QVariantMap map;
+	};
+
+	QVector<Row> rows;
+	rows.reserve(jobs.size());
+	for (const QJsonValue& value : jobs) {
+		const QJsonObject job = value.toObject();
+		const QString id = job.value(QStringLiteral("id")).toString();
+		if (id.isEmpty())
+			continue;   // 没有 id 的行无处可点、也没法停，直接丢
+
+		const QString status = job.value(QStringLiteral("status")).toString();
+
+		Row row;
+		row.live = (status == QLatin1String("running") || status == QLatin1String("stopping"));
+		row.startedAt = static_cast<qint64>(job.value(QStringLiteral("startedAt")).toDouble());
+		row.finishedAt = static_cast<qint64>(job.value(QStringLiteral("finishedAt")).toDouble(row.startedAt));
+
+		row.map.insert(QStringLiteral("id"), id);
+		row.map.insert(QStringLiteral("kind"), job.value(QStringLiteral("kind")).toString());
+		row.map.insert(QStringLiteral("label"), job.value(QStringLiteral("label")).toString());
+		row.map.insert(QStringLiteral("status"), status);
+		row.map.insert(QStringLiteral("progress"), job.value(QStringLiteral("progress")).toString());
+		row.map.insert(QStringLiteral("detail"), job.value(QStringLiteral("detail")).toString());
+		row.map.insert(QStringLiteral("live"), row.live);
+		row.map.insert(QStringLiteral("startedAt"), row.startedAt);
+		row.map.insert(QStringLiteral("finishedAt"), row.finishedAt);
+		rows.append(row);
+	}
+
+	std::sort(rows.begin(), rows.end(), [](const Row& left, const Row& right) {
+		if (left.live != right.live)
+			return left.live;                       // 活的排在已结束的前面
+		if (left.live)
+			return left.startedAt < right.startedAt; // 都是活的：先开始的在前
+		return left.finishedAt > right.finishedAt;   // 都结束了：最近结束的在前
+	});
+
+	QVariantList list;
+	list.reserve(rows.size());
+	for (const Row& row : rows)
+		list.append(row.map);
+
+	m_jobs = list;
+	emit jobsChanged();
+}
+
+bool ChatController::jobRunning() const
+{
+	for (const QVariant& value : m_jobs) {
+		const QString status = value.toMap().value(QStringLiteral("status")).toString();
+		if (status == QLatin1String("running") || status == QLatin1String("stopping"))
+			return true;
+	}
+	return false;
 }
 
 void ChatController::connectApi()
@@ -463,6 +567,8 @@ void ChatController::connectApi()
 	// follow 首帧快照（session/follow）与 mux 帧：本类的事件入口
 	connect(m_api, &DshApiClient::sessionSnapshotReady, this, &ChatController::onFollowSnapshot);
 	connect(m_api, &DshApiClient::muxFrameReceived, this, &ChatController::onMuxFrame);
+	// 后台任务名册（job/list 流，随 follow 会话开关；见 DshApiClient 第六条逻辑流）
+	connect(m_api, &DshApiClient::jobRosterReady, this, &ChatController::onJobRoster);
 
 	// 快照里带一份全量投影（含 sessionStats / tokenUsage）——小灰字统计行的数据源。
 	// 只认当前会话（迟到的帧直接丢，与 onFollowSnapshot 同一判据）
@@ -495,6 +601,9 @@ void ChatController::onFollowSnapshot(const QString& sessionId, int cursor, cons
 	m_historyRecords = records;
 	emit olderChanged();
 
+	// 轨迹视图吃的是同一份账本：快照换了它就跟着重建（两条守卫已经挡掉空帧与重复帧）
+	m_trace->setRecords(records);
+
 	rebuildFromRecords(records);
 }
 
@@ -519,8 +628,7 @@ void ChatController::loadOlder()
 	m_loadingOlder = true;
 	emit olderChanged();
 
-	m_api->callMethod(QStringLiteral("session/page"),
-		SessionCommands::sessionPage(m_sessionId, m_cursor, 200, beforeSeq),
+	m_api->pageSession(m_sessionId, m_cursor, 200, beforeSeq,
 		[this](const QJsonObject& page) {
 			m_loadingOlder = false;
 
@@ -539,6 +647,8 @@ void ChatController::loadOlder()
 				merged.append(value);
 			m_historyRecords = merged;
 			m_hasOlder = page.value(QStringLiteral("hasMore")).toBool();
+			// 同样把整份账本交给轨迹视图（旧页已拼到头部，行序不变）
+			m_trace->setRecords(m_historyRecords);
 
 			qInfo().noquote() << "[Chat] 上翻一页 records=" << older.size() << "hasMore=" << m_hasOlder;
 
@@ -556,6 +666,7 @@ void ChatController::loadOlder()
 void ChatController::rebuildFromRecords(const QJsonArray& records)
 {
 	m_messages->clear();
+	m_turnRow = -1;   // 整表重建：行号全失效，本轮归属也要重来
 
 	QStringList types;  // 诊断用：首帧快照里有哪些事件类型（"空白"是没消息还是解析漏了，一眼可辨）
 	for (const QJsonValue& value : records) {
@@ -567,6 +678,11 @@ void ChatController::rebuildFromRecords(const QJsonArray& records)
 
 	for (const QJsonValue& value : records)
 		applyHistoryEvent(unwrapRecord(value));
+
+	// 重建之后如果这一轮还在跑（例如流式中途刷新）：后续 chunk 必须续到**重建出来的最后一条
+	// agent 行**上，否则会再新开一个气泡，把刚刚合并好的一轮又拆开。
+	if (m_turnActive && m_messages->lastAgentRow() >= 0)
+		m_turnRow = m_messages->lastAgentRow();
 
 	m_streaming = false;
 	emit streamingChanged();
@@ -582,19 +698,31 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 			return;
 		const QString text = extractEventText(event).trimmed();
 		const QVector<MessageListModel::ImageRef> images = extractEventImages(event);
-		if (!text.isEmpty() || !images.isEmpty())
+		if (!text.isEmpty() || !images.isEmpty()) {
 			m_messages->appendUserWithImages(text, images);
+			m_turnRow = -1;   // 用户开口 ⇒ 上一轮到此为止（turn/start 缺失时的兜底）
+		}
+		return;
+	}
+
+	if (type == QStringLiteral("turn/start") || type == QStringLiteral("turn/end")) {
+		// 回合边界：下一个 assistant/message 开新气泡。历史里一轮通常是
+		// turn/start → (user/message) → step/start → assistant/message → tool/* → step/end → … → turn/end
+		m_turnRow = -1;
 		return;
 	}
 
 	if (type == QStringLiteral("assistant/message")) {
-		// 历史回放：每条 assistant/message 各成一条气泡（与旧壳 appendHistoryEventsToQuery 一致）
+		// 历史回放：**一轮（turn）合成一个气泡**。
+		// 旧实现是每条 assistant/message 各 appendAgent()（"与旧壳 appendHistoryEventsToQuery 一致"），
+		// 但引擎在一轮里每次工具调用前后都会各发一条 assistant/message ⇒ 用户看到一轮冒出好几个气泡
+		// （2026-10-20 反馈）。现在同一 turn 的多条消息续写到 m_turnRow 指向的那一行，段顺序不变。
 		const QString thinking = extractThinking(event);
 		const QString reply = extractReply(event);
 		if (thinking.isEmpty() && reply.isEmpty())
 			return;
 
-		const int row = m_messages->appendAgent();
+		const int row = agentRowForTurn();
 		if (!thinking.isEmpty())
 			m_messages->appendChunk(row, QStringLiteral("thinking"), thinking);
 		if (!reply.isEmpty())
@@ -605,7 +733,7 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 	if (type == QStringLiteral("tool/call")) {
 		const ToolCallInfo tool = extractToolCall(event);
 		if (tool.valid)
-			m_messages->appendChunk(targetAgentRow(), QStringLiteral("toolCall"),
+			m_messages->appendChunk(agentRowForTurn(), QStringLiteral("toolCall"),
 				prettyArguments(tool.arguments), tool.name);
 		return;
 	}
@@ -613,7 +741,7 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 	if (type == QStringLiteral("tool/result")) {
 		const ToolResultInfo result = extractToolResult(event);
 		if (result.valid)
-			m_messages->appendToolResult(targetAgentRow(), result.message);
+			m_messages->appendToolResult(agentRowForTurn(), result.message);
 		return;
 	}
 
@@ -657,11 +785,15 @@ void ChatController::onMuxFrame(const QJsonObject& frame)
 	if (m_turnActive && isTurnProgressEvent(event.value(QStringLiteral("type")).toString()))
 		m_turnWatchdog->start();
 
+	// 轨迹视图：账本事件逐条追加（assistant/chunk 这类增量分片由 TraceModel 自己筛掉）
+	m_trace->appendEvent(event);
+
 	applyStreamEvent(event);
 }
 
 void ChatController::beginTurn()
 {
+	m_turnRow = -1;   // 新一轮 = 新气泡（上一轮那行不再被续写）
 	m_turnHadOutput = false;
 	m_turnActive = true;
 	m_turnWatchdog->start();
@@ -798,19 +930,39 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 {
 	const QString type = event.value(QStringLiteral("type")).toString();
 
+	if (type == QStringLiteral("turn/start")) {
+		// 新的一轮：下一条内容开新气泡。上一轮那行到此为止，不再被续写。
+		m_turnRow = -1;
+		return;
+	}
+
+	if (type == QStringLiteral("turn/end")) {
+		// 回合真正的收尾点（以前是 assistant/message，见下面的说明）。
+		m_turnRow = -1;
+		if (m_turnActive) {
+			flushPending();
+			setStreaming(false);
+			finishTurn();
+		}
+		return;
+	}
+
 	if (type == QStringLiteral("assistant/message")) {
 		// 收尾：已流式显示过就不重复追加，只把最后一段封存
 		const QString thinking = extractThinking(event);
 		const QString reply = extractReply(event);
 		if (!thinking.isEmpty() || !reply.isEmpty()) {
-			const int row = targetAgentRow();
+			// ⚠️ 用 agentRowForTurn()（本轮那一行），不是 targetAgentRow()：一轮里会来**多条**
+			//    assistant/message（每次工具调用前后各一条），它们属于同一个气泡。
+			const int row = agentRowForTurn();
 			bufferChunk(row, QStringLiteral("thinking"), thinking);
 			bufferChunk(row, QStringLiteral("reply"), reply);
 			m_turnHadOutput = true;
 		}
 		flushPending();
-		setStreaming(false);
-		finishTurn();
+		// ⚠️ 这里**刻意不** setStreaming(false) + finishTurn()：一条 assistant/message 只代表"这一段说完了"，
+		//    一轮里还有下一次工具调用与后续回复。以前在这里收尾 ⇒ 中间那一瞬界面显示"已完成"、整轮行闪一下，
+		//    紧接着 tool/call 又 setStreaming(true)。回合结束统一由 turn/end（或看门狗）负责。
 		return;
 	}
 
@@ -825,7 +977,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		if (!chunkType.isEmpty() && !thinking && chunkType != QStringLiteral("text-delta"))
 			return;
 
-		bufferChunk(targetAgentRow(), thinking ? QStringLiteral("thinking") : QStringLiteral("reply"), chunk);
+		bufferChunk(agentRowForTurn(), thinking ? QStringLiteral("thinking") : QStringLiteral("reply"), chunk);
 		setStreaming(true);
 		return;
 	}
@@ -835,7 +987,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			.value(QStringLiteral("texts")).toArray();
 		const bool thinking = type == QStringLiteral("reasoning-chunks");
 
-		const int row = targetAgentRow();
+		const int row = agentRowForTurn();
 		bool appended = false;
 		for (const QJsonValue& value : texts) {
 			const QString chunk = value.toString();
@@ -852,7 +1004,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 	if (type == QStringLiteral("tool/call")) {
 		const ToolCallInfo tool = extractToolCall(event);
 		if (tool.valid) {
-			bufferChunk(targetAgentRow(), QStringLiteral("toolCall"),
+			bufferChunk(agentRowForTurn(), QStringLiteral("toolCall"),
 				prettyArguments(tool.arguments), tool.name);
 			m_turnHadOutput = true;
 			setStreaming(true);
@@ -864,7 +1016,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		const ToolResultInfo result = extractToolResult(event);
 		if (result.valid) {
 			flushPending();  // 工具结果是整段落的，直接落盘（并先把缓冲刷掉，保证顺序）
-			m_messages->appendToolResult(targetAgentRow(), result.message);
+			m_messages->appendToolResult(agentRowForTurn(), result.message);
 			m_turnHadOutput = true;
 			setStreaming(true);
 		}
@@ -901,6 +1053,23 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		return;
 	}
 
+	// 实时流里的用户态消息：自己发的那条在发送时已经上屏（见 sendPrompt），这里只关心
+	// 子代理回传/结束通知 —— 它们不画，但到达就意味着运行态变了。
+	if (type == QStringLiteral("user/message")) {
+		if (isPeerRelayUserMessage(event))
+			emit peerActivitySeen();
+		return;
+	}
+
+	// 子代理"有事发生"：目录新增、回传给父会话、结束通知 —— 三种都不改消息区（回传已在上面的
+	// user/message 里过滤掉了），但要通知上层去**轻量重拉一次 session.list**：
+	// 运行态（running）只有那条 RPC 会给，session/control 的投影里没有 ⇒ 否则顶栏那颗"运行中"永远不亮。
+	if (type == QStringLiteral("subagent/catalog")
+		|| type == QStringLiteral("agent/inbox/spliced")) {
+		emit peerActivitySeen();
+		return;
+	}
+
 	// 其余事件类型不参与渲染。**每类只记一次**（旧壳也会收到大量 commands/change、投影类事件，
 	// 逐帧打日志会把排障通道淹掉）
 	if (!m_loggedEventTypes.contains(type)) {
@@ -925,13 +1094,13 @@ void ChatController::finishTurn()
 	emit turnFinished();
 }
 
-int ChatController::targetAgentRow()
+int ChatController::agentRowForTurn()
 {
-	const int existing = m_messages->lastAgentRow();
-	if (existing >= 0)
-		return existing;
+	if (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+		return m_turnRow;
 
-	return m_messages->appendAgent();
+	m_turnRow = m_messages->appendAgent();
+	return m_turnRow;
 }
 
 void ChatController::bufferChunk(int row, const QString& type, const QString& text, const QString& toolName)
@@ -978,6 +1147,17 @@ void ChatController::setStreaming(bool streaming)
 		return;
 
 	m_streaming = streaming;
+	// ⚠️ 同时把**行级**标志写上：这里以前只改控制器自己的 m_streaming，MessageListModel 里每行的
+	//    streaming 永远是初始 false（Quiet bug：旧版气泡不读它，所以没人发现）。新版气泡拿它决定
+	//    "整轮折叠行显不显示 / 摘要取首行还是最近完成段落"——不写就会在还在输出时显示"已完成"。
+	if (m_messages) {
+		// 优先"本轮那一行"（一轮一个气泡）；没有就退回最后一条 agent 行
+		const int row = (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+			? m_turnRow
+			: m_messages->lastAgentRow();
+		if (row >= 0)
+			m_messages->setStreaming(row, streaming);
+	}
 	emit streamingChanged();
 }
 

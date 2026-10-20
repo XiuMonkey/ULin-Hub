@@ -103,6 +103,24 @@ void SessionService::refreshTitles(DshApiClient* api,
 		[](const DshApiClient::RpcError&) {});
 }
 
+void SessionService::refreshRunningStates(DshApiClient* api, SessionCatalog* catalog,
+	const std::function<void(bool changed)>& onChanged)
+{
+	if (!api || !catalog)
+		return;
+
+	api->callMethod(QLatin1String(kSessionListMethod), SessionCommands::sessionList(),
+		[catalog, onChanged](const QJsonObject& value) {
+			const QJsonArray items = value.value(QStringLiteral("items")).toArray();
+			const bool changed = catalog->applyRunningStates(items);
+			if (onChanged)
+				onChanged(changed);
+		},
+		[](const DshApiClient::RpcError&) {
+			// 轻量刷新失败不打扰用户：顶栏那颗点保持旧值，等下一次触发
+		});
+}
+
 void SessionService::clearAllSessionData(const QString& dshHome)
 {
 	if (dshHome.isEmpty())

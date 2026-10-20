@@ -163,10 +163,12 @@ namespace
 		map.insert(QStringLiteral("minConversationWidth"), 320);    // kMinConversationColumnWidth
 		map.insert(QStringLiteral("sendButton"), 32);               // chat #sendButton 四边 32px
 		map.insert(QStringLiteral("selectorChipHeight"), 24);       // ModelSelector 的 chip 高（原版 kChipHeight 28，作为配角收小）
-		map.insert(QStringLiteral("scrollbarThickness"), 8);        // scrollbars.qss QScrollBar 宽/高（也是可点/可拖的轨道宽）
+		map.insert(QStringLiteral("scrollbarThickness"), 10);       // scrollbars.qss QScrollBar 宽/高（也是可点/可拖的轨道宽）；2026-10-20 由 8 放宽到 10（用户反馈把手偏细、不好拖）
 		// 可见把手的粗细：比轨道窄一圈（AppScrollBar 按 (thickness - handleWidth) / 2 内收），
 		// 于是"细窄 + 留白"只改观感 —— 拖拽/点轨道的几何仍由框架按 contentItem（= thickness）算。
-		map.insert(QStringLiteral("scrollbarHandleWidth"), 6);
+		// 2026-10-20 由 6 放宽到 8（与上面的 thickness 同步 +2，保持内收 1px）。
+		// ⚠️ AppScrollBar.qml 里还用 Math.max 兜了同样的下限，旧 EXE 读到的 8/6 也会被抬到 10/8。
+		map.insert(QStringLiteral("scrollbarHandleWidth"), 8);
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
 		map.insert(QStringLiteral("editorMinHeight"), 48);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 = 21，再留 27 的余量（用户两次各要"高 10px"：28 → 38 → 48）
 		map.insert(QStringLiteral("editorMaxHeight"), 140);         // 编辑区高度上限：8 行（行高实测 17）+ editorPadTop 4 = 140；超过就由外层 Flickable 滚动 + AppScrollBar

@@ -672,6 +672,9 @@ void ServerManager::startBundledServer()
 				patch.write("    - id: agent-presets\n      name: '@deepseek-ai/dsh-agent-presets'\n      config:\n        default: standard\n\n");
 				// 右栏「终端」块的 Host 侧实现：不给它上这一行，/api/terminal/* 全是 404（见 ensurePatchEntry 那段）
 				patch.write("    - id: api-terminal-controller\n      name: '@deepseek-ai/dsh-api-terminal-controller'\n");
+				// 顶栏"后台任务"入口的 Host 侧实现（job/list 名册 + job/follow 输出）：官方 web bundle 才有这一行，
+				// 精简 API-only profile 必须显式挂上，否则 /api/job/list 一律 service-unavailable
+				patch.write("    - id: job-controller\n      name: '@deepseek-ai/dsh-api-job-controller'\n");
 				patch.close();
 			}
 
@@ -829,6 +832,36 @@ void ServerManager::startBundledServer()
 						"[ServerManager] profile patch 补不上 %1: %2").arg(terminalName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(terminalName);
+			}
+
+			// 顶栏"后台任务"入口：job 控制器（job/list 名册流、job/follow 输出、job/kill）。
+			// 它只挂在官方 web bundle 里，精简 API-only profile 没有这一行 —— 缺行时名册流会收到
+			// gateway/service-unavailable，顶栏计数恒为 0（与 terminal 那条同样幂等补行）。
+			const QString jobControllerName = QStringLiteral("@deepseek-ai/dsh-api-job-controller");
+			const bool jobControllerAvailable =
+				QFile::exists(profileDir + QStringLiteral("/node_modules/") + jobControllerName
+					+ QStringLiteral("/package.json"))
+				|| QFile::exists(appDir + QStringLiteral("/resources/server/node_modules/") + jobControllerName
+					+ QStringLiteral("/package.json"));
+
+			if (!jobControllerAvailable) {
+				qWarning().noquote() << QStringLiteral(
+					"[ServerManager] 找不到 %1：顶栏的后台任务入口会一直空着（job/* 全 service-unavailable）")
+					.arg(jobControllerName);
+			}
+			else {
+				QString error;
+				const ExtensionRegistry::PatchEntryResult row = ExtensionRegistry::ensurePatchEntry(profileDir,
+					QStringLiteral("job-controller"), jobControllerName,
+					QStringLiteral("session header background jobs: job/list roster stream "
+						"(job/list|follow|kill)"),
+					&error);
+
+				if (row == ExtensionRegistry::PatchEntryResult::Failed)
+					qWarning().noquote() << QStringLiteral(
+						"[ServerManager] profile patch 补不上 %1: %2").arg(jobControllerName, error);
+				else if (row == ExtensionRegistry::PatchEntryResult::Added)
+					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(jobControllerName);
 			}
 		}
 	}

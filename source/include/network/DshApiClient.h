@@ -67,10 +67,19 @@ public:
 	void openStreams();
 	// 关闭流通道（WebSocket + 全部逻辑流）；接管态下只清本地账本、不回调扩展（析构期回调不安全）
 	void closeStreams();
-	// 跟随一个会话（mux 上开 session/follow，换会话自动换流）；接管态下改通知扩展
-	void followSession(const QString& sessionId);
+	// 跟随一个会话（mux 上开 session/follow，换会话自动换流）；接管态下改通知扩展。
+	// parentSessionId 非空 = 目标是一个**子代理会话**：address 必须用 subagent 形状
+	// （引擎对 origin == subagent 的 session 形状寻址一律回 session/agent-busy），mode 取
+	// subagentCatalog 里的 one-shot / continuable；解析在 ClientRuntime（它持有 SessionCatalog）。
+	void followSession(const QString& sessionId, const QString& parentSessionId = QString(),
+		const QString& mode = QString());
 	// 关闭 session/follow 流；接管态下通知扩展
 	void unfollowSession();
+	// 按当前 follow 的地址读 session/page（子代理会自动带上 subagent address）。
+	// 翻页/`surfaceOp:replace` 重拉都走这里：调用方不需要知道目标是不是子代理。
+	void pageSession(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0,
+		std::function<void(const QJsonObject& value)> onSuccess = {},
+		std::function<void(const RpcError& error)> onError = {});
 	// 终端附着流（terminal/follow）：一条终端 = 一条逻辑流，帧是 snapshot / output / state 三种之一。
 	// args 由 SessionCommands::terminalFollow(agentId, id, attachmentId) 给（别在这里拼 wire 名）。
 	// 同时只保留一条：重复调用先 cancel 旧的再开新的；mux 还没连上时只记下 args 并返回
@@ -357,6 +366,13 @@ signals:
 	// 流级错误：code 来自服务端（terminal/unavailable / terminal/control-unavailable / gateway/* …）
 	void terminalStreamError(const QString& streamId, const QString& code, const QString& message);
 
+	// ---- 后台任务名册（job/list，第六条逻辑流；随 follow 会话自动开/关）----
+	// 帧是引擎 job-controller 的 JobListFrame：{type:"rows", jobs:[{id,kind,label,status,progress?,detail?,startedAt,finishedAt?,output:{...}}]}。
+	// 这里不做解释，原样把 jobs 数组交给上层（ChatController 转成 QML 名册）。
+	// 端点需要 profile 里挂 job-controller 插件（ServerManager 幂等补行）；老引擎没有该行时这一条
+	// 会收到 gateway/service-unavailable：只记日志 + 发一次空数组（顶栏入口退回空态），不影响会话本身。
+	void jobRosterReady(const QJsonArray& jobs);
+
 private:
 	struct PendingCall
 	{
@@ -436,6 +452,8 @@ private:
 	void handleControlItem(const QJsonValue& value);
 	// 第五条：terminal/follow（一帧一个终端帧，原样上抛给 TerminalBridge）
 	void handleTerminalItem(const QJsonValue& value);
+	// 第六条：job/list（后台任务名册，帧是 JobListFrame）
+	void handleJobsItem(const QJsonValue& value);
 
 	void emitSessionEventFrame(const QString& sessionId, const QJsonObject& event);
 	void scheduleReconnect();
@@ -471,7 +489,13 @@ private:
 	QString m_controlStreamId;
 	QString m_sessionStreamId;
 	QString m_terminalStreamId;
+	// 后台任务名册流（job/list）。与 session/follow 同生命周期：换会话就换名册，mux 断开一起没。
+	QString m_jobsStreamId;
 	QString m_followedSessionId;
+	// 当前 follow 目标的 subagent address 两段（都为空 = 普通会话）。重连后要按同一形状重开，
+	// 否则子代理会退回 session 形状并被引擎拒成 agent-busy。
+	QString m_followedParentSessionId;
+	QString m_followedMode;
 	bool m_eventsReady = false;
 	bool m_streamConnected = false;
 	int m_streamSeq = 0;                    // 逻辑流 id 自增号

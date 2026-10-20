@@ -341,10 +341,10 @@ AttachedPlugin/
 ```json5
 // regulation.json5（客户端扩展）
 {
-  "Name": "PluginTranspiler",    // 安装目录名 = <exe>/clientExtensions/<Name>/
+  "Name": "plugin-transpiler",    // 安装目录名 = <exe>/clientExtensions/<Name>/
   "Type": "ClientExtension",     // 或 ClientExtensionDebug
   // ---- 扩展身份三件套（2026-10-16 新增；宿主**目前只登记，不消费**）----
-  "ID": "plugin_transpiler",     // 标识符，约定**小写 + 下划线**（与 Name 的安装目录名不是一回事）
+  "ID": "plugin-transpiler",     // 标识符，约定**小写 + 连字符**（与 Name 的安装目录名不是一回事）
   "version": "0.1.0",            // 扩展**自身**版本（与 ABIVersion 的界面契约版本不同）
   "dependence": [],              // 依赖的其它扩展 ID 数组；本版不解析依赖顺序、不校验存在性
   "platform": "windows",         // 适用平台（为跨平台做准备）：字符串或数组都认（["windows","linux"]）
@@ -429,7 +429,7 @@ IconButton {
     parent: HostUi.item("topBar")            // 注入点
     // 什么都不写也行：父项是 Row，位置器会排它
     glyph: "★"
-    onClicked: HostUi.mountInto("PluginTranspiler", "shell", "ui/Panel.qml", null)
+    onClicked: HostUi.mountInto("plugin-transpiler", "shell", "ui/Panel.qml", null)
 }
 ```
 
@@ -473,14 +473,14 @@ Item {
 | C++ 插件面 | `VirtualClass/VirtualCommon.h` 的虚接口 | `VirtualConnectionManager` / `VirtualTheme` / `VirtualTranslation` / `VirtualApiSink` / `VirtualUiHost` / `VirtualBlockBackendHost` | 方法只许**末尾追加**；DLL 与宿主版本不匹配时 `qobject_cast` 失败即视为不实现 |
 | 宿主界面契约 | `pack.json` 的 `uiAbi`（皮肤包）/ 客户端扩展 `regulation.json5` 的 `ABIVersion` | **3**（`kStylePackUiAbi`） | 皮肤包 ⇒ 整包拒载回退内置；扩展 ⇒ **只装 DLL，不落该扩展的 `ui/`**（DLL 部分照旧） |
 
-### 11.6 最小示例（`extensions/PluginTranspiler` 就是活样例）
+### 11.6 最小示例（`..\plugin-transpiler` 就是活样例）
 
 ```
-extensions/PluginTranspiler/
-├── regulation.json5      Name=PluginTranspiler, Type=ClientExtension, ABIVersion=3
+..\plugin-transpiler/
+├── regulation.json5      Name=plugin-transpiler, Type=ClientExtension, ABIVersion=3
 ├── main.cpp              attachHost()：
 │                           auto* ui = qobject_cast<VirtualUiHost*>(DshHost::findObject(DshHostIndex::kUiHost));
-│                           ui->MountInto("PluginTranspiler", "shell", "<自己的>/ui/PluginTranspiler.qml", this);
+│                           ui->MountInto("plugin-transpiler", "shell", "<自己的>/ui/PluginTranspiler.qml", this);
 ├── ui/EntryButton.qml     入口按钮（自绘，注入 sessionBar.extDock；required property var context）
 ├── ui/PluginTranspiler.qml  required property var context（required 属性由宿主 createWithInitialProperties 注入）；
 │                           面板只读宿主 Theme token（`import ULinHub 1.0`），不写死配色
@@ -489,7 +489,7 @@ extensions/PluginTranspiler/
 
 > 样例扩展 `extensions/QuickOrbit/` 于 2026-10-10 删除：它走的是"自己 `new QQuickView` 开独立窗口"的
 > 旧路，依赖的 `QQuickSupport` 运行时包与 `Subtype` 门控都已退役，且从没部署过 —— 要看真样例就看
-> `extensions/PluginTranspiler`（侧栏入口：扩展自绘按钮注入 `sessionBar.extDock`）与 `extensions/CodexBackend`（后端接管 + 注入面板）。
+> `..\plugin-transpiler`（侧栏入口：扩展自绘按钮注入 `sessionBar.extDock`）与 `..\codex-backend`（后端接管 + 注入面板）。
 
 **侧栏入口怎么接**：**按钮归扩展自己** —— 扩展自绘一颗入口按钮，注入宿主的侧栏停靠位
 `sessionBar.extDock`（`Row`，位置器自动排布；所以扩展 QML **不写 x / y / anchors**，只给宽高）：
@@ -506,14 +506,14 @@ Item {
 
 ```cpp
 // attachHost() 里（⚠️ 用 0ms 定时器延后，理由见 §11.3 的登记时机）
-ui->MountInto("PluginTranspiler", "sessionBar.extDock", "<自己的>/ui/EntryButton.qml", bridge);
+ui->MountInto("plugin-transpiler", "sessionBar.extDock", "<自己的>/ui/EntryButton.qml", bridge);
 ```
 
 > **宿主不摆"未装扩展"的哑按钮**：插件转译器不是宿主的功能，停靠位在没有扩展注入时是空的。
 > 旧做法（宿主 `SessionBar.qml` 画一颗按钮 + 登记 `qml.sessionBar.openPluginTranspiler`，扩展用
 > `TakeoverConnection` 接管、`ReleaseTakeover` 交还）**已于 2026-10-12 退役** —— 它会让宿主在
 > 扩展没装时露出一颗点了没反应的按钮。要接管宿主**既有**按钮 / 信号，机制本身仍在
-> （`VirtualConnectionManager`），`extensions/CodexBackend` 是活样例。
+> （`VirtualConnectionManager`），`..\codex-backend` 是活样例。
 > 副作用提醒：给扩展按钮**另起 owner**（PanelAnimDemo 用 `<扩展名>/panel` 给面板）——
 > `UnmountOwner` 是按 owner 整批删的，入口按钮与面板共用一个 owner 会把按钮一起摘掉。
 
@@ -599,7 +599,7 @@ QML（`PanelBarDockView.qml`）只按那组值装机 —— 路由表达式里�
 创建时取一次、交给 `Terminal.registerOn(channel, backend)`，以及 `TerminalBridge` 把
 `pageGone` / `closeBlock` 转给后端。
 
-**活样例**：`<ULin>\LocalTerminal`（VS 工程，宿主仓库的兄弟目录）—— 最小可跑的后端顶替：
+**活样例**：`<ULin>\local-terminal`（VS 工程，宿主仓库的兄弟目录）—— 最小可跑的后端顶替：
 `src/LocalTerminalPlugin.cpp` 登记、`src/LocalTerminalBackend.h/.cpp` 是后端对象本体
 （每块一个会话）、`src/ConPtyProcess.h/.cpp` 用 `CreatePseudoConsole` 起本地终端。
 

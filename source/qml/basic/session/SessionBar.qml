@@ -40,6 +40,16 @@ Item {
     // 侧栏自己不弹 Toast：只把文案抛给壳层（Shell.qml 里统一放一个 Toast）
     signal notify(string text)
 
+    // 操作失败（新建/删除工作区、目录非法…）：core 发 operationFailed，这里转成壳层 Toast。
+    // ⚠️ 这条线以前是断的（QmlBridge 里接了个空 lambda），所以"点了没反应"时用户拿不到任何原因。
+    Connections {
+        target: Hub
+
+        function onOperationFailed(message) {
+            sessionBar.notify(message)
+        }
+    }
+
     // 两个入口的请求信号：按钮不直接开页面，谁响应由连接表决定（扩展接管后就换成扩展自己的面板）
     signal openSettingsRequested()
     signal openPluginMarketRequested()

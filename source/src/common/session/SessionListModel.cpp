@@ -36,9 +36,11 @@ void SessionListModel::rebuild()
 
 	for (const WorkspaceRecord& workspace : workspaces) {  // 有分组的按分组顺序出，没有归属的落到"未分组"档
 		const QVector<SessionRecord> members = byWorkspace.value(workspace.workspaceId);
-		if (members.isEmpty())
-			continue;  // 空分组不占位置（旧壳也是这么做的）
-
+		// ⚠️ 2026-10-20 改：**空工作区也要出行**。
+		//    这里原本是 `if (members.isEmpty()) continue;`（注释写"空分组不占位置，旧壳也这么做"），
+		//    后果是"新建工作区"看起来永远不生效：服务端确实建了、也写进了 harness/storages/workspace.json，
+		//    但侧栏只渲染有会话的分组 ⇒ 新建的空工作区一个都不显示（实测 workspace.json 里有 6 个、
+		//    界面上只看到 1 个有会话的 launch-root）。空工作区必须有行，否则用户没法在里面建第一个会话。
 		Row header;
 		header.kind = QLatin1String(kWorkspaceKind);
 		header.workspaceId = workspace.workspaceId;

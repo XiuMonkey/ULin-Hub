@@ -260,8 +260,6 @@ Item {
         onTriggered: shell.panelBarFollowTick()
     }
 
-    // 跟手驱动（需求 ①）
-
     // ---- 右侧栏：宽度可拖（拖左边缘），压窄量 = 宽度 + 间距 ----
     // 这是本文件里唯一被动画驱动的量：它一变，顶栏卡片与会话卡片**同时**变窄，
     // 消息列表也跟着重新换行 —— 也就是"顶栏和聊天区被压缩"的那段动态。
@@ -300,7 +298,9 @@ Item {
     // 生效宽度：用户值先按上下限夹一次（窗口变小、或被拖到极端都不会越界）
     readonly property real panelBarEffW: clampWidth(panelBarW, panelBarMinW, panelBarMaxW)
     readonly property real panelBarFull: panelBarEffW + Theme.spacing.panelGap
-    property real panelBarInset: Hub.panelBarOpen ? panelBarFull : 0
+    // 压窄量的**目标值**（开 = 面板整宽 + 间距，关 = 0）；panelBarInset 是它的动画副本。
+    readonly property real panelBarTargetInset: Hub.panelBarOpen ? panelBarFull : 0
+    property real panelBarInset: panelBarTargetInset
     // 缓动取 OutCubic（不做过冲）：压窄是"腾地方"，回弹会让人以为界面抖了一下。
     // ⚠️ 拖拽时 enabled=false：宽度是用户手指的位置，不能再去补间。
     Behavior on panelBarInset {
@@ -309,6 +309,77 @@ Item {
             duration: Theme.motion.normal
             easing.type: Easing.OutCubic
         }
+    }
+    // 开合动画是否正在跑（目标值与当前值还没对齐）。
+    // 这一小段里 contentColumn 持续改宽（右栏逐帧滑动，内容列按 15px 分步重排，见下）⇒ 顶栏卡 /
+    // 输入区 / 每个消息气泡的 MultiEffect 阴影源面尺寸持续在变，阴影离屏纹理跟着一次次重做
+    // （PageOverlay 对同一机制的实测是 +4~8ms/帧）。所以把这些"尺寸一变就重渲染"的效果在动画期间
+    // 按停，落定后再开（见 topBarCard、Composer、AgentBubble 的 widthAnimating）。阈值取半像素，收尾不残留。
+    readonly property bool panelBarAnimating: !shell.resizing
+        && Math.abs(panelBarInset - panelBarTargetInset) > 0.5
+
+    // ---- 内容列宽度：按 15px 分步重排（右栏仍逐帧滑入/淡出）----
+    // 用户口径（2026-10-20 晚）：不要"一步到位"（会跳、也没动态感），改成内容宽度每累计变化
+    // ≥ panelBarReflowStep（默认 15px）才更新一次 —— 右栏每帧都在动，内容跟着分步让位。
+    // 拖右栏宽度时仍 1:1 跟手（不插补间）。补间收尾会把不足一档的余量补齐，最终宽度不差像素。
+    // 消息行数只用于诊断日志/调参（Loader 未装载时 0）。
+    readonly property int messageRowCount: {
+        const lv = messageLoader.item
+        return (lv && typeof lv.count === "number") ? lv.count : 0
+    }
+    property real panelBarReflowStep: 15
+    property real panelBarContentInset: 0
+    property int panelBarReflowCount: 0
+    function syncPanelBarContentInset() {
+        if (shell.resizing) {
+            shell.panelBarContentInset = shell.panelBarInset
+            return
+        }
+        if (Math.abs(shell.panelBarInset - shell.panelBarContentInset) >= shell.panelBarReflowStep)
+            shell.panelBarContentInset = shell.panelBarInset
+    }
+    onPanelBarInsetChanged: {
+        syncPanelBarContentInset()
+        // 补间结束：把不足一档的余量补齐（否则最终宽度会差 <15px）；这一下算最后一次重排
+        if (!shell.panelBarAnimating)
+            shell.panelBarContentInset = shell.panelBarTargetInset
+    }
+    onPanelBarContentInsetChanged: panelBarReflowCount++
+    // 内容列宽度正在被"驱动"：开合补间 / 拖右栏宽度。
+    // 阴影按停、列表按停贴底、TopBar 按停高度补间，都统一用这一条。
+    readonly property bool contentWidthDriven: shell.resizing || shell.panelBarAnimating
+
+    // ---- 临时诊断（2026-10-20 晚）：把一次开合的真实帧耗时/重排次数打进 logs/general/info.log ----
+    // 只在动画开始/结束时各记一次（不是每帧写盘），用来判断"卡"到底是重排太多还是单帧太重。
+    property var panelBarFrameTimes: []
+    property real panelBarLastFrame: 0
+    FrameAnimation {
+        running: shell.panelBarAnimating
+        onTriggered: {
+            const n = Date.now()
+            if (shell.panelBarLastFrame > 0)
+                shell.panelBarFrameTimes.push(n - shell.panelBarLastFrame)
+            shell.panelBarLastFrame = n
+        }
+    }
+    onPanelBarAnimatingChanged: {
+        if (shell.panelBarAnimating) {
+            shell.panelBarFrameTimes = []
+            shell.panelBarLastFrame = 0
+            shell.panelBarReflowCount = 0
+            return
+        }
+        const t = shell.panelBarFrameTimes
+        if (!t || t.length < 3)
+            return
+        const sorted = t.slice().sort((a, b) => a - b)
+        const med = sorted[Math.floor(sorted.length / 2)]
+        const max = sorted[sorted.length - 1]
+        const dropped = t.filter(function (x) { return x > 20 }).length
+        console.log("[panelbar-anim] frames=" + t.length + " median=" + med + " max=" + max
+                    + " dropped20=" + dropped + " reflows=" + shell.panelBarReflowCount
+                    + " step=" + Math.round(shell.panelBarReflowStep) + " rows=" + shell.messageRowCount
+                    + " panelW=" + Math.round(shell.panelBarFull))
     }
     // 归一化进度（0 = 收起，1 = 完全展开）：面板的位移/淡入跟着它走
     readonly property real panelBarT: panelBarFull > 0
@@ -357,8 +428,10 @@ Item {
         anchors.left: sessionBarCard.right
         anchors.leftMargin: Theme.spacing.panelGap
         anchors.right: parent.right
-        // 右边距跟着右侧栏的展开量走 ⇒ 顶栏卡片与会话卡片一起被压窄（动画由 panelBarInset 的 Behavior 提供）
-        anchors.rightMargin: Theme.spacing.windowMargin + shell.panelBarInset
+        // 右边距跟着右侧栏的展开量走 ⇒ 顶栏卡片与会话卡片一起被压窄。
+        // ⚠️ 消费的是 panelBarContentInset（不是逐帧的 panelBarInset）：内容宽按 15px 分步重排，
+        //    右栏自身仍逐帧滑动/淡入（见上面 panelBarReflowStep 那段注释）。
+        anchors.rightMargin: Theme.spacing.windowMargin + shell.panelBarContentInset
         anchors.top: parent.top
         anchors.topMargin: Theme.spacing.contentSideInset
         anchors.bottom: parent.bottom
@@ -376,11 +449,30 @@ Item {
             implicitHeight: topBar.implicitHeight
             radius: Theme.radius.panel
             padding: 0
-            shadowEnabled: true
+            // 内容列宽持续在变（开合动画按 15px 分步 / 拖右栏宽度 1:1）时按停阴影：
+            // 卡片宽度一变，阴影源面的离屏纹理就要重做（理由与实测见 shell.panelBarAnimating）。
+            // 落定后自动恢复。
+            shadowEnabled: !shell.contentWidthDriven
 
             TopBar {
                 id: topBar
                 anchors.fill: parent
+                // 内容列宽正在被驱动 ⇒ 顶栏别在 200ms 里再叠第二段高度/位置补间
+                // （chipsWrap 中途翻档时，Behavior 会把落定又推迟 motion.fast，列表跟着二次变高）。
+                widthAnimating: shell.contentWidthDriven
+                // ---- 主/子页签 + 两个入口的真实数据（全部来自 Hub，壳层只做绑定）----
+                // Hub 上没有这些属性时（老宿主 / 桥还没加）`|| 空值` 兜底：入口显示 0、页签不出现，
+                // 界面不会因为读不到属性而崩。
+                peerTabs: Hub.peerTabs || []
+                peerRootId: Hub.peerRootId || ""
+                peerRootTitle: Hub.peerRootTitle || ""
+                subagentCount: Hub.subagentCount || 0
+                subagentRunning: Hub.subagentRunning === true
+                jobItems: Hub.jobs || []
+                jobCount: Hub.jobCount || 0
+                jobRunning: Hub.jobRunning === true
+                // 点主/子页签（或子智能体列表里的一行）：复用既有的换会话链路（消息区/输入框/跟随流一起切）
+                onPeerSelected: (sessionId) => Hub.selectSession(sessionId)
                 onToolsFilterRequested: Hub.openToolsFilter()
                 // ◫ 的三态状态机（需求 ④，照用户原话）：
                 //   ① **副窗口存在且可见** ⇒ 这一次点击 = 关掉那个副窗口（右栏回"已附着但隐藏"：
@@ -425,6 +517,15 @@ Item {
                 height: item ? item.implicitHeight : 0
                 visible: Hub.currentSessionId.length > 0
                 source: Style.url("basic/chat/Composer.qml")
+                // 右栏开合动画期间：输入区宽度也是被动画驱动的（内容列按 15px 分步变），
+                // 它的 MultiEffect 阴影源面会跟着重做离屏纹理 ⇒ 把这个事实推给它，动画期间按停阴影。
+                // 判据用 typeof：风格包可能覆盖本单元（旧版没有 widthAnimating，别让赋值炸掉）。
+                onLoaded: {
+                    if (!item)
+                        return
+                    if (typeof item.widthAnimating !== "undefined")
+                        item.widthAnimating = Qt.binding(function () { return shell.contentWidthDriven })
+                }
             }
 
             // 提问 / 审批面板（M4b）：排在输入区上方。
@@ -454,12 +555,71 @@ Item {
                 // 会话区底 → 输入框顶那条缝的第二段：取 0（原来 labelGap=8 ⇒ 再 panelGap=2）。
                 // 现在"列表内容底边距 8"就是唯一来源 ⇒ 缝约 8px。
                 anchors.bottomMargin: 0
-                visible: Hub.currentSessionId.length > 0
+                // 顶栏的「对话 / 轨迹」胶囊切到轨迹时，这里让位给 traceLoader。
+                // ⚠️ 用 visible 而不是 active：两个视图都保留自己的滚动位置，来回切不丢上下文。
+                visible: Hub.currentSessionId.length > 0 && topBar.activeView !== "trace"
                 // ⚠️ 必须等宽度定下来再创建列表：首帧宽度≈0 时委托里的 Text 会按假宽度排版
                 //    （行数翻几倍），量出的 contentHeight 是最终的 ~3 倍 → 滑块长度先长后短，
                 //    表现就是"一启动滚动条乱跳、然后稳定"（实测 contentH 2400 → 903）。
-                active: width > 200
+                // 用单向闩（而不是直接 width > 200）：面板拖宽 / 窄窗展开会把会话区压到 200 以下，
+                // 直接判宽会把**已经建好的列表整体销毁**，收起时再重建（回顶 + 一帧空白 = 一次性大卡顿）。
+                property bool everWide: false
+                onWidthChanged: if (width > 200) everWide = true
+                active: everWide
                 source: Style.url("basic/chat/MessageListView.qml")
+                // 右栏开合动画 / 拖右栏宽度期间：列表宽度持续在变，旧行为是每次宽度变化都立刻
+                // pinToBottom（一次 positionViewAtIndex = 多一整趟布局），而且每个可见气泡的
+                // 阴影纹理也跟着重做。把"宽度正在被驱动"推给列表，落定后再补一次贴底。
+                // 判据用 typeof：风格包可能覆盖本单元（旧版没有 widthAnimating，别让赋值炸掉）。
+                onLoaded: {
+                    if (!item)
+                        return
+                    if (typeof item.widthAnimating !== "undefined")
+                        item.widthAnimating = Qt.binding(function () { return shell.contentWidthDriven })
+                }
+            }
+
+            // 轨迹视图：同一块会话区，顶栏胶囊切换（数据面 Hub.trace，见 common/session/TraceModel）。
+            // 它和消息列表吃的是同一条 session/follow 流，所以两边永远同一份账本。
+            Loader {
+                id: traceLoader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: interactionLoader.top
+                anchors.bottomMargin: 0
+                visible: topBar.activeView === "trace" && Hub.currentSessionId.length > 0
+                // 首次切到轨迹才创建，之后保留（来回切不丢滚动位置）。
+                // ⚠️ active 必须带上 visible 这一项：只看 width 的话，停在对话视图时这里也白建一整套
+                //    ListView，而 TraceModel 每次账本事件都会整表 reset ⇒ 看不见的列表也跟着重建委托。
+                //    everShown 是个单向闩：一旦建过就一直 active，滚动位置与委托对象都留着。
+                //    everWide 同 messageLoader：宽度掉到 200 以下也不销毁（否则窄窗开合会重建整表）。
+                property bool everShown: false
+                property bool everWide: false
+                onWidthChanged: if (width > 200) everWide = true
+                active: (visible || everShown) && (width > 200 || everWide)
+                source: Style.url("basic/trace/TraceView.qml")
+                // 轨迹列表同样吃"宽度正在被驱动"：动画期间别每帧 positionViewAtIndex。
+                onLoaded: {
+                    if (!item)
+                        return
+                    if (typeof item.widthAnimating !== "undefined")
+                        item.widthAnimating = Qt.binding(function () { return shell.contentWidthDriven })
+                }
+
+                // 切进来时先贴底（与消息列表一致：默认看最新的记录）
+                onVisibleChanged: {
+                    // 看不见时只记账不重建（与"用户上翻暂停"共用同一个开关：切回来时一次性补齐）
+                    Hub.setTracePaused(!visible)
+                    if (!visible)
+                        return
+                    everShown = true
+                    if (item)
+                        Qt.callLater(item.pinToBottom)
+                }
+                // Loader 是异步建对象的：visible 先变、item 后到，这里补一次贴底
+                onItemChanged: if (visible && item)
+                    Qt.callLater(item.pinToBottom)
             }
 
             ConversationPlaceholder {
@@ -497,6 +657,10 @@ Item {
             // 独立态（**确认脱离之后**）：三点改成"搬那扇窗 + 落回来就回附"；回附落点由壳层现算给它
             sideDetached: shell.panelBarDetached
             attachZoneProvider: shell.panelBarScreenRect
+            // 注入内容要不要按卡片圆角裁（PanelBar.body 的 layer+mask）：只有块内容（终端/网页）
+            // 是**铺满的直角矩形**、会盖掉卡片下方两角；启动器/空态不铺满，不需要为了它把整块
+            // 内容（可能装着 WebEngineView）栅格化进离屏纹理。状态取面板坞模型的稳定布尔量。
+            contentNeedsMask: !PanelBarDock.homeVisible
             // 面板自己标题行那颗 ✕：跟手/独立态下它也必须走"回附 + 关窗"（否就只收起主窗口那半边，
             // 内容留在副窗口里 = 状态自相矛盾）；附着态照旧只收起右栏。
             onCloseRequested: {

@@ -28,6 +28,13 @@ public:
 	static void refreshTitles(DshApiClient* api,
 		const std::function<void(const QString& sessionId, const QString& title)>& onTitle);
 
+	// **轻量**重拉：只把 running 字段刷进 catalog，不动列表/选中/工作区（不会触发侧栏重建）。
+	// 引擎的 running 是 session.list 现算的（agents.get(id).status === "running"），
+	// 而 session/control 的投影里没有它 ⇒ 子代理"运行中"必须靠这条重拉才不至于永远显示未在运行。
+	// onChanged(true) 表示至少一行运行态变了。
+	static void refreshRunningStates(DshApiClient* api, SessionCatalog* catalog,
+		const std::function<void(bool changed)>& onChanged);
+
 	// 清空 DSH home 下的会话数据：sessions 目录 + storages/workspace.json。
 	// 默认工作区不在这里补建，由 ClientRuntime::resolveSessionWorkspace() 在缺分组时补。
 	static void clearAllSessionData(const QString& dshHome);

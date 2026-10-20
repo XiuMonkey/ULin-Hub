@@ -50,6 +50,9 @@ public:
 
 	// ---- 会话 / 工作区 RPC ----
 	void refreshSessions();
+	// 轻量重拉：只更新每个会话的 running（子代理页签那颗"运行中"点靠它），不重建列表、不动选中项。
+	// 变了会发 peerCatalogChanged —— 与 subagentCatalog 投影走同一条重画路径。
+	void refreshSessionStates();
 	// workspaceId 传空 = 未分组（服务端用默认 cwd）；侧栏的界面 key 在这里换算，UI 不用管
 	void createSession(const QString& workspaceId);
 	// 清空会话（侧栏那颗 danger 按钮）：抹掉本地会话数据（sessions 目录 + storages/workspace.json）与本地
@@ -85,6 +88,8 @@ signals:
 	void sessionArchived(const QString& sessionId);
 	// 目录变了，宿主该 rebuild 它的列表模型
 	void catalogChanged();
+	// 子代理目录（会话投影 subagentCatalog）变了：顶栏"主 ↔ 子"页签据此重画
+	void peerCatalogChanged();
 	// 列表拉回来了；参数是服务端建议的选中项（空 = 保持现状）
 	void sessionsRefreshed(const QString& autoSelectSessionId);
 	// 会话被整份清空（含当前会话）：宿主据此清掉消息区与"当前会话"这类界面状态 —— 不等它，
@@ -105,6 +110,13 @@ private:
 	// **在清本地目录之前**取好传进来。清空会话之所以要先删完再建：反过来的话 workspace/create 可能被
 	// 随后到达的 delete 抹掉，新会话就挂在一个已删除的分组上了。
 	void deleteWorkspacesThen(const QStringList& workspaceIds, const std::function<void()>& onDone);
+	// 逐个归档会话（workspace/archiveSession），全部收齐或 3 秒兜底后回调。
+	// 删除工作区前必须先走这一步：服务端 workspace/delete 只删注册、不动会话，
+	// 会话会变成无归属 ⇒ 刷新后全落到"未分组"（而那是删不掉的伪分组）。
+	// notifyHost = false：不逐条发 sessionArchived（"清空全部"场景由 sessionsCleared 统一处理，
+	// 否则每归档一条宿主就切一次会话，界面会乱跳）。
+	void archiveSessionsThen(const QStringList& sessionIds, const std::function<void()>& onDone,
+		bool notifyHost = true);
 
 	ServerManager* m_server = nullptr;
 	DshApiClient* m_api = nullptr;

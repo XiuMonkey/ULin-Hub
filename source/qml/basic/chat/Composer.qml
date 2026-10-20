@@ -53,6 +53,12 @@ Item {
 
     property bool streaming: Hub.streaming
 
+    // 宽度是否正被外层动画驱动（右栏开合 / 拖右栏宽度时 contentColumn 持续改宽，输入区跟着变宽窄；
+    // 开合按 15px 分步）。true 期间把卡片阴影按停：MultiEffect 的阴影源面尺寸一变 ⇒ 就要重做一张
+    // 离屏纹理（同一机制的实测见 widgets/PageOverlay.qml 的 overlayAnimating 注释）。阴影只是视觉点缀，
+    // 动画落定后恢复，肉眼几乎无差。由 Shell 的 composerLoader 注入（见 Shell.qml）。
+    property bool widthAnimating: false
+
     // ---- 视觉节奏（只在这里定数，下面全部引用它，保证内边距/行距/对齐三者成套）----
     // 左右统一内边距 16（cardPadding）：编辑器文字左缘、编辑器文字右缘、发送键右缘都落在这一列上
     readonly property real cardPadH: Theme.spacing.cardPadding
@@ -140,6 +146,9 @@ Item {
             anchors.fill: capsule
             anchors.topMargin: Theme.shadow.inputDy
             source: capsule
+            // 宽度动画期间整层隐藏（上面 capsule.visible 反过来直绘卡片本体）：
+            // 这样既没有阴影、也不再每帧把 source 重新栅格化进离屏纹理。落定后恢复。
+            visible: !root.widthAnimating
             shadowEnabled: true
             shadowBlur: Theme.shadow.inputBlur
             shadowColor: Theme.color.shadowSubtle
@@ -151,7 +160,10 @@ Item {
         // ---- ② 输入卡片 ----
         Rectangle {
             id: capsule
-            visible: false                 // 只作为上面 MultiEffect 的 source 绘制
+            // 静止时只当上面 MultiEffect 的 source 绘制（visible:false）；宽度动画期间反过来：
+            // 由自己直绘、MultiEffect 整层隐藏 —— 光关 shadowEnabled 省不掉"source 面尺寸每帧
+            // 都变 ⇒ 每帧重新栅格化一遍"的那张离屏纹理（机制见 widgets/Card.qml 的 surface/effect）。
+            visible: root.widthAnimating
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top

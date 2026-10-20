@@ -56,6 +56,8 @@ public:
 
 	// 拉当前会话的命令表（会话切换后、或用户刚打出 `/` 时调）
 	Q_INVOKABLE void refresh(const QString& sessionId);
+	// 清空命令表（切到子代理会话时用：commands/list 只接受普通会话，问了必回 session/agent-busy）
+	void clear();
 	// 执行整条命令行（含参数原文）
 	Q_INVOKABLE void execute(const QString& sessionId, const QString& line);
 

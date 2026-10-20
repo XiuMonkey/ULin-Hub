@@ -645,7 +645,7 @@ void ExtensionLoader::readIdentityFields(const QString& jsonPath, LoadedExtensio
 	if (!parseError.isEmpty())
 		return;
 
-	// ID：标识符（约定小写 + 下划线）。未声明就留空 —— 不报错、不拒绝整包。
+	// ID：标识符（约定小写 + 连字符）。未声明就留空 —— 不报错、不拒绝整包。
 	out->declaredId = root.value(QStringLiteral("ID")).toString();
 	// version：扩展自身版本。字符串与数字都认（JSON5 里忘加引号写成 1.0 时不至于变 0）。
 	{

@@ -18,9 +18,20 @@ Item {
     // 打开面板时的首页（空 = 显示提示，等用户输入）
     property string startUrl: ""
 
+    // 应用视图 = 扩展的 harness 页面（打开时 URL 带 chrome=0，见 SupporterPlugin::openHarnessView）。
+    // 为什么判标记而不是判 127.0.0.1/端口/index.html：宿主不该知道扩展的回环端口与文件布局，
+    // 一个语义参数就够了；扩展换服务/换路径，宿主这行不用跟着改。
+    property bool appView: false
+
     // 地址也可以**由外面给**（扩展面板）：PanelBarDock 把 PanelBarDock.activeViewUrl 活绑到 startUrl，
     // 切块/换面板时这条 handler 负责真正导航。用户自己在地址栏敲的仍走 navigate()。
     onStartUrlChanged: openExternal(startUrl)
+
+    // 从真正的页面 URL 判定"要不要画地址栏"。放在函数里而不是属性绑定的表达式里：
+    // 属性绑定可能在 view 还没创建时就被求值（bar 声明在 view 之前），那时读 view.url 会拿到空值。
+    function syncChrome() {
+        appView = view.url.toString().indexOf("chrome=0") >= 0
+    }
 
     function navigate(text) {
         // 规范化（判 scheme / 补 https:// / 拼搜索词 / 百分号编码）全在 C++：
@@ -46,11 +57,12 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // ---- 地址栏 ----
+        // ---- 地址栏（应用视图不显示：height 归零 + visible=false，Column 会整行跳过，不留空白）----
         Item {
             id: bar
             width: parent.width
-            height: 40
+            height: root.appView ? 0 : 40
+            visible: !root.appView
 
             Row {
                 anchors.fill: parent
@@ -111,19 +123,22 @@ Item {
             }
         }
 
-        // ---- 加载进度（2px，不占位）----
+        // ---- 加载进度（2px，不占位；应用视图连这条宿主装饰也不画，让网页顶到最上面）----
         Rectangle {
+            id: loadingBar
             width: parent.width * (view.loading ? view.loadProgress / 100 : 0)
             height: 2
             color: Theme.color.accent
-            visible: view.loading
+            visible: view.loading && !root.appView
         }
 
         // ---- 视图 ----
         Item {
             id: viewHost
             width: parent.width
-            height: parent.height - bar.height - 2
+            // 减掉"当前真正占位的宿主装饰"（地址栏隐藏时 bar 被 Column 跳过，不能按它的旧高度算，
+            // 否则底部会空出一整条）；进度条只在加载时占 2px。
+            height: parent.height - bar.height - (loadingBar.visible ? loadingBar.height : 0)
 
             WebEngineView {
                 id: view
@@ -131,9 +146,21 @@ Item {
                 backgroundColor: Theme.color.panelBg
                 settings.javascriptEnabled: true
 
+                // 页面地址一变就重判"这是不是应用视图"（扩展打开时带 chrome=0）
+                onUrlChanged: root.syncChrome()
+
                 onLoadingChanged: (request) => {
-                    if (request.status === WebEngineView.LoadSucceededStatus)
+                    root.syncChrome()   // 重定向可能改 URL：每次加载状态变化都按真实 URL 重判一次
+                    if (request.status !== WebEngineView.LoadSucceededStatus)
+                        return
+                    if (root.appView) {
+                        // 为什么必须在这里抢焦点：应用视图没有地址栏可点，WebEngine 的页面又只有
+                        // 在 WebEngineView 拿到 active focus 后才收键盘事件 —— 否则输入框点得进去、
+                        // 打不了字（"编辑不好用"）。加载完成即把焦点交给网页。
+                        view.forceActiveFocus()
+                    } else {
                         urlField.text = url.toString()
+                    }
                 }
                 // 页内 target=_blank：就在本视图打开，别丢给系统浏览器（右栏是"就地看一眼"）
                 onNewWindowRequested: (request) => {
@@ -156,5 +183,10 @@ Item {
         }
     }
 
-    Component.onCompleted: openExternal(startUrl)   // 创建时就带地址（扩展面板绑上来的那份）
+    // 创建时就带地址（扩展面板绑上来的那份）；再同步一次地址栏可见性，
+    // 避免"打开瞬间先闪一下地址栏"（startUrl 可能在 onLoaded 里才绑上来，urlChanged 稍后才到）
+    Component.onCompleted: {
+        openExternal(startUrl)
+        syncChrome()
+    }
 }

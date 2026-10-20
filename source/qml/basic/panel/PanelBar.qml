@@ -35,6 +35,10 @@ Item {
     //     ⚠️ 用函数而不是 rect 属性：主窗口被搬动/改尺寸后属性绑定不会重算，拖动那一刻现算才是真的。
     property bool sideDetached: false
     property var attachZoneProvider: null
+    // 注入内容是否需要"按卡片圆角裁下方两角"（见 bodyArea 里 body 的 layer+mask）。
+    // 默认 false = 不裁：启动器/空态没有铺满的直角内容，没必要为它把整块内容栅格化到离屏
+    // 纹理。Shell 按面板坞状态（有没有开着块）喂进来，见 Shell.qml 的 PanelBar 实例化处。
+    property bool contentNeedsMask: false
     // 几何的唯一出口（Shell.movePanelBarWindowTo）——**由 Shell 注入的函数引用**。
     // ⚠️ 为什么必须注入、不能沿 parent 链现找：本 Item 在脱离时被 reparent 进副窗口的
     //    panelSlot，parent 链变成 `panelSlot → 窗口 contentItem → QQuickRootItem` ——
@@ -382,11 +386,16 @@ Item {
                 //    矩形 ✗ —— 直接铺到底会把卡片的圆角盖掉（现象：打开终端或浏览器时，右栏底部
                 //    没有圆角）。用 MultiEffect 的 mask 把注入内容裁成"下方两角 = 卡片圆角"；
                 //    上方顶着标题行，本来就不在圆角处，所以不裁上边。
+                //
+                // ⚠️ 但 mask 的代价是**整块内容**（含 WebEngineView）被栅格化进离屏纹理，内容
+                //    每次重绘（终端输出、网页动画）都要重做一张整面板的 FBO —— 这是右栏常驻的
+                //    隐性开销。启动器/空态没有铺满的直角内容，根本不需要裁 ⇒ 由 Shell 喂
+                //    contentNeedsMask，把这份开销限制在"确实开着块"的时候。
                 Item {
                     id: body
                     anchors.fill: parent
 
-                    layer.enabled: true
+                    layer.enabled: root.contentNeedsMask
                     layer.effect: MultiEffect {
                         maskEnabled: true
                         maskSource: bodyMask
@@ -395,11 +404,12 @@ Item {
 
                 // 遮罩源：白 = 保留、透明 = 裁掉。visible: false + layer.enabled 是 MultiEffect
                 // 取源的固定用法（它要的是一张纹理，不是屏幕上的可见项）。
+                // layer.enabled 跟 body 同一条开关：不裁的时候连这张遮罩纹理也不必存在。
                 Item {
                     id: bodyMask
                     anchors.fill: parent
                     visible: false
-                    layer.enabled: true
+                    layer.enabled: root.contentNeedsMask
 
                     Rectangle {
                         anchors.fill: parent

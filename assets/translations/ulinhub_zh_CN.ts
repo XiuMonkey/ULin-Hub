@@ -607,6 +607,10 @@
     <message id="sessionBar_new_workspace">
         <translation>新建工作区</translation>
     </message>
+    <!-- QmlBridge::createWorkspace 的原生目录选择框标题 -->
+    <message id="sidebar_new_workspace">
+        <translation>选择工作区文件夹</translation>
+    </message>
     <message id="sessionBar_clear_sessions">
         <translation>清空会话</translation>
     </message>
@@ -687,8 +691,26 @@
     <message id="workdir_delete_confirm">
         <translation>确定要删除这个工作区吗？只会把它从工作区列表移除，不删除它下面的会话。</translation>
     </message>
+    <message id="workdir_exists_fmt">
+        <translation>这个目录已经是工作区了：%1</translation>
+    </message>
     <message id="chat_thinking_title">
-        <translation>思考过程</translation>
+        <translation>思考</translation>
+    </message>
+    <message id="chat_turn_done">
+        <translation>已完成</translation>
+    </message>
+    <message id="chat_process_think_done">
+        <translation>已完成分析</translation>
+    </message>
+    <message id="chat_process_think_running">
+        <translation>正在分析请求</translation>
+    </message>
+    <message id="chat_process_tools_done">
+        <translation>执行了命令</translation>
+    </message>
+    <message id="chat_process_tools_running">
+        <translation>正在运行命令</translation>
     </message>
     <message id="chat_streaming_meta">
         <translation>进行中…</translation>
@@ -707,6 +729,24 @@
     </message>
     <message id="topbar_view_trace">
         <translation>轨迹</translation>
+    </message>
+    <message id="topbar_subagent">
+        <translation>子代理</translation>
+    </message>
+    <message id="topbar_subagent_tip">
+        <translation>子代理会话</translation>
+    </message>
+    <message id="topbar_subagent_empty">
+        <translation>本会话暂无子代理。子代理运行后，这里会列出可打开的对话。</translation>
+    </message>
+    <message id="topbar_jobs">
+        <translation>后台任务</translation>
+    </message>
+    <message id="topbar_jobs_tip">
+        <translation>后台任务</translation>
+    </message>
+    <message id="topbar_jobs_empty">
+        <translation>本会话暂无后台任务。运行中的任务会在这里显示进度与输出。</translation>
     </message>
     <message id="chat_session_busy_restarting">
         <translation>上一个进程还没退出，正在重启服务并重试…</translation>
@@ -806,6 +846,104 @@
     </message>
     <message id="model_provider_load_failed_fmt">
         <translation>加载 %1 的模型列表失败：%2</translation>
+    </message>
+    <!-- 轨迹视图（basic/trace/TraceView.qml） -->
+    <message id="trace_summary_turns">
+        <translation>轮次</translation>
+    </message>
+    <message id="trace_summary_steps">
+        <translation>步骤</translation>
+    </message>
+    <message id="trace_summary_tools">
+        <translation>工具</translation>
+    </message>
+    <message id="trace_summary_tokens">
+        <translation>tokens</translation>
+    </message>
+    <message id="trace_summary_time">
+        <translation>时长</translation>
+    </message>
+    <message id="trace_summary_errors">
+        <translation>失败 %1</translation>
+    </message>
+    <message id="trace_turn_n">
+        <translation>第 %1 轮</translation>
+    </message>
+    <message id="trace_step_n">
+        <translation>步骤 %1</translation>
+    </message>
+    <message id="trace_kind_turn">
+        <translation>轮次</translation>
+    </message>
+    <message id="trace_kind_step">
+        <translation>步骤</translation>
+    </message>
+    <message id="trace_kind_user">
+        <translation>用户</translation>
+    </message>
+    <message id="trace_kind_assistant">
+        <translation>助手</translation>
+    </message>
+    <message id="trace_kind_tool">
+        <translation>工具</translation>
+    </message>
+    <message id="trace_kind_context">
+        <translation>上下文</translation>
+    </message>
+    <message id="trace_kind_system">
+        <translation>系统</translation>
+    </message>
+    <message id="trace_kind_compaction">
+        <translation>压缩</translation>
+    </message>
+    <message id="trace_kind_attempt">
+        <translation>尝试</translation>
+    </message>
+    <message id="trace_kind_retry">
+        <translation>重试</translation>
+    </message>
+    <message id="trace_status_running">
+        <translation>进行中</translation>
+    </message>
+    <message id="trace_empty">
+        <translation>这个会话还没有可显示的事件</translation>
+    </message>
+    <message id="trace_detail_title">
+        <translation>记录详情</translation>
+    </message>
+    <message id="trace_copy_json">
+        <translation>复制 JSON</translation>
+    </message>
+    <!-- 主/子智能体页签与后台任务名册（basic/topbar/） -->
+    <message id="subagent_mode_one_shot">
+        <translation>一次性</translation>
+    </message>
+    <message id="subagent_mode_continuable">
+        <translation>可继续</translation>
+    </message>
+    <message id="subagent_mode_unknown">
+        <translation>模式未知</translation>
+    </message>
+    <message id="subagent_activity_running">
+        <translation>正在运行</translation>
+    </message>
+    <message id="subagent_activity_inactive">
+        <translation>未在运行</translation>
+    </message>
+    <message id="job_status_running">
+        <translation>运行中</translation>
+    </message>
+    <message id="job_status_stopping">
+        <translation>正在停止</translation>
+    </message>
+    <message id="job_status_completed">
+        <translation>已完成</translation>
+    </message>
+    <message id="job_status_killed">
+        <translation>已取消</translation>
+    </message>
+    <message id="job_status_failed">
+        <translation>已失败</translation>
     </message>
 </context>
 </TS>

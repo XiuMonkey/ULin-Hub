@@ -144,6 +144,7 @@
     <ClCompile Include="src\qmlbridge\QmlBridge.cpp" />
     <ClCompile Include="src\qmlbridge\ThemeController.cpp" />
     <ClCompile Include="src\common\session\MessageListModel.cpp" />
+    <ClCompile Include="src\common\session\TraceModel.cpp" />
     <ClCompile Include="src\common\session\ChatController.cpp" />
     <ClCompile Include="src\common\session\ToolsFilter.cpp" />
     <ClCompile Include="src\common\util\MarkdownSegmenter.cpp" />
@@ -311,6 +312,7 @@
     <QtMoc Include="include\qmlbridge\QmlBridge.h" />
     <QtMoc Include="include\qmlbridge\ThemeController.h" />
     <QtMoc Include="include\common\session\MessageListModel.h" />
+    <QtMoc Include="include\common\session\TraceModel.h" />
     <QtMoc Include="include\common\session\ChatController.h" />
     <QtMoc Include="include\common\session\ToolsFilter.h" />
     <QtMoc Include="include\common\settings\SettingsController.h" />

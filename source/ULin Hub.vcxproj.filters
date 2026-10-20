@@ -111,6 +111,9 @@
     <ClCompile Include="src\common\session\MessageListModel.cpp">
       <Filter>src\common\session</Filter>
     </ClCompile>
+    <ClCompile Include="src\common\session\TraceModel.cpp">
+      <Filter>src\common\session</Filter>
+    </ClCompile>
     <ClCompile Include="src\common\session\ChatController.cpp">
       <Filter>src\common\session</Filter>
     </ClCompile>
@@ -428,6 +431,9 @@
       <Filter>include\qmlbridge</Filter>
     </QtMoc>
     <QtMoc Include="include\common\session\MessageListModel.h">
+      <Filter>include\common\session</Filter>
+    </QtMoc>
+    <QtMoc Include="include\common\session\TraceModel.h">
       <Filter>include\common\session</Filter>
     </QtMoc>
     <QtMoc Include="include\common\session\ChatController.h">

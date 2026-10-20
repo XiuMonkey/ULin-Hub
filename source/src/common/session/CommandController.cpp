@@ -97,6 +97,12 @@ void CommandController::refresh(const QString& sessionId)
 		});
 }
 
+void CommandController::clear()
+{
+	m_listedSession.clear();
+	setItems(QVariantList());
+}
+
 void CommandController::execute(const QString& sessionId, const QString& line)
 {
 	if (!m_api || sessionId.isEmpty() || !looksLikeCommand(line))

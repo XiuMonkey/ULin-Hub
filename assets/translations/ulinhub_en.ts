@@ -607,6 +607,10 @@
     <message id="sessionBar_new_workspace">
         <translation>New workspace</translation>
     </message>
+    <!-- Native directory picker title from QmlBridge::createWorkspace -->
+    <message id="sidebar_new_workspace">
+        <translation>Choose workspace folder</translation>
+    </message>
     <message id="sessionBar_clear_sessions">
         <translation>Clear sessions</translation>
     </message>
@@ -687,8 +691,26 @@ Click ＋ at the top right to create one</translation>
     <message id="workdir_delete_confirm">
         <translation>Delete this workspace? It is only removed from the workspace list; its sessions are kept.</translation>
     </message>
+    <message id="workdir_exists_fmt">
+        <translation>This folder is already a workspace: %1</translation>
+    </message>
     <message id="chat_thinking_title">
-        <translation>Thinking</translation>
+        <translation>Think</translation>
+    </message>
+    <message id="chat_turn_done">
+        <translation>Done</translation>
+    </message>
+    <message id="chat_process_think_done">
+        <translation>Analyzed the request</translation>
+    </message>
+    <message id="chat_process_think_running">
+        <translation>Analyzing the request</translation>
+    </message>
+    <message id="chat_process_tools_done">
+        <translation>Ran commands</translation>
+    </message>
+    <message id="chat_process_tools_running">
+        <translation>Running commands</translation>
     </message>
     <message id="chat_streaming_meta">
         <translation>In progress...</translation>
@@ -707,6 +729,24 @@ Click ＋ at the top right to create one</translation>
     </message>
     <message id="topbar_view_trace">
         <translation>Trace</translation>
+    </message>
+    <message id="topbar_subagent">
+        <translation>Subagents</translation>
+    </message>
+    <message id="topbar_subagent_tip">
+        <translation>Subagent conversations</translation>
+    </message>
+    <message id="topbar_subagent_empty">
+        <translation>No subagents in this session yet. Once one runs, its conversation can be opened from here.</translation>
+    </message>
+    <message id="topbar_jobs">
+        <translation>Jobs</translation>
+    </message>
+    <message id="topbar_jobs_tip">
+        <translation>Background jobs</translation>
+    </message>
+    <message id="topbar_jobs_empty">
+        <translation>No background jobs in this session yet. Running jobs show their progress and output here.</translation>
     </message>
     <message id="chat_session_busy_restarting">
         <translation>The previous process has not exited yet. Restarting the service and retrying…</translation>
@@ -806,6 +846,104 @@ Click ＋ at the top right to create one</translation>
     </message>
     <message id="model_provider_load_failed_fmt">
         <translation>Could not load the model list for %1: %2</translation>
+    </message>
+    <!-- Trace view (basic/trace/TraceView.qml) -->
+    <message id="trace_summary_turns">
+        <translation>Turns</translation>
+    </message>
+    <message id="trace_summary_steps">
+        <translation>Steps</translation>
+    </message>
+    <message id="trace_summary_tools">
+        <translation>Tools</translation>
+    </message>
+    <message id="trace_summary_tokens">
+        <translation>Tokens</translation>
+    </message>
+    <message id="trace_summary_time">
+        <translation>Duration</translation>
+    </message>
+    <message id="trace_summary_errors">
+        <translation>%1 failed</translation>
+    </message>
+    <message id="trace_turn_n">
+        <translation>Turn %1</translation>
+    </message>
+    <message id="trace_step_n">
+        <translation>Step %1</translation>
+    </message>
+    <message id="trace_kind_turn">
+        <translation>Turn</translation>
+    </message>
+    <message id="trace_kind_step">
+        <translation>Step</translation>
+    </message>
+    <message id="trace_kind_user">
+        <translation>User</translation>
+    </message>
+    <message id="trace_kind_assistant">
+        <translation>Assistant</translation>
+    </message>
+    <message id="trace_kind_tool">
+        <translation>Tool</translation>
+    </message>
+    <message id="trace_kind_context">
+        <translation>Context</translation>
+    </message>
+    <message id="trace_kind_system">
+        <translation>System</translation>
+    </message>
+    <message id="trace_kind_compaction">
+        <translation>Compaction</translation>
+    </message>
+    <message id="trace_kind_attempt">
+        <translation>Attempt</translation>
+    </message>
+    <message id="trace_kind_retry">
+        <translation>Retry</translation>
+    </message>
+    <message id="trace_status_running">
+        <translation>running</translation>
+    </message>
+    <message id="trace_empty">
+        <translation>No events to show for this session yet</translation>
+    </message>
+    <message id="trace_detail_title">
+        <translation>Record detail</translation>
+    </message>
+    <message id="trace_copy_json">
+        <translation>Copy JSON</translation>
+    </message>
+    <!-- Main/subagent tabs and the background-job roster (basic/topbar/) -->
+    <message id="subagent_mode_one_shot">
+        <translation>one-shot</translation>
+    </message>
+    <message id="subagent_mode_continuable">
+        <translation>continuable</translation>
+    </message>
+    <message id="subagent_mode_unknown">
+        <translation>unknown mode</translation>
+    </message>
+    <message id="subagent_activity_running">
+        <translation>running</translation>
+    </message>
+    <message id="subagent_activity_inactive">
+        <translation>not running</translation>
+    </message>
+    <message id="job_status_running">
+        <translation>running</translation>
+    </message>
+    <message id="job_status_stopping">
+        <translation>stopping</translation>
+    </message>
+    <message id="job_status_completed">
+        <translation>completed</translation>
+    </message>
+    <message id="job_status_killed">
+        <translation>cancelled</translation>
+    </message>
+    <message id="job_status_failed">
+        <translation>failed</translation>
     </message>
 </context>
 </TS>

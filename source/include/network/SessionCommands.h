@@ -66,17 +66,57 @@ namespace SessionCommands
 		return args;
 	}
 
+	// session/follow 与 session/page 共用的 address：
+	//   · 普通会话 = { kind: "session", sessionId }
+	//   · 子代理会话 = { kind: "subagent", parentSessionId, childSessionId, mode }
+	// ⚠️ 子代理**不能**用 session 形状寻址：引擎 dsh-api-session-controller 的 validateAddress
+	//    （lib/index.js: validateAddress）对 origin == "subagent" 的会话直接回
+	//    `session/agent-busy`（"subagent Sessions require their durable parent address"）⇒ follow 流会开出来
+	//    但一帧快照都不发，表现就是"点进子代理页签消息区全空"。parentSessionId 为空即普通会话。
+	// mode 取 subagentCatalog 条目的 mode（one-shot / continuable）；取不到传空 = "unknown"
+	// （引擎只在 mode != "unknown" 时校验它，空串兜底是安全的）。
+	inline QJsonObject sessionAddress(const QString& sessionId, const QString& parentSessionId = QString(),
+		const QString& mode = QString())
+	{
+		QJsonObject address;
+		if (!parentSessionId.isEmpty()) {
+			address.insert(QStringLiteral("kind"), QStringLiteral("subagent"));
+			address.insert(QStringLiteral("parentSessionId"), parentSessionId);
+			address.insert(QStringLiteral("childSessionId"), sessionId);
+			address.insert(QStringLiteral("mode"),
+				mode.isEmpty() ? QStringLiteral("unknown") : mode);
+			return address;
+		}
+
+		address.insert(QStringLiteral("kind"), QStringLiteral("session"));
+		address.insert(QStringLiteral("sessionId"), sessionId);
+		return address;
+	}
+
+	// session/follow -> args { request: { address, assistantStream? } }。
+	// assistantStream = true 才有实时分片（不带只发已提交的整段消息）；流的生命周期在 DshApiClient。
+	inline QJsonObject sessionFollow(const QString& sessionId, const QString& parentSessionId = QString(),
+		const QString& mode = QString(), bool assistantStream = true)
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("address"), sessionAddress(sessionId, parentSessionId, mode));
+		if (assistantStream)
+			request.insert(QStringLiteral("assistantStream"), true);
+
+		QJsonObject args;
+		args.insert(QStringLiteral("request"), request);
+		return args;
+	}
+
 	// session/page -> args { request: { address, throughSeq, beforeSeq?, maxMessages? } }。throughSeq 必填（缺则回 gateway/input-invalid），
 	// 取 follow 快照的 cursor 或 session/list 行的 projections.asOfSeq（两者相等）；不传 beforeSeq = 预取"throughSeq 往前最近一页"，
 	// 传 = 首屏上翻（取当前内容里最早一条的 seq）；maxMessages 数的是**消息**而不是事件。
-	inline QJsonObject sessionPage(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0)
+	// parentSessionId 非空 = 子代理会话（见 sessionAddress 的说明）。
+	inline QJsonObject sessionPage(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0,
+		const QString& parentSessionId = QString(), const QString& mode = QString())
 	{
-		QJsonObject address;
-		address.insert(QStringLiteral("kind"), QStringLiteral("session"));
-		address.insert(QStringLiteral("sessionId"), sessionId);
-
 		QJsonObject request;
-		request.insert(QStringLiteral("address"), address);
+		request.insert(QStringLiteral("address"), sessionAddress(sessionId, parentSessionId, mode));
 		request.insert(QStringLiteral("throughSeq"), throughSeq);
 		if (maxMessages > 0)
 			request.insert(QStringLiteral("maxMessages"), maxMessages);

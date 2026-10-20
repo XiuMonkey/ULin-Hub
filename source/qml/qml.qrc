@@ -10,6 +10,8 @@
         <file>basic/chat/InteractionPanel.qml</file>
         <file>basic/chat/ToolsFilterPanel.qml</file>
         <file>basic/chat/MessageListView.qml</file>
+        <!-- 轨迹：会话区的另一个视图（顶栏胶囊切换），数据面是 common/session/TraceModel -->
+        <file>basic/trace/TraceView.qml</file>
         <file>basic/chat/ModelSelectorChip.qml</file>
         <file>basic/extensions/ExtensionManagerPage.qml</file>
         <file>basic/plugins/PluginMarketPage.qml</file>
@@ -35,12 +37,23 @@
         <file>basic/terminal/TerminalPanel.qml</file>
         <file>basic/terminal/TerminalView.qml</file>
         <file>basic/session/SessionBar.qml</file>
+        <file>basic/topbar/EntryChip.qml</file>
+        <!-- 主智能体 → 子智能体的标题页签行（点标题切会话） -->
+        <file>basic/topbar/PeerTabs.qml</file>
         <file>basic/topbar/TopBar.qml</file>
         <file>Main.qml</file>
         <file>metrics.json</file>
         <file>pack.json</file>
         <file>skin/chat/AgentBubble.qml</file>
         <file>skin/chat/CodeBlock.qml</file>
+        <!-- 正文块级 Markdown 排版（表格/分界线/引用块/列表/标题 自绘，行内 code 走官方 mono 栈） -->
+        <file>skin/chat/Markdown/MarkdownBody.qml</file>
+        <file>skin/chat/Markdown/MarkdownHeading.qml</file>
+        <file>skin/chat/Markdown/MarkdownInline.qml</file>
+        <file>skin/chat/Markdown/MarkdownList.qml</file>
+        <file>skin/chat/Markdown/MarkdownPlain.qml</file>
+        <file>skin/chat/Markdown/MarkdownQuote.qml</file>
+        <file>skin/chat/Markdown/MarkdownTable.qml</file>
         <file>skin/chat/MenuRow.qml</file>
         <file>skin/chat/SystemNotice.qml</file>
         <file>skin/chat/UserBubble.qml</file>

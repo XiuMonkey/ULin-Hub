@@ -125,6 +125,8 @@ int main(int argc, char* argv[])
 		runClass(&test, "TestLogger");
 	}
 
+	// TestHistoryManager 已移除（被测类 HistoryManager 不再存在），此处不再运行。
+
 	{
 		TestTranslationManager test;
 		runClass(&test, "TestTranslationManager");

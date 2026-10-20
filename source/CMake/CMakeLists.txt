@@ -218,9 +218,11 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/../misc/legacy-tests/UnitTestMain.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestDshEventParser.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestCodeHighlighter.cpp"
-		"${ULINHUB_ROOT}/../misc/legacy-tests/TestHistoryManager.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestMarkdownPreprocess.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestThunk.cpp"
+		# TestHistoryManager 被测的 HistoryManager 类在当前代码库已不存在（旧工程遗留、
+		# 未随重命名迁移），属死测试。不删源文件，仅从测试目标移除，并跳过其头文件的
+		# AUTOMOC（否则会生成孤立的 moc_TestHistoryManager.cpp 引发链接失败）。
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestSessionCatalog.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestPluginMarketModel.cpp"
 		"${ULINHUB_ROOT}/../misc/legacy-tests/TestModelSelection.cpp"
@@ -258,10 +260,20 @@ if(ULINHUB_BUILD_TESTS)
 		# DshApiClient.cpp 按 kApiSink 从公共注册表取"后端接管的接收端"（客户端扩展），
 		# 所以测试目标也要编 CommonRegistry.cpp，否则同样是 LNK2019。
 		"${ULINHUB_ROOT}/src/common/util/CommonRegistry.cpp"
-		"${ULINHUB_ROOT}/src/ExtensionSystem/ExtensionRegistry.cpp")
+		"${ULINHUB_ROOT}/src/ExtensionSystem/ExtensionRegistry.cpp"
+		# ClientExtension.cpp 经 ExtensionLoader::readIdentityFields 与 HostUi::instance()/
+		# releaseBlockBackends 引用这两个类；它们没编进测试目标就会 LNK2019。
+		# HostUi.cpp 又依赖 PanelBarDockModel::instance()，一并编入（后者仅依赖 Qt，自包含）。
+		"${ULINHUB_ROOT}/src/ExtensionSystem/ExtensionLoader.cpp"
+		"${ULINHUB_ROOT}/src/ExtensionSystem/HostUi.cpp"
+		"${ULINHUB_ROOT}/src/common/shell/PanelBarDockModel.cpp")
 
 	# 测试类头文件带 Q_OBJECT，交给 AUTOMOC
 	file(GLOB ULINHUB_TEST_HEADERS CONFIGURE_DEPENDS "${ULINHUB_ROOT}/../misc/legacy-tests/*.h")
+	# 死测试 TestHistoryManager 的头：被测类已不存在，跳过其 AUTOMOC，避免孤立 moc 产物。
+	set_source_files_properties(
+		"${ULINHUB_ROOT}/../misc/legacy-tests/TestHistoryManager.h"
+		PROPERTIES SKIP_AUTOMOC ON)
 
 	# include/ 下的头也要交给 AUTOMOC，但**只列测试目标真正编译了 .cpp 的那些**。
 	#
@@ -282,7 +294,10 @@ if(ULINHUB_BUILD_TESTS)
 		"${ULINHUB_ROOT}/include/ExtensionSystem/DshNamedPipeBridge.h"
 		"${ULINHUB_ROOT}/include/ExtensionSystem/ExtensionToolHost.h"
 		"${ULINHUB_ROOT}/include/common/util/ConnectionManager.h"
-		"${ULINHUB_ROOT}/include/common/util/CommonRegistry.h")
+		"${ULINHUB_ROOT}/include/common/util/CommonRegistry.h"
+		# 上面补编的 HostUi.cpp / PanelBarDockModel.cpp 这两个类头带 Q_OBJECT，必须交给 AUTOMOC。
+		"${ULINHUB_ROOT}/include/ExtensionSystem/HostUi.h"
+		"${ULINHUB_ROOT}/include/common/shell/PanelBarDockModel.h")
 
 	qt_add_executable(ulinhub_tests
 		${ULINHUB_TEST_SOURCES}
@@ -307,11 +322,16 @@ if (MSVC)
 endif()
 	target_compile_definitions(ulinhub_tests PRIVATE QT_NO_DEPRECATED_WARNINGS)
 
-	# 与 .vcxproj 的 QtModules（core;gui;testlib）一致，控制台子系统
+	# 与 .vcxproj 的 QtModules（core;gui;testlib）一致，控制台子系统。
+	# 额外链 CorePrivate（ExtensionLoader.cpp 用私有头 qzipreader_p.h）与 Qml
+	# （HostUi.cpp 用 QQmlComponent / QQmlContext / QQmlEngine）。
 	target_link_libraries(ulinhub_tests PRIVATE
 		Qt6::Core
+		Qt6::CorePrivate
 		Qt6::Gui
 		Qt6::Widgets
+		Qt6::Qml
+		Qt6::Quick
 		Qt6::Test
 		Qt6::Network
 		Qt6::WebSockets)

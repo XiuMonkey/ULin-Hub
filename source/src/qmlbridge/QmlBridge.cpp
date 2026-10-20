@@ -12,6 +12,7 @@
 #include "ExtensionSystem/HostUi.h"
 
 #include "common/session/ChatController.h"
+#include "common/session/TraceModel.h"   // trace() 把 TraceModel* 当 QAbstractItemModel* 返回，需要完整类型
 #include "common/session/ToolsFilter.h"
 #include "common/util/MarkdownSegmenter.h"
 #include "core/ClientRuntime.h"
@@ -23,8 +24,12 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QVariantMap>
 
 namespace
 {
@@ -115,7 +120,18 @@ void QmlBridge::wireRuntime()
 	connect(m_runtime, &ClientRuntime::catalogChanged, this, [this]() {
 		if (m_sessions)
 			m_sessions->rebuild();
-		});
+		// 子代理会话的标题/运行态也来自 session.list：列表重建后顶栏页签跟着重画
+		refreshPeerRoot();
+		emit peerTabsChanged();
+	});
+
+	// 子代理目录（会话投影 subagentCatalog）变了：顶栏"主 ↔ 子"页签重画
+	connect(m_runtime, &ClientRuntime::peerCatalogChanged, this, [this]() {
+		// 父目录可能在"进入子代理之后"才到（冷父会话）：这里把组根从子代理纠正回父会话，
+		// 否则页签行会一直把子代理当成组根（= 切回父会话后仍看到子代理那颗）。
+		refreshPeerRoot();
+		emit peerTabsChanged();
+	});
 
 	// 列表拉回来：按服务端建议自动选中（旧壳规则：第一个非运行中的会话）
 	connect(m_runtime, &ClientRuntime::sessionsRefreshed, this, [this](const QString& autoSelectSessionId) {
@@ -131,20 +147,37 @@ void QmlBridge::wireRuntime()
 
 		if (m_sessions->rowCount() == 0)
 			m_runtime->setStatus(qtTrId("session_none_click_new"));
+
+		refreshPeerRoot();       // 父目录/父子关系可能是这次刷新才到的
+		emit peerTabsChanged();   // 标题/运行态可能是这次刷新才变的
 	});
 
 	// 会话被归档：删的正是当前会话就清空消息区、回到占位页（目录由 runtime 更新，这里只管界面状态）
 	connect(m_runtime, &ClientRuntime::sessionArchived, this, [this](const QString& sessionId) {
-		if (sessionId.isEmpty() || m_currentSessionId != sessionId)
+		if (sessionId.isEmpty())
 			return;
 
-		m_currentSessionId.clear();
-		if (m_chat)
-			m_chat->setSession(QString());
-		emit currentSessionChanged();
+		if (m_currentSessionId == sessionId) {
+			// 当前会话被归档：会话与页签组一起作废（只发一轮信号）
+			m_currentSessionId.clear();
+			m_peerRootId.clear();
+			if (m_chat)
+				m_chat->setSession(QString());
+			emit currentSessionChanged();
+			emit peerTabsChanged();
+			return;
+		}
+
+		// 页签组根被归档（删的是当前所在组的父会话）：页签组作废
+		if (m_peerRootId == sessionId) {
+			m_peerRootId.clear();
+			emit peerTabsChanged();
+		}
 	});
 
-	connect(m_runtime, &ClientRuntime::operationFailed, this, [](const QString&) {});
+	// ⚠️ 这里原本是 `[](const QString&) {}` —— core 里所有 "操作失败" 的文案都被这一句吞掉了：
+	//    新建/删除工作区失败、目录非法…… 用户端只表现为"点了没反应"。现在原样转发给 QML 弹 Toast。
+	connect(m_runtime, &ClientRuntime::operationFailed, this, &QmlBridge::operationFailed);
 	connect(m_runtime, &ClientRuntime::sessionCreateFailed, this, &QmlBridge::sessionCreateFailed);
 
 	// 会话被整份清空：当前会话连同消息区一起作废（清空发生在"当前会话"还在的时候）。
@@ -152,11 +185,13 @@ void QmlBridge::wireRuntime()
 	//    留着旧选中项就等于新会话建出来了却选不上。
 	connect(m_runtime, &ClientRuntime::sessionsCleared, this, [this]() {
 		m_currentSessionId.clear();
+		m_peerRootId.clear();
 		if (m_chat)
 			m_chat->setSession(QString());
 		if (m_sessions)
 			m_sessions->setSelectedSession(QString());
 		emit currentSessionChanged();
+		emit peerTabsChanged();
 	});
 
 	// 服务端重连：如果发送链路攒着一条待补发的（"会话被旧进程占用"自愈），在这里补发
@@ -181,10 +216,26 @@ void QmlBridge::wireChat()
 	connect(m_chat, &ChatController::streamingChanged, this, &QmlBridge::streamingChanged);
 	connect(m_chat, &ChatController::turnFinished, this, &QmlBridge::lastTurnEmptyChanged);
 	connect(m_chat, &ChatController::statsLineChanged, this, &QmlBridge::statsLineChanged);
+	// 轨迹顶部概览（轮次/步骤/工具/token/时长）：模型算好一份 map，桥只转发
+	connect(m_chat->trace(), &TraceModel::summaryChanged, this, &QmlBridge::traceSummaryChanged);
 	connect(m_chat, &ChatController::interactionChanged, this, &QmlBridge::interactionChanged);
 	connect(m_chat, &ChatController::olderChanged, this, &QmlBridge::olderChanged);
 	connect(m_chat, &ChatController::olderPrepended, this, &QmlBridge::olderPrepended);
+
+	// 子代理那边有新动静（目录/回传/结束）⇒ 1.2s 去抖后重拉一次 running。
+	// 为什么必须重拉：引擎的 running 只在 session/list 里现算（agents.status），投影帧不推；
+	// 之前只在启动时拉过一次，于是子代理跑得再欢，顶栏也一直"未在运行"。
+	m_peerStateTimer = new QTimer(this);
+	m_peerStateTimer->setSingleShot(true);
+	m_peerStateTimer->setInterval(1200);
+	connect(m_peerStateTimer, &QTimer::timeout, this, &QmlBridge::refreshSessionStates);
+	connect(m_chat, &ChatController::peerActivitySeen, this, [this]() {
+		if (m_peerStateTimer && !m_peerStateTimer->isActive())
+			m_peerStateTimer->start();
+	});
 	connect(m_chat, &ChatController::catalogChanged, this, &QmlBridge::modelCatalogChanged);
+	// 后台任务名册（引擎 job/list 流 → ChatController → QML）
+	connect(m_chat, &ChatController::jobsChanged, this, &QmlBridge::jobsChanged);
 	// 扩展把产物（如截图）交给输入框：HostUi 只发信号，落到这里的待发附件列表
 	connect(&HostUi::instance(), &HostUi::composerFilesRequested, this, [this](const QStringList& paths) {
 		if (!m_chat || paths.isEmpty())
@@ -208,6 +259,14 @@ void QmlBridge::wireChat()
 void QmlBridge::refreshSessions()
 {
 	m_runtime->refreshSessions();
+}
+
+// 轻量刷新：只更新运行态（会话列表/顶栏页签那颗"运行中"点）。
+// 触发器有三处：① 顶栏打开「子智能体」下拉时（QML 调本函数）；② 换会话；③ 子代理活动事件（去抖）。
+void QmlBridge::refreshSessionStates()
+{
+	if (m_runtime)
+		m_runtime->refreshSessionStates();
 }
 
 void QmlBridge::createSession(const QString& workspaceId)
@@ -240,24 +299,157 @@ void QmlBridge::clearAllSessions()
 	m_runtime->clearAllSessions();
 }
 
+// 当前会话所属页签组的根：父目录已知就用父会话，否则当前会话自己。
+// 页签行只从这一个根的直接子代理目录生成 —— 任何别的会话的子代理都不该混进来。
+void QmlBridge::refreshPeerRoot()
+{
+	if (m_currentSessionId.isEmpty()) {
+		m_peerRootId.clear();
+		return;
+	}
+
+	const SessionCatalog* catalog = m_sessions ? m_sessions->catalog() : nullptr;
+	const QString parentSessionId = catalog ? catalog->parentForSession(m_currentSessionId) : QString();
+	m_peerRootId = parentSessionId.isEmpty() ? m_currentSessionId : parentSessionId;
+}
+
 void QmlBridge::selectSession(const QString& sessionId)
 {
 	if (sessionId.isEmpty() || m_currentSessionId == sessionId)
 		return;
 
 	m_currentSessionId = sessionId;
+	// 组根按**当前会话**重算：目标是子代理就跟着父会话（父目录已知时），否则就是自己。
+	// 父子关系来自引擎：subagentCatalog 投影反推优先，session.list 的 parentSessionId 兜底。
+	refreshPeerRoot();
 	if (DshApiClient* api = m_runtime->apiClient())
 		api->setCurrentSessionId(sessionId);   // 扩展经 VirtualMain 读
 
-	// 消息区换会话（清空 + 记住当前会话），再把跟随流切过去：首帧快照会由 ChatController 接收
+	// 消息区换会话（清空 + 记住当前会话），再把跟随流切过去：首帧快照会由 ChatController 接收。
+	// 子代理的地址形状（parent + mode）由 ClientRuntime 从 catalog 解析，follow/page 都走 subagent address。
 	m_chat->setSession(sessionId);
 	m_chat->refreshModelCatalog();  // 输入区的模型/思考 chip 按会话重拉
-	m_runtime->followSession(sessionId);
-	// 命令是**按 agent（会话）注册**的：换会话必须重拉一份，否则会拿上一个会话的命令表
-	m_commands->refresh(sessionId);
+	m_runtime->followSession(sessionId);   // 同时会换掉 job/list 名册流
+	// 顺手把运行态刷一次：换到子代理/切回父会话都是"看谁在跑"的时刻，
+	// 而 session.list 的 running 是快照，启动后不再自动更新。
+	m_runtime->refreshSessionStates();
+	// 命令是**按 agent（会话）注册**的：换会话必须重拉一份，否则会拿上一个会话的命令表。
+	// 子代理会话没有 commands/list（引擎回 session/agent-busy）⇒ 清空，别拿主会话的命令表糊在上面。
+	// 组根 == 当前会话 ⇔ 目标是普通会话（没有父会话），只有这种才重拉。
+	if (m_peerRootId == m_currentSessionId)
+		m_commands->refresh(sessionId);
+	else
+		m_commands->clear();
 
 	m_sessions->setSelectedSession(sessionId);
 	emit currentSessionChanged();
+	emit peerTabsChanged();
+}
+
+// ------------------------------------------------------------------
+// 子代理页签（顶栏"主 ↔ 子"）
+// ------------------------------------------------------------------
+
+// 当前页签组根会话的直接子代理（不含主会话自己）：顶栏「子智能体」下拉框的列表来源，
+// 页签行也只在里面找"当前子代理"那一行（父会话不画子代理）。
+// 目录是引擎 subagentCatalog 投影的原样内容；标题优先用目录里的 label（continuable 必有、
+// one-shot 可缺），缺了退回该子会话的标题，再退回 id。
+QVariantList QmlBridge::peerTabs() const
+{
+	QVariantList rows;
+	const SessionCatalog* catalog = m_sessions ? m_sessions->catalog() : nullptr;
+	if (!catalog || m_peerRootId.isEmpty())
+		return rows;
+
+	const QJsonArray entries = catalog->subagentCatalog(m_peerRootId);
+	for (const QJsonValue& value : entries) {
+		const QJsonObject entry = value.toObject();
+		const QString id = entry.value(QStringLiteral("id")).toString();
+		if (id.isEmpty())
+			continue;
+
+		QString label = entry.value(QStringLiteral("label")).toString();
+		if (label.isEmpty())
+			label = catalog->childTitleFor(id);
+		if (label.isEmpty())
+			label = id;
+
+		QVariantMap row;
+		row.insert(QStringLiteral("id"), id);
+		row.insert(QStringLiteral("label"), label);
+		row.insert(QStringLiteral("mode"), entry.value(QStringLiteral("mode")).toString());
+		row.insert(QStringLiteral("running"), catalog->childRunning(id));
+		rows.append(row);
+	}
+
+	// 兜底：父会话的目录还没到（冷父会话、投影没推来）但当前会话确实是它的子代理时，
+	// 至少保留"当前子代理"这一行 —— 下拉框里能看见它，页签第二颗也能拿到真实标题。
+	if (rows.isEmpty() && m_currentSessionId != m_peerRootId
+		&& catalog->parentForSession(m_currentSessionId) == m_peerRootId) {
+		QString label = catalog->childTitleFor(m_currentSessionId);
+		if (label.isEmpty())
+			label = m_currentSessionId;
+
+		QVariantMap row;
+		row.insert(QStringLiteral("id"), m_currentSessionId);
+		row.insert(QStringLiteral("label"), label);
+		row.insert(QStringLiteral("mode"), QString());
+		row.insert(QStringLiteral("running"), catalog->childRunning(m_currentSessionId));
+		rows.append(row);
+	}
+
+	return rows;
+}
+
+QString QmlBridge::peerRootTitle() const
+{
+	if (m_peerRootId.isEmpty())
+		return currentSessionTitle();
+
+	const SessionCatalog* catalog = m_sessions ? m_sessions->catalog() : nullptr;
+	if (!catalog)
+		return m_peerRootId;
+
+	QString title = catalog->titleFor(m_peerRootId);
+	if (title.isEmpty())
+		title = catalog->childTitleFor(m_peerRootId);
+	return title.isEmpty() ? m_peerRootId : title;
+}
+
+int QmlBridge::subagentCount() const
+{
+	return peerTabs().size();
+}
+
+bool QmlBridge::subagentRunning() const
+{
+	const SessionCatalog* catalog = m_sessions ? m_sessions->catalog() : nullptr;
+	if (!catalog || m_peerRootId.isEmpty())
+		return false;
+
+	const QJsonArray entries = catalog->subagentCatalog(m_peerRootId);
+	for (const QJsonValue& value : entries) {
+		const QString id = value.toObject().value(QStringLiteral("id")).toString();
+		if (!id.isEmpty() && catalog->childRunning(id))
+			return true;
+	}
+	// 兜底行（父目录未到）：当前子代理的运行态也要算进去
+	return catalog->childRunning(m_currentSessionId);
+}
+
+QVariantList QmlBridge::jobs() const
+{
+	return m_chat ? m_chat->jobs() : QVariantList();
+}
+
+int QmlBridge::jobCount() const
+{
+	return m_chat ? m_chat->jobCount() : 0;
+}
+
+bool QmlBridge::jobRunning() const
+{
+	return m_chat && m_chat->jobRunning();
 }
 
 QString QmlBridge::currentSessionTitle() const
@@ -265,7 +457,10 @@ QString QmlBridge::currentSessionTitle() const
 	if (m_currentSessionId.isEmpty() || !m_sessions)
 		return QString();
 
-	const QString title = m_sessions->catalog()->titleFor(m_currentSessionId);
+	const SessionCatalog* catalog = m_sessions->catalog();
+	QString title = catalog->titleFor(m_currentSessionId);
+	if (title.isEmpty())   // 当前会话可能是子代理（不进侧栏，标题在另一张表里）
+		title = catalog->childTitleFor(m_currentSessionId);
 	return title.isEmpty() ? qtTrId("session_untitled") : title;
 }
 
@@ -350,6 +545,18 @@ bool QmlBridge::loadingOlder() const { return m_chat && m_chat->loadingOlder(); 
 void QmlBridge::loadOlder() { if (m_chat) m_chat->loadOlder(); }
 
 QAbstractItemModel* QmlBridge::messages() const { return m_chat ? m_chat->messages() : nullptr; }
+QAbstractItemModel* QmlBridge::trace() const { return m_chat ? m_chat->trace() : nullptr; }
+QVariantMap QmlBridge::traceSummary() const
+{
+	return m_chat && m_chat->trace() ? m_chat->trace()->summary() : QVariantMap();
+}
+
+void QmlBridge::setTracePaused(bool paused)
+{
+	// 轨迹视图在用户往回翻记录时调它：暂停追加，避免每次新事件都整表重建把滚动位置打回去
+	if (m_chat && m_chat->trace())
+		m_chat->trace()->setPaused(paused);
+}
 int QmlBridge::messageCount() const { return m_chat ? m_chat->messageCount() : 0; }
 bool QmlBridge::streaming() const { return m_chat && m_chat->streaming(); }
 bool QmlBridge::lastTurnEmpty() const { return m_chat && !m_chat->lastTurnHadOutput(); }

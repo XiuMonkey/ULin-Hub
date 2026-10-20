@@ -14,6 +14,12 @@
 
 #include "common/session/ModelSelectionService.h"
 #include "common/session/MessageListModel.h"
+// ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
+//    实例化 QMetaType 校验，此时类型不完整就触发
+//    "Pointer Meta Types must either point to fully-defined types or be declared with
+//    Q_DECLARE_OPAQUE_POINTER(T *)"（C2338），连带 C2737 staticMetaObject 未初始化。
+//    这类错误报在 moc_*.cpp 里，看着像是 moc 生成的代码坏了，其实源码头文件少了 include。
+#include "common/session/TraceModel.h"
 
 #include <QObject>
 #include <QSet>
@@ -31,6 +37,9 @@ class ChatController : public QObject
 {
 	Q_OBJECT
 	Q_PROPERTY(MessageListModel* messages READ messages CONSTANT)
+	// 轨迹视图的记录表（对照官方 dsh-client-ui-trajectory）：与本类吃同一条事件流，
+	// 只是不做"翻译成气泡"，而是把账本事件原样摊成按轮次分组的记录。
+	Q_PROPERTY(TraceModel* trace READ trace CONSTANT)
 	// 待发图片：[{ name, mediaType, data(base64), preview(data URL) }]
 	Q_PROPERTY(QVariantList pendingAttachments READ pendingAttachments NOTIFY pendingAttachmentsChanged)
 	Q_PROPERTY(int messageCount READ messageCount NOTIFY messagesChanged)
@@ -46,6 +55,11 @@ class ChatController : public QObject
 	// M4b 翻页：还有更早的历史 / 正在拉
 	Q_PROPERTY(bool olderAvailable READ olderAvailable NOTIFY olderChanged)
 	Q_PROPERTY(bool loadingOlder READ loadingOlder NOTIFY olderChanged)
+	// 后台任务名册（顶栏"后台任务"入口的数据面）：行来自引擎 job/list 流（DshApiClient 第六条逻辑流），
+	// 这里只把 JobView 摊成 QML 好用的列表并保持官方的"活的任务在前、已结束的按结束时间倒序"顺序。
+	// 放在本类而不是再开一个类：它与会话同生命周期（换会话即清空），与 modelGroups/statsLine 同一档
+	// 会话级实时数据；网络细节仍在 DshApiClient。
+	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
 
 public:
 	explicit ChatController(DshApiClient* api, QObject* parent = nullptr);
@@ -77,10 +91,17 @@ public:
 	// 同时接给 SessionCatalog（同一条信号多个接收者，顺序由宿主决定）——所以由宿主调一次。
 	void connectApi();
 	MessageListModel* messages() const { return m_messages; }
+	TraceModel* trace() const { return m_trace; }
 	int messageCount() const;
 	bool streaming() const { return m_streaming; }
 	// 最近一次收尾的回合有没有可见输出（false 通常意味着后端没干活：没配模型/凭据被拒）
 	bool lastTurnHadOutput() const { return m_lastTurnHadOutput; }
+
+	// ---- 后台任务名册（见上面的 Q_PROPERTY 说明）----
+	QVariantList jobs() const { return m_jobs; }
+	int jobCount() const { return m_jobs.size(); }
+	// 有没有在跑（running / stopping）的任务：顶栏那颗状态点用它
+	bool jobRunning() const;
 
 	QString statsLine() const { return m_statsLine; }
 	QVariantList modelGroups() const { return m_modelGroups; }
@@ -133,6 +154,8 @@ public slots:
 	void onFollowSnapshot(const QString& sessionId, int cursor, const QJsonArray& records, bool hasMore);
 	// mux 帧：payload.type == "session/event" 时取出 event 交给流式处理
 	void onMuxFrame(const QJsonObject& frame);
+	// 引擎 job/list 流的一帧（整份名册，服务端每次给全量）：见 DshApiClient::jobRosterReady
+	void onJobRoster(const QJsonArray& jobs);
 
 signals:
 	void messagesChanged();
@@ -142,6 +165,9 @@ signals:
 	void turnFinished();
 	void statsLineChanged();
 	void catalogChanged();
+	// 子代理那边"有事发生"（目录新增 / 回传消息 / 结束通知）：宿主据此轻量重拉一次 session.list，
+	// 把 running 刷准。运行态**不在** session/control 投影里，只能靠这条重拉。
+	void peerActivitySeen();
 	// 提问/审批面板的出现与收起
 	void interactionChanged();
 	// 翻页状态变化 / 更早的历史已插入头部（QML 收到后者时补偿 contentY，保证锚点不跳）
@@ -150,6 +176,8 @@ signals:
 	// 命令注册表变了（会话流里的 `commands/change` 通知）：宿主据此重拉一次命令表。
 	// 本类不持有命令表（那是 CommandController 的事），只负责把这个事实翻出来。
 	void commandRegistryChanged();
+	// 后台任务名册变了（整表替换，含清空）
+	void jobsChanged();
 
 private:
 	// question/requested：payload.questions 翻成 QML 好用的列表并记住 rpcId/sessionId
@@ -167,8 +195,12 @@ private:
 	// 当前档位 id（原版 currentLevel 的 id）
 	QString currentLevelId() const;
 
-	// 末行是 Agent 就用它（工具事件接在上一气泡后面），否则新建一条
-	int targetAgentRow();
+	// 本轮（turn）的 Agent 行：**一轮只占一个气泡**（官方 Web UI 的形态：整轮收起成一行、展开才看到
+	// 各步骤）。已有就复用，没有就新建。turn/start、本地发送、历史里的 user/message、turn/end 都重置它
+	// —— 见 .cpp 里 m_turnRow 的说明。
+	// 旧实现是按"最后一行是不是 agent"决定续写/新建（targetAgentRow），一轮有多条 assistant/message 时
+	// 只要中间插进别的行就会被拆成多个气泡，已移除。
+	int agentRowForTurn();
 	// 流式合并缓冲：攒够 50ms 或遇到收尾/工具结果时一次写进模型
 	void bufferChunk(int row, const QString& type, const QString& text, const QString& toolName = QString());
 	void flushPending();
@@ -188,6 +220,7 @@ private:
 
 	DshApiClient* m_api = nullptr;
 	MessageListModel* m_messages = nullptr;
+	TraceModel* m_trace = nullptr;
 	QTimer* m_flushTimer = nullptr;
 	// 回合看门狗（单次）：本会话迟迟**一条事件都没有**就补兜底提示。为什么必须有：后端异常时客户端根本
 	// 收不到内容 —— `api-session/error` 走 DshApiClient 的 `$events` type=="emit" 分支，那里只记事件名、
@@ -195,6 +228,11 @@ private:
 	// 收到本会话任何事件就把表续上，慢模型不会被误判。
 	QTimer* m_turnWatchdog = nullptr;
 	bool m_turnActive = false;
+	// 本轮 Agent 行号（-1 = 本轮还没建）。**一轮的所有内容都落到这一行** ⇒ 一个气泡。
+	// 为什么不能只靠 lastAgentRow()：历史回放里一轮有多条 assistant/message，旧代码每条都 appendAgent()，
+	// 于是一轮被拆成好几个气泡（用户 2026-10-20 反馈）；而 lastAgentRow() 只看"最后一行是不是 agent"，
+	// 中间插进系统提示（command/done）就会断掉。回合边界才是正确判据。
+	int m_turnRow = -1;
 	// "会话被旧进程占用"自愈：只重试一次（重试期间再失败就只报错，别无限重启服务端）
 	bool m_pendingRetry = false;
 	QString m_retryText;
@@ -231,6 +269,8 @@ private:
 	QString m_overrideEffort;
 	// 已经记过日志的"被忽略事件类型"（每类只记一次，别把排障通道淹掉）
 	QSet<QString> m_loggedEventTypes;
+	// 后台任务名册（每行 { id, kind, label, status, progress, detail, live, startedAt, finishedAt }）
+	QVariantList m_jobs;
 	QVector<Pending> m_pending;
 	// ---- 交互面板状态（一次只可能有一个待答的提问/审批：服务端会等回答）----
 	QString m_questionRpcId;
