@@ -1,6 +1,6 @@
 #pragma once
 
-// ToolsFilter —— 工具过滤器（对应 DSH 侧 `ToolsFilterPlugin` 暴露的 `/api/tools-filter`）。
+// ToolsFilter —— 工具过滤器（对应 DSH 侧 `tools-filter-plugin` 暴露的 `/api/tools-filter`）。
 // 本类由 `common/appearance/TopBarTools.{h,cpp}` 迁移而来，原来那套名字退役。
 // 迁移的同时**吸收了两块原先散在外面的职责**：
 //  · 形状计算：插件目录 + 已存配置 → 界面用的目录树（原 ToolsFilter::buildDirectories 等静态函数）；

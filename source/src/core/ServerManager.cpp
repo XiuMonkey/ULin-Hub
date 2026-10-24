@@ -935,9 +935,17 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 		return;
 
 	// 内置插件清单：qrc 目录名 == node_modules 目录名 == patch 行的 id/name
-	static const QStringList kBuiltinPlugins{ QStringLiteral("ToolsFilterPlugin") };
+	static const QStringList kBuiltinPlugins{ QStringLiteral("tools-filter-plugin") };
+	static const QStringList kLegacyBuiltinPlugins{ QStringLiteral("ToolsFilterPlugin") };
 
 	const QString nodeModulesPath = profileDir + QStringLiteral("/node_modules");
+	// 旧目录/旧 patch 行迁移到新名字，避免同一个插件被加载两次。
+	for (const QString& legacyName : kLegacyBuiltinPlugins) {
+		QDir legacyDir(nodeModulesPath + QLatin1Char('/') + legacyName);
+		if (legacyDir.exists())
+			legacyDir.removeRecursively();
+		ExtensionRegistry::removePatchEntry(profileDir, legacyName);
+	}
 	for (const QString& pluginName : kBuiltinPlugins) {
 		const QString sourceDir = QStringLiteral(":/ULinHub/") + pluginName;
 		if (!QDir(sourceDir).exists()) {

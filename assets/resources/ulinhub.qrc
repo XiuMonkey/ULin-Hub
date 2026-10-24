@@ -64,9 +64,9 @@
              发布目录里的散装文件；首次启动服务端时由
              ServerManager::ensureBuiltinPlugins() 调用 ExtensionLoader 安装到
              <DSH_HOME>/profiles/web/node_modules/ 下。 -->
-        <file alias="ToolsFilterPlugin/package.json">tools-filter-plugin/package.json</file>
-        <file alias="ToolsFilterPlugin/index.js">tools-filter-plugin/index.js</file>
-        <file alias="ToolsFilterPlugin/example.ToolsFilterConfig.json">tools-filter-plugin/example.ToolsFilterConfig.json</file>
+        <file alias="tools-filter-plugin/package.json">tools-filter-plugin/package.json</file>
+        <file alias="tools-filter-plugin/index.js">tools-filter-plugin/index.js</file>
+        <file alias="tools-filter-plugin/example.ToolsFilterConfig.json">tools-filter-plugin/example.ToolsFilterConfig.json</file>
         <!-- 右栏「终端」块的页面与它的渲染引擎（Qt WebEngine 里跑 xterm.js）。
              这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
              660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见

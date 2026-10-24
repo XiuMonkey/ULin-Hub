@@ -40,8 +40,10 @@ assets/resources/server/node.exe
 
 build_smoke/
 
-# StyleExample 的整包 zip（185 MB，含壁纸）：不进仓库。要入库就删掉下面这行。
-assets/StyleExample/Bg-Genshin-Keqing.zip
+# 整包 zip 一律不进仓库（曾误 add 过一个 327MB 的 SDK 包，触发 git gc 后 .git 涨到 378MB）。
+# 注意：style-example 目录曾从 assets/StyleExample 改名为 assets/style-example，旧的按路径写法因此失效过，故改用通配。
+# 确实有 zip 要入库时：git add -f <file>
+*.zip
 
 # pnpm 装插件市场时的工作目录（不该进仓库）
 .pnpm-store/

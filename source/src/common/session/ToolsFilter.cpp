@@ -15,7 +15,7 @@
 
 namespace
 {
-	const char kEndpointPath[] = "/api/tools-filter";  // 插件端点路径（ToolsFilterPlugin 注册的）
+	const char kEndpointPath[] = "/api/tools-filter";  // 插件端点路径（tools-filter-plugin 注册的）
 	const char kDefaultDirectoryName[] = "Default";  // 程序自动建立的目录名（插件侧同名）
 
 	QString normalizedDirectoryName(const QString& raw)
@@ -73,7 +73,7 @@ namespace
 			{ QStringLiteral("cordis_run"), QStringLiteral("Cordis") },
 			{ QStringLiteral("cordis_stop"), QStringLiteral("Cordis") },
 			{ QStringLiteral("cordis_undefine"), QStringLiteral("Cordis") },
-			{ QStringLiteral("gettools"), QStringLiteral("ToolsFilterPlugin") },
+			{ QStringLiteral("gettools"), QStringLiteral("tools-filter-plugin") },
 		};
 
 		const auto exact = directories.constFind(toolName);

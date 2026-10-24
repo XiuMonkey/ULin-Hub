@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 /**
- * ToolsFilterPlugin — a per-session view of which tools enter the model prompt.
+ * tools-filter-plugin — a per-session view of which tools enter the model prompt.
  *
  * The filter runs on the `system-prompt/assemble` waterfall, so it changes ONLY
  * what a request announces. `ctx.tools` still resolves every hidden name at
@@ -45,7 +45,7 @@ const GETTOOLS_DESCRIPTION = 'Load tools that are missing from your current tool
 // groups (see discoveryCatalogText / the assemble handler).
 const DISCOVERY_CATALOG_CONTEXT_NAME = "toolsfilter:catalog";
 
-export const name = "ToolsFilterPlugin";
+export const name = "tools-filter-plugin";
 export const inject = ["tools", "systemPrompt"];
 
 // ── session directory resolution ────────────────────────────────────────────
@@ -545,7 +545,7 @@ function publicSchema(schema) {
 // the UI and the filter read them as before.
 
 const OTHER_DIRECTORY_NAME = "Other";
-const FILTER_DIRECTORY_NAME = "ToolsFilterPlugin";
+const FILTER_DIRECTORY_NAME = "tools-filter-plugin";
 
 /**
  * Bundled (original) tools grouped by function. Keep package identity out of
