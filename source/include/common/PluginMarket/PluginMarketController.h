@@ -1,25 +1,22 @@
 #pragma once
 
-// 分层（领域归位 2026-10-15）：本文件在 common/PluginMarket/ —— **领域层**，与它驱动的
+// 分层：本文件在 common/PluginMarket/ —— **领域层**，与它驱动的
 // PluginMarketModel / PluginMarketClient / PluginMarketInstaller 同层（过滤与分页等算法在
 // PluginMarketModel，HTTP 与解析在 PluginMarketClient，这里只是本域的数据面与视图状态机）。
 // 它不 import 任何 QML 概念（Q_PROPERTY / Q_INVOKABLE 只是元对象暴露方式，不依赖 QQml*），可单测。
 // QML 面（`Hub.plugins` 属性、类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线。
-//
-// 分层（2026-10-15 清掉反向依赖）：本类**不直接依赖 core**。此前它的构造要 ServerManager*、.cpp 里
-//    include 了 core/ServerManager.h（只为"装完市场包重启内置服务端"），那是 common → core 唯一的一处
-//    反向依赖；现在改成**发信号** serverRestartRequested()，由接线层 qmlbridge/QmlBridge 接住并调
-//    ClientRuntime::restartServer()，与 SettingsController 的 serverRestartRequested / stylesReset 同一范式。
-//    原因：common/** 只放领域与纯逻辑，重启一个进程是宿主行为；领域层不认识 ServerManager，才谈得上
-//    脱离 QML 引擎与服务端单测。发出时机不变：仍在 installFinished(ok) 的同一位置（直接连接 ⇒ 同步落地）。
-//
+// 分层：本类**不直接依赖 core**。此前它的构造要 ServerManager*、.cpp 里
+//  include 了 core/ServerManager.h（只为"装完市场包重启内置服务端"），那是 common → core 唯一的一处
+//  反向依赖；现在改成**发信号** serverRestartRequested，由接线层 qmlbridge/QmlBridge 接住并调
+//  ClientRuntime::restartServer，与 SettingsController 的 serverRestartRequested / stylesReset 同一范式。
+//  原因：common/** 只放领域与纯逻辑，重启一个进程是宿主行为；领域层不认识 ServerManager，才谈得上
+//  脱离 QML 引擎与服务端单测。发出时机不变：仍在 installFinished(ok) 的同一位置（直接连接 ⇒ 同步落地）。
 // 插件市场数据面（M6）：把既有的 PluginMarketClient / PluginMarketModel 接到 QML。
-//
 // 逻辑一行不重写：HTTP 与解析在 PluginMarketClient（/dsh-market/*），
 // 过滤与分页在 PluginMarketModel（filter / paginate，每页 20 条），这里只做：
-//   * 视图状态（当前页、搜索词、当前 Tab、状态文案）
-//   * 把 registry / installed 的回包翻成 QML 好用的 QVariantList
-//   * 操作（安装/更新/卸载/重启服务）与它们的反馈文案
+//  * 视图状态（当前页、搜索词、当前 Tab、状态文案）
+//  * 把 registry / installed 的回包翻成 QML 好用的 QVariantList
+//  * 操作（安装/更新/卸载/重启服务）与它们的反馈文案
 // 文案全部用既有 qtTrId id（plugin_loading / plugin_loaded_fmt / plugin_action_failed_fmt …）。
 
 #include "common/PluginMarket/PluginMarketModel.h"
@@ -54,7 +51,7 @@ class PluginMarketController : public QObject
 	Q_PROPERTY(QStringList installLog READ installLog NOTIFY installChanged)
 
 public:
-	// api：出站客户端（市场数据走 /dsh-market/*）；服务端重启不在这里，见 serverRestartRequested()
+	// api：出站客户端（市场数据走 /dsh-market/*）；服务端重启不在这里，见 serverRestartRequested
 	explicit PluginMarketController(DshApiClient* api, QObject* parent = nullptr);
 
 	bool isOpen() const { return m_open; }
@@ -91,11 +88,11 @@ signals:
 	void installChanged();
 	// 市场包装好了，请宿主重启内置服务端（新插件才会被加载）。
 	// ⚠️ 本类在 common（领域层），**不许**直接 include/调用 core/ServerManager；这条信号由
-	//    qmlbridge/QmlBridge 接住落地（搬家前它在 installFinished 里直调 m_server->restart()）。
+	// qmlbridge/QmlBridge 接住落地。
 	void serverRestartRequested();
 
 private:
-	static constexpr int kPageSize = 20;   // 与旧壳 PluginsManager 同值
+	static constexpr int kPageSize = 20;   // 与现有实现 PluginsManager 同值
 
 	void setBusy(bool busy);
 	void setStatus(const QString& text);
@@ -134,7 +131,7 @@ private:
 	// 打开时再取一次只会在数据回来时触发模型 reset + 委托批量重建 ⇒ 打开后 1.5s 卡一下）。
 	bool m_haveRegistry = false;
 	// 404 自动安装市场包**只试一次**：引擎没有 /dsh-market/* 时，装失败会回到 registryFailed
-	// ⇒ 又触发安装 ⇒ 无限重试；而每轮 refresh() 都把状态打回 plugin_loading（"正在等待最新数据"）
+	// ⇒ 又触发安装 ⇒ 无限重试；而每轮 refresh 都把状态打回 plugin_loading（"正在等待最新数据"）
 	// ⇒ 界面看起来永远在等数据。加这个标记后只试一次，之后停在离线快照上。
 	bool m_marketInstallTried = false;
 };

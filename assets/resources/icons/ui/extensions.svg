@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ULin Hub 单色线性图标：24×24、fill=none、描边纯白（#FFFFFF）、圆头/圆角。
+     运行时由 LineIcon.qml / IconButton.iconColor 按亮度染色，所以这里不要写死主题色。
+     设计原型见 build/temp/sidebar-redesign/index.html 顶部 <symbol id="i-grid">（扩展入口）。 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4" y="4" width="6" height="6" rx="1.5"/>
+  <rect x="14" y="4" width="6" height="6" rx="1.5"/>
+  <rect x="4" y="14" width="6" height="6" rx="1.5"/>
+  <rect x="14" y="14" width="6" height="6" rx="1.5"/>
+</svg>

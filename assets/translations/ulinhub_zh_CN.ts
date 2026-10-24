@@ -3,14 +3,14 @@
 <TS version="2.1" language="zh_CN">
 <context>
     <name></name>
-    <message id="chat_tool_call_fmt">
-        <translation>工具调用：%1</translation>
-    </message>
     <message id="chat_tool_result_label">
         <translation>工具结果</translation>
     </message>
     <message id="common_copy">
         <translation>复制</translation>
+    </message>
+    <message id="context_copy_all">
+        <translation>复制全文</translation>
     </message>
     <message id="ext_delete_dir_failed_fmt">
         <translation>无法删除扩展目录: %1</translation>
@@ -43,10 +43,10 @@
         <translation>允许一次</translation>
     </message>
     <message id="model_missing_provider_or_id">
-        <translation>缺少提供方或模型 id</translation>
+        <translation>模型配置不完整</translation>
     </message>
     <message id="model_credential_missing">
-        <translation>凭据引用或取值缺失</translation>
+        <translation>模型凭据未配置</translation>
     </message>
     <message id="session_untitled">
         <translation>未命名会话</translation>
@@ -58,13 +58,13 @@
         <translation>还没有打开的会话</translation>
     </message>
     <message id="toolfilter_server_not_ready">
-        <translation>服务端地址还没就绪</translation>
+        <translation>服务正在启动，请稍候</translation>
     </message>
     <message id="toolfilter_plugin_unavailable">
         <translation>工具过滤插件未安装或未启用。</translation>
     </message>
     <message id="toolfilter_save_failed_http_fmt">
-        <translation>保存失败（HTTP %1）</translation>
+        <translation>保存失败，请稍后重试</translation>
     </message>
     <message id="toolfilter_save_failed_reason_fmt">
         <translation>保存失败（%1）</translation>
@@ -88,7 +88,7 @@
         <translation>加载更多</translation>
     </message>
     <message id="session_loading">
-        <translation>已连上服务端，正在加载会话…</translation>
+        <translation>正在加载会话…</translation>
     </message>
     <message id="chat_send_failed_fmt">
         <translation>发送失败: %1 %2</translation>
@@ -97,13 +97,22 @@
         <translation>还没有可用的模型配置，请先在设置中添加模型后再发送</translation>
     </message>
     <message id="chat_empty_reply_hint">
-        <translation>本轮没有收到任何回复，请检查模型配置或服务端日志</translation>
+        <translation>本轮没有收到回复，请检查模型配置后重试</translation>
+    </message>
+    <message id="chat_stopping">
+        <translation>正在停止…</translation>
+    </message>
+    <message id="chat_cancel_timeout_hint">
+        <translation>已停止本轮输出，可以继续发送新消息</translation>
+    </message>
+    <message id="chat_cancel_failed_fmt">
+        <translation>中止失败: %1 %2</translation>
     </message>
     <message id="server_auth_token_missing">
-        <translation>无法通过服务端认证，请确认服务端是否正常运行。</translation>
+        <translation>无法连接到本地服务，请重启应用。</translation>
     </message>
     <message id="server_bundled_server_missing">
-        <translation>安装不完整，无法启动内置服务端。请重新安装。</translation>
+        <translation>应用文件不完整，请重新安装。</translation>
     </message>
     <message id="com_member_not_found_fmt">
         <translation>COM 成员不存在: %1 (hr=%2)</translation>
@@ -159,7 +168,7 @@
         <translation>每个 Function 需要 'Tool'；default 接口还需要 'Func'</translation>
     </message>
     <message id="server_stream_not_ready">
-        <translation>服务端尚未就绪，暂时无法提交，请稍后重试。</translation>
+        <translation>服务正在启动，请稍后重试。</translation>
     </message>
     <message id="chat_turn_step_fmt">
         <translation>%1 轮 · %2 步</translation>
@@ -183,13 +192,73 @@
         <translation>输入 %1 tok · 输出 %2 tok</translation>
     </message>
     <message id="chat_input_placeholder">
-        <translation>输入消息，Enter 发送，Shift+Enter 换行</translation>
+        <translation>描述任务，或输入 / 选择命令…</translation>
     </message>
     <message id="chat_stop_output">
         <translation>中止输出</translation>
     </message>
     <message id="common_send">
         <translation>发送</translation>
+    </message>
+    <message id="composer_command_tip">
+        <translation>命令</translation>
+    </message>
+    <message id="composer_context_tip">
+        <translation>上下文</translation>
+    </message>
+    <message id="composer_workspace_switch">
+        <translation>切换工作区</translation>
+    </message>
+    <message id="composer_workspace_empty">
+        <translation>还没有工作区</translation>
+    </message>
+    <message id="composer_agent_current">
+        <translation>当前主 Agent</translation>
+    </message>
+    <message id="composer_agent_desc">
+        <translation>工具调用 · 多步执行</translation>
+    </message>
+    <message id="composer_agent_empty">
+        <translation>当前没有子智能体</translation>
+    </message>
+    <message id="composer_agent_tools">
+        <translation>工具与权限</translation>
+    </message>
+    <message id="permission_title">
+        <translation>权限</translation>
+    </message>
+    <message id="permission_read_only">
+        <translation>仅可查看</translation>
+    </message>
+    <message id="permission_read_only_desc">
+        <translation>只能读取文件和查看信息，不能写入。</translation>
+    </message>
+    <message id="permission_workspace_write">
+        <translation>工作区内修改</translation>
+    </message>
+    <message id="permission_workspace_write_desc">
+        <translation>可在工作区内写文件；越界操作需要审批。</translation>
+    </message>
+    <message id="permission_full_access">
+        <translation>完全权限</translation>
+    </message>
+    <message id="permission_full_access_desc">
+        <translation>不做沙箱限制，减少确认步骤。</translation>
+    </message>
+    <message id="permission_confirm_title">
+        <translation>确认启用完全权限？</translation>
+    </message>
+    <message id="permission_confirm_desc">
+        <translation>完全权限会减少确认步骤，允许直接执行敏感操作、修改文件和外部命令。仅在对当前任务有把握时使用。</translation>
+    </message>
+    <message id="permission_confirm_ack">
+        <translation>确认启用</translation>
+    </message>
+    <message id="terminal_connected">
+        <translation>已连接</translation>
+    </message>
+    <message id="terminal_connecting">
+        <translation>连接中</translation>
     </message>
     <message id="ext_manager_title">
         <translation>扩展管理</translation>
@@ -323,7 +392,7 @@
         <translation>添加模型</translation>
     </message>
     <message id="model_server_not_ready">
-        <translation>服务端未就绪，暂时无法读取模型目录。</translation>
+        <translation>服务正在启动，暂时无法读取模型列表。</translation>
     </message>
     <message id="model_loading_catalog">
         <translation>正在读取服务端模型目录…</translation>
@@ -384,6 +453,15 @@
     </message>
     <message id="common_add">
         <translation>添加</translation>
+    </message>
+    <message id="common_save">
+        <translation>保存</translation>
+    </message>
+    <message id="model_key_hint">
+        <translation>填入该路由的 API Key；留空不修改</translation>
+    </message>
+    <message id="model_key_missing">
+        <translation>还没有 API Key，展开后可填写</translation>
     </message>
     <message id="model_delete_readonly">
         <translation>服务端设置只读，无法删除模型。</translation>
@@ -505,9 +583,6 @@
     <message id="plugin_loading">
         <translation>正在加载插件市场...</translation>
     </message>
-    <message id="plugin_loaded_offline">
-        <translation>插件市场已加载（离线快照），正在等待最新数据...</translation>
-    </message>
     <message id="plugin_loaded_cached_fmt">
         <translation>插件市场已加载（缓存），共 %1 个插件</translation>
     </message>
@@ -604,6 +679,9 @@
     <message id="settings_no_preset">
         <translation>（无可用预设）</translation>
     </message>
+    <message id="settings_agent_preset_unavailable">
+        <translation>当前引擎未内置 Agent 预设</translation>
+    </message>
     <message id="sessionBar_new_workspace">
         <translation>新建工作区</translation>
     </message>
@@ -683,7 +761,52 @@
     </message>
     <message id="sessionBar_no_sessions">
         <translation>还没有会话
-点右上角 ＋ 新建</translation>
+点上方「新对话」开始</translation>
+    </message>
+    <message id="sessionBar_no_matches">
+        <translation>没有匹配的会话</translation>
+    </message>
+    <message id="sessionBar_new_chat">
+        <translation>新对话</translation>
+    </message>
+    <message id="sessionBar_search_placeholder">
+        <translation>搜索会话</translation>
+    </message>
+    <message id="sessionBar_shortcut_new_chat">
+        <translation>Ctrl N</translation>
+    </message>
+    <message id="sessionBar_shortcut_search">
+        <translation>Ctrl K</translation>
+    </message>
+    <message id="sessionBar_pinned">
+        <translation>置顶</translation>
+    </message>
+    <message id="sessionBar_collapse">
+        <translation>收起侧栏</translation>
+    </message>
+    <message id="sessionBar_expand">
+        <translation>展开侧栏</translation>
+    </message>
+    <message id="sessionBar_more">
+        <translation>更多</translation>
+    </message>
+    <message id="sessionBar_archived">
+        <translation>已归档会话</translation>
+    </message>
+    <message id="sessionBar_account_initial">
+        <translation>P</translation>
+    </message>
+    <message id="sessionBar_time_now">
+        <translation>现在</translation>
+    </message>
+    <message id="sessionBar_time_minutes_fmt">
+        <translation>%1 分钟前</translation>
+    </message>
+    <message id="sessionBar_time_hours_fmt">
+        <translation>%1 小时前</translation>
+    </message>
+    <message id="sessionBar_time_days_fmt">
+        <translation>%1 天前</translation>
     </message>
     <message id="workdir_delete_label">
         <translation>删除工作区</translation>
@@ -711,9 +834,6 @@
     </message>
     <message id="chat_process_tools_running">
         <translation>正在运行命令</translation>
-    </message>
-    <message id="chat_streaming_meta">
-        <translation>进行中…</translation>
     </message>
     <message id="workdir_new_session_tip">
         <translation>在此工作区新建会话</translation>
@@ -749,7 +869,7 @@
         <translation>本会话暂无后台任务。运行中的任务会在这里显示进度与输出。</translation>
     </message>
     <message id="chat_session_busy_restarting">
-        <translation>上一个进程还没退出，正在重启服务并重试…</translation>
+        <translation>上一轮还没结束，正在恢复，请稍后重试。</translation>
     </message>
     <message id="chat_session_busy_status">
         <translation>正在重启服务…</translation>
@@ -758,7 +878,7 @@
         <translation>命令失败：%1</translation>
     </message>
     <message id="server_starting">
-        <translation>正在启动内置服务端…</translation>
+        <translation>正在启动服务…</translation>
     </message>
     <message id="session_list_load_failed_fmt">
         <translation>会话列表加载失败：%1</translation>
@@ -800,7 +920,7 @@
         <translation>读取设置失败：%1 %2</translation>
     </message>
     <message id="model_api_key_required">
-        <translation>请先填入 API key。</translation>
+        <translation>请先填写 API Key。</translation>
     </message>
     <message id="model_credential_written_fmt">
         <translation>已写入凭据 %1。可以点「发现模型」拉取可用模型。</translation>
@@ -830,19 +950,19 @@
         <translation>该风格包与当前版本不兼容，已回退到默认外观。</translation>
     </message>
     <message id="server_start_failed">
-        <translation>内置服务端启动失败，请重启应用；若反复出现，请重新安装。</translation>
+        <translation>服务启动失败，请重启应用；如果仍然失败，请重新安装。</translation>
     </message>
     <message id="server_proc_start_failed">
-        <translation>无法启动内置服务端，请重启应用。</translation>
+        <translation>无法启动服务，请重启应用。</translation>
     </message>
     <message id="server_auth_failed">
-        <translation>无法通过服务端认证，请重启应用后再试。</translation>
+        <translation>无法连接到本地服务，请重启应用后重试。</translation>
     </message>
     <message id="server_auth_queue_full">
-        <translation>服务端尚未就绪，请稍后重试。</translation>
+        <translation>服务尚未就绪，请稍后重试。</translation>
     </message>
     <message id="toolfilter_plugin_no_response">
-        <translation>工具过滤插件无响应，请稍后重试。</translation>
+        <translation>工具过滤功能暂时没有响应，请稍后重试。</translation>
     </message>
     <message id="model_provider_load_failed_fmt">
         <translation>加载 %1 的模型列表失败：%2</translation>
@@ -912,7 +1032,7 @@
         <translation>记录详情</translation>
     </message>
     <message id="trace_copy_json">
-        <translation>复制 JSON</translation>
+        <translation>复制原始数据</translation>
     </message>
     <!-- 主/子智能体页签与后台任务名册（basic/topbar/） -->
     <message id="subagent_mode_one_shot">

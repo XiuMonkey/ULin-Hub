@@ -47,8 +47,7 @@ namespace
 		return origin;
 	}
 
-	// 卸掉当前 translator（回到源语言代码里的原文）
-	void uninstall()
+	void uninstall()   // 卸掉当前 translator（回到源语言代码里的原文）
 	{
 		if (!g_translator)
 			return;
@@ -58,8 +57,7 @@ namespace
 		g_translator = nullptr;
 	}
 
-	// 把内置语言包释放到外部目录，让用户能直接改它（存在则不覆盖）；与 ThemeManager 释放样式模板同理
-	void releaseBuiltinPack(const QString& fileBase, const QString& dir)
+	void releaseBuiltinPack(const QString& fileBase, const QString& dir)   // 把内置语言包释放到外部目录，让用户能直接改它（存在则不覆盖）；与 ThemeManager 释放样式模板同理
 	{
 		const QString target = QDir(dir).filePath(fileBase + QStringLiteral(".qm"));
 		if (QFile::exists(target))
@@ -89,16 +87,13 @@ namespace
 
 	const char* const kBuiltinPacks[] = { "ulinhub_zh_CN", "ulinhub_en" };  // 随程序内置的语言包基名（必须与 resources/ulinhub.qrc 里的条目一致）
 
-	// 释放全部内置语言包：内置保底，外部可覆盖（已存在的文件不动）
-	void releaseBuiltinPacks(const QString& dir)
+	void releaseBuiltinPacks(const QString& dir)   // 释放全部内置语言包：内置保底，外部可覆盖（已存在的文件不动）
 	{
 		for (const char* base : kBuiltinPacks)
 			releaseBuiltinPack(QString::fromLatin1(base), dir);
 	}
 
-	// 目标语言代码：显式指定优先，否则退到系统语言（QTranslator 自己有 fallback，
-	// 这里显式取是为了给出准确的回退语言名）
-	QString resolvedCodeFor(const QString& languageCode, const QString& systemCode)
+	QString resolvedCodeFor(const QString& languageCode, const QString& systemCode)   // 目标语言代码：显式指定优先，否则退到系统语言（QTranslator 自己有 fallback
 	{
 		if (!languageCode.isEmpty())
 			return languageCode;
@@ -121,11 +116,6 @@ void TranslationNotifier::notifyLanguageChanged()
 {
 }
 
-// ---------------------------------------------------------------------------
-// VirtualTranslation：插件侧读/改语言的入口，刻意**只转发**到下面 Translation 命名空间的自由函数 —— 宿主设置窗口
-// 「外观」页那个语言下拉框用的也是它们（setSavedLanguageCode + apply），所以扩展自绘的设置界面与宿主行为一致：
-// apply() 内部已做完整套时序（换 translator 前拍快照 → 装新包 → 就地换固定文案 → 通知非控件对象）。
-// ---------------------------------------------------------------------------
 QString TranslationNotifier::ExternalLanguage()
 {
 	return Translation::savedLanguageCode();
@@ -186,8 +176,7 @@ namespace Translation
 		if (languageCode.isEmpty())
 			return true;  // 没指定 = 默认语言
 
-		// 中文的任意变体（zh / zh_CN / zh_TW）都归入默认语言这一槽；只影响语言列表去重，不代表中文"不需要语言包"
-		return QLocale(languageCode).language() == QLocale::Chinese;
+		return QLocale(languageCode).language() == QLocale::Chinese;   // 中文的任意变体（zh / zh_CN / zh_TW）都归入默认语言这一槽；只影响语言列表去重，不代表中文"不需要语言包"
 	}
 
 	QVector<LanguageInfo> parseAvailableLanguages(const QStringList& fileNames)
@@ -228,9 +217,7 @@ namespace Translation
 		LanguageInfo fallback;  // 默认语言（中文）永远可选：qrc 内置包保底，外部包删了会自动释放回来
 		fallback.code = defaultLanguageCode();
 		fallback.name = QLocale(fallback.code).nativeLanguageName();
-		// 源码里唯一保留的自然语言字面量：它是语言下拉里这一项的显示名，且仅在 Qt 取不到系统语言名时
-		// 才用到；若改成从语言包取，包一旦缺失这一项就会显示成代号，反而更糟。
-		if (fallback.name.isEmpty())
+		if (fallback.name.isEmpty())   // 源码里唯一保留的自然语言字面量：它是语言下拉里这一项的显示名，且仅在 Qt 取不到系统语言名时
 			fallback.name = QStringLiteral("中文");
 		languages.append(fallback);
 
@@ -289,8 +276,7 @@ namespace Translation
 		if (!origin.isEmpty())
 			return;
 
-		// 找不到对应语言包：退回默认语言的语言包（再退回 key），原因写进日志
-		qInfo().noquote() << QStringLiteral("[Translation] no language pack for")
+		qInfo().noquote() << QStringLiteral("[Translation] no language pack for")   // 找不到对应语言包：退回默认语言的语言包（再退回 key），原因写进日志
 			<< wanted << QStringLiteral("under") << dir
 			<< QStringLiteral("-> falling back to the default language");
 		g_activeCode = defaultLanguageCode();
@@ -303,14 +289,11 @@ namespace Translation
 		const QString systemCode = QLocale::system().name();
 		const QString wanted = resolvedCodeFor(languageCode, systemCode);
 
-		// (M8) 旧壳的控件文本快照随 ui/TranslationUi.cpp 一起去掉，QML 侧切语言后文案由绑定自动重取
-
-		const QString dir = translationsDir();
+		const QString dir = translationsDir();   // 控件文本快照随 ui/TranslationUi.cpp 一起去掉，QML 侧切语言后文案由绑定自动重取
 		QDir().mkpath(dir);
 		releaseBuiltinPacks(dir);
 
-		// 源语言与其它语言走同一条路径：能装上语言包就用它，装不上就退回代码原文
-		const QString origin = installFrom(translationFileBase(wanted), dir);
+		const QString origin = installFrom(translationFileBase(wanted), dir);   // 源语言与其它语言走同一条路径：能装上语言包就用它，装不上就退回代码原文
 		const bool switched = !origin.isEmpty();
 
 		if (!switched) {
@@ -327,8 +310,7 @@ namespace Translation
 
 		// 装/卸 translator 时 Qt 会给所有控件发 LanguageChange，接了 changeEvent 的会自己刷新
 
-		// 再通知一次非控件对象（重复刷新是幂等的，代价很小）
-		TranslationNotifier::instance().notifyLanguageChanged();
+		TranslationNotifier::instance().notifyLanguageChanged();   // 再通知一次非控件对象（重复刷新是幂等的，代价很小）
 
 		return changed;
 	}

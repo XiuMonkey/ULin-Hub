@@ -45,8 +45,7 @@ void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog,
 			const QJsonArray items = value.value(QStringLiteral("items")).toArray();
 			state->sessions = items;
 			state->sessionsOk = true;
-			// workspacesOk 保持 false，让 catalog 保留 workspace/follow 给的基线分组
-			state->workspacesOk = false;
+			state->workspacesOk = false;   // workspacesOk 保持 false，让 catalog 保留 workspace/follow 给的基线分组
 			applySnapshot();
 		},
 		[state, applySnapshot](const DshApiClient::RpcError& error) {
@@ -132,7 +131,6 @@ void SessionService::clearAllSessionData(const QString& dshHome)
 		sessionsDir.mkpath(QStringLiteral("."));
 	}
 
-	// 工作区注册表一并删掉：不删的话下次启动会把旧分组原样带回侧栏。
 	// 本次运行内的分组不受影响 —— 注册表活在服务端进程内存里，且每次变更都会重新写盘
 	// （dsh-storage-json 的 putRecord → publish），所以"连当前运行的工作区一起清"要走 workspace/delete。
 	// 默认工作区不在这里补，由 ClientRuntime::resolveSessionWorkspace() 在缺分组时补建。

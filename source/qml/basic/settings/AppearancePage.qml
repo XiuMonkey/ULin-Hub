@@ -1,6 +1,6 @@
 // 设置 · 外观设置（按原版 Settings.cpp 的 appearancePanel 复刻）：
-//   说明 settings_appearance_desc → 语言标签 settings_language_label + 下拉（第 0 项"跟随系统"）
-//   → 语言反馈 → 重置样式按钮 settings_reset_styles → 样式反馈。
+// 说明 settings_appearance_desc → 语言标签 settings_language_label + 下拉（第 0 项"跟随系统"）
+// → 语言反馈 → 重置样式按钮 settings_reset_styles → 样式反馈。
 // 语言切换立即生效（原版：Translation::apply 后 Qt 给各控件发 LanguageChange）。
 
 import QtQuick
@@ -29,7 +29,6 @@ Item {
         Text {
             // 原版 settings.qss 把 #settingsAppearanceLabel 与 Hint/Feedback 放在同一组规则里：
             // transparent 底、{{textSecondary}}、font-size 12px。
-            // 也就是说这个标签不是 14px 的正文标题色，之前按正文样式做是不一致的。
             text: qsTrId("settings_language_label")
             color: Theme.color.textSecondary
             font.family: "Microsoft YaHei UI"
@@ -38,17 +37,15 @@ Item {
 
         ComboBox {
             id: languageCombo
+
             // 只复刻原版对"关着的那个框"的定制（settings.qss#settingsLanguageCombo）：
-            //   background {{inputBg}} / border 1px {{scrollbar}} / border-radius 8px
-            //   padding 6px 10px / font-size 13px / min-width 200px
-            //   :hover → border-color {{accent}} / ::drop-down 无边框宽 18px
-            //
-            // ⚠️ 与旧壳的两处有意偏离（都是"去蓝/现代化"要求，纯观感）：
-            //   * :hover 描边：原版取 {{accent}}（强调蓝），这里取 scrollbarHover（中性灰）；
-            //   * 弹出列表：原版没有 QComboBox QAbstractItemView 规则（等于走 QPalette：Highlight=强调蓝、
-            //     HighlightedText=textOnAccent 白 ⇒ Basic 风格拿 palette.light 当高亮底、palette.highlightedText
-            //     当高亮字色，白底白字），这里只把这两个调色板角色换成中性 token + 给弹层一个圆角中性面。
-            // 仍然**不覆盖 contentItem**：第一次把 contentItem 换成自定义 Text 后，框里文字与选项全没了，
+            // background {{inputBg}} / border 1px {{scrollbar}} / border-radius 8px
+            // padding 6px 10px / font-size 13px / min-width 200px
+            // :hover → border-color {{accent}} / ::drop-down 无边框宽 18px
+            // ⚠️ 与现有实现的两处有意偏离（都是"去蓝/现代化"要求，纯观感）：
+            // * :hover 描边：原版取 {{accent}}（强调蓝），这里取 scrollbarHover（中性灰）；
+            // * 弹出列表：原版没有 QComboBox QAbstractItemView 规则（等于走 QPalette：Highlight=强调蓝、
+            // HighlightedText=textOnAccent 白 ⇒ Basic 风格拿 palette.light 当高亮底、palette.highlightedText
             // 日志里却一条错误都没有 —— 那个坑与 delegate/popup 无关，但记着别再踩。
             width: Math.max(200, parent.width)       // 原版 min-width: 200px
             height: 32
@@ -59,8 +56,7 @@ Item {
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body           // 原版 font-size: 13px
 
-            // 选中项跟随已保存的语言（空串 = 跟随系统）
-            Component.onCompleted: syncFromSettings()
+            Component.onCompleted: syncFromSettings()   // 选中项跟随已保存的语言（空串 = 跟随系统）
             Connections {   // 页内同步，不登记（登记等于把 id 暴露成可被接管的目标）
                 target: Hub.settings
                 function onLanguageChanged() {
@@ -85,7 +81,6 @@ Item {
                     Hub.settings.setLanguage(rows[index].code)
             }
 
-            // 原版 :hover 只把描边换成 {{accent}}（蓝）。按"设置页不出蓝"改成中性灰 scrollbarHover
             // （比静止态的 scrollbar 略深一档，克制）。用 HoverHandler 取悬停态并顺手设手型光标：
             // 它是纯悬停处理器（不接按键），所以不会像铺一层 MouseArea 那样有拦点击的风险
             // （Control/ComboBox 自身没有 cursorShape 属性，那个属性只在 MouseArea/Handler 上）。
@@ -110,7 +105,7 @@ Item {
             background: Rectangle {
                 color: Theme.color.inputBg
                 border.width: 1
-                // 静息 2026-10-17 改：scrollbar(#D1D5DB ≈17% 灰) → inputBorder(10% 黑)，
+
                 // 对齐官方 DSH `--dsw-alias-border-l2` 的取法；悬停仍深一档（克制的中性灰）。
                 border.color: comboHover.hovered ? Theme.color.scrollbarHover : Theme.color.inputBorder
                 radius: Theme.radius.control
@@ -136,7 +131,7 @@ Item {
                 palette.highlightedText: Theme.color.textPrimary
             }
 
-            // 弹层：旧壳走 QPalette（方角 + 平台描边），这里给一个与设置页其它面成套的圆角中性面。
+            // 弹层：走 QPalette（方角 + 平台描边），这里给一个与设置页其它面成套的圆角中性面。
             // contentItem 仍照 Basic 风格那份 ListView 写（delegateModel + highlightedIndex）。
             popup: Popup {
                 y: languageCombo.height + 2
@@ -166,6 +161,7 @@ Item {
             visible: Hub.settings.appearanceFeedback.length > 0
             text: Hub.settings.appearanceFeedback
             wrapMode: Text.WordWrap
+
             // 原版 #settingsAppearanceFeedback：{{textSecondary}} + 12px（与上面标签同组规则），
             // 不是强调色。
             color: Theme.color.textSecondary
@@ -174,11 +170,9 @@ Item {
         }
 
         // 原版是 QPushButton#settingsStylesResetButton（settings.qss 与 settingsServerSaveButton 同组规则）：
-        //   background {{primaryButtonBg}} / color {{primaryButtonText}} / border none
-        //   border-radius 8px / padding 8px 14px；:hover→primaryButtonHover、:pressed→primaryButtonPressed、
-        //   :disabled→primaryButtonDisabledBg/Text；setCursor(Qt::PointingHandCursor)。
-        // ActionButton(variant=primary) 就是这套规格，IconButton 是工具栏小按钮，不该用在这里。
-        // 原版在 QVBoxLayout 里横向撑满（QPushButton 默认 Minimum/Fixed 策略），所以这里也撑满。
+        // background {{primaryButtonBg}} / color {{primaryButtonText}} / border none
+        // border-radius 8px / padding 8px 14px；:hover→primaryButtonHover、:pressed→primaryButtonPressed、
+        // :disabled→primaryButtonDisabledBg/Text；setCursor(Qt::PointingHandCursor)。
         ActionButton {
             width: parent.width
             text: qsTrId("settings_reset_styles")

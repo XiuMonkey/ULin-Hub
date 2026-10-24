@@ -11,9 +11,9 @@
 #include <QFileDialog>
 #include <QTimer>
 
-// 与旧壳 ExtensionManagerPopup 一一对应：
-//   populate() <-> populateList()、installFromFile() <-> installExtension()、pollInstall() <-> pollInstall()、
-//   removeSelected() <-> removeSelected()、cleanupResiduals() <-> cleanupResiduals()、refresh() <-> refresh()。
+// 与现有实现 ExtensionManagerPopup 一一对应：
+// populate() <-> populateList()、installFromFile() <-> installExtension()、pollInstall() <-> pollInstall()、
+// removeSelected() <-> removeSelected()、cleanupResiduals() <-> cleanupResiduals()、refresh() <-> refresh()。
 ExtensionManagerController::ExtensionManagerController(ServerManager* server, ExtensionToolHost* toolHost, QObject* parent)
 	: QObject(parent)
 	, m_server(server)
@@ -29,8 +29,7 @@ ExtensionManagerController::ExtensionManagerController(ServerManager* server, Ex
 
 ExtensionManagerController::~ExtensionManagerController()
 {
-	// 后台任务可能还在跑：等它结束再析构，否则它会往已销毁的对象里写结果
-	m_installTask.waitForFinished();
+	m_installTask.waitForFinished();   // 后台任务可能还在跑：等它结束再析构，否则它会往已销毁的对象里写结果
 }
 
 ExtensionRegistry ExtensionManagerController::registry() const
@@ -42,8 +41,7 @@ ExtensionRegistry ExtensionManagerController::registry() const
 
 QString ExtensionManagerController::kindLabel(const QString& kind) const
 {
-	// 工具扩展在原版里没有种类后缀（裸名字），所以这里返回空串，由 QML 决定不画徽章
-	return kind == QLatin1String("client") ? qtTrId("ext_kind_client") : QString();
+	return kind == QLatin1String("client") ? qtTrId("ext_kind_client") : QString();   // 工具扩展在原版里没有种类后缀（裸名字），所以这里返回空串，由 QML 决定不画徽章
 }
 
 QVariantMap ExtensionManagerController::selectedItem() const
@@ -150,8 +148,6 @@ void ExtensionManagerController::populate()
 		rows.append(row);
 	}
 
-	// （2026-10-01 删）这里原有第③来源「Qt Quick 运行时（QQuickSupport）」：宿主自己就是 QML 壳、Qt Quick 随宿主部署，该 .ext 包与其 Subtype 预检一并退役（见工单 A）。
-
 	m_items = rows;
 	m_selected = -1;
 	emit itemsChanged();
@@ -199,8 +195,7 @@ void ExtensionManagerController::pollInstall()
 
 	const ExtensionLoader::LoadedExtension& ext = m_installTask.extension();
 
-	// 客户端扩展：不写 extensions.json、不重启服务端；装载必须留在 GUI 线程
-	if (ext.isClientExtension) {
+	if (ext.isClientExtension) {   // 客户端扩展：不写 extensions.json、不重启服务端；装载必须留在 GUI 线程
 		QString loadError;
 		if (ClientExtension::loadOne(ext.dllPath, ext.pluginName, &loadError)) {
 			setStatus(qtTrId("ext_install_success_fmt").arg(ext.pluginName));
@@ -212,16 +207,13 @@ void ExtensionManagerController::pollInstall()
 			qWarning().noquote() << QStringLiteral("[ExtensionManager] client extension load failed:")
 				<< ext.pluginName << loadError;
 		}
-		// 扩展声明的界面 ABI 与本宿主不符 ⇒ 装载器只落了 DLL，没落 ui/（见 ExtensionLoader）
-		if (!ext.uiAbiMatched)
+		if (!ext.uiAbiMatched)   // 扩展声明的界面 ABI 与本宿主不符 ⇒ 装载器只落了 DLL，没落 ui/（见 ExtensionLoader）
 			setRestartHint(qtTrId("ext_abi_mismatch_hint"));
 		populate();
 		return;
 	}
 
-	// 工具扩展：登记进 extensions.json；要重启服务端才生效（原版是无声自动重启，这里改成提示）
-	// Qt 侧立刻重扫：DLL 不必等服务端重启，重启后插件一连上管道就能调通。
-	if (m_toolHost)
+	if (m_toolHost)   // Qt 侧立刻重扫：DLL 不必等服务端重启，重启后插件一连上管道就能调通
 		m_toolHost->reload();
 	registry().registerInstalled(ext.pluginName);
 	populate();
@@ -250,8 +242,7 @@ bool ExtensionManagerController::removeSelected()
 	}
 
 	QString dirError;  // 工具扩展：目录删没删成功都清配置残留，否则 cordis.patch.yml 引用不存在的包
-	// 先卸 DLL 再删目录：Windows 上本进程还映射着 main.dll 时，删文件会失败
-	if (m_toolHost)
+	if (m_toolHost)   // 先卸 DLL 再删目录：Windows 上本进程还映射着 main.dll 时，删文件会失败
 		m_toolHost->unloadExtension(name);
 	const bool dirRemoved = registry().removeExtensionDirectory(name, &dirError);
 	const bool patchRemoved = ExtensionRegistry::removePatchEntry(registry().serverProfilePath(), name);

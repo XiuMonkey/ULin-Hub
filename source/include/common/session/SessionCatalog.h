@@ -3,16 +3,15 @@
 // 侧边栏"工作区 / 会话"列表的纯逻辑模型（无 Qt Widget 依赖）：解析 session.list 回包，维护
 // sessionId 的归属/标题/归档，并派生分组与自动选中结果。工作区不随 session.list 返回，只由
 // workspace/follow 的 baseline 提供。
-//
-// 2026-10-19：子代理（subagent）数据也归这里（与"会话目录"同一份语义，避免再开一份新类）：
-//   · 子代理会话本身（session.list 里 origin == subagent / 带 parentSessionId 的行）不进侧栏，
-//     但顶栏的"主 ↔ 子"页签要拿它们的标题与运行态 ⇒ 单独存一份 m_childSessions；
-//   · "某个会话有哪些直接子代理"来自**会话投影 subagentCatalog**（引擎 @deepseek-ai/dsh-subagent
-//     注册的 parent-owned 目录投影），由 session/follow 快照、session/control 的 baseline/增量帧喂进来。
-//     投影是引擎权威数据，客户端**不自己造**成员关系（与官方 ui-subagent 一致）。
+// ：子代理（subagent）数据也归这里（与"会话目录"同一份语义，避免再开一份新类）：
+//  · 子代理会话本身（session.list 里 origin == subagent / 带 parentSessionId 的行）不进侧栏，
+//  但顶栏的"主 ↔ 子"页签要拿它们的标题与运行态 ⇒ 单独存一份 m_childSessions；
+//  · "某个会话有哪些直接子代理"来自**会话投影 subagentCatalog**（引擎 @deepseek-ai/dsh-subagent
+//  注册的 parent-owned 目录投影），由 session/follow 快照、session/control 的 baseline/增量帧喂进来。
+//  投影是引擎权威数据，客户端**不自己造**成员关系（与官方 ui-subagent 一致）。
 // 侧栏列表的对外契约（visibleSessions / titleFor / autoSelectSessionId）刻意不变 —— 子代理仍不出现在
 // 侧栏、titleFor 对子代理仍返回空串（见 TestSessionCatalog 的用例）；页签要用子代理标题时走
-// childTitleFor()。
+// childTitleFor。
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -28,6 +27,9 @@ struct WorkspaceRecord
 {
 	QString workspaceId;
 	QString title;
+	// 工作区根目录（服务端 workspace view 的 path）。会话 header 的 cwd 与它相等即视为该工作区的成员 ——
+	// sessionIds 被引擎剪掉之后，这是唯一还能把会话捡回来的凭据（见 SessionCatalog::workspaceFor）。
+	QString path;
 	QStringList sessionIds;
 };
 
@@ -36,8 +38,13 @@ struct SessionRecord
 	QString sessionId;
 	QString title;
 	QString workspaceId;
+	// session/list 的 cwd（会话 header 记录的启动目录）。归属兜底用，见 workspaceFor。
+	QString cwd;
 	bool running = false;
 	bool archived = false;
+	// 最近活动时间（epoch ms）。来自 session/list 的 updatedAt（服务端按 max(createdAt, 最后一次提问) 现算），
+	// 侧栏的"相对时间"就用它；回包里没有这个字段时退 createdAt，再取不到就是 0（调用方按空串显示）。
+	qint64 updatedAtMs = 0;
 	// 子代理会话（只进 m_childSessions，不进侧栏）：父会话 id + 是否是子代理
 	QString parentSessionId;
 	bool subagent = false;
@@ -55,6 +62,9 @@ struct SessionListSnapshot
 {
 	bool workspacesOk = false;
 	QSet<QString> archivedSessionIds;
+	// 置顶会话 id（**有序**：服务端按"最近置顶的在前"给）。与归档集合同源（workspace/follow 的
+	// baseline），顺序决定侧栏"置顶"段的显示顺序，所以这里用 QStringList 而不是 QSet。
+	QStringList pinnedSessionIds;
 	QJsonArray workspaces;
 
 	bool sessionsOk = false;
@@ -88,6 +98,13 @@ public:
 	void reorderWorkspaces(const QStringList& workspaceIds);
 	void setSessions(const QJsonArray& items);
 	void setArchivedSessionIds(const QSet<QString>& ids);
+	// 置顶集合（有序）：baseline 与增量帧（workspace/follow 的 type == "pinned"）给的都是**完整集合**，
+	// 所以这里整体替换。顺序原样保留（服务端：最近置顶的在前），侧栏"置顶"段照这个顺序出。
+	// 置顶只影响分组/排序，不影响可见性 —— 已归档的置顶会话仍然不显示。
+	void setPinnedSessionIds(const QStringList& ids);
+
+	// 置顶集合（有序）。没有置顶时返回空列表。
+	QStringList pinnedSessionIds() const;
 
 	// 新增/更新单个会话；返回 false = 被忽略（sessionId 为空或已归档），调用方不应再渲染它。
 	bool addSession(const QString& sessionId, const QString& title, const QString& workspaceId = QString());
@@ -95,7 +112,12 @@ public:
 	bool updateTitle(const QString& sessionId, const QString& title);
 
 	QString titleFor(const QString& sessionId) const;
+	// 会话归哪个工作区。三级规则（见 .cpp）：会话自己记的 workspaceId → workspace.sessionIds →
+	// header.cwd 与 workspace.path 相等。第三级兜底：引擎会把"解析不出 cwd"
+	// 的会话从 sessionIds 里永久剪掉，只靠前两级的话那些会话只能落"未分组"。
 	QString workspaceFor(const QString& sessionId) const;
+	// setSessions 专用重载：那一刻 record 还没进 m_sessions，cwd 由调用方从 session/list 里给。
+	QString workspaceFor(const QString& sessionId, const QString& cwd) const;
 
 	// 该会话投影到的日志位置（projections.asOfSeq）；没有该会话时返回 0。
 	int asOfSeqFor(const QString& sessionId) const;
@@ -112,8 +134,6 @@ public:
 	// 自动选中：第一个"非运行中、非子代理"的会话，无则返回空串
 	QString autoSelectSessionId() const;
 
-	// ---- 子代理（顶栏"主 ↔ 子"页签的数据面）----
-	// 一个会话的直接子代理目录（投影 subagentCatalog 的 wire view）。没有记录返回空数组。
 	QJsonArray subagentCatalog(const QString& sessionId) const;
 	// 子代理会话的标题 / 运行态（session.list 里那批行）；没有记录返回空串 / false
 	QString childTitleFor(const QString& sessionId) const;
@@ -149,8 +169,8 @@ private:
 	QVector<WorkspaceRecord> m_workspaces;
 	QVector<SessionRecord> m_sessions;
 	QSet<QString> m_archivedSessionIds;
+	QStringList m_pinnedSessionIds;   // 有序（最近置顶的在前），见 setPinnedSessionIds
 
-	// ---- 子代理数据（见文件头说明）----
 	QVector<SessionRecord> m_childSessions;          // session.list 里的子代理会话（不进侧栏）
 	QHash<QString, QJsonArray> m_subagentCatalogs;   // sessionId -> 直接子代理目录（投影值）
 	QHash<QString, QString> m_childParentIndex;      // 子代理 id -> 直接父会话 id（由目录反推）

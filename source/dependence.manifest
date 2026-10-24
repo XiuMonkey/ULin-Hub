@@ -47,6 +47,9 @@
   <file name="Qt6QuickControls2BasicStyleImpl.dll" />
   <file name="Qt6QuickTemplates2.dll" />
   <file name="Qt6QuickEffects.dll" />
+  <!-- SVG：qsvg 图片格式插件（imageformats/qsvg.dll）的依赖。侧栏新图标是 SVG，
+       漏了这份 DLL 时 qsvg 加不上、所有 .svg 图片源都会静默空白。 -->
+  <file name="Qt6Svg.dll" />
 
   <!-- Qt WebEngine（右侧浏览器面板）。这 7 个是 qmake 侧 webenginequick 的依赖闭包：
        webenginequick → QtQuick + webenginecore + webchannelquick；webenginecore → network +

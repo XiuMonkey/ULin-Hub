@@ -136,8 +136,7 @@ QWidget* InteractionHandler::handleQuestion(const QJsonObject& frame, DshApiClie
 				ui.optionButtons.append(button);
 			}
 
-			// 单选且只有一个选项时默认选中，减少用户操作
-			if (!ui.multiSelect && ui.optionButtons.size() == 1)
+			if (!ui.multiSelect && ui.optionButtons.size() == 1)   // 单选且只有一个选项时默认选中，减少用户操作
 				ui.optionButtons.first()->setChecked(true);
 		}
 		else {

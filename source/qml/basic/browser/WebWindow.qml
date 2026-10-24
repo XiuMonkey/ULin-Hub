@@ -1,8 +1,6 @@
 // 通用兜底落点：网页窗口（宿主自带 WebEngine 打开任意 URL）。
-//
 // 定位：插件界面本来是 web 的，原生表达不了（或代价不划算）时，开一个独立窗口让 WebEngine 去解析。
 // 宿主不认识任何插件 —— 它只知道"给我一个 URL，我给你一个能前进后退刷新的窗口"。
-//
 // 由 VirtualUiHost::OpenWebWindow 创建：initialUrl 是 required property（初始属性注入）。
 
 import QtQuick
@@ -22,7 +20,6 @@ Window {
     title: view.title.length > 0 ? view.title : "网页"
     color: Theme.color.panelBg
 
-    // ---------- 工具条 ----------
     Item {
         id: toolbar
         anchors.top: parent.top
@@ -77,8 +74,7 @@ Window {
             }
         }
 
-        // 地址（只读展示：这是宿主给的落点，不给手输）
-        Rectangle {
+        Rectangle {   // 地址（只读展示：这是宿主给的落点，不给手输）
             anchors.left: parent.left
             anchors.leftMargin: 112
             anchors.right: parent.right
@@ -112,7 +108,6 @@ Window {
         }
     }
 
-    // ---------- 进度 ----------
     Rectangle {
         id: progress
         anchors.top: toolbar.bottom
@@ -123,7 +118,6 @@ Window {
         visible: view.loading
     }
 
-    // ---------- 页面 ----------
     WebEngineView {
         id: view
         anchors.top: toolbar.bottom

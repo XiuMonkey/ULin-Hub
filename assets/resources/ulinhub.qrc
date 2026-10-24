@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="ULinHub">
-        <!-- 顶层素材按用途分了目录：icons/（图标与标识）、buttons/（发送/停止圆钮）、
+        <!-- 顶层素材按用途分了目录：icons/（图标与标识；icons/ui/ = 单色线性 SVG 图标集）、buttons/（发送/停止圆钮）、
              config/（highlight-rules.json）。prefix 仍是 ULinHub，resource 路径即"目录/文件名"
              ⇒ QML/C++ 里的引用要写全 qrc:/ULinHub/icons/…、qrc:/ULinHub/config/…（无 alias）。
              留在顶层的 ulin-hub.rc 是 Windows 资源脚本，不进 qrc。 -->
@@ -16,11 +16,36 @@
         <file>icons/ulin-hub-logo-tiny-dark@2x.png</file>
         <file>icons/ulin-hub-icon.png</file>
         <file>icons/ulin-hub-icon-dark.png</file>
-        <file>icons/setting-icon.png</file>
-        <file>icons/plugin-icon.png</file>
-        <file>icons/theme-icon.png</file>
-        <file>icons/extension-icon.png</file>
-        <file>icons/attach-icon-144.png</file>
+        <!-- 单色线性图标集（24×24 SVG：无填充、描边纯白 #FFFFFF、透明底、sw 1.6、圆头圆角）。
+             运行期靠亮度染色（LineIcon.qml 的 name/size/color，或 IconButton.iconColor），
+             所以 SVG 里不要写死主题色。设计原型见 build/temp/sidebar-redesign/index.html 的 <symbol>。
+             引用写法：qrc:/ULinHub/icons/ui/<name>.svg（与上面 PNG 一样无 alias）。 -->
+        <file>icons/ui/search.svg</file>
+        <file>icons/ui/plus.svg</file>
+        <file>icons/ui/chevron-down.svg</file>
+        <file>icons/ui/chevron-right.svg</file>
+        <file>icons/ui/more-horizontal.svg</file>
+        <file>icons/ui/pin.svg</file>
+        <file>icons/ui/panel-collapse.svg</file>
+        <file>icons/ui/clock.svg</file>
+        <file>icons/ui/settings.svg</file>
+        <file>icons/ui/plugin.svg</file>
+        <file>icons/ui/theme.svg</file>
+        <file>icons/ui/extensions.svg</file>
+        <file>icons/ui/send.svg</file>
+        <file>icons/ui/bot.svg</file>
+        <file>icons/ui/browser.svg</file>
+        <file>icons/ui/changes.svg</file>
+        <file>icons/ui/chat.svg</file>
+        <file>icons/ui/close.svg</file>
+        <file>icons/ui/file.svg</file>
+        <file>icons/ui/folder.svg</file>
+        <file>icons/ui/refresh.svg</file>
+        <file>icons/ui/terminal.svg</file>
+        <file>icons/ui/tools.svg</file>
+        <file>icons/ui/trace.svg</file>
+        <file>icons/ui/model.svg</file>
+        <file>icons/ui/server.svg</file>
         <file>config/highlight-rules.json</file>
         <file alias="styles/theme-light.json">styles/theme-light.json</file>
         <file alias="styles/theme-dark.json">styles/theme-dark.json</file>
@@ -35,13 +60,13 @@
         <file alias="translations/ulinhub_zh_CN.qm">translations/ulinhub_zh_CN.qm</file>
         <file alias="translations/ulinhub_en.qm">translations/ulinhub_en.qm</file>
         <!-- 内置插件：工具过滤器（按会话隐藏模型可见的工具，见
-             resources/ToolsFilterPlugin/）。编译进 exe 是为了让内置插件不依赖
+             resources/tools-filter-plugin/）。编译进 exe 是为了让内置插件不依赖
              发布目录里的散装文件；首次启动服务端时由
              ServerManager::ensureBuiltinPlugins() 调用 ExtensionLoader 安装到
              <DSH_HOME>/profiles/web/node_modules/ 下。 -->
-        <file alias="ToolsFilterPlugin/package.json">ToolsFilterPlugin/package.json</file>
-        <file alias="ToolsFilterPlugin/index.js">ToolsFilterPlugin/index.js</file>
-        <file alias="ToolsFilterPlugin/example.ToolsFilterConfig.json">ToolsFilterPlugin/example.ToolsFilterConfig.json</file>
+        <file alias="ToolsFilterPlugin/package.json">tools-filter-plugin/package.json</file>
+        <file alias="ToolsFilterPlugin/index.js">tools-filter-plugin/index.js</file>
+        <file alias="ToolsFilterPlugin/example.ToolsFilterConfig.json">tools-filter-plugin/example.ToolsFilterConfig.json</file>
         <!-- 右栏「终端」块的页面与它的渲染引擎（Qt WebEngine 里跑 xterm.js）。
              这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
              660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见

@@ -1,5 +1,4 @@
 // 见 core/ClientRuntime.h：服务端 + 出站客户端 + 会话目录的生命周期与 RPC 业务。
-// 本文件从原 src/qmlbridge/ShellController.cpp 拆出（2026-10-10），业务语义一字不改。
 
 #include "core/ClientRuntime.h"
 
@@ -25,6 +24,31 @@
 
 #include <memory>
 
+namespace
+{
+	// workspace/follow 的 archivedSessionIds / pinnedSessionIds 都是 JSON 字符串数组：统一转成 id 列表，
+	// 顺手丢掉空串（catalog 的 setter 还会再校验/去重，这里只做形状转换，不重复业务口径）。
+	QStringList idListFromJsonArray(const QJsonArray& values)
+	{
+		QStringList ids;
+		ids.reserve(values.size());
+		for (const QJsonValue& value : values) {
+			const QString id = value.toString();
+			if (!id.isEmpty())
+				ids.append(id);
+		}
+		return ids;
+	}
+
+	QSet<QString> idSetFromJsonArray(const QJsonArray& values)   // 同上，给归档集合用（QSet 无序，去重交给 set）
+	{
+		QSet<QString> ids;
+		for (const QString& id : idListFromJsonArray(values))
+			ids.insert(id);
+		return ids;
+	}
+}
+
 ClientRuntime::ClientRuntime(QObject* parent)
 	: QObject(parent)
 {
@@ -35,10 +59,9 @@ void ClientRuntime::start()
 	m_server = new ServerManager(this);
 	m_api = new DshApiClient(this);
 
-	// 后端接管那条线要的宿主对象（2026-10-01 补）：CodexBackend 这类扩展在 attachHost() 里第一件事就是
 	// findObject(kApiClient) 取出站客户端；此前这个 index 从没登记过 ⇒ 扩展只拿到 null 并静默退化成"没接管"。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiClient, m_api);
-	// 入站注入面（2026-10-01 工单 B-1 补）：同一对象也登记为 kMainWindow。VirtualMain 的 13 个 Handle* 注入方法与
+
 	// DshApiClient 既有信号一一对应（见 DshApiClient.h）—— 扩展灌进来的数据因此走与真服务端完全相同的路。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kMainWindow, m_api);
 
@@ -46,21 +69,21 @@ void ClientRuntime::start()
 	// 会被 SessionAlreadyOwnedError 拒掉（共享退出钩子只做 ClientExtension::shutdownForExit）。
 	connect(qApp, &QCoreApplication::aboutToQuit, this, [this]() {
 		m_exiting = true;   // 先挂标记：下面杀进程会同步触发 finished，别让它被当成"启动失败"
-		// 扩展工具管道先停：服务端一死，管道对端就没了；在途调用的回包也没人要了
-		if (m_toolHost)
+		if (m_toolHost)   // 扩展工具管道先停：服务端一死，管道对端就没了；在途调用的回包也没人要了
 			m_toolHost->stop();
 		if (m_api)
 			m_api->closeStreams();
+
 		// 紧接着必须把内置引擎带走，否则 node 变孤儿：它继续占着会话的写句柄，下次启动
 		// 终端 / 命令全报 session/writer-held（本机日志里刷了一整天）。顺序不能反 ——
 		// 先让服务端收到"流关了"，再结束它的进程（stopForExit: terminate → 杀进程树 → waitForFinished）。
 		// ⚠️ 别指望 ServerManager 的析构：它是静态单例链上的一环，要等 QApplication 拆完才轮到，
-		//    那时太晚；崩溃/强杀更是走不到。所以这里显式调，与 job 的那层保险叠加。
+		// 那时太晚；崩溃/强杀更是走不到。所以这里显式调，与 job 的那层保险叠加。
 		if (m_server)
 			m_server->stopForExit();
 		});
 
-	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流（与旧壳 ULinHub::installServer 同一条路）
+	// 服务端起来 -> 把 baseUrl 交给 API 客户端并开流
 	connect(m_server, &ServerManager::baseUrlReady, this, [this](const QUrl& url) {
 		TimingLogger::mark(QStringLiteral("qml shell: server baseUrl ready"));
 		setStatus(qtTrId("session_loading"));
@@ -117,32 +140,33 @@ void ClientRuntime::start()
 				emit peerCatalogChanged();
 		});
 
-	// 工作区基线（workspace/follow 首帧）：分组与归档集合都在这里，会话列表本身不返回工作区
+	// 工作区基线（workspace/follow 首帧）：分组、归档集合与置顶集合都在这里，会话列表本身不返回工作区。
+	// pinnedSessionIds 是**有序**的（最近置顶的在前），侧栏"置顶"段直接按这个顺序排 ⇒ 用 QStringList 转一道。
 	connect(m_api, &DshApiClient::workspaceSnapshotReady, this,
-		[this](const QJsonArray& items, const QJsonArray& archivedSessionIds) {
-			QSet<QString> archived;
-			for (const QJsonValue& value : archivedSessionIds)
-				archived.insert(value.toString());
-
-			m_catalog.setArchivedSessionIds(archived);
+		[this](const QJsonArray& items, const QJsonArray& archivedSessionIds, const QJsonArray& pinnedSessionIds) {
+			m_catalog.setArchivedSessionIds(idSetFromJsonArray(archivedSessionIds));
+			m_catalog.setPinnedSessionIds(idListFromJsonArray(pinnedSessionIds));
 			m_catalog.setWorkspaces(items);
 			emit catalogChanged();
 		});
 
-	// workspace/follow 的 archived 增量帧：**整体替换**归档集合（旧壳 handleWorkspaceArchiveChanged 同义）。
+	// workspace/follow 的 archived 增量帧：**整体替换**归档集合。
 	// 少了这条，任何"归档/删除"之后侧栏都不会跟着变。
 	connect(m_api, &DshApiClient::workspaceArchiveChanged, this,
 		[this](const QJsonArray& archivedSessionIds) {
-			QSet<QString> archived;
-			for (const QJsonValue& value : archivedSessionIds)
-				archived.insert(value.toString());
+			m_catalog.setArchivedSessionIds(idSetFromJsonArray(archivedSessionIds));
+			emit catalogChanged();
+		});
 
-			m_catalog.setArchivedSessionIds(archived);
+	// workspace/follow 的 pinned 增量帧：同样**整体替换**（服务端每次给完整集合，最近置顶的在前）。
+	// 置顶只影响侧栏排序/分组（会话可见性不变），但"置顶"段的出现/顺序/消失都得靠它刷新。
+	connect(m_api, &DshApiClient::workspacePinnedChanged, this,
+		[this](const QJsonArray& pinnedSessionIds) {
+			m_catalog.setPinnedSessionIds(idListFromJsonArray(pinnedSessionIds));
 			emit catalogChanged();
 		});
 
 	// workspace/follow 的分组增量帧（upserted / removed / reordered）。**这三条此前一条都没接**：
-	// 缺 upserted ⇒ 点"新建工作区"后新分组要等下次启动才出现；缺 removed ⇒ 删掉的分组在侧栏赖着不走；
 	// 缺 reordered ⇒ 拖拽后的顺序不生效。三条共用一份 catalog 基线，改完就通知侧栏重建。
 	connect(m_api, &DshApiClient::workspaceUpserted, this, [this](const QJsonObject& workspace) {
 		m_catalog.upsertWorkspace(workspace);
@@ -167,8 +191,7 @@ void ClientRuntime::start()
 	m_toolHost = new ExtensionToolHost(this);
 	const QString profileDir = m_server->dshHome() + QStringLiteral("/profiles/web");
 	if (!m_toolHost->start(profileDir)) {
-		// 桥起不来只影响"扩展 DLL 工具"这一条线，别把整个壳拖死：记日志、状态行不动
-		qWarning().noquote() << "[Shell] extension tool host failed to start:"
+		qWarning().noquote() << "[Shell] extension tool host failed to start:"   // 桥起不来只影响"扩展 DLL 工具"这一条线，别把整个壳拖死：记日志、状态行不动
 			<< m_toolHost->errorString();
 	}
 }
@@ -181,13 +204,8 @@ void ClientRuntime::restartServer()
 
 void ClientRuntime::refollow(const QString& sessionId)
 {
-	// 与 followSession 同一条解析：重连后子代理仍然要按 subagent address 重开（别退回 session 形状）
-	followSession(sessionId);
+	followSession(sessionId);   // 与 followSession 同一条解析：重连后子代理仍然要按 subagent address 重开（别退回 session 形状）
 }
-
-// ------------------------------------------------------------------
-// 状态机：值去重在这里，宿主只管转成 QML 属性信号
-// ------------------------------------------------------------------
 
 bool ClientRuntime::setStatus(const QString& text)
 {
@@ -215,9 +233,6 @@ bool ClientRuntime::setInitializing(bool value)
 	emit initializingChanged(value);
 	return true;
 }
-
-// 会话 / 工作区 RPC
-// ------------------------------------------------------------------
 
 void ClientRuntime::refreshSessions()
 {
@@ -254,11 +269,10 @@ void ClientRuntime::createSession(const QString& workspaceId)
 	// 工作区 id：原样发给 session/create，服务端 workspaceRegistry.get() 查不到就回 workspace/not-found
 	// （"workspace \"#ungrouped\" not found"）→ 点＋永远建不出会话。未分组 == 没有工作区：按空 id 发。
 	// ⚠️ 这个 key 与 SessionListModel::ungroupedWorkspaceKey() 必须一致 —— 两侧各留一个字面量是因为
-	//    core 不能反向依赖 qmlbridge；改一处就要改另一处。
+	// core 不能反向依赖 qmlbridge；改一处就要改另一处。
 	const QString serverWorkspaceId = (workspaceId == QStringLiteral("#ungrouped")) ? QString() : workspaceId;
 
-	// 用户动作值得留痕：点没点进来、参数是什么、翻译成了什么，一眼可辨（排查"按钮没反应"时很关键）
-	qInfo().noquote() << "[Shell] createSession requested, workspaceId=" << workspaceId
+	qInfo().noquote() << "[Shell] createSession requested, workspaceId=" << workspaceId   // 用户动作值得留痕：点没点进来、参数是什么、翻译成了什么，一眼可辨（排查"按钮没反应"时很关键）
 		<< "-> server workspaceId="
 		<< (serverWorkspaceId.isEmpty() ? QStringLiteral("(none)") : serverWorkspaceId);
 
@@ -270,7 +284,6 @@ void ClientRuntime::createSession(const QString& workspaceId)
 		// （dsh-api-session-controller 的 create：只有 `request.workspaceId !== void 0` 才查注册表并
 		// attachSession）会把会话建出来却不挂进任何工作区 ⇒ 侧栏只能回落到未分组；而且注册表一旦是空的
 		// 就会一直空下去，不是"这一次没分组"而是永久没分组。
-		// 所以先把"没指定分组"解析成真实分组（已有取第一个 / 一个都没有就补建默认），再建会话。
 		resolveSessionWorkspace([this](const QString& resolvedId) {
 			createSessionIn(resolvedId);
 			});
@@ -285,7 +298,7 @@ void ClientRuntime::createSessionIn(const QString& workspaceId)
 	SessionService::createSession(m_api, workspaceId,
 		[this, workspaceId](const QString& sessionId) {
 			// ⚠️ 归属必须带上：addSession 的 workspaceId 为空时侧栏就把这条挂到"未分组"下面
-			//    （见 SessionListModel::rebuild 的分桶），而服务端其实已经把它挂到 workspaceId 了。
+			// （见 SessionListModel::rebuild 的分桶），而服务端其实已经把它挂到 workspaceId 了。
 			m_catalog.addSession(sessionId, qtTrId("session_untitled"), workspaceId);
 			emit catalogChanged();
 			emit sessionsRefreshed(sessionId);   // 建完直接选中它（宿主按这个建议切会话）
@@ -294,6 +307,7 @@ void ClientRuntime::createSessionIn(const QString& workspaceId)
 			const QString text = qtTrId("session_new_failed_fmt").arg(error.code, error.message);
 			if (setStatus(text))
 				emit operationFailed(text);
+
 			// 只有"服务端没连上"的遮罩会画 statusText，初始化完成后它看不见 —— 失败必须走 Toast，
 			// 否则用户看到的就是"点了没反应"（这次就是被这个静默坑了很久）。
 			qWarning().noquote() << "[Shell] createSession failed:" << error.code << error.message;
@@ -311,8 +325,8 @@ void ClientRuntime::resolveSessionWorkspace(const std::function<void(const QStri
 	}
 
 	// ② 一个分组都没有：按内置服务端的 cwd 补建默认工作区。路径必须与服务端的 defaultCwd 同源
-	//    （ServerManager::defaultWorkspacePath 就是内置进程的 cwd），否则补出来的分组和"不带
-	//    workspaceId 时服务端用的 cwd"会指向两个目录。
+	// （ServerManager::defaultWorkspacePath 就是内置进程的 cwd），否则补出来的分组和"不带
+	// workspaceId 时服务端用的 cwd"会指向两个目录。
 	if (!m_server) {
 		onResolved(QString());
 		return;
@@ -343,24 +357,22 @@ void ClientRuntime::resolveSessionWorkspace(const std::function<void(const QStri
 			onResolved(created);
 		},
 		[onResolved](const DshApiClient::RpcError& error) {
-			// 补建失败也要建会话：宁可落到未分组，也不能让"点新建"没反应
-			qWarning().noquote() << "[Shell] 默认工作区补建失败，新会话将落到未分组:"
+			qWarning().noquote() << "[Shell] 默认工作区补建失败，新会话将落到未分组:"   // 补建失败也要建会话：宁可落到未分组，也不能让"点新建"没反应
 				<< error.code << error.message;
 			onResolved(QString());
 		});
 }
 
-// 清空会话 = 旧壳那颗「清空会话」按钮的全部语义（ULinHub::onClearConversationClicked）：
-//   ① 抹掉磁盘上的会话数据（sessions 目录 + storages/workspace.json）；
-//   ② 本地目录当场清空（会话 + 分组），侧栏立刻空掉；
-//   ③ 服务端注册表逐个 workspace/delete 删干净，删完再建一个新的默认会话。
+// 清空会话 = 那颗「清空会话」按钮的全部语义（ULinHub::onClearConversationClicked）：
+// ① 抹掉磁盘上的会话数据（sessions 目录 + storages/workspace.json）；
+// ② 本地目录当场清空（会话 + 分组），侧栏立刻空掉；
+// ③ 服务端注册表逐个 workspace/delete 删干净，删完再建一个新的默认会话。
 // ③ 的顺序不能反：反过来的话 workspace/create 可能被随后到达的 delete 抹掉，新会话就挂在一个已删除的分组上了。
 void ClientRuntime::clearAllSessions()
 {
 	qInfo().noquote() << "[Shell] clearAllSessions requested";
 
-	// 先把要处理的东西都取出来 —— 下面会清本地目录，之后就取不到了
-	QStringList workspaceIds;
+	QStringList workspaceIds;   // 先把要处理的东西都取出来 —— 下面会清本地目录，之后就取不到了
 	for (const WorkspaceRecord& workspace : m_catalog.workspaces()) {
 		if (!workspace.workspaceId.isEmpty())
 			workspaceIds.append(workspace.workspaceId);
@@ -370,10 +382,10 @@ void ClientRuntime::clearAllSessions()
 		sessionIds.append(record.sessionId);
 
 	// ① **先归档所有会话**（顺序是关键）：
-	//    服务端 workspace/delete 只删工作区注册、不动会话；而会话注册表活在**服务端进程内存**里
-	//    （下面 clearAllSessionData 只是删磁盘文件，服务端当次并不知道）。于是不归档的话：
-	//    删完工作区 → 这些会话的 workspaceId 被清空 → 下一次 session/list 又原样把它们拉回来，
-	//    全堆进"未分组"（用户实测："清空后刷新，一堆会话跑到未分组建"）。
+	// 服务端 workspace/delete 只删工作区注册、不动会话；而会话注册表活在**服务端进程内存**里
+	// （下面 clearAllSessionData 只是删磁盘文件，服务端当次并不知道）。于是不归档的话：
+	// 删完工作区 → 这些会话的 workspaceId 被清空 → 下一次 session/list 又原样把它们拉回来，
+	// 全堆进"未分组"（用户看到的是"清空后刷新，一堆会话跑到未分组建"）。
 	archiveSessionsThen(sessionIds, [this, workspaceIds]() {
 		// ② 磁盘：会话文件 + 工作区注册表（不删的话下次启动会原样带回来）
 		if (m_server)
@@ -381,16 +393,17 @@ void ClientRuntime::clearAllSessions()
 
 		// ③ 本地目录：侧栏先空，也保证随后取不到旧分组
 		// ⚠️ 保留归档集合：服务端那边这些会话仍是归档态，这里清掉的话，随后 session/list
-		//    会把它们当"未归档"全拉回来；而 workspace/delete 已经把它们 detach 了
-		//    ⇒ 全部堆进"未分组"（用户看到的"清空后一堆未分组会话"就是这个）。
+		// 会把它们当"未归档"全拉回来；而 workspace/delete 已经把它们 detach 了
+		// ⇒ 全部堆进"未分组"（用户看到的"清空后一堆未分组会话"就是这个）。
 		m_catalog.clear(true);
 		emit catalogChanged();
+
 		// "当前会话"已经不存在了：宿主先清掉消息区与选中态。少了这一条，随后的自动选中会被旧选中项挡掉
 		// （宿主那边是 `keep.isEmpty()` 才自动选）。
 		emit sessionsCleared();
 
 		// ④ 服务端注册表活在服务端进程内存里，删 workspace.json 当次无效（之后任何变更都会把它整体写回来），
-		//    所以必须逐个删。删完（或超时兜底）再建一个新会话：catalog 已空，它会走"补建默认分组"那条路。
+		// 所以必须逐个删。删完（或超时兜底）再建一个新会话：catalog 已空，它会走"补建默认分组"那条路。
 		deleteWorkspacesThen(workspaceIds, [this]() { createSession(QString()); });
 	}, false);   // 不逐条通知宿主：清空自己会发 sessionsCleared
 }
@@ -419,8 +432,7 @@ void ClientRuntime::deleteWorkspacesThen(const QStringList& workspaceIds, const 
 					finish();
 			},
 			[workspaceId, remaining, finish](const DshApiClient::RpcError& error) {
-				// 删失败也继续：宁可留一个空分组，也不能让"清空"卡死在这里
-				qWarning().noquote() << QStringLiteral("[Shell] 工作区删除失败，新会话不会再挂到它: %1")
+				qWarning().noquote() << QStringLiteral("[Shell] 工作区删除失败，新会话不会再挂到它: %1")   // 删失败也继续：宁可留一个空分组，也不能让"清空"卡死在这里
 					.arg(workspaceId) << error.code << error.message;
 				if (--(*remaining) == 0)
 					finish();
@@ -435,11 +447,11 @@ void ClientRuntime::archiveSession(const QString& sessionId)
 	if (sessionId.isEmpty() || !m_api)
 		return;
 
-	// 与旧壳同路：workspace/archiveSession（args { request: { sessionId } }）
+	// 走同一条路：workspace/archiveSession（args { request: { sessionId } }）
 	m_api->callMethod(QStringLiteral("workspace/archiveSession"), SessionCommands::sessionArchive(sessionId),
 		[this, sessionId](const QJsonObject& value) {
 			// ⚠️ 关键：回包里是**完整的归档集合**，必须立刻写进 SessionCatalog —— 侧栏就是靠 catalog 的
-			// archivedSessionIds 把这条滤掉的（旧壳同路：ULinHub.cpp:814-818）；只刷新列表而不更新归档集合
+			// archivedSessionIds 把这条滤掉的；只刷新列表而不更新归档集合
 			// = 会话看上去"删不掉"。
 			m_catalog.setArchivedSessionIds(SessionCatalog::parseArchivedSessionIds(value));
 			emit catalogChanged();
@@ -458,7 +470,6 @@ void ClientRuntime::deleteWorkspace(const QString& workspaceId)
 		return;
 
 	// 侧栏的"未分组"是界面伪分组（key "#ungrouped"），服务端没有对应实体：
-	// 以前直接发 workspace/delete("#ungrouped")，服务端查不到 ⇒ 这一档永远删不掉。
 	// 它的"删除"应该等于"把这一档里的会话逐条归档"。
 	const bool ungrouped = (workspaceId == QStringLiteral("#ungrouped"));
 	const QString groupKey = ungrouped ? QString() : workspaceId;
@@ -474,9 +485,9 @@ void ClientRuntime::deleteWorkspace(const QString& workspaceId)
 		<< "组内会话数=" << sessionIds.size();
 
 	// ⚠️ 服务端 workspace/delete 的语义是"只删工作区注册，不删目录、也不删会话"
-	//    （dsh 的注释原话：Delete one Workspace registration without deleting its directory or Sessions）。
-	//    于是组内会话会变成无归属，刷新后全部落到"未分组"那一档 —— 这就是"删了工作区，
-	//    会话全跑进未分组"的来源。正确顺序：先把组内会话逐条归档，再删分组。
+	// （dsh 的注释原话：Delete one Workspace registration without deleting its directory or Sessions）。
+	// 于是组内会话会变成无归属，刷新后全部落到"未分组"那一档 —— 这就是"删了工作区，
+	// 会话全跑进未分组"的来源。正确顺序：先把组内会话逐条归档，再删分组。
 	archiveSessionsThen(sessionIds, [this, ungrouped, workspaceId]() {
 		if (ungrouped) {
 			refreshSessions();   // 伪分组：没有服务端实体可删
@@ -515,9 +526,9 @@ void ClientRuntime::archiveSessionsThen(const QStringList& sessionIds, const std
 	for (const QString& sessionId : sessionIds) {
 		m_api->callMethod(QStringLiteral("workspace/archiveSession"), SessionCommands::sessionArchive(sessionId),
 			[this, sessionId, remaining, finish, notifyHost](const QJsonObject& value) {
-				// 回包是**完整的归档集合**，直接写进 catalog —— 侧栏就是靠它把会话滤掉的
-				m_catalog.setArchivedSessionIds(SessionCatalog::parseArchivedSessionIds(value));
+				m_catalog.setArchivedSessionIds(SessionCatalog::parseArchivedSessionIds(value));   // 回包是**完整的归档集合**，直接写进 catalog —— 侧栏就是靠它把会话滤掉的
 				emit catalogChanged();
+
 				// 和"删单个会话"同一条链路：宿主据此判断删掉的是不是当前会话、要不要切走
 				// （"清空全部"不逐条发：那边紧接着有 sessionsCleared 统一处理）
 				if (notifyHost)
@@ -527,8 +538,7 @@ void ClientRuntime::archiveSessionsThen(const QStringList& sessionIds, const std
 					finish();
 			},
 			[sessionId, remaining, finish](const DshApiClient::RpcError& error) {
-				// 归档失败也继续：宁可留一条会话，也不能让删除流程卡死
-				qWarning().noquote() << "[Shell] 会话归档失败:" << sessionId << error.code << error.message;
+				qWarning().noquote() << "[Shell] 会话归档失败:" << sessionId << error.code << error.message;   // 归档失败也继续：宁可留一条会话，也不能让删除流程卡死
 				if (--(*remaining) == 0)
 					finish();
 			});
@@ -542,15 +552,15 @@ void ClientRuntime::createWorkspace(const QString& path)
 	if (!m_api || path.isEmpty())
 		return;
 
-	// 与旧壳同路：workspace/create（args 是 { request: { path } }）；目录由调用方先选好
+	// 走同一条路：workspace/create（args 是 { request: { path } }）；目录由调用方先选好
 	m_api->callMethod(QStringLiteral("workspace/create"), SessionCommands::workspaceCreate(path),
 		[this, path](const QJsonObject& value) {
 			// 回包形状 { workspace: { workspaceId, title, sessionIds, ... }, created }
 			const QJsonObject workspace = value.value(QStringLiteral("workspace")).toObject();
 			const QString created = workspace.value(QStringLiteral("workspaceId")).toString();
+
 			// ⚠️ 服务端（dsh-api-workspace-controller 的 create）：**目录已经注册过就直接返回原记录、
-			//    created=false**，不新建。以前这里把回包整个丢掉，于是"选了一个已有的目录"和"没反应"
-			//    在界面上完全一样 —— 用户只能反复点、反复选，摸不着头脑。
+			// created=false**，不新建。只看 created 才能区分"新建了工作区"和"选的目录早就在列表里"。
 			const bool isNew = value.value(QStringLiteral("created")).toBool(false);
 			const QString title = workspace.value(QStringLiteral("title")).toString();
 
@@ -564,7 +574,6 @@ void ClientRuntime::createWorkspace(const QString& path)
 			}
 
 			// 本地先补一条分组：侧栏的分组来自 catalog，而 workspace/follow 的 upsert 帧是异步的
-			// （实测新建后侧栏不出现新工作区，要等下次启动 baseline 才带上）。与下面"建默认工作区"
 			// 那条路径同一做法，也正是 SessionCatalog::upsertWorkspace 注释里要求的。
 			QJsonObject local = workspace;
 			if (local.value(QStringLiteral("title")).toString().isEmpty())
@@ -583,7 +592,6 @@ void ClientRuntime::createWorkspace(const QString& path)
 				setStatus(text);
 				emit operationFailed(text);
 			} else {
-				// 新建的工作区**自带一个空会话**（用户口径 2026-10-20）：侧栏是按会话分桶的，
 				// 一个 0 会话的分组要么不显示、要么只是个空壳 —— 都不像"新建成功"。
 				// 建完会走 createSessionIn 的 addSession + catalogChanged + sessionsRefreshed，
 				// 于是这个分组立刻出现、并且直接选中那个新会话。

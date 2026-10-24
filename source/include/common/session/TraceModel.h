@@ -1,18 +1,15 @@
 #pragma once
 
 // 轨迹视图的数据面（对照官方 @deepseek-ai/dsh-client-ui-trajectory）。
-//
 // 官方那套是"纯投影"：不额外问服务端要数据，而是把会话事件账本（turn/step/消息/工具/压缩）
 // 摊成一张按轮次组织的记录表。这里做同一件事 —— 数据来源就是 ChatController 已经在收的那条流：
-//   · session/follow 首帧快照的 records（历史）
-//   · mux 上的 session/event 帧（流式）
+//  · session/follow 首帧快照的 records（历史）
+//  · mux 上的 session/event 帧（流式）
 // 所以**没有新增任何 RPC**，也不需要服务端配合。
-//
 // 与官方的差距（有意为之，见 build 说明）：
-//   · 不做 14 个标签页的检查器，只给一份"原文 JSON + 时序 + 用量"的检查面板；
-//   · 不做可拖拽时间轴（Overview），只保留每条记录的耗时与 TTFT 文本；
-//   · 不做虚拟化（ListView 自己复用委托，行数上千也没有压力）。
-//
+//  · 不做 14 个标签页的检查器，只给一份"原文 JSON + 时序 + 用量"的检查面板；
+//  · 不做可拖拽时间轴（Overview），只保留每条记录的耗时与 TTFT 文本；
+//  · 不做虚拟化（ListView 自己复用委托，行数上千也没有压力）。
 // 事件信封（dsh-session 的 SessionEvent）：{ type, seq, time(ms), data }。
 // 本模型只吃"账本事件"，**忽略 assistant/chunk** —— 那是 LLM 增量分片，不是账本记录，
 // 官方的记录表同样不显示（它只显示 assistant/message 这条已结算的记录）。
@@ -22,6 +19,7 @@
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QSet>
 #include <QString>
 #include <QVariantMap>
 #include <QVector>
@@ -67,8 +65,8 @@ public:
 	// 流式：追加一条账本事件。非账本事件（assistant/chunk 等）直接丢掉。
 	void appendEvent(const QJsonObject& event);
 
-	// 暂停追加（对应官方"向上滚动就停跟随，新记录不打断对旧记录的检查"）。
-	// 暂停期间事件照收（进 m_events），只是**不重建行**；恢复时一次性重建。
+	// 暂停投影（对应官方"向上滚动就停跟随，新记录不打断对旧记录的检查"）。
+	// 暂停期间事件照收（进 m_events），只是**不投影成行**；恢复时补一次增量投影。
 	void setPaused(bool paused);
 	bool paused() const { return m_paused; }
 
@@ -94,15 +92,30 @@ private:
 	};
 
 	void rebuild();
-	// 一条事件能变成 0..n 行；返回新增行数（0 = 这条事件不进记录表）
+	// 一条事件能变成 0..n 行（返回时新行先落在 m_pendingRows 里）
 	void projectEvent(const QJsonObject& event);
 	void recomputeSummary();
 
+	// 清投影状态（跨事件保留的那堆"当前位置"与配对表），rebuild 前用
+	void resetProjectionState();
+	// 投影 m_events[fromEvent, end)：新行进 m_pendingRows，被回填的旧行记进 m_touchedRows
+	void projectRange(int fromEvent);
+	// 增量投影：把还没投影的事件补上（恢复暂停 / 流式追加都走这里）
+	void projectPending();
+	// 把 m_pendingRows 里的新行以 beginInsertRows 的形式并进 m_rows，并通知被回填的行
+	void flushPendingRows();
+	// 行指针（新行还在 pending 区时也能拿到）；越界返回 nullptr
+	Row* rowAt(int rowIndex);
+	// 旧行被回填时登记一下，投影结束后只对这些行发 dataChanged
+	void markTouched(int rowIndex);
+
 	QVector<QJsonObject> m_events;   // 原始账本（已按 seq 去重、升序）
 	QVector<Row> m_rows;
+	QVector<Row> m_pendingRows;      // 本次投影新产生的行（尚未进 m_rows）
+	QSet<int> m_touchedRows;         // 本次投影回填过的旧行号
 	QVariantMap m_summary;
-	bool m_paused = false;           // 暂停期间只收事件、不重建行
-	int m_projectedCount = 0;        // 上一次重建时 m_events 的长度（恢复暂停时据此判断要不要补一次重建）
+	bool m_paused = false;           // 暂停期间只收事件、不投影成行
+	int m_projectedCount = 0;        // 已投影到 m_events 的哪一条（增量投影的游标）
 
 	// 投影过程中的"当前位置"（跨事件保留，rebuild 前重置）
 	int m_currentTurnRow = -1;

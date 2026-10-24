@@ -1,23 +1,6 @@
-// 输入区（原版 ui/ChatInputWidget.cpp + chat.qss 复刻，视觉上做了一次"成套化"收敛）
-//
-// 结构（自上而下，与原版一一对应）：
-//   ① 细阴影卡片（圆角 Theme.radius.composer=16；1px composerBorder；MultiEffect 阴影取
-//      Theme.shadow.inputBlur/inputDy = 8/2，与 Card 的 cardBlur/cardDy 同一档，克制不发光）
-//   ② 卡片内容列（左右统一 cardPadH=16、上 cardPadTop=12、下 cardPadBottom=12、段间距 cardGap=8）：
-//        ├ 输入框（13px；左右内边距=cardPadH、上=editorPadTop 4、下 0；高 48–140 =
-//        │  editorMinHeight–editorMaxHeight，单行最小、多行跟内容长；到上限后由外层 Flickable
-//        │  滚动，右侧出现 AppScrollBar，**未超高时不画**）—— 文字左上角内缩 16/16，与卡片左边距同列
-//        └ #inputControlRow（高 = 发送键 32）：左 chip（24px 配角）、右发送键（32×32 圆钮），
-//          两者各贴一边、行内垂直居中；chip 文字与编辑器文字同列，圆钮右缘与编辑器文字右缘同列
-//   ③ sessionStatsLine：固定 14px、**始终显示**（空串不画字）；上沿离卡片下沿 statsGap(4px)、
-//      字号 caption(12) —— 它是卡片的附属说明，不跟编辑区抢视线
-//
-// 视觉约定（**改一处即全局成套**）：内边距/行距全部由 token 派生（cardPadding / sectionGap /
-// labelGap / editorPadTop），颜色圆角一律取 token；字号三档相邻（13 / 12 / 11），
-// 聚焦态只把 1px 描边从 10% 黑加深到 textSecondary 灰（**不用 accent 蓝**），不加发光、不加第二层阴影。
-//
-// 与原版一致的键位：Enter/Return 无 Shift 则发送（输出中则中止）——**Ctrl+Enter 也发送**；
-// Shift+Enter 换行。输入区**从不禁用**；空文本静默丢弃（拦截在宿主）。
+// 输入区：阴影卡片、内容列（输入框 / 控制行）与统计行。
+// 内边距、字号、颜色均取 token；聚焦只加深描边，不加发光或第二层阴影。
+// Enter 发送（Shift+Enter 换行，Ctrl+Enter 也发送），空文本静默丢弃。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -28,10 +11,106 @@ import "../../widgets"
 Item {
     id: root
 
-    // 扩展注入点：扩展用 HostUi.item("composer") 拿到本对象后 setParentItem 进来（见 HostExports.h 的名字契约）
-    Component.onCompleted: HostUi.registerItem("composer", this)
+    // 工作区 / 模式 / 模型这一行的上下文 chip
+    component ContextChip: Rectangle {
+        id: ctx
+        property string iconName: ""
+        property string label: ""
+        property bool accent: false
+        property bool clickable: false
+        property int maxLabelWidth: 120
+        signal clicked()
 
-    // 拖放加附件：把图片文件拖进输入框即可（addImageFiles 会按扩展名筛掉非图片）
+        implicitWidth: ctxRow.implicitWidth + 12
+        implicitHeight: 22
+        radius: 5
+        color: ctx.accent
+            ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.10)
+            : (ctx.clickable && ctxMouse.containsMouse ? Theme.color.hoverBg : "transparent")
+        border.width: 1
+        border.color: ctx.accent
+            ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.22)
+            : Theme.color.border
+
+        Row {
+            id: ctxRow
+            anchors.centerIn: parent
+            spacing: 4
+            LineIcon {
+                name: ctx.iconName
+                size: 11
+                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                visible: ctx.iconName.length > 0
+            }
+            Text {
+                text: ctx.label
+                width: Math.min(implicitWidth, ctx.maxLabelWidth)
+                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+                elide: Text.ElideRight
+            }
+            Text {
+                visible: ctx.clickable
+                text: "▾"
+                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                font.pixelSize: 9
+            }
+        }
+
+        MouseArea {
+            id: ctxMouse
+            anchors.fill: parent
+            enabled: ctx.clickable
+            hoverEnabled: true
+            cursorShape: ctx.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: ctx.clicked()
+        }
+    }
+
+    // 底栏小工具按钮：图标前缀 + 文字标签
+    component CompactToolButton: Rectangle {
+        id: toolButton
+        property string prefix: ""
+        property string label: ""
+        property string tip: ""
+        signal clicked()
+
+        implicitWidth: toolContent.implicitWidth + 12
+        implicitHeight: 26
+        radius: 6
+        color: toolMouse.containsMouse ? Theme.color.iconButtonHoverBg : "transparent"
+
+        Row {
+            id: toolContent
+            anchors.centerIn: parent
+            spacing: 4
+            Text {
+                text: toolButton.prefix
+                color: Theme.color.textTertiary
+                font.family: "Cascadia Code"
+                font.pixelSize: Theme.font.small
+            }
+            Text {
+                text: toolButton.label
+                color: Theme.color.textTertiary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+        }
+
+        MouseArea {
+            id: toolMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: toolButton.clicked()
+        }
+    }
+
+    Component.onCompleted: HostUi.registerItem("composer", this)   // 扩展注入点
+
+    // 拖入图片附件；addImageFiles 会按扩展名筛选
     DropArea {
         id: dropArea
         anchors.fill: parent
@@ -47,41 +126,58 @@ Item {
         }
     }
 
-    // 斜杠命令菜单句柄：菜单是 Popup，可视项挂在 Overlay 下、不在本项的 children 里，
-    // 外部（离屏试装台、扩展）要读它的状态只能走这个转发。
-    readonly property var commandMenuRef: commandMenu
+    readonly property var commandMenuRef: commandMenu   // 供外部读取 Popup 状态
 
     property bool streaming: Hub.streaming
+    readonly property bool cancelling: Hub.cancelling === true   // 已停止，等待收尾
 
-    // 宽度是否正被外层动画驱动（右栏开合 / 拖右栏宽度时 contentColumn 持续改宽，输入区跟着变宽窄；
-    // 开合按 15px 分步）。true 期间把卡片阴影按停：MultiEffect 的阴影源面尺寸一变 ⇒ 就要重做一张
-    // 离屏纹理（同一机制的实测见 widgets/PageOverlay.qml 的 overlayAnimating 注释）。阴影只是视觉点缀，
-    // 动画落定后恢复，肉眼几乎无差。由 Shell 的 composerLoader 注入（见 Shell.qml）。
+    // 宽度正被外层动画驱动时按停阴影，避免反复重做离屏纹理；由 Shell 注入。
     property bool widthAnimating: false
 
-    // ---- 视觉节奏（只在这里定数，下面全部引用它，保证内边距/行距/对齐三者成套）----
-    // 左右统一内边距 16（cardPadding）：编辑器文字左缘、编辑器文字右缘、发送键右缘都落在这一列上
+    // 内边距与行距集中定义，保证文字、chip、发送键对齐。
     readonly property real cardPadH: Theme.spacing.cardPadding
-    // 上内边距 12（sectionGap）+ 编辑器自身的 editorPadTop(4) = 16 = cardPadH：左上角内缩成正方形
     readonly property real cardPadTop: Theme.spacing.sectionGap
-    // 下内边距：原 12（sectionGap）—— 用户要求"调用量小字的底部对齐会话栏底部"，
-    // 于是宿主那条 composerLoader.bottomMargin 归零，这里也收到 4（editorPadTop）
-    // ⇒ 小字底距会话栏底约 4px，视觉上就是对齐。
     readonly property real cardPadBottom: Theme.spacing.editorPadTop
-    // 编辑区与控制行/用量小字之间的行距：原 8（labelGap）⇒ 用户要求"再近一些"，收到 2（panelGap）。
-    // 这一列内部的行距统一走它，所以编辑区↔chip↔小字会一起收紧（观感更成套）。
     readonly property real cardGap: Theme.spacing.panelGap
 
-    // 发送键的"可用"观感：空文本且未在输出中 ⇒ 压暗。
-    // ⚠️ **纯视觉**：按钮依旧可点（原版语义 = 空文本静默丢弃，拦截在宿主），键盘 Enter 规则也不变。
+    // 纯视觉可用状态：按钮仍可点，空文本由宿主静默丢弃。
     readonly property bool canSend: streaming || editor.text.trim().length > 0
+
+    // 当前会话的权限预设（来自 Hub.permissionPreset，投影未到/不支持时为空）。
+    readonly property string permissionLabel: {
+        if (Hub.permissionPreset === "read-only")
+            return qsTrId("permission_read_only")
+        if (Hub.permissionPreset === "workspace-write")
+            return qsTrId("permission_workspace_write")
+        if (Hub.permissionPreset === "danger-full-access")
+            return qsTrId("permission_full_access")
+        return qsTrId("permission_title")
+    }
+    readonly property bool permissionIsFull: Hub.permissionPreset === "danger-full-access"
+    readonly property var permissionOptions: [
+        {
+            id: "read-only",
+            label: qsTrId("permission_read_only"),
+            description: qsTrId("permission_read_only_desc")
+        },
+        {
+            id: "workspace-write",
+            label: qsTrId("permission_workspace_write"),
+            description: qsTrId("permission_workspace_write_desc")
+        },
+        {
+            id: "danger-full-access",
+            label: qsTrId("permission_full_access"),
+            description: qsTrId("permission_full_access_desc")
+        }
+    ]
 
     implicitHeight: shadowHost.height + Theme.size.statsLineHeight
 
     function submit() {
         const text = editor.text
         if (text.trim().length === 0)
-            return      // 空文本静默丢弃（原版由宿主拦，这里同一语义）
+            return      // 空文本静默丢弃
         Hub.sendPrompt(text)
         editor.clear()
         editor.forceActiveFocus()
@@ -91,11 +187,9 @@ Item {
         Hub.cancelPrompt()
     }
 
-    // 按键路由（单独一个函数：规则集中一处，也便于离屏测）。
-    // 返回 true = 已消费（调用方把 event.accepted 置真）。
+    // 按键路由：返回 true 表示已消费。
     function handleKey(event) {
-        // 斜杠命令菜单优先吃键：↑↓ 选、Tab 补全、Esc 收起
-        if (commandMenu.visible) {
+        if (commandMenu.visible) {   // 斜杠菜单优先：↑↓ 选择、Tab 补全、Esc 收起
             if (event.key === Qt.Key_Down) {
                 commandMenu.move(1)
                 return true
@@ -115,11 +209,9 @@ Item {
             }
         }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            // 只有 Shift 例外（Ctrl+Enter 也发送，与原版 eventFilter 一致）
-            if (event.modifiers & Qt.ShiftModifier)
+            if (event.modifiers & Qt.ShiftModifier)   // Shift 换行，Ctrl+Enter 仍发送
                 return false
-            // 候选还没敲全 ⇒ 这一下是"补全"，不是提交
-            if (commandMenu.visible && !commandMenu.isExact()) {
+            if (commandMenu.visible && !commandMenu.isExact()) {   // 候选未完整时先补全
                 commandMenu.complete()
                 return true
             }
@@ -132,7 +224,7 @@ Item {
         return false
     }
 
-    // ---- ① 阴影卡片 ----
+    // 阴影卡片
     Item {
         id: shadowHost
         anchors.left: parent.left
@@ -140,15 +232,12 @@ Item {
         anchors.top: parent.top
         implicitHeight: capsule.implicitHeight
 
-        // 阴影：blur 8 / dy 2 / radius 16（token inputBlur/inputDy/inputRadius）——
-        // 与 Card 的 cardBlur/cardDy 同一档，把原来"更重的一档"收平，避免输入卡比顶栏卡片更抢眼
+        // 阴影与 Card 同档，避免输入卡比顶栏卡片更抢眼。
         MultiEffect {
             anchors.fill: capsule
             anchors.topMargin: Theme.shadow.inputDy
             source: capsule
-            // 宽度动画期间整层隐藏（上面 capsule.visible 反过来直绘卡片本体）：
-            // 这样既没有阴影、也不再每帧把 source 重新栅格化进离屏纹理。落定后恢复。
-            visible: !root.widthAnimating
+            visible: !root.widthAnimating   // 动画期间改为直接绘制卡片本体，避免每帧栅格化 source
             shadowEnabled: true
             shadowBlur: Theme.shadow.inputBlur
             shadowColor: Theme.color.shadowSubtle
@@ -157,34 +246,26 @@ Item {
             autoPaddingEnabled: true
         }
 
-        // ---- ② 输入卡片 ----
+        // 输入卡片
         Rectangle {
             id: capsule
-            // 静止时只当上面 MultiEffect 的 source 绘制（visible:false）；宽度动画期间反过来：
-            // 由自己直绘、MultiEffect 整层隐藏 —— 光关 shadowEnabled 省不掉"source 面尺寸每帧
-            // 都变 ⇒ 每帧重新栅格化一遍"的那张离屏纹理（机制见 widgets/Card.qml 的 surface/effect）。
+            // 静止时只作为阴影源；宽度动画期间直接绘制。
             visible: root.widthAnimating
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            // 高度 = 内容 + 上下内边距（不再是写死的 +10，改内边距时高度自动跟着成套）
             implicitHeight: content.implicitHeight + root.cardPadTop + root.cardPadBottom
             radius: Theme.radius.composer
-            // composerBg：可选 token。壁纸类皮肤需要单独把输入卡做成半透明，
-            // 但输入卡与 Agent 气泡共用 panelBg（AgentBubble.qml），靠 panelBg 区分不开，
-            // 所以给输入卡留一个专属键；皮肤不定义它时回退 panelBg（行为与原来完全一致）。
+            // 皮肤可用 composerBg 单独覆盖输入卡底色，未定义时回退 panelBg。
             color: Theme.color.composerBg || Theme.color.panelBg
-            // 聚焦态：只把描边换成**更深的灰**（Theme.color.textSecondary），不发光、不加阴影、不改高度。
-            // 为什么不用 accent 蓝：输入区是常驻控件，蓝描边在整个界面里过于抢眼，也把"主色"用在了
-            // 一个只需要"我在这儿"提示的地方；灰阶描边与静息态（composerBorder，10% 黑）同一族，只深一档。
-            // 静息：可见的细灰（白卡片在浅底上要能立住）；聚焦/拖入：浅灰 + 1px 不变粗
+            // 聚焦只加深灰色描边，不用 accent 蓝，也不加发光或阴影。
             readonly property color restingBorder: Theme.isDark ? "#2E3034" : "#E3E5E9"
             readonly property color activeBorder: Theme.isDark ? "#4A4D53" : "#C6CAD0"
             border.color: (editor.activeFocus || dropArea.containsDrag) ? activeBorder : restingBorder
             border.width: 1
         }
 
-        // 真实内容（与 capsule 同尺寸；卡片本体不参与绘制）
+        // 真实内容，与 capsule 同尺寸
         Column {
             id: content
             anchors.left: parent.left
@@ -193,11 +274,39 @@ Item {
             anchors.topMargin: root.cardPadTop
             spacing: root.cardGap
 
-            // ---- 编辑区：高度内容驱动（单行 = editorMinHeight、多行跟内容长、封顶 editorMaxHeight），
-            //      封顶之后靠 Flickable 滚动 + **只在超高时**出现 AppScrollBar ----
-            // 为什么要一层 Flickable：TextEdit 自己那套"光标可见就内部挪一下"没有对外暴露 contentY，
-            // 挂不了滚动条；把它放进 Flickable、让 TextEdit 的高度等于全文高度，滚动就归 Flickable 管。
-            // ---- 待发图片（缩略图 + 移除）----
+            Row {
+                id: contextRow
+                x: root.cardPadH
+                width: Math.max(0, parent.width - 2 * root.cardPadH)
+                height: 24
+                spacing: 6
+                clip: true
+
+                ContextChip {
+                    id: workspaceChip
+                    clickable: true
+                    iconName: "folder"
+                    label: Hub.currentWorkspaceTitle.length > 0
+                        ? Hub.currentWorkspaceTitle
+                        : qsTrId("sessionBar_ungrouped")
+                    onClicked: workspaceMenu.open()
+                }
+                ContextChip {
+                    id: agentChip
+                    clickable: true
+                    iconName: "bot"
+                    label: "助手"
+                    accent: true
+                    onClicked: agentMenu.open()
+                }
+                ModelSelectorChip {
+                    id: chip
+                    onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
+                    onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
+                }
+            }
+
+            // 待发图片（缩略图 + 移除）
             Item {
                 id: pendingRow
                 width: parent.width
@@ -224,7 +333,7 @@ Item {
                         border.color: Theme.isDark ? "#3A3D42" : "#D8DBE0"
                         clip: true
 
-                        // 圆角遮罩：clip 只能裁矩形，圆角处会露方角 ⇒ 用 MultiEffect mask
+                        // 圆角遮罩：clip 只能裁矩形，圆角处会露方角
                         Rectangle {
                             id: thumbMask
                             anchors.fill: parent
@@ -246,8 +355,7 @@ Item {
                                 maskSource: thumbMask
                             }
 
-                            // 文件刚落盘时 QML 可能抢在写完之前读（实测差 5ms）⇒ 解码失败就带 cache-bust 重试一次
-                            property int retry: 0
+                            property int retry: 0   // 解码失败时带 cache-bust 重试
 
                             onStatusChanged: {
                                 if (status === Image.Error && retry < 3)
@@ -294,38 +402,29 @@ Item {
                 }
             }
 
+            // 编辑区：高度随内容增长，封顶后由 Flickable 滚动。
             Flickable {
                 id: editorView
                 width: parent.width
-                // 高度：内容 + 上下内边距，夹在 [editorMinHeight, editorMaxHeight] 之间
-                // ⇒ 单行 = min（用户说的"再高 10px"落在这个 token 上：38 → 48）；
-                //    多行跟着内容长；到 max 就不再长（此时进入滚动）。
-                // 行高实测：13px "Microsoft YaHei UI" 每行 17 逻辑 px（editorMaxHeight=140 ⇒ 8 行 + 上内边距 4）。
                 height: Math.min(Math.max(editor.contentHeight + editor.topPadding + editor.bottomPadding,
                                           Theme.size.editorMinHeight),
                                  Theme.size.editorMaxHeight)
                 contentWidth: width
                 contentHeight: editor.height
                 clip: true
-                // 关掉拖拽 flick：编辑区里按住鼠标是**选文字**，不能让 Flickable 抢走鼠标；
-                // 滚轮不受 interactive 影响（Flickable 自己处理滚轮），滚动条照常可拖。
-                interactive: false
+                interactive: false   // 按住鼠标用于选文字，不让 Flickable 抢走
                 boundsBehavior: Flickable.StopAtBounds
 
-                // 只有"内容超高"时才需要给滚动条让出宽度（未超高时不减，单行的换行宽度与改动前一致）。
-                // 判据直接用几何：contentHeight 比可视高度大 ⇒ 一定滚得动，与 ScrollBar 的 AsNeeded 同义。
+                // 只有内容超高时才给滚动条让出宽度。
                 readonly property bool needsScroll: contentHeight > height + 0.5
 
-                // 滚动条：挂在 Flickable 上（框架负责摆到右缘、按 position/size 定长度）。
-                // policy 用 AsNeeded：内容没超高就不画，不会常驻一条占位。
                 ScrollBar.vertical: AppScrollBar {
                     id: editorScrollBar
-                    objectName: "composerScrollBar"   // 供离屏试装台定位（同 composerEditor 的约定）
+                    objectName: "composerScrollBar"
                     policy: editorView.needsScroll ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                 }
 
-                // 光标跑出可视区时把内容滚过去（TextEdit 现在高度等于全文高度 ⇒ 它自己不滚了，
-                // 光标可见性归这里管）。上沿/下沿各留 4px（editorPadTop）免得光标贴着边。
+                // 光标跑出可视区时滚动内容，上下各留 editorPadTop。
                 function ensureCursorVisible() {
                     if (!needsScroll)
                         return
@@ -337,12 +436,9 @@ Item {
                         contentY = Math.min(maxY, r.y + r.height - height + Theme.spacing.editorPadTop)
                 }
 
-                // 高度变化（换行/删行）后光标可能落到可视区外：跟着滚一把
-                onHeightChanged: ensureCursorVisible()
+                onHeightChanged: ensureCursorVisible()   // 换行/删行后跟随光标
 
-                // 滚轮：编辑区自己滚内容（**不吞事件**：真的滚了才改 contentY，滚不动时什么也不做）。
-                // 显式写一个 WheelHandler 而不是只靠 Flickable 内建行为：interactive 关掉后靠它更稳，
-                // 也不会和"按住拖选文字"抢鼠标（拖拽仍归 TextEdit）。
+                // 显式处理滚轮，兼容 interactive=false，且不影响拖选文字。
                 WheelHandler {
                     onWheel: (event) => {
                         const maxY = Math.max(0, editorView.contentHeight - editorView.height)
@@ -355,12 +451,10 @@ Item {
 
                 TextEdit {
                     id: editor
-                    objectName: "composerEditor"   // 供离屏试装台定位
-                    // 宽度：超高时右侧让出滚动条厚度（文字换行宽度因此窄一点，但不会被滚动条压住）；
-                    // 未超高时全额宽度（滚动条此时根本不画）。
+                    objectName: "composerEditor"
+                    // 超高时为滚动条让出宽度
                     width: editorView.width - (editorView.needsScroll
                                                ? Theme.size.scrollbarThickness : 0)
-                    // 内边距：左右 = cardPadH（与卡片左右内边距同列）/ 上 4 / 下 0
                     leftPadding: root.cardPadH
                     rightPadding: root.cardPadH
                     topPadding: Theme.spacing.editorPadTop
@@ -373,39 +467,28 @@ Item {
                     selectionColor: Theme.color.selectionBg
                     selectedTextColor: Theme.color.textPrimary
                     font.family: "Microsoft YaHei UI"
-                    // 13px（Theme.font.body）：与 widgets/SearchField.qml 的输入文字同档。
-                    // 原来取 lead(16) 比全应用正文大 3px，输入区显得"字很大"；现在整条输入区的字号是
-                    // 13（正文/chip 之上）→ 12（chip、菜单说明、统计行）→ 11（▾、分组标签）三档相邻，
-                    // 主次靠**颜色**（textPrimary / textSecondary / textTertiary）拉开，不靠字号断层。
-                    font.pixelSize: Theme.font.body
-                    // 高度 = 全文高度（不再自己夹 min/max）：夹取与滚动都在外层 editorView 上，
-                    // 这样超高时滚动条才有东西可滚。
-                    // ⚠️ TextEdit 的 implicitHeight 是只读的（原版也是 setFixedHeight 而非设 implicit），
-                    // 所以这里给 height 赋值。
+                    font.pixelSize: Theme.font.body   // 与 SearchField 输入文字同档
+                    // 高度等于全文高度，夹取与滚动交给外层 editorView。
                     height: contentHeight + topPadding + bottomPadding
-                    // 光标移动（打字/方向键/点选）后跟着滚
                     onCursorRectangleChanged: editorView.ensureCursorVisible()
 
-                    // 占位符（空文本时画）：与正文同列同基线
+                    // 占位符与正文同列同基线
                     Text {
                         anchors.left: parent.left
-                        // 占位符与正文同列同基线：直接引用编辑器自己的内边距/字体，改一处不会跑偏
                         anchors.leftMargin: editor.leftPadding
                         anchors.top: parent.top
                         anchors.topMargin: editor.topPadding
                         visible: editor.text.length === 0
                         text: qsTrId("chat_input_placeholder")
-                        // 占位符再弱一档（textCaption），与 widgets/SearchField.qml 的 placeholder 同色
                         color: Theme.color.textCaption
                         font.family: editor.font.family
                         font.pixelSize: editor.font.pixelSize
                     }
 
                     onTextChanged: {
-                        commandMenu.dismissed = false     // 一敲字就重新参与候选（Esc/点外面收起后不要赖着不走）
-                        commandMenu.syncVisibility()      // Popup 只能显式开关（见 commandMenu 上的说明）
-                        // 刚打出 `/` 时懒拉一次命令表：会话切换时宿主已拉过，这里兜"开着会话时新注册了命令"
-                        if (text === "/")
+                        commandMenu.dismissed = false     // 敲字后重新参与候选
+                        commandMenu.syncVisibility()
+                        if (text === "/")   // 懒拉一次命令表，兼容运行中注册的命令
                             Hub.commands.refresh(Hub.currentSessionId)
                     }
 
@@ -416,50 +499,28 @@ Item {
                 }
             }
 
-            // ---- #inputControlRow：左 chip / 右发送键（配角区）----
-            // 用锚点而不是 Row + 手算 stretch：两件配角各贴一边、在同一行里垂直居中，
-            // 行高就取发送键高（chip 更矮，居中后与圆钮同心）。这样既没有"手算宽度在
-            // chip 隐藏（width 0）时算错"的隐患，也不再需要那个 height:1 的占位块。
+            // 控制行：左侧工具、右侧发送键
             Item {
                 id: controlRow
                 width: parent.width
                 implicitHeight: sendButton.implicitHeight
 
-                // 模型 / 思考档位 chip（配角：24px、12px、次级色；无模型时自身隐藏 ⇒ 宽 0）
-                ModelSelectorChip {
-                    id: chip
-                    anchors.left: parent.left
-                    // chip 内部左右各留 labelGap(8)，这里再退 8 ⇒ chip **文字**正好落在
-                    // cardPadH(16) 这一列上，与上面的输入文字左对齐（悬停底色会往左溢出 8px，
-                    // 那是 chip 的点击热区，属于有意为之）。
-                    anchors.leftMargin: root.cardPadH - Theme.spacing.labelGap
-                    anchors.verticalCenter: parent.verticalCenter
-                    onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
-                    onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
-                }
-
-                // 附件（图片）：原生文件对话框，多选
+                // 附件：原生文件对话框，支持多选
                 Rectangle {
                     id: attachButton
-                    anchors.right: sendButton.left
-                    anchors.rightMargin: 8
+                    anchors.left: parent.left
+                    anchors.leftMargin: root.cardPadH
                     anchors.verticalCenter: parent.verticalCenter
                     width: 26
                     height: 26
                     radius: Theme.radius.small
                     color: attachArea.containsMouse ? Theme.color.iconButtonHoverBg : "transparent"
 
-                    Image {
-                        // 图标走资源系统（assets/resources/icons → qrc:/ULinHub/icons/），
-                        // 与侧栏入口图标同一套路：源图超采样（144），显示 18 逻辑 px 下采样，
-                        // 不设 sourceSize —— 设小了会在 200% 缩放下被放大糊掉。
+                    LineIcon {
                         anchors.centerIn: parent
-                        source: "qrc:/ULinHub/icons/attach-icon-144.png"
-                        width: 18
-                        height: 18
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true
-                        opacity: attachArea.containsMouse ? 1.0 : 0.92
+                        name: "plus"
+                        size: 17
+                        color: attachArea.containsMouse ? Theme.color.textPrimary : Theme.color.textTertiary
                     }
 
                     MouseArea {
@@ -471,18 +532,94 @@ Item {
                     }
                 }
 
+                // 命令：等价于在输入框敲 “/”
+                CompactToolButton {
+                    id: commandButton
+                    anchors.left: attachButton.right
+                    anchors.leftMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    prefix: "/"
+                    label: qsTrId("composer_command_tip")
+                    tip: qsTrId("composer_command_tip")
+                    onClicked: {
+                        editor.text = "/"
+                        editor.cursorPosition = 1
+                        editor.forceActiveFocus()
+                    }
+                }
+
+                // 上下文：插入 “@” 供后续引用
+                CompactToolButton {
+                    id: contextButton
+                    anchors.left: commandButton.right
+                    anchors.leftMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    prefix: "@"
+                    label: qsTrId("composer_context_tip")
+                    tip: qsTrId("composer_context_tip")
+                    onClicked: {
+                        editor.text += "@"
+                        editor.cursorPosition = editor.text.length
+                        editor.forceActiveFocus()
+                    }
+                }
+
+                // 权限预设直接显示在按钮上，点开切换
+                Rectangle {
+                    id: permissionButton
+                    anchors.left: contextButton.right
+                    anchors.leftMargin: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: permissionRow.implicitWidth + 14
+                    height: 26
+                    radius: 6
+                    color: root.permissionIsFull
+                        ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.10)
+                        : (permissionMouse.containsMouse ? Theme.color.iconButtonHoverBg : "transparent")
+                    border.width: 1
+                    border.color: root.permissionIsFull
+                        ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.24)
+                        : "transparent"
+
+                    Row {
+                        id: permissionRow
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        LineIcon {
+                            name: "tools"
+                            size: 13
+                            color: root.permissionIsFull ? Theme.color.accent : Theme.color.textTertiary
+                        }
+                        Text {
+                            text: root.permissionLabel
+                            color: root.permissionIsFull ? Theme.color.accent : Theme.color.textTertiary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                        }
+                        Text {
+                            text: "▾"
+                            color: Theme.color.textCaption
+                            font.pixelSize: 9
+                        }
+                    }
+
+                    MouseArea {
+                        id: permissionMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: permissionMenu.open()
+                    }
+                }
+
                 IconButton {
                     id: sendButton
                     anchors.right: parent.right
-                    // 圆钮右缘 = 编辑器文字右缘（同在 cardPadH 这一列），不再比文字多探出 4px
-                    anchors.rightMargin: root.cardPadH
+                    anchors.rightMargin: root.cardPadH   // 与编辑器文字右缘同列
                     anchors.verticalCenter: parent.verticalCenter
-                    boxSize: Theme.size.sendButton   // 32×32
-                    // 原版：enter-btn.png / stop-btn.png（ChatInputWidget.cpp:334/418）。
-                    // 现在是**成对**资源，按主题选一套（IconButton.qml:68 写明的约定，与 SessionBar 的 logo 同例）：
-                    //   浅色 = 深灰圆 #343A42 + 白图形 ｜ 暗色 = 白圆 #FFFFFF + 深灰图形（两套几何逐像素相同，只换色）。
-                    // 四条路径都写字面量、不拼后缀：改名/挪位时 grep 得到，也免得白圆悄悄贴到白面板上整个消失
-                    // （见 ulinhub.qrc 里那段注记）。
+                    boxSize: Theme.size.sendButton
+                    // 成对的明暗资源，四条路径写字面量，便于改名与检查。
                     readonly property string sendIcon: Theme.isDark
                         ? "qrc:/ULinHub/buttons/enter-btn-dark.png"
                         : "qrc:/ULinHub/buttons/enter-btn.png"
@@ -491,46 +628,551 @@ Item {
                         : "qrc:/ULinHub/buttons/stop-btn.png"
                     iconSource: root.streaming ? stopIcon : sendIcon
                     iconSize: Theme.size.sendButton
-                    // 四态：可用（满不透明=1.0）/ 空文本（压暗=0.45，视觉上的"不可用"）/
-                    //      悬停（圆形蒙版 35%）/ 按下（55%）—— 由 circleHoverOverlay 统一给
-                    opacity: root.canSend ? 1.0 : 0.45
-                    circleHoverOverlay: root.canSend
-                    // 蒙版基色跟着圆底走：暗色主题下圆底是**白的**，白蒙版叠上去等于没叠
-                    // （悬停/按下会完全没有反馈）⇒ 白底改成压暗；浅色主题维持原样的提亮。
+                    opacity: root.canSend && !root.cancelling ? 1.0 : 0.45
+                    circleHoverOverlay: root.canSend && !root.cancelling
+                    // 暗色主题圆底是白色，悬停蒙版必须用压暗色。
                     circleHoverTint: Theme.isDark ? "#000000" : "#FFFFFF"
-                    tooltip: root.streaming ? qsTrId("chat_stop_output") : qsTrId("common_send")
-                    // 原版：按钮**永远可用**（没有 disabled 判定）；上面只改观感，行为一字不动
-                    onClicked: root.streaming ? root.stop() : root.submit()
+                    tooltip: root.cancelling
+                        ? qsTrId("chat_stopping")
+                        : (root.streaming ? qsTrId("chat_stop_output") : qsTrId("common_send"))
+                    // 按钮始终可点；等待收尾期间直接吞掉点击，避免重复取消。
+                    onClicked: {
+                        if (root.cancelling)
+                            return
+                        if (root.streaming)
+                            root.stop()
+                        else
+                            root.submit()
+                    }
                 }
             }
         }
     }
 
-    // ---- ③ 小灰字统计行：固定 14px、始终显示、空串不画字 ----
-    Text {
+    // 工作区切换：选中一个工作区就打开它最近的会话，没有则新建
+    Popup {
+        id: workspaceMenu
+        parent: root
+        width: 264
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        x: Math.max(8, Math.min(root.width - width - 8, workspaceChip.mapToItem(root, 0, 0).x))
+        y: workspaceChip.mapToItem(root, 0, workspaceChip.height).y + 6
+
+        readonly property var items: Hub.sessions ? Hub.sessions.workspaceItems() : []
+
+        function activate(item) {
+            const first = Hub.sessions.firstSessionForWorkspace(item.workspaceId)
+            if (first.length > 0)
+                Hub.selectSession(first)
+            else
+                Hub.createSession(item.ungrouped ? "" : item.workspaceId)
+            close()
+        }
+
+        background: Rectangle {
+            radius: 10
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: workspaceMenu.width - 12
+            spacing: 2
+
+            Text {
+                width: parent.width
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("composer_workspace_switch")
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Repeater {
+                model: workspaceMenu.items
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: parent.width
+                    height: 30
+                    radius: 5
+                    color: itemMouse.containsMouse
+                        ? Theme.color.hoverBg
+                        : ((modelData.workspaceId === Hub.currentWorkspaceId
+                            || (modelData.ungrouped && Hub.currentWorkspaceId.length === 0))
+                           ? Theme.color.activeBg : "transparent")
+
+                    Row {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 7
+                        anchors.rightMargin: 7
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+
+                        Text {
+                            text: modelData.title
+                            color: Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                            elide: Text.ElideRight
+                            width: Math.max(0, parent.width - 46)
+                        }
+                        Text {
+                            text: modelData.count
+                            color: Theme.color.textCaption
+                            font.pixelSize: Theme.font.small
+                            width: 16
+                            horizontalAlignment: Text.AlignRight
+                        }
+                        Text {
+                            visible: modelData.workspaceId === Hub.currentWorkspaceId
+                                || (modelData.ungrouped && Hub.currentWorkspaceId.length === 0)
+                            text: "✓"
+                            color: Theme.color.accent
+                            font.pixelSize: Theme.font.small
+                        }
+                    }
+
+                    MouseArea {
+                        id: itemMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: workspaceMenu.activate(modelData)
+                    }
+                }
+            }
+
+            Text {
+                visible: workspaceMenu.items.length === 0
+                width: parent.width
+                height: 28
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("composer_workspace_empty")
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Rectangle { width: parent.width; height: 1; color: Theme.color.border }
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
+                color: newSessionMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("workdir_new_session_tip")
+                    color: Theme.color.textSecondary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+                MouseArea {
+                    id: newSessionMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Hub.createSession(Hub.currentWorkspaceId)
+                        workspaceMenu.close()
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
+                color: newWorkspaceMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("sessionBar_new_workspace")
+                    color: Theme.color.textSecondary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+                MouseArea {
+                    id: newWorkspaceMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Hub.createWorkspace()
+                        workspaceMenu.close()
+                    }
+                }
+            }
+        }
+    }
+
+    // Agent 菜单：当前模式说明、子智能体切换、工具权限入口
+    Popup {
+        id: agentMenu
+        parent: root
+        width: 280
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        x: Math.max(8, Math.min(root.width - width - 8, agentChip.mapToItem(root, 0, 0).x))
+        y: agentChip.mapToItem(root, 0, agentChip.height).y + 6
+
+        readonly property var peers: Hub.peerTabs || []
+
+        background: Rectangle {
+            radius: 10
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: agentMenu.width - 12
+            spacing: 2
+
+            Text {
+                width: parent.width
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("composer_agent_current")
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+            Text {
+                width: parent.width
+                height: 22
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("composer_agent_desc")
+                color: Theme.color.textTertiary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Repeater {
+                model: agentMenu.peers
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: parent.width
+                    height: 30
+                    radius: 5
+                    color: peerMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                    Row {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: 7
+                        anchors.rightMargin: 7
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        Rectangle {
+                            width: 5
+                            height: 5
+                            radius: 3
+                            color: modelData.running ? Theme.color.accent : Theme.color.textCaption
+                        }
+                        Text {
+                            text: modelData.label
+                            color: Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                            elide: Text.ElideRight
+                            width: Math.max(0, parent.width - 24)
+                        }
+                    }
+
+                    MouseArea {
+                        id: peerMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Hub.selectSession(modelData.id)
+                            agentMenu.close()
+                        }
+                    }
+                }
+            }
+
+            Text {
+                visible: agentMenu.peers.length === 0
+                width: parent.width
+                height: 28
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("composer_agent_empty")
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Rectangle { width: parent.width; height: 1; color: Theme.color.border }
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
+                color: toolsMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("composer_agent_tools")
+                    color: Theme.color.textSecondary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+                MouseArea {
+                    id: toolsMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Hub.openToolsFilter()
+                        agentMenu.close()
+                    }
+                }
+            }
+        }
+    }
+
+    // 权限菜单：会话级权限预设，完全权限需二次确认
+    Popup {
+        id: permissionMenu
+        parent: root
+        width: 292
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        x: Math.max(8, Math.min(root.width - width - 8, permissionButton.mapToItem(root, 0, 0).x))
+        y: permissionButton.mapToItem(root, 0, 0).y - height - 8
+
+        background: Rectangle {
+            radius: 10
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: permissionMenu.width - 12
+            spacing: 2
+
+            Text {
+                width: parent.width
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: qsTrId("permission_title")
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Repeater {
+                model: root.permissionOptions
+
+                delegate: Rectangle {
+                    required property var modelData
+                    width: parent.width
+                    height: 46
+                    radius: 5
+                    color: optionMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                    Column {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 7
+                        anchors.right: optionCheck.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 1
+
+                        Text {
+                            text: modelData.label
+                            color: modelData.id === "danger-full-access"
+                                ? Theme.color.danger : Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                        }
+                        Text {
+                            text: modelData.description
+                            width: parent.width
+                            color: Theme.color.textCaption
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Text {
+                        id: optionCheck
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: Hub.permissionPreset === modelData.id
+                        text: "✓"
+                        color: Theme.color.accent
+                        font.pixelSize: Theme.font.caption
+                    }
+
+                    MouseArea {
+                        id: optionMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            permissionMenu.close()
+                            if (modelData.id === "danger-full-access")
+                                permissionConfirm.open()
+                            else
+                                Hub.setPermissionPreset(modelData.id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Popup {
+        id: permissionConfirm
+        parent: root
+        anchors.centerIn: Overlay.overlay
+        width: 380
+        padding: 0
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+
+        background: Rectangle {
+            radius: 12
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: 380
+
+            Item {
+                width: parent.width
+                height: 46
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("permission_confirm_title")
+                    color: Theme.color.textPrimary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.title
+                    font.weight: Theme.font.weightBold
+                }
+            }
+
+            Text {
+                x: 20
+                width: parent.width - 40
+                text: qsTrId("permission_confirm_desc")
+                color: Theme.color.textSecondary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.caption
+                wrapMode: Text.WordWrap
+                lineHeight: 1.4
+            }
+
+            Row {
+                width: parent.width - 40
+                x: 20
+                height: 32
+                spacing: 8
+
+                Item { width: parent.width - 84 - 118 - 16; height: 1 }
+
+                ActionButton {
+                    width: 84
+                    height: 32
+                    text: qsTrId("common_cancel")
+                    variant: "ghost"
+                    onClicked: permissionConfirm.close()
+                }
+                ActionButton {
+                    width: 118
+                    height: 32
+                    text: qsTrId("permission_confirm_ack")
+                    variant: "primary"
+                    onClicked: {
+                        Hub.setPermissionPreset("danger-full-access")
+                        permissionConfirm.close()
+                    }
+                }
+            }
+
+            Item { width: 1; height: 14 }
+        }
+    }
+
+    // 统计行：固定高度，始终占位，文本为空时不绘制
+    Item {
         id: statsLine
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        // 用户要的是"小字**底边**对齐会话栏底边"⇒ 取 0：本行底边正好落在 root.bottom
-        // （= Shell composerLoader 的底 = 会话栏底边，因为那条 bottomMargin 已经是 0）。
-        // 不取 -statsGap（那会让小字落到列底**下方** 4px，轻微溢出）；也不动 root.implicitHeight
-        // （band 里本来就含 statsLineHeight）⇒ 卡片位置与会话区那条缝都不受影响。
-        anchors.bottomMargin: 0
+        anchors.bottomMargin: 0   // 底边对齐会话栏底部
         height: Theme.size.statsLineHeight
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        text: Hub.statsLine
-        elide: Text.ElideRight
-        color: Theme.color.textTertiary
-        font.family: "Microsoft YaHei UI"
-        // 调用量小字：用户觉得原来 12（font.caption）偏大 ⇒ 降到 font.small（11）。
-        // 行高 band 仍是 statsLineHeight(14)，文字垂直居中 ⇒ "底边对齐会话栏底"那条不受影响。
-        font.pixelSize: Theme.font.small
 
-        // 仅在被省略号截断时给 tooltip（原版 syncToolTip 同规则）
+        Row {
+            anchors.centerIn: parent
+            spacing: 5
+            visible: statsText.text.length > 0
+
+            Item {
+                width: 4
+                height: parent.height
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 4
+                    height: 4
+                    radius: 2
+                    color: Hub.streaming ? Theme.color.accent : Theme.color.textCaption
+                    opacity: Hub.streaming ? 1 : 0.55
+                }
+            }
+
+            Text {
+                id: statsText
+                width: Math.min(implicitWidth, statsLine.width - 24)
+                height: statsLine.height
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                text: Hub.statsLine
+                elide: Text.ElideRight
+                color: Theme.color.textTertiary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+                font.letterSpacing: 0.15
+            }
+        }
+
+        // 仅在文本被截断时显示 tooltip
         AppToolTip {
-            visible: statsLine.truncated && statsLineMouse.containsMouse
+            visible: statsText.truncated && statsLineMouse.containsMouse
             text: Hub.statsLine
         }
 
@@ -541,24 +1183,16 @@ Item {
         }
     }
 
-    // ---- ④ 斜杠命令菜单 ----
-    // 用 Popup（= 画在窗口 Overlay 层）而不是内联 Rectangle，原因是实测踩到过一次：
-    //   · Composer 的兄弟节点 messageLoader 是**后声明**的（见 basic/shell/Shell.qml），
-    //     后声明的兄弟画在上面 ⇒ 菜单被消息列表压住，列表里那颗「加载更多」直接盖在菜单上；
-    //   · 命中测试跟绘制同序 ⇒ 菜单行根本点不到，点了是列表/按钮收到事件。
-    //   `z` 只在同一个父节点内排序，加多大都没用；Popup 走 Overlay，天然在所有普通项之上。
-    // `focus: false` 沿用 ModelSelectorChip 的做法：不抢输入框焦点，用户可以一边看候选一边继续敲。
-    // 候选来自引擎（Hub.commands.items），这里只做前缀过滤 —— 本地不维护第二份命令表，"认不认识"由引擎裁定。
+    // 斜杠命令菜单：Popup 走 Overlay，避免被后声明的消息列表盖住；不抢输入框焦点。
+    // 候选来自 Hub.commands，这里只做前缀过滤。
     Popup {
         id: commandMenu
-        objectName: "composerCommandMenu"   // 供离屏试装台定位（Popup 不在 children 里，试装台走 Overlay）
+        objectName: "composerCommandMenu"
 
-        // 只在"还在敲命令名"时有候选：`/com` 会过滤，`/compact ` 之后（名字已敲定）自动收起
         readonly property var candidates: Hub.commands.matching(editor.text)
         property int index: 0
         property bool dismissed: false
-        // 补全时会把文本改掉，那次改动不该被当成"用户又在敲"而把菜单重新弹出来
-        property bool suppressReopen: false
+        property bool suppressReopen: false   // 补全引起的文本变化不重新弹菜单
 
         function current() {
             if (candidates.length === 0)
@@ -570,7 +1204,6 @@ Item {
                 return
             index = Math.max(0, Math.min(index + step, candidates.length - 1))
         }
-        // "选中的正是我敲完的那个名字" ⇒ 这一下 Enter 不再是补全，而是提交（= 执行命令）
         function isExact() {
             const item = current()
             return item !== null && editor.text === "/" + item.name
@@ -580,16 +1213,15 @@ Item {
             if (item === null)
                 return
             suppressReopen = true
-            // 有 input hint 的命令补一个空格（用户接着敲参数）；没有的就把名字放上，再按 Enter 即执行
+            // 有参数提示的命令补一个空格，否则直接补上名字
             editor.text = "/" + item.name + (item.hint ? " " : "")
             editor.cursorPosition = editor.text.length
             suppressReopen = false
-            dismissed = true          // 补完就收，别继续挡着内容
+            dismissed = true
             close()
             editor.forceActiveFocus()
         }
-        // Popup 的 visible 不能直接绑（closePolicy 从内部关掉它会**拆掉绑定**，之后再也弹不出来），
-        // 所以只在这里显式开关；所有会影响"该不该显示"的地方都调它。
+        // visible 不能直接绑定：closePolicy 关闭时会拆掉绑定，只能显式开关。
         function syncVisibility() {
             if (suppressReopen || dismissed || candidates.length === 0)
                 close()
@@ -598,12 +1230,11 @@ Item {
         }
 
         onCandidatesChanged: syncVisibility()
-        // 被 Esc / 点到外面关掉时记下来：等用户再敲字（onTextChanged 会清掉 dismissed）才重新弹
-        onClosed: dismissed = true
+        onClosed: dismissed = true   // 等用户再次输入才重新弹出
 
         parent: root
         x: 16
-        y: shadowHost.y - height - 8            // 贴输入卡上沿 8px
+        y: shadowHost.y - height - 8   // 贴输入卡上沿 8px
         width: Math.min(560, root.width - 32)
         padding: 6
         modal: false
@@ -619,8 +1250,7 @@ Item {
 
         contentItem: Flickable {
             id: menuScroll
-            // 命令多时封顶（与 ModelSelectorChip 的菜单同一手法），否则会把整个菜单顶出屏幕
-            implicitHeight: Math.min(contentHeight, 320)
+            implicitHeight: Math.min(contentHeight, 320)   // 命令多时封顶，避免顶出屏幕
             contentHeight: menuColumn.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -657,9 +1287,7 @@ Item {
                             Text {
                                 id: nameText
                                 text: "/" + commandRow.modelData.name
-                                // 命令名走 textPrimary 而不是 accent 蓝：整个输入区（含弹层）不出现蓝色，
-                                // 层级靠"白底黑字 > 灰字"拉开，和输入框的灰阶体系保持一致
-                                color: Theme.color.textPrimary
+                                color: Theme.color.textPrimary   // 输入区保持灰阶，不使用 accent 蓝
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
                                 anchors.verticalCenter: parent.verticalCenter
@@ -667,8 +1295,7 @@ Item {
 
                             Text {
                                 id: hintText
-                                // input hint = 这个命令吃什么参数（引擎给的 `input.hint`）
-                                text: commandRow.modelData.hint
+                                text: commandRow.modelData.hint   // 命令参数提示
                                 visible: text.length > 0
                                 color: Theme.color.textTertiary
                                 font.family: "Microsoft YaHei UI"
@@ -677,7 +1304,6 @@ Item {
                             }
 
                             Text {
-                                // 宽度手工算：Row 里若用 `parent.width - x` 会和 Row 的定位互相触发
                                 text: commandRow.modelData.description
                                 width: Math.max(0, rowHost.width - nameText.width - hintText.width
                                                    - (hintText.visible ? rowHost.spacing * 2 : rowHost.spacing))

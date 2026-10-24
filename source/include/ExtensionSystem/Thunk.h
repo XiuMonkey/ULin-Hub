@@ -59,7 +59,7 @@ namespace Thunk
 		Thunk(const Thunk&) = delete;
 		Thunk& operator=(const Thunk&) = delete;
 
-		// 根据签名和目标函数地址生成 thunk：成功返回 true，失败可通过 errorString() 获取原因。
+		// 根据签名和目标函数地址生成 thunk：成功返回 true，失败可通过 errorString 获取原因。
 		bool build(const Signature& signature, void* target);
 
 		// 调用生成的 thunk。

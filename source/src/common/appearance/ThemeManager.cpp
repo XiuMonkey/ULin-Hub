@@ -1,11 +1,11 @@
 #include "common/appearance/ThemeManager.h"
 
-#include "common/appearance/UiAbi.h"   // kStylePackUiAbi：旧 ABI 的副本按陈旧处理
+#include "common/ClientInfo.h"   // kUiAbi：旧 ABI 的副本按陈旧处理
 #include "common/appearance/CardShadow.h"
 #include "common/settings/ClientSettings.h"
 #include "common/util/CommonRegistry.h"
-// (M8) removed: #include "core/ULinHub.h"
-#include "common/util/HostIndex.h"
+#include "common/util/HostIndex.h"   // (M8) removed: #include "core/ULinHub.h"
+
 // (M8) removed: #include "ui/ShadowPanel.h"
 // (M8) removed: #include "ui/SpinnerWidget.h"
 #include <QAbstractScrollArea>
@@ -38,8 +38,7 @@
 #include <future>
 #include <utility>
 
-// 常量走函数式 static，避免静态初始化期构造 QString（Qt 老坑）
-QString ThemeManager::modeKey(Mode mode)
+QString ThemeManager::modeKey(Mode mode)   // 常量走函数式 static，避免静态初始化期构造 QString（Qt 老坑）
 {
 	return mode == Mode::Dark ? QStringLiteral("dark") : QStringLiteral("light");
 }
@@ -55,6 +54,7 @@ QString ThemeManager::token(const QHash<QString, QString>& palette, const QStrin
 void ThemeManager::installPaletteFor(const QHash<QString, QString>& palette)
 {
 	QPalette pal = QApplication::palette();
+
 	// 色值可能是 CSS rgba(...)，QColor 认不出；一律走 CardShadow::parseColor
 	const QColor window(CardShadow::parseColor(token(palette, QStringLiteral("windowBg"), QStringLiteral("#FFFFFF"))));
 	const QColor panel(CardShadow::parseColor(token(palette, QStringLiteral("panelBg"), QStringLiteral("#FFFFFF"))));
@@ -65,8 +65,7 @@ void ThemeManager::installPaletteFor(const QHash<QString, QString>& palette)
 	const QColor border(CardShadow::parseColor(token(palette, QStringLiteral("border"), QStringLiteral("#E5E7EB"))));
 
 	const auto apply = [&pal](QPalette::ColorRole role, const QColor& color) {
-		// 显式给全部组上色：仅 Disabled 组亮化一档，其余组同色
-		for (int i = 0; i < QPalette::NColorGroups; ++i) {
+		for (int i = 0; i < QPalette::NColorGroups; ++i) {   // 显式给全部组上色：仅 Disabled 组亮化一档，其余组同色
 			pal.setColor(static_cast<QPalette::ColorGroup>(i), role,
 				i == QPalette::Disabled ? color.lighter(150) : color);
 		}
@@ -90,8 +89,7 @@ void ThemeManager::installPaletteFor(const QHash<QString, QString>& palette)
 
 ThemeManager& ThemeManager::instance()
 {
-	// 刻意不析构：已登记进 CommonRegistry，静态析构顺序无从保证
-	static ThemeManager* const inst = new ThemeManager();
+	static ThemeManager* const inst = new ThemeManager();   // 刻意不析构：已登记进 CommonRegistry，静态析构顺序无从保证
 	return *inst;
 }
 
@@ -106,8 +104,7 @@ QString ThemeManager::paletteFileFor(Mode m) const
 		: QStringLiteral("theme-light.json");
 }
 
-// 外部优先、qrc 兜底
-QHash<QString, QString> ThemeManager::loadPaletteFor(Mode m) const
+QHash<QString, QString> ThemeManager::loadPaletteFor(Mode m) const   // 外部优先、qrc 兜底
 {
 	QHash<QString, QString> result;
 
@@ -127,8 +124,7 @@ QHash<QString, QString> ThemeManager::loadPaletteFor(Mode m) const
 	return result;
 }
 
-// 全局兜底：init 时装一次；新控件漏调 repolishScrollArea 也不会退回原生样式
-namespace
+namespace   // 全局兜底：init 时装一次；新控件漏调 repolishScrollArea 也不会退回原生样式
 {
 	class ScrollAreaShowFilter : public QObject
 	{
@@ -140,7 +136,6 @@ namespace
 		{
 			if (event->type() == QEvent::Show) {
 				if (auto* area = qobject_cast<QAbstractScrollArea*>(watched)) {
-					// Show 派发期间重解析会搅乱事件流，故排到本轮之后；控件销毁后调用自动作废
 					QMetaObject::invokeMethod(area, [area]() {
 						ThemeManager::instance().repolishScrollArea(area);
 						}, Qt::QueuedConnection);
@@ -151,9 +146,6 @@ namespace
 	};
 } // namespace
 
-// ---- QML 风格包（M8）----
-// 以前这里释放的是各板块 *.qss 模板；现在对象换成 QML 风格包：qrc:/qml 整棵树 + theme-*.json。
-// 规则不变：**按文件补缺，已存在的绝不覆盖**。
 void ThemeManager::ensureStylePack()
 {
 	if (m_stylesDir.isEmpty()) {
@@ -161,16 +153,9 @@ void ThemeManager::ensureStylePack()
 		return;
 	}
 
-	// 2026-10-01 两处改动：
-	//   ① 释放目录从 <exe>/styles 改成 <exe>/ui（用户在 <exe>/ui 里划定的新界面目录）；
-	//   ② 规则从"缺什么补什么、绝不覆盖"改成**增量同步** —— 旧的 fill-only 规则会让内置界面的
-	//      更新永远进不去副本（实测：重编之后点扩展按钮还是旧提示，只有按"重置"才刷新）。
-	// 增量同步靠同目录的 release-manifest.json（相对路径 → 上次释放时的内容哈希）做三方比对：
-	//   包内没有                             → 释放
-	//   有、但清单没记过（旧副本/用户放的）    → 不动，把包内现状记为基线
-	//   有、包内哈希 == 清单（用户没改过）
-	//      且 内置哈希 != 清单（内置更新了）   → 覆盖
-	//   其余（用户改过 / 内置没变）           → 不动
+	// 包内没有                             → 释放
+	// 有、但清单没记过（旧副本/用户放的）    → 不动，把包内现状记为基线
+	// 且 内置哈希 != 清单（内置更新了）   → 覆盖
 	static const QString kBuiltin = QStringLiteral(":/qml");
 	QDir builtin(kBuiltin);
 	if (!builtin.exists()) {
@@ -191,7 +176,6 @@ void ThemeManager::ensureStylePack()
 		return QString::fromLatin1(QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha1).toHex());
 	};
 
-	// 上次释放的基线
 	// 包里还留着旧 ABI 的 pack.json ⇒ 那个副本已经不可用（StyleResolver 会整包拒载），
 	// 直接当陈旧处理：下面所有内置文件都覆盖一遍，省掉"让用户手工删目录"。
 	bool forceFresh = false;
@@ -200,9 +184,9 @@ void ThemeManager::ensureStylePack()
 		if (packFile.open(QIODevice::ReadOnly)) {
 			const int abi = QJsonDocument::fromJson(packFile.readAll()).object()
 				.value(QStringLiteral("uiAbi")).toInt(-1);
-			forceFresh = (abi != kStylePackUiAbi);
+			forceFresh = (abi != ClientInfo::kUiAbi);
 			if (forceFresh)
-				qInfo().noquote() << "[Theme] 界面包 uiAbi=" << abi << "与本版本" << kStylePackUiAbi
+				qInfo().noquote() << "[Theme] 界面包 uiAbi=" << abi << "与本版本" << ClientInfo::kUiAbi
 					<< "不符，按陈旧处理并整份重放:" << m_stylesDir;
 		}
 	}
@@ -276,7 +260,6 @@ void ThemeManager::ensureStylePack()
 			continue;
 		}
 		if (current == recorded && builtinHash != recorded) {
-			// 用户没改过、内置更新了 → 覆盖（本次新增的规则）
 			if (QFile::remove(target) && QFile::copy(source, target)) {
 				giveWritePermission(target);
 				nextBaseline.insert(relative, builtinHash);
@@ -317,8 +300,7 @@ void ThemeManager::resetStylePack()
 		return;
 	}
 
-	// 只删"内置包里有的"文件（用户自建的文件不动）
-	static const QString kBuiltin = QStringLiteral(":/qml");
+	static const QString kBuiltin = QStringLiteral(":/qml");   // 只删"内置包里有的"文件（用户自建的文件不动）
 	const int prefixLength = kBuiltin.length();
 	QDirIterator it(kBuiltin, QDir::Files, QDirIterator::Subdirectories);
 	int removed = 0;
@@ -339,7 +321,6 @@ void ThemeManager::resetStylePack()
 	qInfo().noquote() << "[Theme] 风格包已重置，删除" << removed << "个已释放文件";
 }
 
-// (M8) QSS 合成都已删除：这里只取调色板（token 替换在 QML 运行时完成）。
 QHash<QString, QString> ThemeManager::buildFor(Mode m) const { return loadPaletteFor(m); }
 
 void ThemeManager::buildAllCaches()
@@ -364,8 +345,7 @@ void ThemeManager::activate(Mode m)
 	m_palette = m_paletteCache.value(modeKey(m));
 }
 
-// (M8) 只用来读风格包目录里的文本（调色板 JSON）；QSS 文本读取已随 QSS 合成一起删除。
-QString ThemeManager::loadText(const QString& fileName) const
+QString ThemeManager::loadText(const QString& fileName) const   // (M8) 只用来读风格包目录里的文本（调色板 JSON）；QSS 文本读取已随 QSS 合成一起删除
 {
 	if (m_stylesDir.isEmpty() || fileName.isEmpty())
 		return QString();
@@ -383,8 +363,7 @@ void ThemeManager::applyToWindow(QWidget* window)
 	Q_UNUSED(window);
 }
 
-// (M8) 同上：QSS 时代滚动区需要重新 polish 才会吃到样式；QML 侧没有 QSS，无操作。
-void ThemeManager::repolishScrollArea(QWidget* widget)
+void ThemeManager::repolishScrollArea(QWidget* widget)   // (M8) 同上：QSS 时代滚动区需要重新 polish 才会吃到样式；QML 侧没有 QSS，无操作
 {
 	Q_UNUSED(widget);
 }
@@ -420,8 +399,7 @@ void ThemeManager::setMode(Mode mode)
 	qInfo().noquote() << "[Theme] set mode:" << (m_mode == Mode::Dark ? "Dark" : "Light");
 }
 
-// 把合成样式表装到单个窗口及其子树；各顶层窗口自行调用
-void ThemeManager::reload()
+void ThemeManager::reload()   // 把合成样式表装到单个窗口及其子树；各顶层窗口自行调用
 {
 	buildAllCaches();
 	activate(m_mode);
@@ -483,7 +461,6 @@ namespace
 		{
 			if (event->type() == QEvent::Show && !m_shown) {
 				m_shown = true;
-				// Show 期间重解析会搅乱事件流，挪到本轮事件之后
 				QMetaObject::invokeMethod(this, [this]() {
 					ThemeManager::instance().repolishScrollArea(m_area);
 					retireIfDone();
@@ -516,7 +493,7 @@ namespace
 	};
 } // namespace
 
-// (M8) 旧壳已删：这里原本是 [过渡卡片 -> 重建主窗口] 的控件壳做法。QML 壳不重建窗口，
+// 已删：这里原本是 [过渡卡片 -> 重建主窗口] 的控件壳做法。QML 壳不重建窗口，
 // 切模式后由 ThemeBridge::reload() 热重载 token（过渡卡片是 QML 的 ThemeSwitchOverlay.qml）。
 // 保留该入口只为不改头文件签名。
 void ThemeManager::switchTheme(QWidget* currentWindow)

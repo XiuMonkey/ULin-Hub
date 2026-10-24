@@ -1,4 +1,4 @@
-// 见 PanelBarDockModel.h：右栏面板坞的块（页签）列表。行为逐条对齐搬家前的 JS 数组。
+// 见 PanelBarDockModel.h：右栏面板坞的块（页签）列表。行为逐条对齐的 JS 数组。
 
 #include "common/shell/PanelBarDockModel.h"
 
@@ -9,12 +9,12 @@ namespace
 {
 	const char kKindTerminal[] = "terminal";
 	const char kKindBrowser[] = "browser";
+
 	// 插件数据块：一个插件的一份数据面的**原生**视图（扩展把内容 QML 注入到 panel 里的容器）。
 	// 与浏览器块的区别：这里没有 WebEngine，数据由扩展 C++ 取、QML 原生画。
 	const char kKindPluginData[] = "pluginData";
 
-	// 启动器一行（{ kind, label, hint }）；label 统一由 kindLabel() 给，中文名只有一份。
-	QVariantMap launcherRow(const QString& kind, const QString& hint)
+	QVariantMap launcherRow(const QString& kind, const QString& hint)   // 启动器一行（{ kind, label, hint }）；label 统一由 kindLabel() 给，中文名只有一份
 	{
 		QVariantMap item;
 		item.insert(QStringLiteral("kind"), kind);
@@ -43,35 +43,33 @@ QString PanelBarDockModel::kindLabel(const QString& kind)
 		return QStringLiteral("终端");
 	if (kind == QLatin1String(kKindPluginData))
 		return QStringLiteral("插件数据");
-	return QStringLiteral("文件浏览");   // 与搬家前一致：未知 kind 兜底成"文件浏览"
+	return QStringLiteral("文件浏览");   // 保持一致：未知 kind 兜底成"文件浏览"
 }
 
 PanelBarDockModel::ViewSpec PanelBarDockModel::viewFor(const QString& kind, bool webEngineAvailable)
 {
 	// WebEngine 是浏览器/终端两个视图的运行期依赖：缺了就降级成说明页。
 	// ⚠️ 这里不能"先试后错" —— 未调 QtWebEngineQuick::initialize() 的构建里建 WebEngineView
-	//    是直接崩（不是报错），所以必须在建之前就判掉，判定权因此收在 C++。
+	// 是直接崩（不是报错），所以必须在建之前就判掉，判定权因此收在 C++。
 	const bool needsWebEngine = kind == QLatin1String(kKindBrowser) || kind == QLatin1String(kKindTerminal);
 	if (needsWebEngine && !webEngineAvailable) {
 		return ViewSpec{ QString(), false,
-			QStringLiteral("本构建未包含 Qt WebEngine —— %1面板跑不起来（引擎只给原始字节与序列化的 VT 串，"
-						   "没有网格接口）。装好后打开 vcxproj 的 webenginequick 与 main.cpp 的 "
-						   "QtWebEngineQuick::initialize()。").arg(kindLabel(kind)) };
+			QStringLiteral("当前版本不支持%1：缺少网页渲染组件，面板暂时打不开。"
+						   "请使用完整安装版本，或联系维护者更新客户端。").arg(kindLabel(kind)) };
 	}
 
-	// 逻辑路径，不是 url：QML 侧还要过 Style.url() 让 <exe>/ui/ 的同名文件能遮蔽内置
-	if (kind == QLatin1String(kKindBrowser))
+	if (kind == QLatin1String(kKindBrowser))   // 逻辑路径，不是 url：QML 侧还要过 Style.url() 让 <exe>/ui/ 的同名文件能遮蔽内置
 		return ViewSpec{ QStringLiteral("basic/browser/WebBrowserPanel.qml"), false, QString() };
 	if (kind == QLatin1String(kKindTerminal))
 		return ViewSpec{ QStringLiteral("basic/terminal/TerminalPanel.qml"), true, QString() };
+
 	// 插件数据块：宿主只提供外壳（标题 + 空态 + 一个名为 pluginData.host 的容器），
 	// 内容由扩展 MountInto 进来 —— 因此它不依赖 WebEngine。
 	if (kind == QLatin1String(kKindPluginData))
 		return ViewSpec{ QStringLiteral("basic/panelui/PluginDataPanel.qml"), false, QString() };
 
-	// files 与未知 kind 一样走占位页（文案与搬家前 PanelBarDockView.qml 的 placeholderComp 逐字一致）
-	return ViewSpec{ QString(), false,
-		QStringLiteral("文件浏览还没接入：需要挂上 api-workspace-files（workspaceFiles/*）做目录树与预览。") };
+	return ViewSpec{ QString(), false,   // files 与未知 kind 一样走占位页
+		QStringLiteral("文件浏览还在接入中，暂时不可用。") };
 }
 
 QString PanelBarDockModel::activeKind() const
@@ -133,18 +131,16 @@ void PanelBarDockModel::setWebEngineAvailable(bool available)
 
 QVariantList PanelBarDockModel::launcherItems() const
 {
-	// 与搬家前 PanelBarDockView.qml 里那张表逐字一致（顺序、文案都没动）
-	QVariantList items;
+	QVariantList items;   // 内置三行（终端 / 网页 / 文件），扩展登记的行追加在后面
 	items.append(launcherRow(QStringLiteral("terminal"),
-		QStringLiteral("在当前会话的工作目录里跑命令（引擎的 terminal 面）")));
+		QStringLiteral("在当前会话的工作目录里运行命令")));
 	items.append(launcherRow(QStringLiteral("browser"),
-		QStringLiteral("用 Qt WebEngine 在右栏看网页")));
+		QStringLiteral("在右栏浏览网页")));
 	items.append(launcherRow(QStringLiteral("files"),
-		QStringLiteral("浏览工作区文件（待接入 workspaceFiles）")));
+		QStringLiteral("浏览工作区的文件（即将支持）")));
 	items.append(m_extraLaunchers);   // 扩展登记的行追加在宿主内置三行之后
 	return items;
 }
-
 
 void PanelBarDockModel::registerLauncher(const QString& kind, const QString& label, const QString& hint)
 {
@@ -180,8 +176,7 @@ void PanelBarDockModel::open(const QString& kind)
 
 QString PanelBarDockModel::openUrl(const QString& url, const QString& title)
 {
-	// URL 为空 = 打开来是一块空面板，对调用方没有意义 ⇒ 拒绝（返回空串，什么也不开）
-	if (url.isEmpty())
+	if (url.isEmpty())   // URL 为空 = 打开来是一块空面板，对调用方没有意义 ⇒ 拒绝（返回空串，什么也不开）
 		return QString();
 
 	return appendBlock(QStringLiteral("browser"), url, title);
@@ -209,15 +204,13 @@ QStringList PanelBarDockModel::blockIds() const
 
 QString PanelBarDockModel::appendBlock(const QString& kind, const QString& url, const QString& customTitle)
 {
-	// 同类计数：标题在**开块这一刻**定下来（关块不重排，见头文件）
-	int seq = 0;
+	int seq = 0;   // 同类计数：标题在**开块这一刻**定下来（关块不重排，见头文件）
 	for (const Block& block : m_blocks) {
 		if (block.kind == kind)
 			++seq;
 	}
 
-	// 扩展面板自带标题时用它（同类的编号照算，但不进块名）
-	const QString title = customTitle.isEmpty()
+	const QString title = customTitle.isEmpty()   // 扩展面板自带标题时用它（同类的编号照算，但不进块名）
 		? kindLabel(kind) + QLatin1Char(' ') + QString::number(seq + 1)
 		: customTitle;
 
@@ -244,9 +237,7 @@ void PanelBarDockModel::close(int index)
 	endRemoveRows();
 	emit countChanged();
 
-	// 活动索引只在越界时收敛（搬家前的 `if (activeIndex >= list.length) activeIndex = list.length - 1`）。
-	// 关掉活动块**前面**那块时索引不动 ⇒ 活动块换成"原来的下一块"，这是既有行为。
-	if (m_activeIndex >= m_blocks.size()) {
+	if (m_activeIndex >= m_blocks.size()) {   // 活动索引只在越界时收敛（的 `if（activeIndex >= list.length) activeIndex = list.length - 1`）
 		setActiveIndex(m_blocks.size() - 1);
 	} else {
 		// 索引没动，但行少了 ⇒ 活动块可能就是另一块（关的是它前面那块）：kind 也跟着换，
@@ -264,7 +255,7 @@ void PanelBarDockModel::activate(int index)
 	if (index < 0 || index >= m_blocks.size())
 		return;
 
-	setActiveIndex(index);    // 点当前块是空操作：值没变 ⇒ 不重放内容动画（与搬家前一致）
+	setActiveIndex(index);   // 点当前块是空操作：值没变 ⇒ 不重放内容动画
 	setHomeVisible(false);
 }
 

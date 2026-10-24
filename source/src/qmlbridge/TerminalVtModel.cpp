@@ -1,5 +1,4 @@
 // 见 TerminalVtModel.h：VT 状态与 QML 渲染之间的桥（按行暴露网格 + 脏行通知 + 键盘编码）。
-//
 // ⚠️ 本文件里没有一处绘制、也没有一处 VT 解析：前者在 QML，后者在 common/terminal/TerminalVt。
 
 #include "qmlbridge/TerminalVtModel.h"
@@ -14,11 +13,9 @@
 
 namespace
 {
-	// 段里的 width 值（渲染遇到它必须跳过这一格 —— 宽字符首格已占两格）
-	constexpr int kWideContinuation = 0;
+	constexpr int kWideContinuation = 0;   // 段里的 width 值（渲染遇到它必须跳过这一格 —— 宽字符首格已占两格）
 
-	// "RRGGBB" / "#RRGGBB" → 0xRRGGBB；认不出来给 -1（该索引回落到库内置调色板）
-	int parseRgb(const QString& text)
+	int parseRgb(const QString& text)   // "RRGGBB" / "#RRGGBB" → 0xRRGGBB；认不出来给 -1（该索引回落到库内置调色板）
 	{
 		QString value = text.trimmed();
 		if (value.startsWith(QLatin1Char('#')))
@@ -30,8 +27,7 @@ namespace
 		return ok ? static_cast<int>(rgb) : -1;
 	}
 
-	// 一格 → 段用的文本。空串 = 宽字符续格（width==0）或真空格。
-	QString cellText(const TermCell& cell)
+	QString cellText(const TermCell& cell)   // 一格 → 段用的文本。空串 = 宽字符续格（width==0）或真空格
 	{
 		if (cell.width == 0)
 			return QString();   // 续格：渲染跳过
@@ -41,8 +37,7 @@ namespace
 		return text;
 	}
 
-	// Qt::Key_* → TerminalVt::SpecialKey 的名字。返回空 = 不是这批里的。
-	QString specialNameForQtKey(int qtKey)
+	QString specialNameForQtKey(int qtKey)   // Qt::Key_* → TerminalVt::SpecialKey 的名字。返回空 = 不是这批里的
 	{
 		switch (qtKey)
 		{
@@ -66,8 +61,7 @@ namespace
 		}
 	}
 
-	// 名字 → TerminalVt::SpecialKey。映射只在本文件里有一份（别让 QML 记枚举数字）。
-	bool specialKeyFromName(const QString& name, TerminalVt::SpecialKey* out)
+	bool specialKeyFromName(const QString& name, TerminalVt::SpecialKey* out)   // 名字 → TerminalVt::SpecialKey。映射只在本文件里有一份（别让 QML 记枚举数字）
 	{
 		if (!out)
 			return false;
@@ -116,10 +110,6 @@ TerminalVtModel::TerminalVtModel(QObject* parent)
 {
 }
 
-// ------------------------------------------------------------------
-// 会话侧驱动
-// ------------------------------------------------------------------
-
 void TerminalVtModel::feed(const QByteArray& bytes)
 {
 	if (bytes.isEmpty())
@@ -128,9 +118,7 @@ void TerminalVtModel::feed(const QByteArray& bytes)
 	afterFeed();
 }
 
-// 快照 = xterm 的序列化重放串：它自己以 \e[?25l\e[H\e[2J 起手，语义上就是整屏重来。
-// 这里再硬复位一次，为的是把"上一代的回滚历史/标题/光标"也清干净 —— 状态不跨快照。
-void TerminalVtModel::feedSnapshot(const QByteArray& bytes)
+void TerminalVtModel::feedSnapshot(const QByteArray& bytes)   // 快照 = xterm 的序列化重放串：它自己以 \e[?25l\e[H\e[2J 起手，语义上就是整屏重来
 {
 	m_vt.reset();
 	if (m_paletteCount > 0)
@@ -162,8 +150,7 @@ void TerminalVtModel::emitDirty()
 		rows.append(row);
 	emit dirtyRowsChanged(rows);
 
-	// 滚屏/换行会顶掉回滚行数（视图靠它钳住滚动范围），真变了才通知
-	if (m_lastScrollback != m_vt.scrollbackLines()) {
+	if (m_lastScrollback != m_vt.scrollbackLines()) {   // 滚屏/换行会顶掉回滚行数（视图靠它钳住滚动范围），真变了才通知
 		m_lastScrollback = m_vt.scrollbackLines();
 		emit scrollbackChanged();
 	}
@@ -184,16 +171,13 @@ void TerminalVtModel::setSessionState(const QString& state, const QString& statu
 		m_readOnly = readOnly;
 		emit readOnlyChanged();
 	}
-	// 标题以 VT 里 OSC 0/2 设的为准；VT 还没设过时用引擎报的兜底
-	if (m_title.isEmpty() && !title.isEmpty()) {
+	if (m_title.isEmpty() && !title.isEmpty()) {   // 标题以 VT 里 OSC 0/2 设的为准；VT 还没设过时用引擎报的兜底
 		m_title = title;
 		emit titleChanged();
 	}
 }
 
-// 网格尺寸：**下限 2×4** —— libvterm 的 screen_resize 在退化尺寸（实测 2×1）上会 abort
-// （"screen_resize failed to update cursor position"），所以这里把下限也钉住，不依赖调用方自觉。
-void TerminalVtModel::setGridSize(int rows, int cols)
+void TerminalVtModel::setGridSize(int rows, int cols)   // （"screen_resize failed to update cursor position"），所以这里把下限也钉住，不依赖调用方自觉
 {
 	const int safeRows = qBound(2, rows, 500);
 	const int safeCols = qBound(4, cols, 1000);
@@ -207,18 +191,11 @@ void TerminalVtModel::setGridSize(int rows, int cols)
 	emitDirty();
 }
 
-// ------------------------------------------------------------------
-// 网格读取：按行给"同样式合并后的段"
-// ------------------------------------------------------------------
-
 QVariantList TerminalVtModel::rowSegments(int first, int last) const
 {
 	// 结构化的同一份数据：**复用 rowsJson 的合并逻辑**（段合并只此一份，别复制），
-	// 只是把序列化成文本换成在 C++ 里直接给出 QVariantList（省掉每帧一次文本编解码）。
-	//
-	// ⚠️ 兼容两种顶层形状：直接是数组，或者对象里带一个 rows 数组 —— 上一版只认数组，
-	//    形状不符时 doc.array() 拿到空 ⇒ 终端整屏空白（已回过退一次 ✗）。这里两种都认，
-	//    仍拿不到就返回空列表，由 QML 侧兜底退回 rowsJson。
+	// 形状不符时 doc.array() 拿到空 ⇒ 终端整屏空白（已回过退一次 ✗）。这里两种都认，
+	// 仍拿不到就返回空列表，由 QML 侧兜底退回 rowsJson。
 	const QByteArray raw = rowsJson(first, last).toUtf8();
 	if (raw.isEmpty())
 		return {};
@@ -276,8 +253,7 @@ QString TerminalVtModel::rowsJson(int first, int last) const
 
 			if (cell.width == 0)
 			{
-				// 宽字符续格：自成一段（文本空串 + 专有标志），渲染据此跳过这一格
-				flush();
+				flush();   // 宽字符续格：自成一段（文本空串 + 专有标志），渲染据此跳过这一格
 				QJsonArray segment;
 				segment.append(QString());
 				segment.append(0);
@@ -306,17 +282,12 @@ QString TerminalVtModel::rowsJson(int first, int last) const
 	return QString::fromUtf8(QJsonDocument(out).toJson(QJsonDocument::Compact));
 }
 
-// ------------------------------------------------------------------
-// 键盘
-// ------------------------------------------------------------------
-
 void TerminalVtModel::typeText(const QString& text)
 {
 	if (text.isEmpty())
 		return;
 
-	// QKeyEvent::text 可能带**多个**码点（组合字符等）：逐码点走键盘表，别整串塞进去
-	const QList<uint> codepoints = text.toUcs4();
+	const QList<uint> codepoints = text.toUcs4();   // QKeyEvent::text 可能带**多个**码点（组合字符等）：逐码点走键盘表，别整串塞进去
 	for (uint codepoint : codepoints)
 		m_vt.keyUnichar(codepoint, TerminalVt::ModNone);
 
@@ -394,10 +365,6 @@ QByteArray TerminalVtModel::takePendingInput()
 	out.swap(m_pendingInput);
 	return out;
 }
-
-// ------------------------------------------------------------------
-// 视口 / 尺寸 / 主题
-// ------------------------------------------------------------------
 
 void TerminalVtModel::scrollBy(int lines)
 {

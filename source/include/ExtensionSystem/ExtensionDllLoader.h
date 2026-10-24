@@ -2,7 +2,7 @@
 
 // 工具扩展 DLL 的启动装载（纯 header + inline）：env 显式指定则只加载那一份，否则扫描 extensions/
 // 与 node_modules/ 下每个扩展目录的 regulation.json5 + main.dll；caller 内部按扩展名去重。
-// 与 ExtensionLoader（管 .ext 安装）、ClientExtension::loadAll()（客户端扩展）不是一回事。
+// 与 ExtensionLoader（管 .ext 安装）、ClientExtension::loadAll（客户端扩展）不是一回事。
 
 #include "ExtensionSystem/DllCaller.h"
 

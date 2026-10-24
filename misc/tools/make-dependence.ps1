@@ -132,3 +132,36 @@ foreach ($name in $names) {
 Copy-Item -LiteralPath $manifestSrc -Destination $manifestDst -Force
 
 Write-Host ("[{0}] {1}: 本次移入 {2} 个，已在位 {3} 个，清单共 {4} 个" -f $Config, $target, $moved, $already, $names.Count)
+
+# ---- 4) WebEngine 的运行时数据（不是 DLL，但缺了会 qFatal 整个进程）----
+# 这些是 Chromium 的数据文件（icudtl.dat / qtwebengine_resources*.pak / v8_context_snapshot.bin），
+# 不是服务端那套 JS/Node，统一放在 <exe>\resources\webengine\。
+# Qt 自己只找 <exe>\resources\、不递归子目录 ⇒ main.cpp 里用 QTWEBENGINE_RESOURCES_PATH 指过去
+# （WebEngine 首次建上下文时读走并缓存，所以那段代码在 QApplication 前后各设一次）。
+# 缺了 Qt 会在**首次创建 WebEngineView 时** qFatal 退出：
+#   "The following paths were searched for Qt WebEngine resources: ... but could not find any."
+# 这条只在打开网页时才炸，很容易被当成渲染崩溃 —— 2026-10-22 发布包就是这么丢的。
+$webEngineResources = @(
+	'icudtl.dat',
+	'qtwebengine_resources.pak',
+	'qtwebengine_resources_100p.pak',
+	'qtwebengine_resources_200p.pak',
+	'v8_context_snapshot.bin'
+)
+$resDst = Join-Path $target 'resources\webengine'
+$resSrc = if ($QtBin) { Join-Path (Split-Path -Parent $QtBin) 'resources' } else { $null }
+$addedResources = 0
+foreach ($name in $webEngineResources) {
+	$dst = Join-Path $resDst $name
+	if (Test-Path -LiteralPath $dst) { continue }
+	$src = if ($resSrc) { Join-Path $resSrc $name } else { $null }
+	if (-not $src -or -not (Test-Path -LiteralPath $src)) {
+		Write-Warning ("  缺 WebEngine 资源 {0}（打开网页会 qFatal）—— 加 -QtBin <Qt\bin> 让脚本从 Qt 安装目录补，或手工拷到 {1}" -f $name, $resDst)
+		continue
+	}
+	New-Item -ItemType Directory -Path $resDst -Force | Out-Null
+	Copy-Item -LiteralPath $src -Destination $dst -Force
+	Write-Host "  WebEngine 资源  $name"
+	$addedResources++
+}
+if ($addedResources -gt 0) { Write-Host ("  本次补入 {0} 个 WebEngine 资源文件" -f $addedResources) }

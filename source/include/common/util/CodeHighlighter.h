@@ -52,6 +52,6 @@ private:
 	bool m_dark = false;
 	mutable QHash<QString, QString> m_cache;
 	// 高亮会被渲染 worker 线程并发调用，规则/缓存读写统一加锁；用递归锁是因为
-	// loadFromFile 持锁期间会调用同样加锁的 clearCache()。
+	// loadFromFile 持锁期间会调用同样加锁的 clearCache。
 	mutable QRecursiveMutex m_mutex;
 };

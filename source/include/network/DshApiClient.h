@@ -29,13 +29,12 @@ class QNetworkReply;
 class QTimer;
 class QWebSocket;
 
-// DSH API 客户端；用法：setBaseUrl() → openStreams() → callMethod() / 监听 muxFrameReceived。
+// DSH API 客户端；用法：setBaseUrl → openStreams → callMethod / 监听 muxFrameReceived。
 // 接管态下不走 HTTP，出站请求改交扩展。
-//
-// 2026-10-01（工单 B-1）追加：本类**同时实现 VirtualMain**，并以索引 kMainWindow 登记。为什么是它：
+// 本类**同时实现 VirtualMain**，并以索引 kMainWindow 登记。为什么是它：
 // VirtualMain 那 13 个入站注入方法是本类既有信号的**翻转入口**（下面 HandleXxx 逐个对应），而
-// ShellController::init() 已把这些信号接到真处理器（ChatController / SessionCatalog / …）⇒ 实现 = 原样重新 emit，真逻辑一行不用重写。
-// M8 删旧控件壳时 VirtualMain 的实现类（ULinHub）一起没了、kMainWindow 再没登记过 ⇒ 后端接管类扩展（CodexBackend）
+// ShellController::init 已把这些信号接到真处理器（ChatController / SessionCatalog / …）⇒ 实现 = 原样重新 emit，真逻辑一行不用重写。
+// ⚠️ VirtualMain 的实现类（ULinHub）随控件壳删除后、kMainWindow 再没登记过 ⇒ 后端接管类扩展（CodexBackend）
 // 的入站注入恒拿 null（findObject("mainWindow") = 空），主功能一直是死的 —— 这个类就是把那条路补回来。
 class DshApiClient : public QObject, public VirtualApiHost, public VirtualMain
 {
@@ -83,7 +82,7 @@ public:
 	// 终端附着流（terminal/follow）：一条终端 = 一条逻辑流，帧是 snapshot / output / state 三种之一。
 	// args 由 SessionCommands::terminalFollow(agentId, id, attachmentId) 给（别在这里拼 wire 名）。
 	// 同时只保留一条：重复调用先 cancel 旧的再开新的；mux 还没连上时只记下 args 并返回
-	// （调用方监听 connected()，连上后再调一次即可重开，重开必须换新的 attachmentId）。
+	// （调用方监听 connected，连上后再调一次即可重开，重开必须换新的 attachmentId）。
 	void openTerminalStream(const QJsonObject& followArgs);
 	// 关掉终端附着流（不影响终端进程本身，那要一发 terminal/close）
 	void closeTerminalStream();
@@ -192,21 +191,12 @@ public:
 	// 接管态查询：Takenover(bool) 无回执，插件靠它确认请求有没有被接受（即 isTakenover 的接口版）
 	bool IsTakenover() const override { return isTakenover(); }
 
-	// ------------------------------------------------------------------
-	// VirtualMain（登记名 kMainWindow）—— 后端接管类扩展的**入站注入面**
-	//
-	// 每个方法都只是把参数原样转成下面那条既有信号：宿主内部（以及我们在 QML 壳里的接线）只认
-	// 这些信号，出站改由扩展负责之后，信号没人发 ⇒ 扩展改调这里，让 UI 照常动。
-	// 必须 **GUI 线程同步**调用（VirtualCommon.h 的约定；扩展是在自己的 QObject 槽里调，天然满足）。
-	// ⚠️ 这些方法是 ABI：方法名与签名一发布就定死，以后只许在 VirtualMain **末尾追加**。
-	// ------------------------------------------------------------------
-
 	// 让 UI 认为已连接（扩展把流/后端备好之后调一次）
-	// ⚠️ 只允许**发一次** `connected`：宿主把那条信号接到 `ShellController::onConnected()`，而它里面会
-	// `refreshSessions()`（又发一次 session/list 出站、可能重新选中会话 ⇒ 重新注入历史）；扩展若每服务一次
+	// ⚠️ 只允许**发一次** `connected`：宿主把那条信号接到 `ShellController::onConnected`，而它里面会
+	// `refreshSessions`（又发一次 session/list 出站、可能重新选中会话 ⇒ 重新注入历史）；扩展若每服务一次
 	// session/list 就调一次本方法，就是 HandleConnected → connected → onConnected → refreshSessions →
-	// session/list 出站 → 扩展回包 → HandleConnected 的滚雪球（实测：CPU 满载、内存每秒涨 ~30MB、界面未响应）。
-	// 接口注释本来就写的是"调一次"，所以这里按语义加闸门；每轮接管在 `enterTakenoverState()` 里复位。
+	// session/list 出站 → 扩展回包 → HandleConnected 的滚雪球（CPU 满载、内存每秒涨 ~30MB、界面未响应）。
+	// 接口注释本来就写的是"调一次"，所以这里按语义加闸门；每轮接管在 `enterTakenoverState` 里复位。
 	void HandleConnected() override
 	{
 		if (m_injectConnectedEmitted)
@@ -251,10 +241,12 @@ public:
 		emit sessionProjectionChanged(sessionId, key, value, seq);
 	}
 
-	// workspace/follow 的 baseline（清单 + 归档集合）
+	// workspace/follow 的 baseline（VirtualMain 入口：只有清单 + 归档集合；置顶集合由 handleWorkspaceItem 解析）
 	void HandleWorkspaceSnapshot(const QJsonArray& items, const QJsonArray& archivedSessionIds) override
 	{
-		emit workspaceSnapshotReady(items, archivedSessionIds);
+		// VirtualClass 签名里没有 pinnedSessionIds，这里只能给空数组；真实 baseline 帧由 handleWorkspaceItem
+		// 解析（那里会读帧上的置顶集合）。这条入口当前没有调用方，别把它当成置顶集合的来源。
+		emit workspaceSnapshotReady(items, archivedSessionIds, QJsonArray());
 	}
 
 	void HandleWorkspaceUpserted(const QJsonObject& workspace) override
@@ -277,14 +269,14 @@ public:
 		emit workspaceArchiveChanged(archivedSessionIds);
 	}
 
-	// 侧栏会话标题刷新：旧壳是 ULinHub::refreshSessionTitles（重拉标题、不重选会话）。本宿主**刻意不接**（只记一次日志）：
-	// 这条线上根本没有"只刷标题"的端点 —— 唯一接近的 session/list 由 ShellController::refreshSessions() 拉，
+	// 侧栏会话标题刷新：当前是 ULinHub::refreshSessionTitles（重拉标题、不重选会话）。本宿主**刻意不接**（只记一次日志）：
+	// 这条线上根本没有"只刷标题"的端点 —— 唯一接近的 session/list 由 ShellController::refreshSessions 拉，
 	// 它拿到列表后会把 SessionCatalog 整个重建（当前选中会话可能被换掉）；扩展调这条的动机是"标题变了、侧栏该更新"，
-	// 而侧栏本就是会话列表驱动的、稳态下已是新的 ⇒ 不接不会显示错内容，接错反而会把用户正看的会话切走（旧壳记的就是这个坑）。
+	// 而侧栏本就是会话列表驱动的、稳态下已是新的 ⇒ 不接不会显示错内容，接错反而会把用户正看的会话切走。
 	// 真要做，得在 M4b 给 ShellController 加一条"只刷标题不动选择"的路，再来这里转发。
 	void ExternalRefreshSessionTitles() override;
 
-	// VirtualMain 末尾追加那条的**套壳实现**：原函数 baseUrl() 一行没动，这里只转一下，
+	// VirtualMain 末尾追加那条的**套壳实现**：原函数 baseUrl 一行没动，这里只转一下，
 	// 让插件经 VirtualMain 就能拿到引擎地址（`dsh web --port 0`，真实端口只有宿主知道）。
 	QUrl ServerBaseUrl() override { return baseUrl(); }
 	// 【末尾追加】带令牌的启动地址：扩展跑插件 JS 时 fetch 要鉴权
@@ -333,8 +325,10 @@ public:
 	// 位置参数版（args 可为数组），用于 settings/update 这类方法
 	void callMethodArgs(const QString& method, const QJsonValue& args, std::function<void(const QJsonValue& value)> onSuccess, std::function<void(const RpcError& error)> onError = {});
 
-	// 应答 mux 上的审批/提问帧：rpcId 用帧里的，value 形如 {sessionId, approvalId, outcome}
+	// 应答 mux 上的 Remote event（提问/审批）：rpcId 用帧里的 eventId。
+	// 新版协议里 approval 的 result 是字符串 outcome，提问是 {answers:[…]}，所以另开 QJsonValue 版本。
 	void respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
+	void respondValue(const QString& rpcId, const QJsonValue& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
 
 signals:
 	// 宿主内部信号：ULinHub 靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
@@ -342,12 +336,17 @@ signals:
 	void connected();
 	// 兼容旧消费者：把 0.1.5 的新帧翻译成旧形状再发出
 	void muxFrameReceived(const QJsonObject& frame);
-	void workspaceSnapshotReady(const QJsonArray& items, const QJsonArray& archivedSessionIds);
-	// workspace/follow 的四类增量帧：order 与 archived 是整体替换
+	// workspace/follow 的 baseline：items + 归档集合 + **有序**置顶集合（pinnedSessionIds，最近置顶的在前）。
+	// 三个 payload 同源同帧，接收方应当在同一轮里应用完再刷新界面（拆成多条信号会多一轮重建）。
+	void workspaceSnapshotReady(const QJsonArray& items, const QJsonArray& archivedSessionIds,
+		const QJsonArray& pinnedSessionIds);
+	// workspace/follow 的增量帧：order / archived / pinned 都是**整体替换**（服务端每次给完整集合）
 	void workspaceUpserted(const QJsonObject& workspace);
 	void workspaceRemoved(const QString& workspaceId);
 	void workspaceReordered(const QStringList& workspaceIds);
 	void workspaceArchiveChanged(const QJsonArray& archivedSessionIds);
+	// 置顶集合增量（type == "pinned"）：完整集合，保序（最近置顶的在前）
+	void workspacePinnedChanged(const QJsonArray& pinnedSessionIds);
 	void sessionSnapshotReady(const QString& sessionId, int cursor, const QJsonArray& records, bool hasMore);
 	// 快照帧带的投影由服务端全量折叠现算，没被 Agent 附着的会话也准
 	void sessionProjectionsReady(const QString& sessionId, int asOfSeq, const QJsonObject& values);
@@ -355,22 +354,14 @@ signals:
 	// 现算现推，不读缓存
 	void sessionProjectionChanged(const QString& sessionId, const QString& key, const QJsonValue& value, int seq);
 	void transportError(const QString& context, const QString& message);
-	// ---- 终端附着流（terminal/follow，第五条逻辑流）----
-	// 一帧原样上抛（帧里是 {type:"snapshot"|"output"|"state", …}）；分流靠 streamId —— 终端流会换
-	// （重连/换 attachment 都是新 id），所以调用方要按自己的 id 过滤，别只认"最后一条"。
 	void terminalFrame(const QString& streamId, const QJsonObject& frame);
 	// 流已开出（open 帧发出）；收到它就意味着"下一帧必须是 snapshot"
 	void terminalStreamOpened(const QString& streamId);
-	// 流结束：attachment 没了（mux 断开也算一次，之后 connected() 会到）
+	// 流结束：attachment 没了（mux 断开也算一次，之后 connected 会到）
 	void terminalStreamEnded(const QString& streamId);
 	// 流级错误：code 来自服务端（terminal/unavailable / terminal/control-unavailable / gateway/* …）
 	void terminalStreamError(const QString& streamId, const QString& code, const QString& message);
 
-	// ---- 后台任务名册（job/list，第六条逻辑流；随 follow 会话自动开/关）----
-	// 帧是引擎 job-controller 的 JobListFrame：{type:"rows", jobs:[{id,kind,label,status,progress?,detail?,startedAt,finishedAt?,output:{...}}]}。
-	// 这里不做解释，原样把 jobs 数组交给上层（ChatController 转成 QML 名册）。
-	// 端点需要 profile 里挂 job-controller 插件（ServerManager 幂等补行）；老引擎没有该行时这一条
-	// 会收到 gateway/service-unavailable：只记日志 + 发一次空数组（顶栏入口退回空态），不影响会话本身。
 	void jobRosterReady(const QJsonArray& jobs);
 
 private:
@@ -432,7 +423,7 @@ private:
 	QUrl makeUrl(const QString& path) const;
 	void post(const QString& path, const QJsonObject& body, std::function<void(const QJsonValue& value)> onSuccess, std::function<void(const RpcError& error)> onError);
 	// 用启动令牌换认证 cookie：GET /?token=<令牌> → 303 + Set-Cookie，之后所有 /api 请求与
-	// WebSocket 握手都必须带上，否则一律 401；成功后自动 openStreams()
+	// WebSocket 握手都必须带上，否则一律 401；成功后自动 openStreams
 	void startAuthHandshake();
 
 private slots:
@@ -496,6 +487,14 @@ private:
 	// 否则子代理会退回 session 形状并被引擎拒成 agent-busy。
 	QString m_followedParentSessionId;
 	QString m_followedMode;
+	// "想跟随哪个会话"的**愿望账**（与上面三格"当前有没有活着的流"分开记）。
+	// closeStreams 会清掉上面三格（流确实没了），而重连后重开 follow 必须靠这本愿望账 ——
+	// 混成一本时，一次重连（内置引擎重启 / 网络抖动）之后 session/follow 就再也不开了：
+	// 界面收不到任何消息事件，用户看到的是"模型不说话"，而回合其实在服务端跑完了。
+	// 只在 followSession 里写、unfollowSession 里清，mux 断开/重连都不碰它。
+	QString m_resumeFollowId;
+	QString m_resumeFollowParent;
+	QString m_resumeFollowMode;
 	bool m_eventsReady = false;
 	bool m_streamConnected = false;
 	int m_streamSeq = 0;                    // 逻辑流 id 自增号
@@ -507,6 +506,6 @@ private:
 	QTimer* m_takeoverSweep = nullptr;  // 回填超时扫描（只有接管态才跑）
 
 	bool m_destroyed = false;
-	// 本类作为 kMainWindow（VirtualMain）时，"已连接"是否已经发过 —— 见 HandleConnected()
+	// 本类作为 kMainWindow（VirtualMain）时，"已连接"是否已经发过 —— 见 HandleConnected
 	bool m_injectConnectedEmitted = false;
 };

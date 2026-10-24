@@ -1,24 +1,22 @@
 #pragma once
 
 // 扩展 UI 宿主（QML 单例 `HostUi` / 插件侧 index `kUiHost`）
-//
 // 职责（不做槽位、不做贡献清单、不做 mount 编排 —— 见 VirtualCommon.h 的 VirtualUiHost / VirtualBlockBackendHost）：
-//   ① 宿主把可注入的界面对象按**稳定名字**登记出来：QML 根里一行
-//        Component.onCompleted: HostUi.registerItem("topBar", this)
-//   ② 扩展"拿到对象直接注入"：
-//        DLL → DshHost::findObject("topBar") / VirtualUiHost::MountInto(...)
-//        QML → HostUi.item("topBar")（然后在自己的 QML 里写 parent: … / anchors）
-//   ③ 记账 owner → 注入项，卸载时整批摘掉（UnmountOwner / 退出时 unmountAll）
-//   ④ 顶替（VirtualBlockBackendHost）：扩展登记某个块（当前只有 "terminal"）的**后端**改由它的对象担任，
-//      界面仍是宿主的 —— 终端块照旧由 TerminalPanel 渲染，只是页面接上的对象换了。按 kind 只记一份，
-//      卸载时 releaseBlockBackends 撤。
-//
+//  ① 宿主把可注入的界面对象按**稳定名字**登记出来：QML 根里一行
+//  Component.onCompleted: HostUi.registerItem("topBar", this)
+//  ② 扩展"拿到对象直接注入"：
+//  DLL → DshHost::findObject("topBar") / VirtualUiHost::MountInto(...)
+//  QML → HostUi.item("topBar")（然后在自己的 QML 里写 parent: … / anchors）
+//  ③ 记账 owner → 注入项，卸载时整批摘掉（UnmountOwner / 退出时 unmountAll）
+//  ④ 顶替（VirtualBlockBackendHost）：扩展登记某个块（当前只有 "terminal"）的**后端**改由它的对象担任，
+//  界面仍是宿主的 —— 终端块照旧由 TerminalPanel 渲染，只是页面接上的对象换了。按 kind 只记一份，
+//  卸载时 releaseBlockBackends 撤。
 // 名字契约（稳定，加名字要跟版本一起发）：shell / titleBar / topBar / sessionBar / sessionBar.extDock /
-//   panelBarDock.extDock / composer
-//   · topBar 的根是 Row（位置器）⇒ 注入进去**自动排在末尾**（= 旧控件壳 layout->addWidget 的手感）
-//   · sessionBar.extDock（左栏底部图标行）与 panelBarDock.extDock（右栏标题行）都是 Row（位置器）
-//     ⇒ 扩展的入口按钮自动排在末尾；"功能面"类入口用右栏那个，会话级才用左栏那个
-//   · 其余是自由 Item ⇒ 位置由扩展自己的 QML 写 anchors / x,y
+//  panelBarDock.extDock / composer
+// · topBar 的根是 Row（位置器）⇒ 注入进去**自动排在末尾**
+//  · sessionBar.extDock（左栏底部图标行）与 panelBarDock.extDock（右栏标题行）都是 Row（位置器）
+//  ⇒ 扩展的入口按钮自动排在末尾；"功能面"类入口用右栏那个，会话级才用左栏那个
+//  · 其余是自由 Item ⇒ 位置由扩展自己的 QML 写 anchors / x,y
 
 #include "VirtualClass/VirtualCommon.h"
 
@@ -45,7 +43,6 @@ class HostUi : public QObject, public VirtualUiHost, public VirtualBlockBackendH
 public:
 	static HostUi& instance();
 
-	// ---------- VirtualUiHost（DLL 插件面）----------
 	QObject* HostItem(const char* name) override;
 	QStringList HostItemNames() override;
 	QString MountInto(const char* owner, const char* hostItem, const char* qmlUrl, QObject* context) override;
@@ -54,7 +51,6 @@ public:
 	int CloseWindow(const char* owner) override;
 	QString OpenWebWindow(const char* owner, const char* url, const char* title) override;
 
-	// ---------- VirtualBlockBackendHost（DLL 插件面）----------
 	bool SetBlockBackend(const QString& owner, const QString& kind, QObject* backend) override;
 	void ClearBlockBackend(const QString& owner, const QString& kind) override;
 	bool HasBlockBackend(const QString& kind) override;
@@ -67,7 +63,6 @@ public:
 	void OpenBlock(const char* kind) override;
 	bool CloseBlock(const QString& blockId) override;
 
-	// ---------- QML 面 ----------
 	QStringList names() const;
 	// 宿主 QML 根自己登记（重复登记同一个对象是幂等的）
 	Q_INVOKABLE bool registerItem(const QString& name, QObject* item);
@@ -121,8 +116,6 @@ private:
 	QQmlEngine* anyEngine() const;   // 从已登记的宿主对象借一个 QML 引擎（窗口要在它上面建组件）
 	QWindow* mainWindow() const;     // 宿主主窗口（从已登记 item 的 window() 取；取不到就 nullptr）
 	void dropAt(int index);
-
-
 
 	QHash<QString, QPointer<QObject>> m_items;   // 名字 → 宿主对象（QML item）
 	QVector<Mounted> m_mounted;                  // 注入项记账

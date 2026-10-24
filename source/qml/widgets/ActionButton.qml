@@ -1,12 +1,10 @@
 // 全宽文本按钮（原版 sidebar.qss 的 #newWorkspaceButton / #clearSessionButton 这类）。
 // variant 决定配色（都取 token）：
-//   primary     —— primaryButtonBg / Text（官方 brand-primary：light 近黑面 + 白字、dark 近白面 + 近黑字）
-//   danger      —— dangerButtonBg / textOnAccent，hover danger
-//   elevated    —— 官方 secondary 面：buttonBg/buttonHover/buttonPressed + textPrimary，
-//                  无描边（层次靠面色差），用于"新建工作区"这种次要主动作
-//   ghost       —— 透明面，文字 textSecondary → 悬停 textPrimary + chipHoverBg（官方 ghost 按钮）
-//   ghostDanger —— 透明面，文字 dangerText，悬停 12% 危险色底 —— 危险动作不该用实心红块抢视觉
-// radius 12（官方 --dsw-radius-md）、高 32、14px。
+// primary     —— primaryButtonBg / Text（官方 brand-primary：light 近黑面 + 白字、dark 近白面 + 近黑字）
+// danger      —— dangerButtonBg / textOnAccent，hover danger
+// elevated    —— 官方 secondary 面：buttonBg/buttonHover/buttonPressed + textPrimary，
+// 无描边（层次靠面色差），用于"新建工作区"这种次要主动作
+// ghost       —— 透明面，文字 textSecondary → 悬停 textPrimary + chipHoverBg（官方 ghost 按钮）
 
 import QtQuick
 import ULinHub 1.0
@@ -23,8 +21,7 @@ Item {
     readonly property bool hovered: area.containsMouse
     readonly property bool pressedState: area.pressed
     readonly property bool isGhost: variant === "ghost" || variant === "ghostDanger"
-    // 新 token 带兜底（老风格包没有 dangerText 时退回 danger）
-    readonly property color dangerTone: Theme.color.dangerText || Theme.color.danger
+    readonly property color dangerTone: Theme.color.dangerText || Theme.color.danger   // 新 token 带兜底（老风格包没有 dangerText 时退回 danger）
 
     readonly property color bgColor: {
         if (root.isGhost) {
@@ -57,6 +54,7 @@ Item {
         if (root.variant === "elevated")
             return Theme.color.textPrimary
         if (root.variant === "danger")
+
             // 红胶囊的字色不能借用 textOnAccent：那个 token 现在跟着"官方主按钮"走
             // （light 白字 / dark 近黑字），暗色下会把红块上的字压成近黑。
             return Theme.color.dangerButtonText || Theme.color.textOnAccent
@@ -70,6 +68,7 @@ Item {
         anchors.fill: parent
         radius: Theme.radius.control      // 12 = 官方 --dsw-radius-md
         color: root.bgColor
+
         // elevated 的"浮起"在 light 下是白面（官方 button-elevated-fill），需要一道 4% 的收边才立得住；
         // 其余变体的面自己就有对比，不画线（官方 elevated 面的边也是 0.5px ring，不是 border）。
         border.width: root.variant === "elevated" ? 1 : 0

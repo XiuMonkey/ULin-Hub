@@ -1,27 +1,23 @@
 #pragma once
 
-// 分层（领域归位 2026-10-15）：本文件在 common/session/ —— **领域与纯逻辑层**（命令文法的判定与过滤、
+// 分层：本文件在 common/session/ —— **领域与纯逻辑层**（命令文法的判定与过滤、
 // 候选状态机、RPC 结果翻信号都在这里）。它不 import 任何 QML 概念，可以脱离 QML 引擎单测。
 // QML 面（`Hub.commands` 属性、类型注册、发送分支里"走命令还是走模型"的转调）在
 // qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
-//
 // 斜杠命令处理器（QML 面：`Hub.commands`）—— 发现 / 过滤 / 执行。
-//
-// 为什么单独一个类：命令**不进模型历史**。引擎侧 `execute()` 只往接收方会话日志追加
+// 为什么单独一个类：命令**不进模型历史**。引擎侧 `execute` 只往接收方会话日志追加
 // `command/run` + `command/done` 两条生命周期事件，不产生任何模型消息（见 dsh-commands README：
 // "run directly against an agent without creating a model message"）—— 所以它既不属于
 // ChatController 的"发一轮提示"，也不属于任何设置面，单独一层最省事。
-//
 // 引擎契约（随包 0.1.7-rc.2 与官方 0.2.0-rc.2 **逐字段一致**；依据是引擎生成的远程客户端桩
 // `@deepseek-ai/dsh-commands/lib/typert.remote-client.js`）：
-//   · commands/list    args { agentId }                        -> [{ name, description, input?: { hint, attachments? } }]
-//   · commands/execute args { agentId, line, submittedAttachments }
-//                                                              -> undefined（语法不对/命令名不认识）| { commandId, result }
-//   · result = { kind: 'success', text?, sourceEventSeq? } | { kind: 'error', text }
-//   · 命令名文法同引擎 COMMAND_NAME：`^/[a-z][a-z0-9_-]*(\s|$)`
-//
+//  · commands/list args { agentId } -> [{ name, description, input?: { hint, attachments? } }]
+//  · commands/execute args { agentId, line, submittedAttachments }
+//  -> undefined（语法不对/命令名不认识）| { commandId, result }
+//  · result = { kind: 'success', text?, sourceEventSeq? } | { kind: 'error', text }
+//  · 命令名文法同引擎 COMMAND_NAME：`^/[a-z][a-z0-9_-]*(\s|$)`
 // ⚠️ sessionId 一律**入参**（与 ChatController 同一约定）：当前会话归 QmlBridge（qmlbridge/QmlBridge.h）所有，
-//    本类只记"上一次给哪个会话拉过列表"，用来丢弃换会话之后才回来的旧响应。
+//  本类只记"上一次给哪个会话拉过列表"，用来丢弃换会话之后才回来的旧响应。
 
 #include <QObject>
 #include <QString>

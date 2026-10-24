@@ -1,16 +1,16 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
 <TS version="2.1" language="en">
 <context>
     <name></name>
-    <message id="chat_tool_call_fmt">
-        <translation>Tool call: %1</translation>
-    </message>
     <message id="chat_tool_result_label">
         <translation>Tool result</translation>
     </message>
     <message id="common_copy">
         <translation>Copy</translation>
+    </message>
+    <message id="context_copy_all">
+        <translation>Copy all</translation>
     </message>
     <message id="ext_delete_dir_failed_fmt">
         <translation>Could not delete the extension directory: %1</translation>
@@ -43,10 +43,10 @@
         <translation>Allow once</translation>
     </message>
     <message id="model_missing_provider_or_id">
-        <translation>Missing provider or model id</translation>
+        <translation>The model settings are incomplete</translation>
     </message>
     <message id="model_credential_missing">
-        <translation>Credential reference or value is missing</translation>
+        <translation>The model credential is not set</translation>
     </message>
     <message id="session_untitled">
         <translation>Untitled session</translation>
@@ -58,13 +58,13 @@
         <translation>No session is open yet</translation>
     </message>
     <message id="toolfilter_server_not_ready">
-        <translation>The server address is not ready yet</translation>
+        <translation>The service is starting. Please wait.</translation>
     </message>
     <message id="toolfilter_plugin_unavailable">
         <translation>The tool-filter plugin is not installed or not enabled.</translation>
     </message>
     <message id="toolfilter_save_failed_http_fmt">
-        <translation>Save failed (HTTP %1)</translation>
+        <translation>Could not save. Please try again.</translation>
     </message>
     <message id="toolfilter_save_failed_reason_fmt">
         <translation>Save failed (%1)</translation>
@@ -88,7 +88,7 @@
         <translation>Load more</translation>
     </message>
     <message id="session_loading">
-        <translation>Connected to the server; loading sessions...</translation>
+        <translation>Loading conversation…</translation>
     </message>
     <message id="chat_send_failed_fmt">
         <translation>Send failed: %1 %2</translation>
@@ -97,13 +97,22 @@
         <translation>No model is configured yet. Add a model in Settings before sending.</translation>
     </message>
     <message id="chat_empty_reply_hint">
-        <translation>No reply was produced this turn. Check the model configuration or the server logs.</translation>
+        <translation>No reply was received. Check the model settings and try again.</translation>
+    </message>
+    <message id="chat_stopping">
+        <translation>Stopping...</translation>
+    </message>
+    <message id="chat_cancel_timeout_hint">
+        <translation>Stopped this response. You can send a new message.</translation>
+    </message>
+    <message id="chat_cancel_failed_fmt">
+        <translation>Could not stop: %1 %2</translation>
     </message>
     <message id="server_auth_token_missing">
-        <translation>Could not authenticate with the server. Please check that the server is running.</translation>
+        <translation>Could not connect to the local service. Please restart the app.</translation>
     </message>
     <message id="server_bundled_server_missing">
-        <translation>The installation is incomplete, so the built-in server cannot start. Please reinstall.</translation>
+        <translation>The app files are incomplete. Please reinstall.</translation>
     </message>
     <message id="com_member_not_found_fmt">
         <translation>COM member not found: %1 (hr=%2)</translation>
@@ -159,7 +168,7 @@
         <translation>Every Function requires 'Tool'; the default interface also requires 'Func'</translation>
     </message>
     <message id="server_stream_not_ready">
-        <translation>The server is not ready yet, so this cannot be submitted. Please try again shortly.</translation>
+        <translation>The service is starting. Please try again shortly.</translation>
     </message>
     <message id="chat_turn_step_fmt">
         <translation>%1 turns · %2 steps</translation>
@@ -183,13 +192,73 @@
         <translation>Input %1 tok · Output %2 tok</translation>
     </message>
     <message id="chat_input_placeholder">
-        <translation>Type a message. Enter to send, Shift+Enter for a new line</translation>
+        <translation>Describe a task, or type / for commands…</translation>
     </message>
     <message id="chat_stop_output">
         <translation>Stop generating</translation>
     </message>
     <message id="common_send">
         <translation>Send</translation>
+    </message>
+    <message id="composer_command_tip">
+        <translation>Commands</translation>
+    </message>
+    <message id="composer_context_tip">
+        <translation>Context</translation>
+    </message>
+    <message id="composer_workspace_switch">
+        <translation>Switch workspace</translation>
+    </message>
+    <message id="composer_workspace_empty">
+        <translation>No workspaces yet</translation>
+    </message>
+    <message id="composer_agent_current">
+        <translation>Current main agent</translation>
+    </message>
+    <message id="composer_agent_desc">
+        <translation>Tool calls · multi-step execution</translation>
+    </message>
+    <message id="composer_agent_empty">
+        <translation>No subagents in this session</translation>
+    </message>
+    <message id="composer_agent_tools">
+        <translation>Tools &amp; permissions</translation>
+    </message>
+    <message id="permission_title">
+        <translation>Permission</translation>
+    </message>
+    <message id="permission_read_only">
+        <translation>Read only</translation>
+    </message>
+    <message id="permission_read_only_desc">
+        <translation>Read files and inspect information; writes are blocked.</translation>
+    </message>
+    <message id="permission_workspace_write">
+        <translation>Workspace write</translation>
+    </message>
+    <message id="permission_workspace_write_desc">
+        <translation>Write inside the workspace; wider access needs approval.</translation>
+    </message>
+    <message id="permission_full_access">
+        <translation>Full access</translation>
+    </message>
+    <message id="permission_full_access_desc">
+        <translation>No sandbox limits; fewer confirmation steps.</translation>
+    </message>
+    <message id="permission_confirm_title">
+        <translation>Enable full access?</translation>
+    </message>
+    <message id="permission_confirm_desc">
+        <translation>Full access reduces confirmation steps and lets the agent run sensitive operations, change files, and execute external commands directly. Only use it when you trust the current task.</translation>
+    </message>
+    <message id="permission_confirm_ack">
+        <translation>Enable full access</translation>
+    </message>
+    <message id="terminal_connected">
+        <translation>Connected</translation>
+    </message>
+    <message id="terminal_connecting">
+        <translation>Connecting</translation>
     </message>
     <message id="ext_manager_title">
         <translation>Extension Manager</translation>
@@ -323,7 +392,7 @@
         <translation>Add model</translation>
     </message>
     <message id="model_server_not_ready">
-        <translation>The server is not ready; the model catalog cannot be read yet.</translation>
+        <translation>The service is starting, so the model list is not available yet.</translation>
     </message>
     <message id="model_loading_catalog">
         <translation>Reading the server model catalog...</translation>
@@ -384,6 +453,15 @@
     </message>
     <message id="common_add">
         <translation>Add</translation>
+    </message>
+    <message id="common_save">
+        <translation>Save</translation>
+    </message>
+    <message id="model_key_hint">
+        <translation>Enter this route's API key; leave empty to keep the current one</translation>
+    </message>
+    <message id="model_key_missing">
+        <translation>No API key yet. Expand to add one.</translation>
     </message>
     <message id="model_delete_readonly">
         <translation>Server settings are read-only; models cannot be deleted.</translation>
@@ -505,9 +583,6 @@
     <message id="plugin_loading">
         <translation>Loading the plugin marketplace...</translation>
     </message>
-    <message id="plugin_loaded_offline">
-        <translation>Plugin marketplace loaded (offline snapshot); waiting for fresh data...</translation>
-    </message>
     <message id="plugin_loaded_cached_fmt">
         <translation>Plugin marketplace loaded (cache), %1 plugins</translation>
     </message>
@@ -604,6 +679,9 @@
     <message id="settings_no_preset">
         <translation>(no preset available)</translation>
     </message>
+    <message id="settings_agent_preset_unavailable">
+        <translation>Agent presets are not available in this engine build</translation>
+    </message>
     <message id="sessionBar_new_workspace">
         <translation>New workspace</translation>
     </message>
@@ -683,7 +761,52 @@ Terminal, files and preview will show up in this panel.</translation>
     </message>
     <message id="sessionBar_no_sessions">
         <translation>No sessions yet
-Click ＋ at the top right to create one</translation>
+Click “New chat” above to start</translation>
+    </message>
+    <message id="sessionBar_no_matches">
+        <translation>No matching sessions</translation>
+    </message>
+    <message id="sessionBar_new_chat">
+        <translation>New chat</translation>
+    </message>
+    <message id="sessionBar_search_placeholder">
+        <translation>Search sessions</translation>
+    </message>
+    <message id="sessionBar_shortcut_new_chat">
+        <translation>Ctrl N</translation>
+    </message>
+    <message id="sessionBar_shortcut_search">
+        <translation>Ctrl K</translation>
+    </message>
+    <message id="sessionBar_pinned">
+        <translation>Pinned</translation>
+    </message>
+    <message id="sessionBar_collapse">
+        <translation>Collapse sidebar</translation>
+    </message>
+    <message id="sessionBar_expand">
+        <translation>Expand sidebar</translation>
+    </message>
+    <message id="sessionBar_more">
+        <translation>More</translation>
+    </message>
+    <message id="sessionBar_archived">
+        <translation>Archived sessions</translation>
+    </message>
+    <message id="sessionBar_account_initial">
+        <translation>P</translation>
+    </message>
+    <message id="sessionBar_time_now">
+        <translation>now</translation>
+    </message>
+    <message id="sessionBar_time_minutes_fmt">
+        <translation>%1 min ago</translation>
+    </message>
+    <message id="sessionBar_time_hours_fmt">
+        <translation>%1 h ago</translation>
+    </message>
+    <message id="sessionBar_time_days_fmt">
+        <translation>%1 d ago</translation>
     </message>
     <message id="workdir_delete_label">
         <translation>Delete workspace</translation>
@@ -711,9 +834,6 @@ Click ＋ at the top right to create one</translation>
     </message>
     <message id="chat_process_tools_running">
         <translation>Running commands</translation>
-    </message>
-    <message id="chat_streaming_meta">
-        <translation>In progress...</translation>
     </message>
     <message id="workdir_new_session_tip">
         <translation>New session in this workspace</translation>
@@ -749,7 +869,7 @@ Click ＋ at the top right to create one</translation>
         <translation>No background jobs in this session yet. Running jobs show their progress and output here.</translation>
     </message>
     <message id="chat_session_busy_restarting">
-        <translation>The previous process has not exited yet. Restarting the service and retrying…</translation>
+        <translation>The previous turn is still finishing. Recovering; please try again shortly.</translation>
     </message>
     <message id="chat_session_busy_status">
         <translation>Restarting the service…</translation>
@@ -758,7 +878,7 @@ Click ＋ at the top right to create one</translation>
         <translation>Command failed: %1</translation>
     </message>
     <message id="server_starting">
-        <translation>Starting the built-in server...</translation>
+        <translation>Starting the service…</translation>
     </message>
     <message id="session_list_load_failed_fmt">
         <translation>Could not load the session list: %1</translation>
@@ -830,19 +950,19 @@ Click ＋ at the top right to create one</translation>
         <translation>This style pack is not compatible with the current version. Reverted to the default appearance.</translation>
     </message>
     <message id="server_start_failed">
-        <translation>The built-in server failed to start. Please restart the app; if it keeps happening, reinstall.</translation>
+        <translation>The service could not start. Restart the app; if it still fails, reinstall.</translation>
     </message>
     <message id="server_proc_start_failed">
-        <translation>Could not start the built-in server. Please restart the app.</translation>
+        <translation>The service could not start. Please restart the app.</translation>
     </message>
     <message id="server_auth_failed">
-        <translation>Could not authenticate with the server. Please restart the app and try again.</translation>
+        <translation>Could not connect to the local service. Restart the app and try again.</translation>
     </message>
     <message id="server_auth_queue_full">
-        <translation>The server is not ready yet. Please try again in a moment.</translation>
+        <translation>The service is not ready yet. Please try again shortly.</translation>
     </message>
     <message id="toolfilter_plugin_no_response">
-        <translation>The tool-filter plugin did not respond. Please try again shortly.</translation>
+        <translation>Tool filtering is not responding. Please try again shortly.</translation>
     </message>
     <message id="model_provider_load_failed_fmt">
         <translation>Could not load the model list for %1: %2</translation>
@@ -912,7 +1032,7 @@ Click ＋ at the top right to create one</translation>
         <translation>Record detail</translation>
     </message>
     <message id="trace_copy_json">
-        <translation>Copy JSON</translation>
+        <translation>Copy raw data</translation>
     </message>
     <!-- Main/subagent tabs and the background-job roster (basic/topbar/) -->
     <message id="subagent_mode_one_shot">

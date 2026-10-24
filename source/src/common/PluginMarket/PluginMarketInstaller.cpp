@@ -11,16 +11,13 @@
 
 namespace
 {
-	// 自动安装的市场包版本（与 registry 快照保持一致）
-	const char* const kMarketPackage = "dshmarket";
-	// 1.9.0 是早先写死的版本，而 npm 上的 latest 已经是 1.66.32（2026-10 查）。
-	// 这里仍显式钉住一个具体版本（分发要可控），只是钉到当前最新；升级时改这一行即可。
-	const char* const kMarketVersion = "1.66.32";
+	const char* const kMarketPackage = "dshmarket";   // 自动安装的市场包版本（与 registry 快照保持一致）
+	const char* const kMarketVersion = "1.66.32";   // 这里仍显式钉住一个具体版本（分发要可控），只是钉到当前最新；升级时改这一行即可
 	const char* const kMarketPackageJson =
 		"/resources/server/harness/profiles/web/node_modules/dshmarket/package.json";
 	const char* const kNodeRelativePath = "/resources/server/node.exe";
 	const char* const kHarnessRelativePath = "/resources/server/harness";
-	// 随包发布的 pnpm：实测这份 npm 装出来的包是 artifacts/exe 布局，bin/pnpm.cjs 指向的
+
 	// dist/pnpm.mjs 是个坏 stub（跑 --version 直接抛异常），真正能跑的是 artifacts/exe/dist/pnpm.mjs
 	// （验证过：11.21.0，exit 0）。所以优先用它，退而求其次才是传统入口。
 	const char* const kPnpmEntryRelativePath = "/resources/server/node_modules/pnpm/artifacts/exe/dist/pnpm.mjs";
@@ -49,8 +46,7 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 	const QString nodePath = appDir + QLatin1String(kNodeRelativePath);
 	const QString dshHome = appDir + QLatin1String(kHarnessRelativePath);
 
-	// 确保 pnpm 可用：如果 PATH 里没有 pnpm，就创建一个本地 shim
-	QString pnpmEntryPath = appDir + QLatin1String(kPnpmEntryRelativePath);
+	QString pnpmEntryPath = appDir + QLatin1String(kPnpmEntryRelativePath);   // 确保 pnpm 可用：如果 PATH 里没有 pnpm，就创建一个本地 shim
 	if (!QFile::exists(pnpmEntryPath))
 		pnpmEntryPath = appDir + QLatin1String(kPnpmEntryFallbackRelativePath);
 	const QString pnpmEntry = QDir::toNativeSeparators(pnpmEntryPath);
@@ -83,8 +79,7 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 
 	m_installer->setProcessEnvironment(env);
 
-	// m_installer 每次安装新建、完成即销毁，不进登记表
-	connect(m_installer, &QProcess::readyReadStandardOutput, this, [this]() {
+	connect(m_installer, &QProcess::readyReadStandardOutput, this, [this]() {   // m_installer 每次安装新建、完成即销毁，不进登记表
 		while (m_installer->canReadLine()) {
 			const QString line = QString::fromUtf8(m_installer->readLine()).trimmed();
 			if (line.isEmpty())
@@ -129,8 +124,7 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 
 void PluginMarketInstaller::patchProfileManifest(const QString& profileDir) const
 {
-	// pnpm 只写 dependencies，需要手动把 dshmarket 加入 profile bundles
-	const QString manifestPath = profileDir + QStringLiteral("/package.json");
+	const QString manifestPath = profileDir + QStringLiteral("/package.json");   // pnpm 只写 dependencies，需要手动把 dshmarket 加入 profile bundles
 	QFile manifestFile(manifestPath);
 	if (!manifestFile.open(QIODevice::ReadOnly | QIODevice::Text))
 		return;

@@ -1,17 +1,34 @@
 #include "common/session/SessionCatalog.h"
 
 #include <QCoreApplication>
+#include <QDir>
 
-// 会话/工作区列表的解析与派生逻辑。所有函数都不触碰控件，因此可以脱离 UI 单独做单元测试。
-
-namespace
+namespace   // 会话/工作区列表的解析与派生逻辑。所有函数都不触碰控件，因此可以脱离 UI 单独做单元测试
 {
 	const char* const kWorkspaceIdKey = "workspaceId";
 	const char* const kTitleKey = "title";
 	const char* const kSessionIdsKey = "sessionIds";
+	const char* const kPathKey = "path";   // workspace view 里的根目录；会话 header 里的启动目录叫 cwd（session/list 会原样带回来）
+	const char* const kCwdKey = "cwd";
 
-	// 解析一条 workspace 记录；workspaceId 为空返回 false（这种条目一律丢弃）。
-	bool parseWorkspace(const QJsonObject& obj, WorkspaceRecord* out)
+	// 路径比较口径：Windows 大小写不敏感、`/` 与 `\` 等价、尾部斜杠不算区别。
+	// 不解析 8.3 短名与符号链接 —— 会话 header 与 workspace.path 由同一个引擎写出来，
+	// 同一台机器上是同一形态，这里只做"字符串层面能对上"的归一化。
+	bool samePath(const QString& left, const QString& right)
+	{
+		if (left.isEmpty() || right.isEmpty())
+			return false;
+
+		QString a = QDir::fromNativeSeparators(left);
+		QString b = QDir::fromNativeSeparators(right);
+		while (a.size() > 1 && a.endsWith(QLatin1Char('/')))
+			a.chop(1);
+		while (b.size() > 1 && b.endsWith(QLatin1Char('/')))
+			b.chop(1);
+		return a.compare(b, Qt::CaseInsensitive) == 0;
+	}
+
+	bool parseWorkspace(const QJsonObject& obj, WorkspaceRecord* out)   // 解析一条 workspace 记录；workspaceId 为空返回 false（这种条目一律丢弃）
 	{
 		const QString workspaceId = obj.value(QLatin1String(kWorkspaceIdKey)).toString();
 		if (workspaceId.isEmpty())
@@ -21,6 +38,7 @@ namespace
 		record.workspaceId = workspaceId;
 		const QString title = obj.value(QLatin1String(kTitleKey)).toString();
 		record.title = title.isEmpty() ? workspaceId : title;
+		record.path = obj.value(QLatin1String(kPathKey)).toString();
 
 		const QJsonArray sessionIds = obj.value(QLatin1String(kSessionIdsKey)).toArray();
 		for (const auto& sidValue : sessionIds) {
@@ -38,18 +56,21 @@ void SessionCatalog::clear(bool keepArchived)
 {
 	m_workspaces.clear();
 	m_sessions.clear();
-	if (!keepArchived)
+	if (!keepArchived) {
 		m_archivedSessionIds.clear();   // 见头文件：清空全部会话时不能清它，否则旧会话会以"未分组"回流
+		m_pinnedSessionIds.clear();     // 置顶只影响排序/分组、不决定可见性；下一次 workspace/follow baseline 会重新给
+	}
 	m_childSessions.clear();
 	m_subagentCatalogs.clear();
 	m_childParentIndex.clear();
 }
 
-// 0.1.5：工作区清单与归档集合来自 mux 上的 workspace/follow，不再随会话列表回来
+// 0.1.5：工作区清单、归档集合与置顶集合都来自 mux 上的 workspace/follow，不再随会话列表回来
 void SessionCatalog::applySnapshot(const SessionListSnapshot& snapshot)
 {
 	if (snapshot.workspacesOk) {  // false = 本次没有任何工作区信息：必须保留现有分组，清空会把 workspace/follow 的基线抹掉
 		setArchivedSessionIds(snapshot.archivedSessionIds);
+		setPinnedSessionIds(snapshot.pinnedSessionIds);
 		setWorkspaces(snapshot.workspaces);
 	}
 
@@ -67,8 +88,7 @@ bool SessionCatalog::applyRunningStates(const QJsonArray& items)
 			continue;
 		const bool running = session.value(QStringLiteral("running")).toBool();
 
-		// 子代理在 m_childSessions，普通会话在 m_sessions：两边都试，谁命中改谁（同一个 id 不会同时在两处）。
-		bool hit = false;
+		bool hit = false;   // 子代理在 m_childSessions，普通会话在 m_sessions：两边都试，谁命中改谁（同一个 id 不会同时在两处）
 		for (SessionRecord& child : m_childSessions) {
 			if (child.sessionId != sid)
 				continue;
@@ -151,8 +171,7 @@ void SessionCatalog::removeWorkspace(const QString& workspaceId)
 	}
 }
 
-// 按服务端给的完整顺序重排；没被点名的接在后面，避免丢分组。
-void SessionCatalog::reorderWorkspaces(const QStringList& workspaceIds)
+void SessionCatalog::reorderWorkspaces(const QStringList& workspaceIds)   // 按服务端给的完整顺序重排；没被点名的接在后面，避免丢分组
 {
 	if (workspaceIds.isEmpty())
 		return;
@@ -210,9 +229,17 @@ void SessionCatalog::setSessions(const QJsonArray& items)
 		SessionRecord record;
 		record.sessionId = sid;
 		record.title = sessionTitle(session);
-		record.workspaceId = workspaceFor(sid);
+		record.cwd = session.value(QLatin1String(kCwdKey)).toString();   // header.cwd（session/list 原样带回）：归属的第三条依据，见 workspaceFor
+		record.workspaceId = workspaceFor(sid, record.cwd);
 		record.running = session.value(QStringLiteral("running")).toBool();
 		record.archived = m_archivedSessionIds.contains(sid);
+
+		// 最近活动时间：session/list 的 updatedAt（服务端 = max(createdAt, 最后一次提问)）是数字（epoch ms）。
+		// 字段缺失时退 createdAt；两者都没有就留 0（模型侧当"未知"处理，不显示相对时间）。
+		qint64 updatedAtMs = static_cast<qint64>(session.value(QStringLiteral("updatedAt")).toDouble(0));
+		if (updatedAtMs <= 0)
+			updatedAtMs = static_cast<qint64>(session.value(QStringLiteral("createdAt")).toDouble(0));
+		record.updatedAtMs = updatedAtMs;
 
 		const QJsonObject projections = session.value(QStringLiteral("projections")).toObject();  // 游标回落值 + 该会话的模型选择都在这份投影里（0.1.5 起）
 		record.asOfSeq = projections.value(QStringLiteral("asOfSeq")).toInt();
@@ -230,7 +257,6 @@ void SessionCatalog::setSessions(const QJsonArray& items)
 		}
 
 		// 会话列表本身也带一份（可能不完整的）投影提示：有 subagentCatalog 就顺手记下来，
-		// 这样冷会话在 follow 快照到之前也能立刻画出页签。返回值这里不关心通知（setSessions
 		// 的调用方本来就会整表刷新界面）。
 		if (values.contains(QStringLiteral("subagentCatalog")))
 			setSubagentCatalog(sid, values.value(QStringLiteral("subagentCatalog")).toArray());
@@ -248,6 +274,28 @@ void SessionCatalog::setArchivedSessionIds(const QSet<QString>& ids)
 	m_archivedSessionIds = ids;
 	for (SessionRecord& record : m_sessions)
 		record.archived = m_archivedSessionIds.contains(record.sessionId);
+}
+
+// 整体替换置顶集合。空 id 与重复 id 丢掉；顺序保留（服务端是"最近置顶的在前"）。
+// 这里只在侧栏分组/排序时用，所以不需要回头改 SessionRecord（record 里不放 pinned 标志，
+// 避免同一份状态存两处、baseline 与 session/list 先后到达时对不上）。
+void SessionCatalog::setPinnedSessionIds(const QStringList& ids)
+{
+	m_pinnedSessionIds.clear();
+	m_pinnedSessionIds.reserve(ids.size());
+
+	QSet<QString> seen;
+	for (const QString& id : ids) {
+		if (id.isEmpty() || seen.contains(id))
+			continue;
+		seen.insert(id);
+		m_pinnedSessionIds.append(id);
+	}
+}
+
+QStringList SessionCatalog::pinnedSessionIds() const
+{
+	return m_pinnedSessionIds;
 }
 
 bool SessionCatalog::addSession(const QString& sessionId, const QString& title, const QString& workspaceId)
@@ -314,6 +362,12 @@ bool SessionCatalog::modelSelectionFor(const QString& sessionId, QString* provid
 // 会话自身记录的归属优先（addSession / addSessionToWorkspace 会显式写入），否则界面在"在工作区里新建会话"之后会把按钮挂到未分组下面
 QString SessionCatalog::workspaceFor(const QString& sessionId) const
 {
+	const SessionRecord* record = find(sessionId);
+	return workspaceFor(sessionId, record ? record->cwd : QString());
+}
+
+QString SessionCatalog::workspaceFor(const QString& sessionId, const QString& cwd) const
+{
 	if (const SessionRecord* record = find(sessionId)) {
 		if (!record->workspaceId.isEmpty())
 			return record->workspaceId;
@@ -322,6 +376,18 @@ QString SessionCatalog::workspaceFor(const QString& sessionId) const
 	for (const WorkspaceRecord& workspace : m_workspaces) {  // 其次看工作区记录（workspace/follow 的 baseline）给出的 sessionIds 归属
 		if (workspace.sessionIds.contains(sessionId))
 			return workspace.workspaceId;
+	}
+
+	// 引擎的 sessionIds 是"有序归属账"，但 dsh-workspace 的唯一写路径 `mutate()` 每写一次都会
+	// sessionIds.filter(id => host.sessionPath(id) === record.path)
+	// 把"这一刻内存表里解析不出 cwd"的会话从账上剪掉（lib/index.js 里那句 "pruning candidates
+	// that no longer pass the id-plus-canonical-cwd membership check"）；而能按 cwd 重建归属的
+	// bootstrap() 只在 initialized === false 时跑一次。于是旧会话一旦被剪就永久除名，重启也不自愈。
+	if (!cwd.isEmpty()) {
+		for (const WorkspaceRecord& workspace : m_workspaces) {
+			if (samePath(workspace.path, cwd))
+				return workspace.workspaceId;
+		}
 	}
 	return QString();
 }
@@ -344,16 +410,26 @@ QVector<SessionRecord> SessionCatalog::visibleSessions() const
 
 QString SessionCatalog::autoSelectSessionId() const
 {
+	// 启动默认进入"最近有活动"的会话：session/list 的 updatedAt 是服务端按
+	// max(createdAt, 最后一次提问) 现算的，取未归档里最大的那条（运行中也算——
+	// 用户往往就是想回到那个正在跑的会话）。旧服务端没有 updatedAt 时退回原规则：
+	// 第一条非运行中的会话。
+	const SessionRecord* newest = nullptr;
 	for (const SessionRecord& record : m_sessions) {
-		if (!record.running)
+		if (record.archived || record.updatedAtMs <= 0)
+			continue;
+		if (newest == nullptr || record.updatedAtMs > newest->updatedAtMs)
+			newest = &record;
+	}
+	if (newest != nullptr)
+		return newest->sessionId;
+
+	for (const SessionRecord& record : m_sessions) {
+		if (!record.archived && !record.running)
 			return record.sessionId;
 	}
 	return QString();
 }
-
-// ------------------------------------------------------------------
-// 子代理：目录（投影）+ 子代理会话索引
-// ------------------------------------------------------------------
 
 QJsonArray SessionCatalog::subagentCatalog(const QString& sessionId) const
 {

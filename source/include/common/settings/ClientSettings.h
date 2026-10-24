@@ -38,7 +38,7 @@ namespace AppearanceSetting
 		Dark
 	};
 
-	// 文件名（相对 ClientSettings::dir()）
+	// 文件名（相对 ClientSettings::dir）
 	QString fileName();
 
 	// 首次运行时落一份带默认值的模板，便于用户找到并手改；文件已存在就原样不动，绝不覆盖用户已做的选择。

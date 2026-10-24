@@ -1,4 +1,4 @@
-// 轻提示（旧壳的 toastLabel：「没有更多了」这类）。挂在页面底部居中，show() 后自动淡出。
+// 轻提示。挂在页面底部居中，show 后自动淡出。
 // 用法：Toast { id: toast; anchors.bottom: parent.bottom }  →  toast.show("没有更多了")
 
 import QtQuick

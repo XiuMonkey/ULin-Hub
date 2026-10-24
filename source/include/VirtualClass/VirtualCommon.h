@@ -16,14 +16,14 @@ class QNetworkAccessManager;
 // VirtualCommon.h —— 宿主 → 插件方向唯一的 C++ 接口面：纯虚接口，无 .cpp，宿主与插件各编一份。
 // 取对象：qobject_cast<VirtualTheme*>(DshHost::findObject(DshHostIndex::kThemeManager))
 // 接口 → 宿主实现（登记名）：
-//   VirtualTheme → ThemeManager (kThemeManager)          VirtualMain → DshApiClient (kMainWindow)
-//   VirtualConnectionManager → ConnectionManager (kConnectionManager)
-//   VirtualTranslation → TranslationNotifier (kTranslationNotifier)   VirtualUiHost → HostUi (kUiHost)
-//   VirtualBlockBackendHost → HostUi (kUiHost，与 VirtualUiHost 同一个单例 —— 不单列 index)
+//  VirtualTheme → ThemeManager (kThemeManager) VirtualMain → DshApiClient (kMainWindow)
+//  VirtualConnectionManager → ConnectionManager (kConnectionManager)
+//  VirtualTranslation → TranslationNotifier (kTranslationNotifier) VirtualUiHost → HostUi (kUiHost)
+//  VirtualBlockBackendHost → HostUi (kUiHost，与 VirtualUiHost 同一个单例 —— 不单列 index)
 // 登记名见 HostIndex.h，取址入口见 HostExports.h，IID 见文件末尾。
 // ⚠️ 跨模块只能 qobject_cast，不能 dynamic_cast（RTTI 不跨 DLL，恒 nullptr）；取接口与调用都只在 GUI 线程。
 // ⚠️ ABI：虚方法只许末尾追加（不改名 / 不换签名 / 不插中间 / 不删），接口只能增（新类 + 新 IID）——
-//    vtable 槽位 = 声明顺序，插中间会让旧插件调到错槽位，不报错、只在调用时崩。末尾追加的标了【末尾追加】。
+//  vtable 槽位 = 声明顺序，插中间会让旧插件调到错槽位，不报错、只在调用时崩。末尾追加的标了【末尾追加】。
 // 扩展开发全貌见 assets/resources/docs/EXTENSION_DEV.zh-CN.md（界面注入 §11.3、ABI §11.5）。
 
 class QWidget;   // 只出现在 VirtualTheme / VirtualMain 的历史签名里；QML 壳已无 QWidget
@@ -71,9 +71,6 @@ virtual QNetworkAccessManager* AuthenticatedHttp() = 0;
 
 	virtual void ExternalRefreshSessionTitles() = 0;  // 无操作桩：刻意不接 —— session/list 会重建 SessionCatalog、切走用户正看的会话
 
-	// ---- 末尾追加（2026-10-17）：引擎侧地址 ----
-	// 返回**干净的 baseUrl**（无 query / fragment，不含启动令牌）；后端被接管时为空。
-	// 实现就是"套壳"：DshApiClient::ServerBaseUrl() 只 return baseUrl();（原函数一行没动）
 	virtual QUrl ServerBaseUrl() = 0;
 	// 带启动令牌的引擎入口（WebEngine 打开时用；没有令牌就是 baseUrl 本身）
 	virtual QUrl ServerLaunchUrl() = 0;
@@ -103,7 +100,7 @@ public:
 	virtual void SuspendConnection(QString index) = 0;
 	virtual void TakeoverConnection(QString index, QObject* receiver, QByteArray slot) = 0;
 	virtual void Reconnect(QString index) = 0;
-	// 新增订阅宿主公开信号：signal 是原生签名串（"2clearRequested()"），不在白名单会被拒
+	// 新增订阅宿主公开信号：signal 是原生签名串（"2clearRequested"），不在白名单会被拒
 	virtual void ProtectedRegisterConnection(QString index, const QObject* sender, QByteArray signal, const QObject* receiver, const char* slot) = 0;
 	// 【末尾追加】交还接管：还原成接管前的样子（QML 登记项解闸、宿主内部连接只回卷一层）；没有接管者 / 没这条连接 ⇒ false
 	virtual bool ReleaseTakeover(QString index) = 0;
@@ -122,7 +119,7 @@ public:
 };
 
 // VirtualUiHost —— 扩展 UI 宿主接口（QML 时代）：把扩展自己的 QML 注入到宿主界面的指定对象下面。
-// 沿用旧控件壳的直觉 —— 那时是 new QToolButton(hostObject) + layout->addWidget，现在换成
+// 沿用控件壳的直觉 —— 那时是 new QToolButton(hostObject) + layout->addWidget，现在换成
 // qobject_cast<QQuickItem*>(DshHost::findObject("topBar")) 之后 setParentItem(host)。实现类 = HostUi 单例（kUiHost）。
 // 可挂名字（稳定，加名字跟版本一起发）：shell / titleBar / sessionBar / composer 是自由 Item，位置由扩展 QML 自己写；
 // topBar / sessionBar.extDock 根是 Row（位置器），注入进去自动排末尾，不用算 x/y。
@@ -136,22 +133,13 @@ public:
 	// owner = 扩展安装目录名，按 owner 整批卸载；返回句柄（供 UnmountOwner），失败回空串。
 	// ⚠️ 装载期（attachHost 里）调必失败 —— 名字是 QML 根在 Component.onCompleted 登记的 ⇒ 延后到 QTimer::singleShot(0)。
 	virtual QString MountInto(const char* owner, const char* hostItem, const char* qmlUrl, QObject* context) = 0;
-	// ⚠️ 按 owner 整批删：同 owner 既挂入口又挂面板会一起被摘（用后缀分开，如 owner + "/panel"）；运行期"移除扩展"宿主不代劳，须在自己 detachHost() 里摘。
+	// ⚠️ 按 owner 整批删：同 owner 既挂入口又挂面板会一起被摘（用后缀分开，如 owner + "/panel"）；运行期"移除扩展"宿主不代劳，须在自己 detachHost 里摘。
 	virtual int UnmountOwner(const char* owner) = 0;
 
-	// ---- 真窗口（2026-10-17 追加）：给扩展一块**自己的顶层窗口**，不是塞进宿主界面的 item。
-	// 与 MountInto 的分工：MountInto = "往宿主已有界面里追加"；OpenWindow = "开一个独立窗口"。
-	// 用它的理由：可拖动 / 最大化 / 最小化 / 原生边框 —— 塞进面板做不到这些。
-	// qmlUrl 的根**必须是 Window**；context 会作为 `context` 注入该窗口的 QML 上下文。
-	// owner 与 MountInto 同义（同一 owner 只留一个窗口，重复开会先关旧的）；返回句柄，失败回空串。
 	virtual QString OpenWindow(const char* owner, const char* qmlUrl, QObject* context, const char* title) = 0;
 	// 关掉某 owner 的窗口（点 × 也算关；回收由宿主做）。返回关掉的个数。
 	virtual int CloseWindow(const char* owner) = 0;
 
-	// ---- 网页窗口（2026-10-18 追加）：用宿主自带的 WebEngine 打开一个 URL 的独立窗口 ----
-	// 定位：这是**通用兜底落点** —— 插件界面是 web 的，原生表达不了（或代价不划算）时就开窗让
-	// WebEngine 去解析，而不是为每个插件写原生视图。宿主只提供窗口与内嵌浏览器，不认识任何插件。
-	// owner 语义同 OpenWindow（同一 owner 只一个窗口）。返回句柄，失败回空串。
 	virtual QString OpenWebWindow(const char* owner, const char* url, const char* title) = 0;
 };
 
@@ -174,8 +162,8 @@ public:
 	// （start / pageReady / pageGone / write / resize / ack / log / pageHello / closeBlock +
 	// frameReady / statusChanged）。宿主把它**原样**注册到该块的 QWebChannel 上，页面直连它。
 	// 传 nullptr 等于撤销。owner = 扩展安装目录名：宿主按 kind 只记一份，后登记者取得该 kind。
-	// ⚠️ 只在 GUI 线程调，且要赶在**该块的面板被创建之前**（即 attachHost() 里）：面板只在创建时
-	//    取一次后端，晚了它已经接上内置桥。
+	// ⚠️ 只在 GUI 线程调，且要赶在**该块的面板被创建之前**（即 attachHost 里）：面板只在创建时
+	//  取一次后端，晚了它已经接上内置桥。
 	virtual bool SetBlockBackend(const QString& owner, const QString& kind, QObject* backend) = 0;
 	// 撤销：仅当该 kind 当前登记的 owner 就是调用方时才撤（免得卸 A 时把 B 顶上去的登记清掉）；
 	// 撤掉后该 kind 恢复内置后端。
@@ -183,14 +171,6 @@ public:
 	// 该 kind 当前是否已被顶替（扩展自省 / 宿主界面提示用）
 	virtual bool HasBlockBackend(const QString& kind) = 0;
 
-	// ---- 以下两条为【末尾追加】：开一块面板 / 按 id 关它（与"顶替后端"是两件事）----
-	// 开面板 = 宿主用内置 browser 视图渲染一块块，扩展只交地址；界面/地址栏/前进后退全归宿主。
-	// **纯转发**：实现只调 PanelBarDockModel 的 openUrl / closeBlock —— 那两个是块模型本来就该有的
-	// 能力（"开一块带初始地址的浏览器块"、"按稳定 id 关一块"），不是为扩展加的。
-	//
-	// ⚠️ ABI：纯虚只能**末尾**追加；壳与扩展一起发（扩展 include 宿主 source/include 重编）。
-	// url 必须完整（含 scheme）；title 可空（空 = 内置块名 "网页浏览 N"）。
-	// 返回块 id（"blk-N"）：调用方自己记住它，关的时候原样传回 CloseBlock —— 模型不记"是谁开的"。
 	virtual QString OpenBlockUrl(const QString& url, const QString& title) = 0;
 	// 【末尾追加】扩展登记右栏启动器行（与"终端/网页浏览"并列）；实现只转发到块模型。
 	virtual void RegisterLauncher(const char* kind, const char* label, const char* hint) = 0;
@@ -204,7 +184,7 @@ public:
 	virtual bool CloseBlock(const QString& blockId) = 0;
 };
 
-Q_DECLARE_INTERFACE(VirtualMain, "com.ulinhub.VirtualMain/1.0")   // 与类名一致（原 IID 里叫 VirtualWindow，2026-10-18 对齐）
+Q_DECLARE_INTERFACE(VirtualMain, "com.ulinhub.VirtualMain/1.0")   // 与类名一致
 Q_DECLARE_INTERFACE(VirtualConnectionManager, "com.ulinhub.VirtualConnectionManager/1.0")
 Q_DECLARE_INTERFACE(VirtualTheme, "com.ulinhub.VirtualTheme/1.0")
 Q_DECLARE_INTERFACE(VirtualTranslation, "com.ulinhub.VirtualTranslation/1.0")
@@ -212,4 +192,4 @@ Q_DECLARE_INTERFACE(VirtualUiHost, "com.ulinhub.VirtualUiHost/1.0")
 Q_DECLARE_INTERFACE(VirtualBlockBackendHost, "com.ulinhub.VirtualBlockBackendHost/1.0")
 
 // 已删接口（旧文档 / 旧插件可能还在引用，不要照抄）：VirtualTopBar、VirtualSidebar、VirtualShell、VirtualMessageHost ——
-// 实现类均随 M8 删 src/ui 一起没了，findObject 必得空；kTopBar / kSessionBar 后来以"宿主 QML 对象登记名"的含义恢复。
+// 实现类均随 删 src/ui 一起没了，findObject 必得空；kTopBar / kSessionBar 后来以"宿主 QML 对象登记名"的含义恢复。

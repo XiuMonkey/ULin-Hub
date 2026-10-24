@@ -78,8 +78,7 @@ namespace
 		return var;
 	}
 
-	// JSON 标量 -> VARIANT；数组/对象暂不支持（返回 false）。
-	bool jsonToVariant(const QJsonValue& value, VARIANT& out)
+	bool jsonToVariant(const QJsonValue& value, VARIANT& out)   // JSON 标量 -> VARIANT；数组/对象暂不支持（返回 false）
 	{
 		if (value.isString()) {
 			out = vtString(value.toString());
@@ -105,8 +104,7 @@ namespace
 		return false;
 	}
 
-	// VARIANT 标量 -> JSON。
-	QJsonValue variantToJson(const VARIANT& v)
+	QJsonValue variantToJson(const VARIANT& v)   // VARIANT 标量 -> JSON
 	{
 		switch (v.vt) {
 		case VT_BSTR:
@@ -133,8 +131,7 @@ namespace
 		}
 	}
 
-	// 兜底：用 VariantChangeType 尽力转成 VT_BSTR / VT_R8 后再序列化。
-	QJsonValue coerceVariantToJson(const VARIANT& v)
+	QJsonValue coerceVariantToJson(const VARIANT& v)   // 兜底：用 VariantChangeType 尽力转成 VT_BSTR / VT_R8 后再序列化
 	{
 		VARIANT conv;
 		VariantInit(&conv);
@@ -167,8 +164,7 @@ namespace
 		return dispId;
 	}
 
-	// 读属性（PROPERTYGET），结果放入 out。
-	bool getMemberValue(IDispatch* obj, const QString& name, VARIANT* out, QString* error)
+	bool getMemberValue(IDispatch* obj, const QString& name, VARIANT* out, QString* error)   // 读属性（PROPERTYGET），结果放入 out
 	{
 		DISPID dispId = resolveMember(obj, name, error);
 		if (dispId == DISPID_UNKNOWN)
@@ -200,8 +196,7 @@ namespace
 		if (dispId == DISPID_UNKNOWN)
 			return false;
 
-		// 参数需逆序填入 DISPPARAMS
-		std::vector<VARIANT> reversed(args.rbegin(), args.rend());
+		std::vector<VARIANT> reversed(args.rbegin(), args.rend());   // 参数需逆序填入 DISPPARAMS
 		DISPPARAMS params = {};
 		if (!reversed.empty()) {
 			params.rgvarg = reversed.data();
@@ -232,8 +227,7 @@ namespace
 		return true;
 	}
 
-	// 写属性（PROPERTYPUT），值所有权转移给本函数。
-	bool putMemberValue(IDispatch* obj, const QString& name, VARIANT value, QString* error)
+	bool putMemberValue(IDispatch* obj, const QString& name, VARIANT value, QString* error)   // 写属性（PROPERTYPUT），值所有权转移给本函数
 	{
 		DISPID dispId = resolveMember(obj, name, error);
 		if (dispId == DISPID_UNKNOWN) {
@@ -260,8 +254,7 @@ namespace
 		return true;
 	}
 
-	// 读整型属性（用于对象摘要，如 Count）。
-	bool readIntProperty(IDispatch* obj, const QString& name, long& out)
+	bool readIntProperty(IDispatch* obj, const QString& name, long& out)   // 读整型属性（用于对象摘要，如 Count）
 	{
 		VARIANT v;
 		VariantInit(&v);
@@ -300,8 +293,7 @@ namespace comcall
 	{
 		ComThreadInit comInit;
 
-		// 白名单：只允许 regulation "Com" 段声明的组件
-		const QString progId = comConfig.value(QStringLiteral("ProgId")).toString();
+		const QString progId = comConfig.value(QStringLiteral("ProgId")).toString();   // 白名单：只允许 regulation "Com" 段声明的组件
 		if (progId.isEmpty()) {
 			error = qtTrId("com_missing_config");
 			return false;

@@ -29,6 +29,17 @@ namespace SessionCommands
 		return args;
 	}
 
+	// session/projections -> args { request: { sessionId } }；用于读当前会话的权限预设
+	// （values.permissions.currentValue，如 read-only / workspace-write / danger-full-access）。
+	inline QJsonObject sessionProjections(const QString& sessionId)
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("sessionId"), sessionId);
+		QJsonObject args;
+		args.insert(QStringLiteral("request"), request);
+		return args;
+	}
+
 	// workspace/create -> args { request: { path } }
 	inline QJsonObject workspaceCreate(const QString& path)
 	{
@@ -67,12 +78,12 @@ namespace SessionCommands
 	}
 
 	// session/follow 与 session/page 共用的 address：
-	//   · 普通会话 = { kind: "session", sessionId }
-	//   · 子代理会话 = { kind: "subagent", parentSessionId, childSessionId, mode }
+	//  · 普通会话 = { kind: "session", sessionId }
+	//  · 子代理会话 = { kind: "subagent", parentSessionId, childSessionId, mode }
 	// ⚠️ 子代理**不能**用 session 形状寻址：引擎 dsh-api-session-controller 的 validateAddress
-	//    （lib/index.js: validateAddress）对 origin == "subagent" 的会话直接回
-	//    `session/agent-busy`（"subagent Sessions require their durable parent address"）⇒ follow 流会开出来
-	//    但一帧快照都不发，表现就是"点进子代理页签消息区全空"。parentSessionId 为空即普通会话。
+	//  （lib/index.js: validateAddress）对 origin == "subagent" 的会话直接回
+	//  `session/agent-busy`（"subagent Sessions require their durable parent address"）⇒ follow 流会开出来
+	//  但一帧快照都不发，表现就是"点进子代理页签消息区全空"。parentSessionId 为空即普通会话。
 	// mode 取 subagentCatalog 条目的 mode（one-shot / continuable）；取不到传空 = "unknown"
 	// （引擎只在 mode != "unknown" 时校验它，空串兜底是安全的）。
 	inline QJsonObject sessionAddress(const QString& sessionId, const QString& parentSessionId = QString(),
@@ -247,14 +258,15 @@ namespace SessionCommands
 		const QJsonArray& images = QJsonArray())
 	{
 		QJsonArray content;
+		// 与 DSH 客户端一致：图片附件在前，正文在后。
+		for (const QJsonValue& image : images)
+			content.append(image);
 		if (!text.isEmpty()) {
 			QJsonObject textPart;
 			textPart.insert(QStringLiteral("type"), QStringLiteral("text"));
 			textPart.insert(QStringLiteral("text"), text);
 			content.append(textPart);
 		}
-		for (const QJsonValue& image : images)
-			content.append(image);
 
 		QJsonObject request;
 		request.insert(QStringLiteral("requestId"), QUuid::createUuid().toString(QUuid::WithoutBraces));
@@ -373,11 +385,6 @@ namespace SessionCommands
 		return args;
 	}
 
-	// ---- 斜杠命令（commands）----
-	// 两个端点的 scope 是 { context: 'agent', wire: 'agentId' } ⇒ args 顶层就是 `agentId`，
-	// **不套 `request`**（与上面的 agentPresets/select 同形）。依据：引擎生成的远程客户端桩
-	// `@deepseek-ai/dsh-commands/lib/typert.remote-client.js`（0.1.7 与 0.2.0 逐字段一致）。
-	// commands/list -> args { agentId }
 	inline QJsonObject commandsList(const QString& sessionId)
 	{
 		QJsonObject args;
@@ -396,16 +403,6 @@ namespace SessionCommands
 		args.insert(QStringLiteral("submittedAttachments"), QJsonArray());
 		return args;
 	}
-
-	// ---- 交互式终端（api-terminal-controller）----
-	// 全部依据引擎生成的远程客户端桩
-	// `@deepseek-ai/dsh-api-terminal-controller/lib/typert.remote-client.d.ts`（0.1.7-rc.2）与
-	// `lib/typert.host.js` 的描述符 wire 名。三条形状规矩：
-	//   · agent 作用域的方法是**平铺** `agentId`（与 commands/* 同形，不套 `request`），值是 sessionId；
-	//   · `terminal/list` 的 scope 是 `{ context: 'session', wire: 'sessionId' }` ⇒ 顶层就是 `sessionId`
-	//     （没有 agent lookup，未附着 Agent 的会话也能列）；`terminal/create` 走 `request` 包装；
-	//   · `attachmentId` 由**客户端**铸（每次 attach 换新的），`id`（终端 id）也是客户端铸的幂等键；
-	//     `terminal/follow` 的 signal 参数不进 args，别写进来。
 
 	// terminal/environment -> args { agentId }（回 cwd/maxInputBytes/maxCols/maxRows/scrollback）
 	inline QJsonObject terminalEnvironment(const QString& sessionId)
@@ -450,7 +447,7 @@ namespace SessionCommands
 	}
 
 	// terminal/write -> args { agentId, id, attachmentId, data }
-	// ⚠️ data 里的**回车必须是 CR（\r）**：实测发 `"echo hi\n"` 只回显不执行，发 `"echo hi\r"` 才执行。
+	// ⚠️ data 里的**回车必须是 CR（\r）**：发 `"echo hi\n"` 只回显不执行，发 `"echo hi\r"` 才执行。
 	// xterm.js 的 onData 对 Enter 原生发 \r，所以这条路不用自己转；自绘键盘处理才需要。
 	inline QJsonObject terminalWrite(const QString& sessionId, const QString& terminalId,
 		const QString& attachmentId, const QString& data)

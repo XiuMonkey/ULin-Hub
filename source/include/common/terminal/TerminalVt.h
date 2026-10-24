@@ -1,19 +1,15 @@
 #pragma once
 
 // TerminalVt —— 终端 VT 核心：把原始 PTY 字节（含 ANSI/VT 转义）解析成屏幕网格。
-//
 // 分层：TerminalBridge（协议状态）→ **本类（VT 状态）** → 网格 → QML 渲染。输入是字节、输出是格子
 // 与脏行；不碰网络、不碰 QObject，可脱离窗口单测。
-//
 // 运行时消费者：`TerminalVtModel`（qmlbridge/**，QML 可见的桥）+ `TerminalView.qml`（逐格渲染）。
 // 接线在 `TerminalSession` 的帧路径上 —— terminal/follow 的 snapshot/output 帧原样喂进来。
 // 另有一条只跑字节的离线自检 `misc/tools/vt-selfcheck/`（不链 Qt）。
 // 早先终端面板走的是页面里的 xterm.js（同一条字节流的另一条路）；两条路的取舍与理由见
 // source/3rdparty/libvterm/README.md 的「为什么内嵌」。
-//
 // 解析器用内嵌的 libvterm（source/3rdparty/libvterm，只解析不渲染）：活的屏幕归它持有，本类只补
 // 两件它不管的事 —— 回滚历史、以及"哪几行变了"。
-//
 // 本头文件**不出现任何 libvterm 类型**：一是别把内嵌库的类型带进工程契约，二是日后换解析器只需改 .cpp。
 
 #include <cstdint>
@@ -74,17 +70,12 @@ public:
 	TerminalVt(const TerminalVt&) = delete;
 	TerminalVt& operator=(const TerminalVt&) = delete;
 
-	// ---- 输入 ----
-	// 灌入原始 PTY 字节。跨调用被拆开的 UTF-8 序列与转义序列由 libvterm 自己续上（编码器与
-	// 解析器的状态都挂在 VTerm 上），所以**不需要**外部拼帧 —— 引擎逐 chunk 给的帧直接喂。
 	void feed(const char* bytes, int len);
 	// 硬复位（重连取新快照前调）：清屏、清回滚、清脏行。调色板会被重放一次（硬复位会把它冲掉）。
 	void reset();
 	// 改网格尺寸：libvterm 按 reflow 重排折行内容（回滚历史不重排）。
 	void setSize(int rows, int cols);
 
-	// ---- 键盘：生成要回写给 PTY 的字节 ----
-	// 修饰键位。刻意不用 libvterm 的 VTermModifier 当契约，改库时不至于把调用点都带上。
 	enum Modifier
 	{
 		ModNone  = 0x00,
@@ -119,7 +110,6 @@ public:
 	// 取走并清空积累的待写字节（回车/退格/方向键等生成的序列）
 	std::vector<std::string> takeKeyOutput();
 
-	// ---- 视口 ----
 	int rows() const { return m_rows; }
 	int cols() const { return m_cols; }
 	// 可回滚的历史行数（不含屏幕本身）
@@ -128,24 +118,16 @@ public:
 	int viewOffset() const { return m_viewOffset; }
 	void setViewOffset(int offset);
 
-	// ---- 读取 ----
-	// 视口第 viewRow 行（0 = 视口最顶）。返回**内部缓冲**，长度恒为 cols()，下次调用本函数前有效。
-	// viewRow 越界返回空格行。
 	const TermCell* viewRow(int viewRow) const;
 	bool cursorVisible() const { return m_cursorVisible; }
-	// 光标在视口里的行；<0 或 >=rows() 表示不在视口内（滚在历史里时会发生）
+	// 光标在视口里的行；<0 或 >=rows 表示不在视口内（滚在历史里时会发生）
 	int cursorViewRow() const { return m_cursorRow + m_viewOffset; }
 	int cursorCol() const { return m_cursorCol; }
 	// OSC 0/2 设的窗口标题（空 = 没设过）
 	const std::string& title() const { return m_title; }
 
-	// ---- 变化通知 ----
-	// 自上次调用以来变化的视口行（升序、不重复）。视口整体换过（建/复位/改尺寸/滚屏/回滚/换回滚
-	// 偏移）时返回全部 rows() 行 —— 调用方据此"补几行"或"整屏重画"，判据是 size() == rows()。
 	std::vector<int> takeDirtyRows();
 
-	// ---- 主题 ----
-	// 覆盖 ANSI 前 16 色（索引 0-15）；索引 16-255 是标准色立方，不覆盖。不调则用 libvterm 内置默认。
 	void setAnsiPalette(const uint32_t rgb[16]);
 
 private:
@@ -188,7 +170,7 @@ private:
 	// 键盘生成、待回写给 PTY 的字节
 	std::vector<std::string> m_keyOutput;
 
-	// viewRow() 的返回缓冲：按需从 libvterm 屏幕或回滚历史里拷一格
+	// viewRow 的返回缓冲：按需从 libvterm 屏幕或回滚历史里拷一格
 	mutable std::vector<TermCell> m_rowBuffer;
 
 	uint32_t m_ansiPalette[16] = {};

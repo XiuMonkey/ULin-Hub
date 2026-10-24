@@ -27,8 +27,7 @@ namespace
 
 QString ClientSettings::dir()
 {
-	// 覆盖目录（供测试与用户挪位）；每次现读不做缓存
-	const QByteArray override = qgetenv(kDirEnvVar);
+	const QByteArray override = qgetenv(kDirEnvVar);   // 覆盖目录（供测试与用户挪位）；每次现读不做缓存
 	const QString trimmed = QString::fromLocal8Bit(override).trimmed();
 	if (!trimmed.isEmpty())
 		return trimmed;
@@ -68,8 +67,7 @@ QJsonObject ClientSettings::read(const QString& fileName)
 		return {};
 	}
 	if (!doc.isObject()) {
-		// 合法 JSON 但根不是对象：按没有处理，别让后面的 .value() 落空
-		qWarning().noquote() << QStringLiteral("[ClientSettings] root is not an object:")
+		qWarning().noquote() << QStringLiteral("[ClientSettings] root is not an object:")   // 合法 JSON 但根不是对象：按没有处理，别让后面的 .value() 落空
 			<< path << QStringLiteral("-> using defaults");
 		return {};
 	}
@@ -88,8 +86,7 @@ bool ClientSettings::write(const QString& fileName, const QJsonObject& object)
 		return false;
 	}
 
-	// QSaveFile：commit() 时原子替换，中途失败不留半截 JSON
-	QSaveFile file(path);
+	QSaveFile file(path);   // QSaveFile：commit() 时原子替换，中途失败不留半截 JSON
 	if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
 		qWarning().noquote() << QStringLiteral("[ClientSettings] cannot write:")
 			<< path << file.errorString();
@@ -131,8 +128,7 @@ QString AppearanceSetting::languageCode()
 	const QString raw = ClientSettings::read(kAppearanceFile)
 		.value(QLatin1String(kLanguageKey)).toString().trimmed();
 
-	// 文件里写 "system"，代码里统一用空串表示"跟随系统"
-	if (raw.isEmpty() || raw.compare(QLatin1String(kSystemValue), Qt::CaseInsensitive) == 0)
+	if (raw.isEmpty() || raw.compare(QLatin1String(kSystemValue), Qt::CaseInsensitive) == 0)   // 文件里写 "system"，代码里统一用空串表示"跟随系统"
 		return QString();
 
 	return raw;

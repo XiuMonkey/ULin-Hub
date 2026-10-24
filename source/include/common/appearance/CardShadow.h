@@ -28,6 +28,6 @@ namespace CardShadow
 	// 必须用它：色板的 rgba(...) QColor 字符串构造不认 → 无效色 → 阴影不画且不报错
 	QColor parseColor(const QString& text);
 
-	// cardRect 须已按 padding() 内缩，阴影画在它之外的空白；padOverride 四边 >= 0 才算给了
+	// cardRect 须已按 padding 内缩，阴影画在它之外的空白；padOverride 四边 >= 0 才算给了
 	void paint(QPainter& painter, const QRect& cardRect, const Spec& spec, const QColor& color, qreal devicePixelRatio = 1.0, const QMargins& padOverride = QMargins(-1, -1, -1, -1));
 }

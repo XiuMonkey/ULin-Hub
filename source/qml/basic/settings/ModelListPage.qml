@@ -1,16 +1,8 @@
-// 设置 · 模型列表（按原版 ui/ModelListPanel.cpp + styles/model-list.qss 复刻）
-//
-// 结构（自上而下，与原版一一对应）：
-//   1 标题 model_list_title(14/600)   2 说明 model_list_desc(12 secondary)
-//   3 状态行(12 secondary，加载/汇总/失败逐条)   4 瞬时提示(12 secondary，4 秒自隐；原版是强调色，见"去蓝"注释)
-//   5 滚动区：#modelListGroup 分组标题 + #modelListEntry 成员卡（点击展开详情）+ 空态 + 新增表单
-//   6 「添加模型」按钮在滚动区**外**（表单在滚动区内，面板高度才不随表单开合变化）
-//
-// 与原版一致的几个要点：
-//   * 成员卡无列、无选中态；表头最小高 48，右侧 ▸/▾；徽章按 userDeclared / declared 决定；
-//   * 删除走右键菜单（common_delete），不是行内按钮；
-//   * 表单提交 = 先（可选）写凭据 credentials/set，失败则**整次中止**，再整份写回 models；
-//   * 凭据引用行 = 基础句（profile 点名 / 按约定派生）+ 状态后缀。
+// 设置 · 模型列表（按原版 ui/ModelListPanel.cpp + styles/model-list.qss 复刻）。
+// 结构自上而下：标题/说明 → 状态行 → 瞬时提示（4 秒自隐）→ 滚动区（分组标题 + 成员卡 + 空态 + 新增表单）
+// → 「添加模型」按钮在滚动区**外**（表单在滚动区内，面板高度才不随表单开合变化）。
+// 要点：成员卡无列/无选中态，表头最小高 48、右侧 ▸/▾，徽章按 userDeclared/declared 决定；
+// 删除走右键菜单（common_delete）不是行内按钮；表单提交先（可选）写凭据，失败整次中止，再整份写回 models。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -21,16 +13,14 @@ import "../../skin/settings"
 Item {
     id: page
 
-    // 展开过的成员 key（刷新后按它恢复展开态，与原版 m_expanded 同思路）
-    property var expandedKeys: ({})
+    property var expandedKeys: ({})   // 展开过的成员 key（刷新后按它恢复展开态，与原版 m_expanded 同思路）
     property bool formOpen: false
     property bool candidatesVisible: false
     readonly property int fieldHeight: 30
     readonly property int labelWidth: 96
     readonly property int detailLabelWidth: 96
 
-    // 当前表单选中的路由
-    readonly property var currentProvider: {
+    readonly property var currentProvider: {   // 当前表单选中的路由
         const rows = Hub.settings.providers
         if (rows.length === 0)
             return null
@@ -46,6 +36,23 @@ Item {
         return page.expandedKeys[page.keyOf(row)] === true
     }
 
+    // 模型行只带 settings 侧信息（settingsNs / settingsWritable）；凭据状态挂在 provider 行上，
+    // 按 provider 路由回查一行 —— 同一路由下的所有模型共用一条凭据引用（如
+    // deepseek-official → DEEPSEEK_API_KEY），所以 key 是**路由级**的，不是模型级的。
+    function providerRowFor(providerId) {
+        const rows = Hub.settings.providers
+        for (let i = 0; i < rows.length; ++i) {
+            if (rows[i].provider === providerId)
+                return rows[i]
+        }
+        return null
+    }
+
+    function keyReadonly(providerId) {   // 只读 = 服务端已确认这条引用由 profile / 环境提供，写不进去
+        const row = page.providerRowFor(providerId)
+        return row !== null && row.keyKnown && !row.keyWritable
+    }
+
     function toggleRow(row) {
         const key = page.keyOf(row)
         const next = Object.assign({}, page.expandedKeys)
@@ -56,8 +63,7 @@ Item {
         page.expandedKeys = next
     }
 
-    // 状态行文案（原版 updateStatus）
-    function statusText() {
+    function statusText() {   // 状态行文案（原版 updateStatus）
         if (!Hub.settings.busy && Hub.serverState !== "running" && Hub.settings.models.length === 0)
             return qsTrId("model_server_not_ready")
 
@@ -81,8 +87,7 @@ Item {
         return text
     }
 
-    // 凭据引用行：基础句 + 状态后缀（原版 refreshCredentialRowText）
-    function credentialText(row) {
+    function credentialText(row) {   // 凭据引用行：基础句 + 状态后缀（原版 refreshCredentialRowText）
         if (!row || !row.keyRef || row.keyRef.length === 0)
             return ""
 
@@ -106,8 +111,7 @@ Item {
         return text
     }
 
-    // 详情行：值为空时不显示（原版 addDetailRow）
-    function reasoningText(row) {
+    function reasoningText(row) {   // 详情行：值为空时不显示（原版 addDetailRow）
         if (row.reasoningDisabled)
             return qsTrId("model_think_not_offered")
         if (row.hasReasoning)
@@ -138,13 +142,34 @@ Item {
         anchors.fill: parent
         spacing: 3
 
-        Text {
+        Item {   // 标题行：页面主动作（添加模型）右对齐到这里，不再沉在滚动区下方和内容混在一起
+            id: titleRow
             width: parent.width
-            text: qsTrId("model_list_title")
-            color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
-            font.pixelSize: Theme.font.title
-            font.weight: Theme.font.weightBold
+            implicitHeight: Math.max(titleLabel.implicitHeight, addButton.implicitHeight)
+
+            Text {
+                id: titleLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: qsTrId("model_list_title")
+                color: Theme.color.textPrimary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.title
+                font.weight: Theme.font.weightBold
+            }
+
+            IconButton {   // 原版可用性：settingsWritable && 有可配置提供方；禁用时 tooltip 说明原因
+                id: addButton
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                enabled: Hub.settings.writable && Hub.settings.providers.length > 0
+                label: qsTrId("model_add")
+                tooltip: enabled ? qsTrId("model_add") : qsTrId("model_add_requires_api")
+                onClicked: {
+                    page.formOpen = true
+                    page.candidatesVisible = false
+                }
+            }
         }
 
         Text {
@@ -170,17 +195,15 @@ Item {
             visible: Hub.settings.notice.length > 0
             text: Hub.settings.notice
             wrapMode: Text.WordWrap
-            // 瞬时提示：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
-            color: Theme.color.textSecondary
+            color: Theme.color.textSecondary   // 瞬时提示：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
         }
 
-        // ---- 滚动区（原版 #modelListScroll，最小高 120）----
         Flickable {
             id: scroller
             width: parent.width
-            height: Math.max(120, root.height - scroller.y - addButton.height - root.spacing)
+            height: Math.max(120, root.height - scroller.y)
             contentHeight: listColumn.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -200,32 +223,40 @@ Item {
                         required property var modelData
                         required property int index
 
+                        readonly property var providerRow: page.providerRowFor(modelData.provider)   // 该模型所属 provider 的那一行（凭据状态都在那边）
+
                         width: listColumn.width
                         spacing: 2
 
                         // 分组标题：provider 与上一行不同时插入（原版 modelListGroup）
+                        // 分组标题：压到 textTertiary + 一点字距，读起来是"分区"而不是"正文"
                         Text {
                             width: parent.width
                             visible: rowHost.index === 0
                                 || Hub.settings.models[rowHost.index - 1].provider !== rowHost.modelData.provider
                             text: rowHost.modelData.providerName
-                            color: Theme.color.textCaption
+                            color: Theme.color.textTertiary
                             font.family: "Microsoft YaHei UI"
                             font.pixelSize: Theme.font.small
                             font.weight: Theme.font.weightBold
+                            font.letterSpacing: 0.4
                             topPadding: 4
                             leftPadding: 2
                         }
 
-                        // 成员卡（原版 #modelListEntry：panelBg + 1px border + radius 10）
-                        Rectangle {
+                        Rectangle {   // 成员卡（原版 #modelListEntry：panelBg + 1px border + radius 10）
                             id: entry
                             width: parent.width
                             implicitHeight: entryColumn.implicitHeight
                             radius: Theme.radius.card
                             color: Theme.color.panelBg
                             border.width: 1
-                            border.color: Theme.color.border
+
+                            // 原描边是 border(4% 黑)，和白底几乎同色 —— 卡片边界只能靠 4px 间距"猜"。
+                            // 提到 menuBorder(6%)，展开时 inputBorder(10%)：一屏四张才分得清。
+                            border.color: page.isExpanded(rowHost.modelData)
+                                ? Theme.color.inputBorder
+                                : Theme.color.menuBorder
 
                             Column {
                                 id: entryColumn
@@ -233,8 +264,7 @@ Item {
                                 anchors.right: parent.right
                                 anchors.top: parent.top
 
-                                // 表头（原版最小高 48、内边距 (10,3,10,3)）
-                                Item {
+                                Item {   // 表头（原版最小高 48、内边距 (10,3,10,3)）
                                     id: header
                                     width: parent.width
                                     implicitHeight: Math.max(48, headerRow.implicitHeight + 6)
@@ -276,6 +306,35 @@ Item {
                                                 font.family: "Microsoft YaHei UI"
                                                 font.pixelSize: Theme.font.caption
                                             }
+
+                                            // 这条路由还没配凭据时给个入口提示：否则"已接上的模型在哪填 key"
+                                            // 在界面上没有任何线索。前面的 5px 琥珀点是全页唯一的饱和度来源，
+                                            // 只出现在需要动手的那一行。
+                                            Row {
+                                                width: parent.width
+                                                visible: rowHost.providerRow !== null
+                                                    && rowHost.providerRow.keyKnown
+                                                    && !rowHost.providerRow.keyConfigured
+                                                topPadding: 1
+                                                spacing: 5
+
+                                                Rectangle {
+                                                    width: 5
+                                                    height: 5
+                                                    radius: 2.5
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    color: "#F59E0B"
+                                                }
+
+                                                Text {
+                                                    width: parent.width - 10
+                                                    text: qsTrId("model_key_missing")
+                                                    elide: Text.ElideRight
+                                                    color: Theme.color.textTertiary
+                                                    font.family: "Microsoft YaHei UI"
+                                                    font.pixelSize: Theme.font.small
+                                                }
+                                            }
                                         }
 
                                         Rectangle {
@@ -283,9 +342,7 @@ Item {
                                             visible: rowHost.modelData.userDeclared || !rowHost.modelData.declared
                                             implicitWidth: badgeText.implicitWidth + 16
                                             implicitHeight: badgeText.implicitHeight + 2
-                                            // 徽章走中性面：tagBg 是蓝调底（#EEF2FF / #1E3A5F），
-                                            // 设置页不出蓝 ⇒ 换成中性灰 buttonBg，与说明文字同档
-                                            radius: Theme.radius.control
+                                            radius: Theme.radius.control   // 徽章走中性面：tagBg 是蓝调底（#EEF2FF / #1E3A5F）
                                             color: Theme.color.buttonBg
                                             anchors.verticalCenter: parent.verticalCenter
 
@@ -342,8 +399,7 @@ Item {
                                     }
                                 }
 
-                                // 详情（原版边距 (10,0,10,10)、spacing 2；名称列固定 96）
-                                Column {
+                                Column {   // 详情（原版边距 (10,0,10,10)、spacing 2；名称列固定 96）
                                     id: detail
                                     width: parent.width
                                     visible: page.isExpanded(rowHost.modelData)
@@ -399,6 +455,75 @@ Item {
                                         }
                                     }
                                 }
+
+                                // 凭据是**路由级**的（一个 provider 一条引用），所以展开任意一条模型就地写，
+                                // 同路由下所有模型共用；只写 credentials/set，不动 models 数组。
+                                Column {
+                                    id: keyPanel
+                                    width: parent.width
+                                    visible: page.isExpanded(rowHost.modelData)
+                                    bottomPadding: 10
+                                    leftPadding: 10
+                                    rightPadding: 10
+                                    spacing: 4
+
+                                    Row {
+                                        width: keyPanel.width - keyPanel.leftPadding - keyPanel.rightPadding
+                                        spacing: 8
+
+                                        Text {
+                                            width: page.detailLabelWidth
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "API Key"
+                                            color: Theme.color.textTertiary
+                                            font.family: "Microsoft YaHei UI"
+                                            font.pixelSize: Theme.font.caption
+                                        }
+
+                                        FieldBox {
+                                            id: rowKeyField
+                                            width: parent.width - page.detailLabelWidth - saveKeyButton.width - 2 * parent.spacing
+                                            height: page.fieldHeight
+                                            placeholder: page.keyReadonly(rowHost.modelData.provider)
+                                                ? qsTrId("model_credential_readonly_hint")
+                                                : qsTrId("model_key_hint")
+                                            password: true
+                                            enabled: !page.keyReadonly(rowHost.modelData.provider)
+                                        }
+
+                                        IconButton {
+                                            id: saveKeyButton
+                                            height: page.fieldHeight
+                                            label: qsTrId("common_save")
+                                            enabled: !page.keyReadonly(rowHost.modelData.provider)
+                                                && rowKeyField.text.trim().length > 0
+                                                && !Hub.settings.busy
+                                            onClicked: {
+                                                Hub.settings.saveApiKey(rowHost.modelData.provider, rowKeyField.text)
+                                                rowKeyField.text = ""
+                                            }
+                                        }
+                                    }
+
+                                    Text {   // 凭据状态（与新增表单那一行同一套文案：引用名 + 已/未配置 + 来源）
+                                        width: keyPanel.width - keyPanel.leftPadding - keyPanel.rightPadding
+                                        text: page.credentialText(rowHost.providerRow)
+                                        wrapMode: Text.WordWrap
+                                        color: Theme.color.textCaption
+                                        font.family: "Microsoft YaHei UI"
+                                        font.pixelSize: Theme.font.small
+                                    }
+                                }
+                            }
+
+                            Rectangle {   // 多张卡里找不到是哪一张被打开了。声明在 entryColumn 之后，保证在最上层
+                                visible: page.isExpanded(rowHost.modelData)
+                                x: 1
+                                y: 10
+                                width: 2
+                                height: Math.max(0, parent.height - 20)
+                                radius: 1
+                                color: Theme.color.textPrimary
                             }
                         }
                     }
@@ -414,7 +539,6 @@ Item {
                     font.pixelSize: Theme.font.caption
                 }
 
-                // ---- 新增模型表单（在滚动区内，原版 #modelListForm）----
                 Rectangle {
                     id: form
                     width: parent.width
@@ -441,8 +565,7 @@ Item {
                             font.weight: Theme.font.weightBold
                         }
 
-                        // 1 提供方路由
-                        Row {
+                        Row {   // 1 提供方路由
                             width: parent.width
                             spacing: 8
 
@@ -456,9 +579,7 @@ Item {
                                 font.pixelSize: Theme.font.caption
                             }
 
-                            // 与"外观设置"的语言下拉同款中性皮肤（原来这个框走 Basic 默认：平台灰底、
-                            // 无圆角，且键盘焦点时描边是 palette.highlight = 强调蓝）。
-                            ComboBox {
+                            ComboBox {   // 无圆角，且键盘焦点时描边是 palette.highlight = 强调蓝）
                                 id: providerCombo
                                 width: parent.width - page.labelWidth - parent.spacing
                                 height: page.fieldHeight
@@ -488,8 +609,8 @@ Item {
                                 background: Rectangle {
                                     color: Theme.color.inputBg
                                     border.width: 1
+
                                     // 悬停略深一档；聚焦（键盘走查）用 textSecondary，都是中性灰。
-                                    // 静息原为 scrollbar(#D1D5DB ≈17% 灰)，2026-10-17 改 inputBorder(10% 黑)：
                                     // 对齐官方 DSH `--dsw-alias-border-l2`。
                                     border.color: providerCombo.activeFocus
                                         ? Theme.color.textSecondary
@@ -497,7 +618,6 @@ Item {
                                     radius: Theme.radius.control
                                 }
 
-                                // 与语言下拉同一套：只把 Basic 风格用到的两个调色板角色换成中性 token
                                 delegate: ItemDelegate {
                                     id: providerOption
 
@@ -538,8 +658,7 @@ Item {
                             }
                         }
 
-                        // 2 模型 ID + 获取模型
-                        Row {
+                        Row {   // 2 模型 ID + 获取模型
                             width: parent.width
                             spacing: 8
 
@@ -573,8 +692,7 @@ Item {
                             }
                         }
 
-                        // 候选模型（原版是独立弹层；这里就地铺在 ID 输入框下方，点一条回填）
-                        Column {
+                        Column {   // 候选模型（原版是独立弹层；这里就地铺在 ID 输入框下方，点一条回填）
                             width: parent.width
                             visible: page.candidatesVisible && Hub.settings.candidates.length > 0
                             leftPadding: page.labelWidth + 8
@@ -614,8 +732,7 @@ Item {
                             }
                         }
 
-                        // 3 显示名称
-                        Row {
+                        Row {   // 3 显示名称
                             width: parent.width
                             spacing: 8
 
@@ -636,8 +753,7 @@ Item {
                             }
                         }
 
-                        // 4 上下文窗口
-                        Row {
+                        Row {   // 4 上下文窗口
                             width: parent.width
                             spacing: 8
 
@@ -659,8 +775,7 @@ Item {
                             }
                         }
 
-                        // 5 最大输出
-                        Row {
+                        Row {   // 5 最大输出
                             width: parent.width
                             spacing: 8
 
@@ -682,8 +797,7 @@ Item {
                             }
                         }
 
-                        // 6 思考档位（仅 pi-ai 路由显示，与原版一致）
-                        Row {
+                        Row {   // 6 思考档位（仅 pi-ai 路由显示，与原版一致）
                             width: parent.width
                             spacing: 8
                             visible: page.currentProvider !== null && Hub.settings.routeIsPiAi(page.currentProvider.provider)
@@ -705,8 +819,7 @@ Item {
                             }
                         }
 
-                        // 7 输入模态（仅非 pi-ai 路由显示）
-                        Row {
+                        Row {   // 7 输入模态（仅非 pi-ai 路由显示）
                             width: parent.width
                             spacing: 8
                             visible: page.currentProvider !== null && !Hub.settings.routeIsPiAi(page.currentProvider.provider)
@@ -723,18 +836,15 @@ Item {
 
                             // 勾选控件：默认 Basic 风格的指示器是 28×28 方角 + 1px 平台灰描边，
                             // 且 **键盘焦点时描边取 palette.highlight（ThemeManager 装的是强调蓝）**。
-                            // 这里换成一枚中性指示器：18×18 / radius.check(5) / 未选中透明描边、
                             // 悬停浅灰底、选中 = textPrimary 近黑面 + 反相勾（panelBg），
                             // 禁用退回 border 描边。整体高 = 18 + 上下 padding 12 = 30px（命中区 > 24px）。
-                            // 只改观感：checkState/checked 的属性与信号一律沿用 CheckBox 自己的。
                             CheckBox {
                                 id: imageInputBox
                                 text: qsTrId("model_supports_image")
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.body
                                 spacing: Theme.spacing.labelGap
-                                // 标签色/高亮色也钉在 token 上：不再受全局 QPalette 影响（深色主题下尤其重要）
-                                palette.windowText: Theme.color.textPrimary
+                                palette.windowText: Theme.color.textPrimary   // 标签色/高亮色也钉在 token 上：不再受全局 QPalette 影响（深色主题下尤其重要）
                                 palette.text: Theme.color.textPrimary
                                 palette.highlight: Theme.color.textSecondary
                                 palette.highlightedText: Theme.color.panelBg
@@ -759,8 +869,8 @@ Item {
                                             return Theme.color.border
                                         if (imageInputBox.checked)
                                             return Theme.color.textPrimary
-                                        // 未勾选的静息描边原为 scrollbarHover(#9CA3AF ≈33% 灰，是本页最深的一条线)，
-                                        // 2026-10-17 改 inputBorder(10% 黑)：官方 DSH 的控件 ring 就在这一档。
+
+                                        // 未勾选的静息描边用 textSecondary / inputBorder（scrollbarHover 那档太深）
                                         return (imageInputBox.hovered || imageInputBox.visualFocus)
                                             ? Theme.color.textSecondary
                                             : Theme.color.inputBorder
@@ -768,8 +878,7 @@ Item {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        // 勾：反相中性色（浅色下"近黑面 + 白勾"，深色下"近白面 + 深灰勾"）
-                                        visible: imageInputBox.checkState === Qt.Checked
+                                        visible: imageInputBox.checkState === Qt.Checked   // 勾：反相中性色（浅色下"近黑面 + 白勾"，深色下"近白面 + 深灰勾"）
                                         text: "✓"
                                         color: Theme.color.panelBg
                                         font.family: "Microsoft YaHei UI"
@@ -780,8 +889,7 @@ Item {
                             }
                         }
 
-                        // 8 API Key（原版是字面量标签，无 id）
-                        Row {
+                        Row {   // 8 API Key（原版是字面量标签，无 id）
                             width: parent.width
                             spacing: 8
 
@@ -829,8 +937,7 @@ Item {
                             width: parent.width
                             text: Hub.settings.formFeedback
                             wrapMode: Text.WordWrap
-                            // 表单反馈：原版走强调色（蓝）⇒ 中性灰
-                            color: Theme.color.textSecondary
+                            color: Theme.color.textSecondary   // 表单反馈：原版走强调色（蓝）⇒ 中性灰
                             font.family: "Microsoft YaHei UI"
                             font.pixelSize: Theme.font.caption
                         }
@@ -862,19 +969,6 @@ Item {
                         }
                     }
                 }
-            }
-        }
-
-        // ---- 添加模型按钮（滚动区外，原版 #modelListAddButton）----
-        // 原版可用性：settingsWritable && 有可配置提供方；禁用时 tooltip 说明原因（model_add_requires_api）
-        IconButton {
-            id: addButton
-            enabled: Hub.settings.writable && Hub.settings.providers.length > 0
-            label: qsTrId("model_add")
-            tooltip: enabled ? qsTrId("model_add") : qsTrId("model_add_requires_api")
-            onClicked: {
-                page.formOpen = true
-                page.candidatesVisible = false
             }
         }
     }

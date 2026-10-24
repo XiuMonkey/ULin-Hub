@@ -193,7 +193,6 @@ bool ExtensionRegistry::removePatchEntry(const QString& profilePath, const QStri
 		const QString line = lines.at(i);
 		const QString trimmed = line.trimmed();
 
-		// 删掉 ExtensionLoader 写进来的标准两行条目（- id: <name> / name: '<name>'）
 		if (trimmed == patchIdLine(name).trimmed() && i + 1 < lines.size()
 			&& lines.at(i + 1).trimmed() == patchNameLine(name).trimmed()) {
 			++i;  // 下一行（name 行）也一起跳过

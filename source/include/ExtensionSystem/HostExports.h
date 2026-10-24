@@ -17,7 +17,7 @@
 #include <QString>
 #include <QtGlobal>
 
-// 宿主 ULinHubHostAbiVersion() 返回它；插件取到的值不一致就别再调后面的函数。
+// 宿主 ULinHubHostAbiVersion 返回它；插件取到的值不一致就别再调后面的函数。
 #define ULINHUB_HOST_ABI_VERSION 1u
 
 // 导出符号名（QLibrary::resolve 走字符串，改 .cpp 里的定义时同步这里）
@@ -30,7 +30,7 @@ using DshHostRegistryFindFn = void* (*)(const char* index);
 
 namespace DshHost
 {
-	// 插件侧唯一取址入口：从宿主 exe 主模块取导出符号；用 applicationFilePath() 免引 <windows.h>，
+	// 插件侧唯一取址入口：从宿主 exe 主模块取导出符号；用 applicationFilePath 免引 <windows.h>，
 	// 用 QLibrary::resolve 静态重载（成员版会被局部 QLibrary 析构卸载）。
 	inline QFunctionPointer resolveHostSymbol(const char* symbol)
 	{

@@ -46,20 +46,18 @@
         <file>pack.json</file>
         <file>skin/chat/AgentBubble.qml</file>
         <file>skin/chat/CodeBlock.qml</file>
-        <!-- 正文块级 Markdown 排版（表格/分界线/引用块/列表/标题 自绘，行内 code 走官方 mono 栈） -->
+        <!-- 正文由 C++ QTextDocument + 单个 MarkdownBody 承担 -->
         <file>skin/chat/Markdown/MarkdownBody.qml</file>
-        <file>skin/chat/Markdown/MarkdownHeading.qml</file>
-        <file>skin/chat/Markdown/MarkdownInline.qml</file>
-        <file>skin/chat/Markdown/MarkdownList.qml</file>
-        <file>skin/chat/Markdown/MarkdownPlain.qml</file>
-        <file>skin/chat/Markdown/MarkdownQuote.qml</file>
-        <file>skin/chat/Markdown/MarkdownTable.qml</file>
         <file>skin/chat/MenuRow.qml</file>
         <file>skin/chat/SystemNotice.qml</file>
         <file>skin/chat/UserBubble.qml</file>
         <file>skin/settings/FieldBox.qml</file>
         <file>skin/shell/ThemeSwitchOverlay.qml</file>
+        <file>skin/session/SessionFooter.qml</file>
+        <file>skin/session/SessionOverflowMenu.qml</file>
         <file>skin/session/SessionRow.qml</file>
+        <!-- 侧栏搜索框（Ctrl K 聚焦；过滤动作归 SessionBar） -->
+        <file>skin/session/SessionSearchBox.qml</file>
         <file>skin/session/WorkspaceHeader.qml</file>
         <file>skin/window/Backdrop.qml</file>
         <file>skin/window/TitleBar.qml</file>
@@ -71,6 +69,8 @@
         <file>widgets/Card.qml</file>
         <file>widgets/Collapsible.qml</file>
         <file>widgets/IconButton.qml</file>
+        <!-- 单色 SVG 图标载体（侧栏新图标全部走它；qrc 资源在 assets/resources/ulinhub.qrc） -->
+        <file>widgets/LineIcon.qml</file>
         <file>widgets/PageOverlay.qml</file>
         <file>widgets/PanelGrip.qml</file>
         <file>widgets/PillButton.qml</file>

@@ -1,5 +1,3 @@
-// 见 NativeWindowFilter.h：QML 壳的无边框窗口原生行为（旧控件壳的 WindowFrame.cpp 已于 2026-10-01 删除）。
-
 #include "common/platform/win/NativeWindowFilter.h"
 
 #include <QCoreApplication>
@@ -23,8 +21,7 @@
 #  include <dwmapi.h>
 #  pragma comment(lib, "dwmapi.lib")
 
-// 老 SDK 的 dwmapi.h 缺这两个常量
-#  ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#  ifndef DWMWA_WINDOW_CORNER_PREFERENCE   // 老 SDK 的 dwmapi.h 缺这两个常量
 #    define DWMWA_WINDOW_CORNER_PREFERENCE 33
 #  endif
 #  ifndef DWMWCP_DONOTROUND
@@ -44,8 +41,7 @@ namespace {
 			return 0;
 		return static_cast<quintptr>(window->winId());
 	}
-	// 贴屏幕边缘（最大化/全屏）：此时不留边缘缩放热区
-	bool isEdgeToEdge(const QWindow* window)
+	bool isEdgeToEdge(const QWindow* window)   // 贴屏幕边缘（最大化/全屏）：此时不留边缘缩放热区
 	{
 		if (!window)
 			return false;
@@ -125,8 +121,7 @@ void NativeWindowFilter::applyNativeStyle(QWindow* window)
 	}
 
 	LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-	// 幂等：重复 SetWindowPos 会打断最大化动画
-	if ((style & (WS_THICKFRAME | WS_CAPTION)) == (WS_THICKFRAME | WS_CAPTION))
+	if ((style & (WS_THICKFRAME | WS_CAPTION)) == (WS_THICKFRAME | WS_CAPTION))   // 幂等：重复 SetWindowPos 会打断最大化动画
 		return;
 
 	// FramelessWindowHint 会摘掉 WS_CAPTION/WS_THICKFRAME，这里补回来才能保留投影、贴边吸附、
@@ -134,8 +129,7 @@ void NativeWindowFilter::applyNativeStyle(QWindow* window)
 	style |= WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
 	SetWindowLongPtrW(hwnd, GWL_STYLE, style);
 
-	// Win11 默认的 8px 系统圆角会裁掉自绘 12px 描边的四角，故关掉只留投影
-	const BOOL doNotRound = DWMWCP_DONOTROUND;
+	const BOOL doNotRound = DWMWCP_DONOTROUND;   // Win11 默认的 8px 系统圆角会裁掉自绘 12px 描边的四角，故关掉只留投影
 	DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &doNotRound, sizeof(doNotRound));
 
 	SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
@@ -196,6 +190,7 @@ int NativeWindowFilter::maximizedContentInset(const QWindow* window) const
 {
 	int inset = 0;
 #ifdef Q_OS_WIN
+
 	// 句柄一律走缓存：这个函数会被 QML 绑定反复求值（anchors.margins），绝不能在这里调 winId()
 	// —— 那会在窗口关闭后又把它创建出来（见 safeHandle 的说明）
 	quintptr cachedHandle = 0;
@@ -232,7 +227,6 @@ int NativeWindowFilter::maximizedContentInset(const QWindow* window) const
 	return inset;
 }
 
-// ---- 拖动跟手用的两个纯查询（见头文件）----
 QPoint NativeWindowFilter::cursorScreenPos()
 {
 	// QCursor::pos() 直接问系统：不受 Qt Quick 的鼠标抓取、窗口激活、焦点影响。
@@ -243,13 +237,13 @@ QPoint NativeWindowFilter::cursorScreenPos()
 bool NativeWindowFilter::leftButtonDown()
 {
 #ifdef Q_OS_WIN
+
 	// 物理按键状态：跟手期间 WM_LBUTTONUP 很可能投给的是**主窗口**（它握着捕获），
 	// 而这次拖动要结束的是另一扇窗里的东西 —— 事件推不出来，只能问系统当前状态。
 	if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
 		return true;
 #endif
-	// 非 Windows（或取不到物理状态时）的兜底：Qt 自己维护的按键状态
-	return QGuiApplication::mouseButtons().testFlag(Qt::LeftButton);
+	return QGuiApplication::mouseButtons().testFlag(Qt::LeftButton);   // 非 Windows（或取不到物理状态时）的兜底：Qt 自己维护的按键状态
 }
 
 QWindow* NativeWindowFilter::findByHwnd(void* hwnd)
@@ -263,8 +257,7 @@ QWindow* NativeWindowFilter::findByHwnd(void* hwnd)
 		if (!window)
 			continue;
 
-		// 常规路径：只比缓存（零成本，且不会碰平台窗口）
-		if (entry.hwnd == target)
+		if (entry.hwnd == target)   // 常规路径：只比缓存（零成本，且不会碰平台窗口）
 			return window;
 
 		// 缓存可能过期（平台窗口被重建，例如换屏/系统 DPI 变化）：刷新一次再比。
@@ -283,6 +276,7 @@ const NativeWindowFilter::ControlEntry* NativeWindowFilter::windowControlAt(QWin
 	for (const ControlEntry& entry : m_windowControls) {
 		if (!entry.item || !entry.item->isVisible())
 			continue;
+
 		// 登记项按"它实际在哪扇窗"归属：控件表只有一份，但同一份表服务多扇窗
 		// （主窗口的自绘标题栏按钮 + 覆盖率页的抓手都在主窗口里；副窗口没有登记项）
 		if (entry.item->window() != window)
@@ -302,8 +296,7 @@ qintptr NativeWindowFilter::hitTest(QWindow* window, const QPoint& logicalPos, i
 	if (!window)
 		return HTCLIENT;
 
-	// 四周边缘 = 缩放热区（最大化/全屏时不可缩放）
-	if (!isEdgeToEdge(window)) {
+	if (!isEdgeToEdge(window)) {   // 四周边缘 = 缩放热区（最大化/全屏时不可缩放）
 		const QSize size = window->size();
 		const bool left = logicalPos.x() < kResizeBorder;
 		const bool right = logicalPos.x() >= size.width() - kResizeBorder;
@@ -330,8 +323,8 @@ qintptr NativeWindowFilter::hitTest(QWindow* window, const QPoint& logicalPos, i
 	// 自绘标题栏：整块是拖动区，窗口按钮区域除外 —— 否则鼠标落在按钮上会被系统当成标题栏拖动，
 	// 按钮永远收不到点击。
 	// ⚠️ 只有 caption item **本身在这扇窗里**时才算：本类服务多扇窗（主窗口 + 右栏副窗口），
-	//    而 caption 是主窗口的自绘标题栏；拿它的矩形去判副窗口会算到"别的窗口的场景坐标"里去，
-	//    副窗口整块都可能被判成 HTCAPTION（副窗口不能整块拖动）。
+	// 而 caption 是主窗口的自绘标题栏；拿它的矩形去判副窗口会算到"别的窗口的场景坐标"里去，
+	// 副窗口整块都可能被判成 HTCAPTION（副窗口不能整块拖动）。
 	if (m_captionItem && m_captionItem->window() == window
 		&& itemRectInWindow(m_captionItem.data()).contains(logicalPos)) {
 		const ControlEntry* control = windowControlAt(window, logicalPos);
@@ -341,8 +334,7 @@ qintptr NativeWindowFilter::hitTest(QWindow* window, const QPoint& logicalPos, i
 		if (controlKind)
 			*controlKind = control->kind;
 
-		// 交给系统处理三个窗口按钮：点击、悬停与 Win11 Snap Layouts 都靠它
-		if (m_systemWindowButtons) {
+		if (m_systemWindowButtons) {   // 交给系统处理三个窗口按钮：点击、悬停与 Win11 Snap Layouts 都靠它
 			switch (control->kind) {
 			case ControlMinimize:
 				return HTMINBUTTON;
@@ -404,7 +396,6 @@ bool NativeWindowFilter::nativeEventFilter(const QByteArray& eventType, void* me
 	case WM_NCHITTEST: {
 		// WM_NCHITTEST 的 lParam 是**屏幕物理像素**，QML 几何是逻辑像素，必须先换算，
 		// 否则整块窗口都成了缩放热区。
-		// 缩放比不取 QWindow::devicePixelRatio()：那个值受平台/感知设置影响，实测与本窗口的
 		// 物理客户区对不上；直接用"窗口自身的物理客户区宽度 / 逻辑宽度"自校准，永远一致。
 		const POINTS point = MAKEPOINTS(msg->lParam);
 		POINT nativePoint{ point.x, point.y };

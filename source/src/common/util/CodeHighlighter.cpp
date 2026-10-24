@@ -9,7 +9,6 @@
 namespace
 {
 	// 兜底配色：主题包里没有 syntax* 键时用它（旧风格包 / 只改了部分键的自定义包）。
-	// 这一档是必要的 —— 曾经因为 `<exe>/ui/` 里的主题包是旧副本，角色查不到色，
 	// 整片代码块就退化成了纯文本（"高亮直接没了"）。宁可色偏一点，也不能没有高亮。
 	struct FallbackColor
 	{
@@ -62,8 +61,7 @@ bool CodeHighlighter::loadFromFile(const QString& filePath)
 
 	const QJsonObject root = doc.object();
 
-	// 别名表：大小写不敏感（加载时统一小写），值也统一小写
-	const QJsonObject aliases = root.value(QStringLiteral("aliases")).toObject();
+	const QJsonObject aliases = root.value(QStringLiteral("aliases")).toObject();   // 别名表：大小写不敏感（加载时统一小写），值也统一小写
 	for (auto it = aliases.begin(); it != aliases.end(); ++it)
 		m_aliases.insert(it.key().trimmed().toLower(), it.value().toString().trimmed().toLower());
 
@@ -81,8 +79,7 @@ bool CodeHighlighter::loadFromFile(const QString& filePath)
 
 			Rule rule;
 			rule.regex = QRegularExpression(pattern);
-			// 新格式：只写角色，色值走主题包；旧格式（color）仍认，作为单条硬覆盖
-			rule.role = ruleObj.value(QStringLiteral("role")).toString();
+			rule.role = ruleObj.value(QStringLiteral("role")).toString();   // 新格式：只写角色，色值走主题包；旧格式（color）仍认，作为单条硬覆盖
 			rule.color = ruleObj.value(QStringLiteral("color")).toString();
 			rule.bold = ruleObj.value(QStringLiteral("bold")).toBool(false);
 			rule.italic = ruleObj.value(QStringLiteral("italic")).toBool(false);
@@ -119,8 +116,7 @@ void CodeHighlighter::setThemeColors(const QHash<QString, QString>& colors, bool
 
 	m_themeColors = byRole;
 	m_dark = dark;
-	// 颜色变了，旧 HTML 里烘的是旧色 ⇒ 必须清缓存（换肤立刻生效的关键）
-	m_cache.clear();
+	m_cache.clear();   // 颜色变了，旧 HTML 里烘的是旧色 ⇒ 必须清缓存（换肤立刻生效的关键）
 }
 
 QString CodeHighlighter::normalizeHint(const QString& language) const
@@ -129,14 +125,12 @@ QString CodeHighlighter::normalizeHint(const QString& language) const
 	if (hint.isEmpty())
 		return hint;
 
-	// 只取第一个词：```js title="x" / ```python {1,2}
-	static const QRegularExpression whitespace(QStringLiteral("\\s+"));
+	static const QRegularExpression whitespace(QStringLiteral("\\s+"));   // 只取第一个词：```js title="x" / ```python {1,2}
 	const int split = hint.indexOf(whitespace);
 	if (split > 0)
 		hint = hint.left(split);
 
-	// 去掉 fence 里常见的装饰字符（```json, ```'js' 、```{c}）
-	static const QRegularExpression decoration(QStringLiteral("^[`'\"{]+|[`'\"}]+$"));
+	static const QRegularExpression decoration(QStringLiteral("^[`'\"{]+|[`'\"}]+$"));   // 去掉 fence 里常见的装饰字符（```json, ```'js' 、```{c}）
 	hint.remove(decoration);
 
 	const auto alias = m_aliases.constFind(hint);
@@ -151,8 +145,7 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 	// 再经别名表落到语法 id —— 与官方 LANG_ALIASES 的取法一致（官方也是 Map 归一后查语法）。
 	const QString hint = normalizeHint(language);
 
-	// 缓存键带上当前主题：setThemeColors 已经会清缓存，这里再兜一层 ——
-	// 万一将来有人只改颜色不清缓存，也不会把亮色的 HTML 端给暗色。
+	// 缓存键带上当前主题：setThemeColors 已经会清缓存，这里再带一层主题标记做双保险。
 	const QString key = hint + QLatin1Char('\n') + code + (m_dark ? QLatin1String("\x01d") : QLatin1String("\x01l"));
 	const auto cached = m_cache.constFind(key);
 	if (cached != m_cache.constEnd())
@@ -162,13 +155,12 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 	const QVector<Rule> rules = m_rules.value(lang, m_rules.value(QStringLiteral("default")));
 
 	// 外层必须套 <pre>：QML 侧用 RichText 渲染，裸换行与**连续空格都会折叠** ——
-	// 不套的话多行代码会挤成一行、缩进全丢（实测 lineCount=1，加 <pre> 后正常）
+	// 不套的话多行代码会挤成一行、缩进全丢（lineCount 恒为 1）；套上 <pre> 才正常。
 	QString html = QStringLiteral("<pre style=\"margin:0;font-family:Consolas,monospace;\">");
 	int pos = 0;
 	const int codeLength = code.length();
 
-	// 逐位置贪心：每轮在剩余文本里找最早、同位置最长的那条规则；前段原样转义，命中段套 span
-	while (pos < codeLength) {
+	while (pos < codeLength) {   // 逐位置贪心：每轮在剩余文本里找最早、同位置最长的那条规则；前段原样转义，命中段套 span
 		int bestPos = -1;
 		int bestLen = 0;
 		const Rule* bestRule = nullptr;
@@ -199,6 +191,7 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 		html += code.mid(pos, bestPos - pos).toHtmlEscaped();
 
 		const QString matched = code.mid(bestPos, bestLen).toHtmlEscaped();
+
 		// 色值 = 单条硬覆盖 > 主题包里该角色的色 > 内置兜底表 >（都没有）不着色。
 		// 兜底表保证"主题包缺键"不会让整片代码块失去高亮（这个坑踩过一次）。
 		QString color = !bestRule->color.isEmpty()

@@ -16,8 +16,7 @@
 
 namespace
 {
-	// QML 侧用字符串避免在 QML 里写魔数（见 TitleBar/WindowButton.qml）
-	int controlKindFromName(const QString& name)
+	int controlKindFromName(const QString& name)   // QML 侧用字符串避免在 QML 里写魔数（见 TitleBar/WindowButton.qml）
 	{
 		if (name == QLatin1String("min"))
 			return NativeWindowFilter::ControlMinimize;
@@ -38,7 +37,6 @@ WindowBridge& WindowBridge::instance()
 WindowBridge::WindowBridge(QObject* parent)
 	: QObject(parent)
 {
-	// 这里曾经订阅 NativeWindowFilter 的"悬停到哪个窗口按钮"回调（setHoveredKindChanged），
 	// 唯一用途是喂 QML 面的 hoveredControl 属性；该属性全仓无人读（悬停反馈由 QML 自己画），
 	// 已随死成员一起删除，所以本构造函数不再订阅任何东西。
 }
@@ -56,17 +54,14 @@ void WindowBridge::attachWindow(QObject* window)
 
 	m_window = quickWindow;
 
-	// 样式位必须在窗口已原生创建之后补；winId() 会强制创建原生窗口
-	NativeWindowFilter::instance().applyNativeStyle(quickWindow);
+	NativeWindowFilter::instance().applyNativeStyle(quickWindow);   // 样式位必须在窗口已原生创建之后补；winId() 会强制创建原生窗口
 
 	connect(quickWindow, &QWindow::windowStateChanged, this,
 		[this](Qt::WindowState) { refreshFrameState(); });
 	connect(quickWindow, &QWindow::screenChanged, this,
 		[this](QScreen*) { refreshFrameState(); });
 
-	// 指针位置只在"有窗口"之后才有意义，所以过滤器挂在这里而不是构造函数里
-	// （构造函数可能在 QGuiApplication 之前跑）。app 级过滤器是**旁观**的，见头文件。
-	if (auto* app = QGuiApplication::instance())
+	if (auto* app = QGuiApplication::instance())   // 指针位置只在"有窗口"之后才有意义，所以过滤器挂在这里而不是构造函数里
 		app->installEventFilter(this);
 
 	refreshFrameState();
@@ -101,7 +96,6 @@ bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
 	case QEvent::MouseButtonRelease: {
 		// 过滤器挂在 QGuiApplication 上 ⇒ watched 是**接收者**。Qt Quick 的鼠标事件投给
 		// QQuickWindow（QML 控件那一层是场景图内部的命中测试，不走 QObject 事件），但也可能
-		// 投给某个 QQuickItem；两种都认，别的一律不算（将来多窗 / 原生弹层不该被记进来）。
 		const bool fromUs = m_window
 			&& (watched == m_window.data()
 				|| (qobject_cast<QQuickItem*>(watched) && qobject_cast<QQuickItem*>(watched)->window() == m_window.data()));
@@ -109,11 +103,9 @@ bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
 			break;
 
 		// ⚠️ 必须用 scenePosition()，不能用 position()：
-		//    Qt Quick 的鼠标事件可能投给 QQuickWindow，也可能投给某个 QQuickItem（QML 控件），
-		//    投给 item 时 position() 是**该 item 的局部坐标**（实测点侧栏 ⚙ 时得到 19,6，
-		//    正好落在那个 32×32 的按钮里），而 QML 侧按"场景坐标"去 mapFromItem ⇒
-		//    起点算到左上角，表现就是"覆盖页卡片从左上角长出来"。
-		//    scenePosition() 两种投递下都是同一套场景坐标（窗口内容坐标、逻辑像素）。
+		// Qt Quick 的鼠标事件可能投给 QQuickWindow，也可能投给某个 QQuickItem（QML 控件），
+		// 正好落在那个 32×32 的按钮里），而 QML 侧按"场景坐标"去 mapFromItem ⇒
+		// 起点算到左上角，表现就是"覆盖页卡片从左上角长出来"。
 		auto* mouse = static_cast<QMouseEvent*>(event);
 		m_pointerPos = mouse->scenePosition();
 		m_pointerAge.start();   // QElapsedTimer::start() 就是"重启"，重复调用取最近一次
@@ -181,8 +173,7 @@ void WindowBridge::startSystemMove()
 
 void WindowBridge::startSystemResize(int edges)
 {
-	// QML 侧传 Qt.Edge 位（Qt.LeftEdge | Qt.TopEdge ...）
-	if (m_window)
+	if (m_window)   // QML 侧传 Qt.Edge 位（Qt.LeftEdge | Qt.TopEdge ...）
 		m_window->startSystemResize(Qt::Edges(edges));
 }
 
@@ -191,7 +182,6 @@ void WindowBridge::notifyThemeChanged()
 	emit themeChanged();
 }
 
-// ---- 拖动跟手用的两个纯查询：一律转发 NativeWindowFilter（原生判定归它，见那边的说明）----
 QPoint WindowBridge::cursorScreenPos() const
 {
 	return NativeWindowFilter::cursorScreenPos();

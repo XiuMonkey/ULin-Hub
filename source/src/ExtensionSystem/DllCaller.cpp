@@ -457,8 +457,7 @@ bool DllCaller::invokeJsonFunction(const FunctionSpec& fn, const QJsonObject& ar
 
 	const QByteArray argsJson = QJsonDocument(args).toJson(QJsonDocument::Compact);
 
-	// 结果落地：resultIsJson 时 DLL 回的是 JSON 对象，否则包成 { "value": "<原文>" }
-	const auto applyResult = [&](const QByteArray& bytes) {
+	const auto applyResult = [&](const QByteArray& bytes) {   // 结果落地：resultIsJson 时 DLL 回的是 JSON 对象，否则包成 { "value": "<原文>" }
 		if (fn.resultIsJson) {
 			QJsonParseError parseError;
 			const QJsonDocument resultDoc = QJsonDocument::fromJson(bytes, &parseError);

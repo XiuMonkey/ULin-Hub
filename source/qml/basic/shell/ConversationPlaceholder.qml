@@ -1,4 +1,4 @@
-// 会话区占位：M3 只显示当前会话身份与服务端状态，消息列表/输入区在 M4–M5 迁入。
+// 会话区占位：M3 只显示当前会话身份与服务端状态，消息列表/输入区在 M4–M5 接入。
 // 本文件将被 chat/MessageListView.qml + chat/Composer.qml 取代。
 
 import QtQuick
@@ -36,6 +36,5 @@ Item {
             font.family: "Consolas"
             font.pixelSize: Theme.font.caption
         }
-
     }
 }

@@ -5,14 +5,13 @@
 // 文件名与键名只允许出现在这里，避免在 UI / core 各处散落字符串字面量。
 // 界面语言与主题在 AppearanceSetting.json（见 ClientSettings.h）；默认 Agent 预设归服务端设置，
 // 客户端刻意不留副本。
-// （历史上曾走 QSettings/注册表：因 org/app 名从未设置实际存不住，已整体迁出，
-// 注册表残留键也已于 2026-09-26 清空。）
+// （不用 QSettings/注册表：org/app 名未设置时实际存不住；统一走上述 JSON 文件。）
 
 #include <QString>
 
 namespace SettingsStore
 {
-	// 设置文件名（相对 ClientSettings::dir()）
+	// 设置文件名（相对 ClientSettings::dir）
 	QString fileName();
 
 	// 自定义 DSH 服务地址；未设置时返回空串

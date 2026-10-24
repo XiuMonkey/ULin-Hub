@@ -1,8 +1,7 @@
 // 见 ThemeBridge.h：QML 壳的 A 层 token。
-//
 // 内置默认值取自 docs/qss-token-archaeology.md（12 份 QSS + C++ 布局常量的频次统计），
 // 与 source/qml/metrics.json 逐键一致；metrics.json 只做覆盖，所以即使它被删/写坏，界面也不会崩。
-// 值若与旧壳不一致，注释里会点明 —— M8 删旧壳后这些注释就是唯一的出处记录。
+// 值若与现有实现不一致，注释里会点明 —— 删后这些注释就是唯一的出处记录。
 
 #include "qmlbridge/ThemeBridge.h"
 
@@ -22,7 +21,6 @@
 namespace
 {
 	// 解析 theme-*.json 里的颜色：⚠️ rgb()/rgba() 函数式写法必须自己处理 —— QML 的 color 值类型不接受它
-	// （实测 `color: "rgba(0,0,0,0.12)"` 直接让整个 QML 文件加载失败："Invalid property assignment: color expected"，
 	// 而 QSS 时代它合法）：这些字符串塞进 QML 后绑定被丢弃、属性退回默认值 —— 阴影就成了 MultiEffect 默认的
 	// 不透明黑、悬停底色同理，所以这里统一转成 QColor（带 alpha）再交给 QML。
 	// 支持 #RGB / #RRGGBB / #AARRGGBB / SVG 颜色名 / transparent，外加 rgb(r,g,b) 与 rgba(r,g,b,a)（a 可为 0..1 浮点或 0..255 整数）。
@@ -120,7 +118,7 @@ namespace
 		map.insert(QStringLiteral("columnClearance"), 16);     // kColumnSideClearance
 		map.insert(QStringLiteral("panelGap"), 2);             // kPanelGap
 		map.insert(QStringLiteral("contentSideInset"), 9);     // kContentSideInset
-		map.insert(QStringLiteral("cardPadding"), 16);         // QML 侧取值（旧壳最接近的是 extension-manager #extPopupList 8px）
+		map.insert(QStringLiteral("cardPadding"), 16);   // QML 侧取值
 		map.insert(QStringLiteral("sectionGap"), 12);          // ChatInputWidget.cpp kCardGap
 		map.insert(QStringLiteral("buttonGap"), 6);            // kRowBottomPadding / Tooltip.cpp kGap
 		map.insert(QStringLiteral("buttonPadY"), 8);           // QSS padding: 8px 14px（8 处）
@@ -131,9 +129,7 @@ namespace
 		map.insert(QStringLiteral("fieldPadWideX"), 12);
 		map.insert(QStringLiteral("labelGap"), 8);             // 单选/复选行、#toolsFilterToolRow 的 spacing
 		map.insert(QStringLiteral("editorPadTop"), 4);         // ChatInputWidget.cpp kEditorVerticalPadding
-		// 输入卡片下沿 → 底下那行用量小字上沿的距离（新键，只在 basic/chat/Composer.qml 用）：
-		// 原来小字紧贴会话区底、离卡片 14px，显得"两截"；收到 4px 让它是卡片的附属说明。
-		map.insert(QStringLiteral("statsGap"), 4);
+		map.insert(QStringLiteral("statsGap"), 4);   // 输入卡片下沿 → 底下那行用量小字上沿的距离（新键，只在 basic/chat/Composer.qml 用）
 		return map;
 	}
 
@@ -141,12 +137,12 @@ namespace
 	{
 		QVariantMap map;
 		map.insert(QStringLiteral("sessionBarWidth"), 240);            // Main.cpp kSessionBarWidth
+
 		// 右侧栏（面板坞）宽度。⚠️ 新 token 必须**先在这里**登记：metrics.json 只是覆盖层，
 		// 未知键会被 overlayGroup 直接忽略 —— 只加 metrics.json 的话运行时读到 undefined，
 		// 表现是"面板不出现、压窄量算成 NaN"（踩过一次，日志/布局都正常但界面毫无反应）。
 		map.insert(QStringLiteral("panelBarWidth"), 300);
-		// 右侧栏拖拽下限：再窄标题和关闭键就挤在一起了；上限由 Shell 按"会话区最小宽度"现算
-		map.insert(QStringLiteral("panelBarMinWidth"), 260);
+		map.insert(QStringLiteral("panelBarMinWidth"), 260);   // 右侧栏拖拽下限：再窄标题和关闭键就挤在一起了；上限由 Shell 按"会话区最小宽度"现算
 		map.insert(QStringLiteral("titleBarHeight"), 42);           // TitleBar::kHeight
 		map.insert(QStringLiteral("titleBarPadLeft"), 14);          // TitleBar.cpp:56 布局左边距
 		map.insert(QStringLiteral("windowButtonWidth"), 46);        // kButtonWidth
@@ -156,22 +152,22 @@ namespace
 		map.insert(QStringLiteral("logoHeight"), 20);               // kLogoHeight
 		map.insert(QStringLiteral("logoTextGap"), 8);               // kLogoTextGap
 		map.insert(QStringLiteral("statsLineHeight"), 14);          // SessionStatsLine::kHeight
-		map.insert(QStringLiteral("minWindowWidth"), 720);          // QML 侧取值（旧壳 setMinimumWidth 是算出来的）
+		map.insert(QStringLiteral("minWindowWidth"), 720);   // QML 侧取值
 		map.insert(QStringLiteral("minWindowHeight"), 480);         // Main.cpp:59 qBound 下限
 		map.insert(QStringLiteral("preferredWindowWidth"), 1440);   // kPreferredWindowWidth
 		map.insert(QStringLiteral("preferredWindowHeight"), 880);   // kPreferredWindowHeight（另加标题栏高度）
 		map.insert(QStringLiteral("minConversationWidth"), 320);    // kMinConversationColumnWidth
 		map.insert(QStringLiteral("sendButton"), 32);               // chat #sendButton 四边 32px
 		map.insert(QStringLiteral("selectorChipHeight"), 24);       // ModelSelector 的 chip 高（原版 kChipHeight 28，作为配角收小）
-		map.insert(QStringLiteral("scrollbarThickness"), 10);       // scrollbars.qss QScrollBar 宽/高（也是可点/可拖的轨道宽）；2026-10-20 由 8 放宽到 10（用户反馈把手偏细、不好拖）
+		map.insert(QStringLiteral("scrollbarThickness"), 10);       // scrollbars.qss QScrollBar 宽/高（也是可点/可拖的轨道宽；太细会不好拖）
+
 		// 可见把手的粗细：比轨道窄一圈（AppScrollBar 按 (thickness - handleWidth) / 2 内收），
 		// 于是"细窄 + 留白"只改观感 —— 拖拽/点轨道的几何仍由框架按 contentItem（= thickness）算。
-		// 2026-10-20 由 6 放宽到 8（与上面的 thickness 同步 +2，保持内收 1px）。
-		// ⚠️ AppScrollBar.qml 里还用 Math.max 兜了同样的下限，旧 EXE 读到的 8/6 也会被抬到 10/8。
+		// ⚠️ AppScrollBar.qml 里还用 Math.max 兜了同样的下限，令牌取到较小值时也会被抬到 10/8。
 		map.insert(QStringLiteral("scrollbarHandleWidth"), 8);
 		map.insert(QStringLiteral("scrollbarHandleMin"), 20);       // scrollbars.qss ::handle min-height
-		map.insert(QStringLiteral("editorMinHeight"), 48);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 = 21，再留 27 的余量（用户两次各要"高 10px"：28 → 38 → 48）
-		map.insert(QStringLiteral("editorMaxHeight"), 140);         // 编辑区高度上限：8 行（行高实测 17）+ editorPadTop 4 = 140；超过就由外层 Flickable 滚动 + AppScrollBar
+		map.insert(QStringLiteral("editorMinHeight"), 48);          // 单行编辑区最小高度（原版 kEditorMinHeight 40）：一行 17 + editorPadTop 4 = 21，再留 27 的余量
+		map.insert(QStringLiteral("editorMaxHeight"), 140);         // 编辑区高度上限：8 行（行高 17）+ editorPadTop 4 = 140；超过就由外层 Flickable 滚动 + AppScrollBar
 		map.insert(QStringLiteral("dropdownArrowWidth"), 18);       // #settingsLanguageCombo::drop-down 宽度
 		map.insert(QStringLiteral("comboMinWidth"), 200);           // #settingsLanguageCombo min-width
 		map.insert(QStringLiteral("checkbox"), 18);                 // chat #interactionPanel QCheckBox::indicator
@@ -201,7 +197,7 @@ namespace
 		map.insert(QStringLiteral("inputRadius"), 16);    // 必须等于 radius.composer
 		map.insert(QStringLiteral("floatBlur"), 24);      // CardShadow.h level3() = Spec{24, 8, 14}
 		map.insert(QStringLiteral("floatDy"), 8);
-		map.insert(QStringLiteral("floatRadius"), 14);    // ⚠ 与 radius.float(20) 不同：旧壳靠 Main.cpp:273 setRadius(20) 硬纠正 #initCard 的圆角
+		map.insert(QStringLiteral("floatRadius"), 14);   // ⚠ 与 radius.float(20) 不同：靠 Main.cpp:273 setRadius(20) 硬纠正 #initCard 的圆角
 		map.insert(QStringLiteral("topBarGap"), 8);       // Main.cpp kTopBarShadowGap
 		return map;
 	}
@@ -209,8 +205,8 @@ namespace
 	QVariantMap defaultMotion()
 	{
 		QVariantMap map;
-		map.insert(QStringLiteral("fast"), 120);      // 旧壳最近锚点：Tooltip.cpp kFadeMs 110
-		map.insert(QStringLiteral("normal"), 180);    // 旧壳无对应常量（QSS 无 transition）
+		map.insert(QStringLiteral("fast"), 120);   // 最近锚点：Tooltip.cpp kFadeMs 110
+		map.insert(QStringLiteral("normal"), 180);   // 无对应常量（QSS 无 transition）
 		map.insert(QStringLiteral("slow"), 260);      // SmoothWheelScroller.cpp 的 80/220 是滚动动画，不是通用档
 		return map;
 	}

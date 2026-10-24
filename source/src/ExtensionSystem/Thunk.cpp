@@ -135,8 +135,7 @@ namespace
 
 		void movsdXmmFromR10Disp8(int xmmIndex, std::uint8_t disp)
 		{
-			// F2 是 legacy 前缀，必须在 REX 之前
-			u8(0xF2);
+			u8(0xF2);   // F2 是 legacy 前缀，必须在 REX 之前
 			u8(0x41);
 			u8(0x0F);
 			u8(0x10);
@@ -144,8 +143,7 @@ namespace
 			u8(disp);
 		}
 
-		// 0x24 一定要有，是 x64 确认偏移的 SIB 字节
-		void movRaxToRspDisp8(std::uint8_t disp)
+		void movRaxToRspDisp8(std::uint8_t disp)   // 0x24 一定要有，是 x64 确认偏移的 SIB 字节
 		{
 			u8(0x48);
 			u8(0x89);
@@ -323,8 +321,7 @@ namespace Thunk
 		writer.popRbx();
 		writer.ret();
 
-		// X86Writer 不做边界检查，越界说明编码逻辑被改坏了，宁可报错也不要写穿这一页
-		if (writer.size() > kThunkPageSize) {
+		if (writer.size() > kThunkPageSize) {   // X86Writer 不做边界检查，越界说明编码逻辑被改坏了，宁可报错也不要写穿这一页
 			m_errorString = QStringLiteral("generated thunk exceeds the allocated page");
 			return false;
 		}

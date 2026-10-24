@@ -3,11 +3,9 @@
 // 后端接管（API takeover）的两个公共接口：宿主实现接口一（挂在 DshApiClient 上），客户端扩展
 // 实现接口二（挂在插件根对象上）。接管时内置 DSH 进程停掉，全部出站交给扩展，宿主 UI 不改；
 // 入站数据注入见 VirtualMain（VirtualCommon.h）。设计文档：misc/DESIGN_NOTES.zh-CN.md、API_TAKEOVER_PLAN.zh-CN.md §2.6。
-//
 // ABI 四条：全内联（out-of-line 成员 = 真外部符号，插件 LNK2019）；虚方法只在末尾追加（vtable
 // 槽位 = 声明顺序）；改 IID = 改 ABI（旧插件静默拿 nullptr）；参数可带 Qt 类型。不把虚方法加进
 // DshApiClient.h 的原因：那个类方法全在 .cpp（out-of-line），插件一碰类型就 LNK2019。
-//
 // 通讯形态：插件 → 宿主走接口一（findObject(kApiClient) 后 qobject_cast）；宿主 → 插件走接口二
 // （装载时 cast 一次登记到 kApiSink）；入站注入走 VirtualMain（findObject(kMainWindow)）。
 // 出站一元 RPC 汇成 (method, argsJson)，扩展用 CompleteCall / FailCall 回填成功回调该拿的 value
@@ -25,8 +23,8 @@ public:
 	virtual ~VirtualApiHost() = default;
 
 	// 拨动"后端已被接管"开关：true = 宿主不再走 HTTP/WebSocket、出站全交扩展；false = 交还
-	// （不会自动重启内置服务端，恢复只能重启客户端或触发 ServerManager::restart()）。宿主动作幂等；
-	// attachHost() 可能被调多次（同名扩展二次装载）—— 每次都该重新取接口并再调一次 Takenover(true)。
+	// （不会自动重启内置服务端，恢复只能重启客户端或触发 ServerManager::restart）。宿主动作幂等；
+	// attachHost 可能被调多次（同名扩展二次装载）—— 每次都该重新取接口并再调一次 Takenover(true)。
 	virtual void Takenover(bool on) = 0;
 
 	// 回填一次出站请求：resultJson 是成功回调该拿到的那份 value（不是 server-response 信封），

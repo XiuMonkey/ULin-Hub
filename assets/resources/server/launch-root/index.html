@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据面板 · 单文件演示</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #1a1d21;
+    --muted: #646b76;
+    --line: #e3e6ea;
+    --accent: #3559e0;
+    --ok: #1a7f4b;
+    --warn: #a15c00;
+    --bad: #b42318;
+    --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 8px 24px rgb(16 24 40 / 6%);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #14161a;
+    --surface: #1c1f24;
+    --text: #eceef1;
+    --muted: #9aa1ab;
+    --line: #2c3138;
+    --accent: #7b95ff;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 30%);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 24px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: .2px; }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 64px; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .card .label { font-size: 13px; color: var(--muted); }
+  .card .value { font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .card .delta { font-size: 12px; margin-top: 4px; color: var(--ok); }
+  .card .delta.down { color: var(--bad); }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .toolbar input[type="search"] {
+    flex: 1 1 220px;
+    min-width: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  .toolbar input[type="search"]:focus-visible,
+  .toolbar select:focus-visible,
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toolbar select {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  .toolbar .count { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 11px 16px; text-align: left; white-space: nowrap; }
+  th {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 55%, var(--surface));
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { color: var(--text); }
+  th .arrow { opacity: .45; margin-left: 6px; font-size: 10px; }
+  tbody tr { border-bottom: 1px solid var(--line); }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.7;
+  }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .badge.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .badge.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+  footer { margin-top: 26px; font-size: 13px; color: var(--muted); text-align: center; }
+  code { font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; background: color-mix(in srgb, var(--text) 7%, transparent); padding: 1px 5px; border-radius: 5px; }
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .toggle:hover { border-color: var(--accent); }
+  @media (prefers-reduced-motion: no-preference) {
+    tbody tr { transition: background .15s ease; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>数据面板 <span>· 单文件演示</span></h1>
+  <button class="toggle" id="theme" type="button" aria-label="切换深色模式">🌙 深色</button>
+</header>
+
+<main>
+  <section class="stats" aria-label="关键指标">
+    <div class="card"><div class="label">总请求</div><div class="value">12,480</div><div class="delta">↑ 8.2% 较上周</div></div>
+    <div class="card"><div class="label">成功率</div><div class="value">99.42%</div><div class="delta">↑ 0.11%</div></div>
+    <div class="card"><div class="label">平均延迟</div><div class="value">182 ms</div><div class="delta down">↓ 12 ms</div></div>
+    <div class="card"><div class="label">活跃节点</div><div class="value">7 / 8</div><div class="delta down">1 个维护中</div></div>
+  </section>
+
+  <section class="panel" aria-label="服务列表">
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="搜索服务或区域…" autocomplete="off">
+      <select id="status">
+        <option value="">全部状态</option>
+        <option value="ok">正常</option>
+        <option value="warn">注意</option>
+        <option value="bad">异常</option>
+      </select>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="name">服务 <span class="arrow">↕</span></th>
+            <th data-key="region">区域</th>
+            <th data-key="status">状态</th>
+            <th data-key="latency" class="num">延迟 (ms)</th>
+            <th data-key="uptime" class="num">可用率</th>
+            <th data-key="updated">更新时间</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>没有匹配的记录</div>
+    </div>
+  </section>
+
+  <footer>静态演示页 · 无外部依赖 · 数据为虚构示例 · 支持 <code>?theme=dark</code></footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const DATA = [
+    { name: "网关 API",      region: "华东 1",  status: "ok",   latency: 42,  uptime: "99.99%", updated: "2024-06-11 09:20" },
+    { name: "认证服务",      region: "华东 2",  status: "ok",   latency: 88,  uptime: "99.95%", updated: "2024-06-11 09:18" },
+    { name: "订单服务",      region: "华北 1",  status: "warn", latency: 310, uptime: "99.71%", updated: "2024-06-11 09:05" },
+    { name: "支付回调",      region: "华北 2",  status: "ok",   latency: 126, uptime: "99.90%", updated: "2024-06-11 09:21" },
+    { name: "消息队列",      region: "华南 1",  status: "bad",  latency: 980, uptime: "97.20%", updated: "2024-06-11 08:52" },
+    { name: "对象存储",      region: "华南 2",  status: "ok",   latency: 64,  uptime: "99.98%", updated: "2024-06-11 09:19" },
+    { name: "搜索索引",      region: "西南 1",  status: "warn", latency: 254, uptime: "99.60%", updated: "2024-06-11 09:11" },
+    { name: "报表任务",      region: "华东 1",  status: "ok",   latency: 190, uptime: "99.87%", updated: "2024-06-11 09:00" }
+  ];
+
+  const STATUS = {
+    ok:   { text: "正常", cls: "ok" },
+    warn: { text: "注意", cls: "warn" },
+    bad:  { text: "异常", cls: "bad" }
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+  const rowsEl = $("#rows");
+  const emptyEl = $("#empty");
+  const countEl = $("#count");
+
+  let sortKey = "name";
+  let sortDir = 1;
+
+  function render() {
+    const q = $("#q").value.trim().toLowerCase();
+    const st = $("#status").value;
+
+    const list = DATA
+      .filter((r) => (!st || r.status === st) &&
+        (!q || r.name.toLowerCase().includes(q) || r.region.toLowerCase().includes(q)))
+      .sort((a, b) => {
+        const x = a[sortKey], y = b[sortKey];
+        if (typeof x === "number") return (x - y) * sortDir;
+        return String(x).localeCompare(String(y), "zh-CN") * sortDir;
+      });
+
+    rowsEl.replaceChildren(...list.map((r) => {
+      const tr = document.createElement("tr");
+      const s = STATUS[r.status];
+      tr.innerHTML =
+        `<td><strong>${r.name}</strong></td>` +
+        `<td>${r.region}</td>` +
+        `<td><span class="badge ${s.cls}">${s.text}</span></td>` +
+        `<td class="num">${r.latency}</td>` +
+        `<td class="num">${r.uptime}</td>` +
+        `<td>${r.updated}</td>`;
+      return tr;
+    }));
+
+    emptyEl.hidden = list.length > 0;
+    countEl.textContent = `显示 ${list.length} / ${DATA.length} 条`;
+  }
+
+  function setTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    $("#theme").textContent = theme === "dark" ? "☀️ 浅色" : "🌙 深色";
+    try { localStorage.setItem("demo-theme", theme); } catch (_) { /* 忽略隐私模式 */ }
+  }
+
+  $("#theme").addEventListener("click", () => {
+    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
+
+  $("#q").addEventListener("input", render);
+  $("#status").addEventListener("change", render);
+
+  document.querySelectorAll("th[data-key]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if (key === "updated") return;
+      sortDir = key === sortKey ? -sortDir : 1;
+      sortKey = key;
+      render();
+    });
+  });
+
+  const params = new URLSearchParams(location.search);
+  let initial = params.get("theme");
+  if (initial !== "dark" && initial !== "light") {
+    try { initial = localStorage.getItem("demo-theme"); } catch (_) { initial = null; }
+  }
+  if (initial !== "dark" && initial !== "light") {
+    initial = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  setTheme(initial);
+  render();
+})();
+</script>
+</body>
+</html>

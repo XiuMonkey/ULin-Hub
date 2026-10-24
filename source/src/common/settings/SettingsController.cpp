@@ -31,8 +31,6 @@ SettingsController::SettingsController(DshApiClient* api, QObject* parent)
 	// openPage() 的顺序是"先 emit openChanged()（QML 的 Loader 同步开始装载设置页，
 	// 语言下拉当场绑定 Hub.settings.languages）、后 refresh() → loadAppearance() 填数据"，
 	// 所以在第一次打开设置页时绑定到的是空列表；配合 CONSTANT 属性就是"永远空白且不报错"。
-	// Translation::init() 在 main.cpp 里早于 ShellController::init() 执行（main.cpp:45 < :70），
-	// 所以这里调用是安全的，能拿到真实的语言包列表。
 	loadAppearance();
 }
 
@@ -120,8 +118,7 @@ void SettingsController::loadAgentPresets()
 				m_defaultPresetName = qtTrId("settings_no_preset");
 			}
 			else {
-				// 选中项完全由服务端定（每行的 isDefault）；客户端不存本地副本
-				const QString selectedId = AgentPresetService::resolveSelectedId(presets, QString());
+				const QString selectedId = AgentPresetService::resolveSelectedId(presets, QString());   // 选中项完全由服务端定（每行的 isDefault）；客户端不存本地副本
 				m_defaultPresetName.clear();
 				for (const AgentPreset& preset : presets) {
 					if (preset.id == selectedId) {
@@ -134,9 +131,13 @@ void SettingsController::loadAgentPresets()
 			}
 			emit presetsChanged();
 		},
-		[this](const DshApiClient::RpcError& error) {
+		[this](const DshApiClient::RpcError&) {
 			m_agentPresets.clear();
-			m_defaultPresetName = qtTrId("common_load_failed_fmt").arg(error.code, error.message);
+
+			// 当前 ULin Hub 的 minimal API profile 没有装 agent preset registry（/api/agentPresets/list 会 404）。
+			// 这不是网络故障，不要把底层 transport 文案原样怼到设置页按钮上；明确显示"未内置"。
+			m_defaultPresetName = qtTrId("settings_agent_preset_unavailable");
+			m_presetFeedback.clear();
 			emit presetsChanged();
 		});
 }
@@ -146,7 +147,7 @@ void SettingsController::selectDefaultPreset(const QString& presetId)
 	if (!m_api || presetId.isEmpty())
 		return;
 
-	const QString previousName = m_defaultPresetName;  // 乐观显示（与旧壳同）：写入失败再退回原文字
+	const QString previousName = m_defaultPresetName;   // 乐观显示：写入失败再退回原文字
 	for (const QVariant& value : m_agentPresets) {
 		const QVariantMap row = value.toMap();
 		if (row.value(QStringLiteral("id")).toString() == presetId) {
@@ -159,8 +160,7 @@ void SettingsController::selectDefaultPreset(const QString& presetId)
 
 	AgentPresetService::persistDefault(m_api, presetId,
 		[this](const QString& savedId) {
-			// 旧壳只在成功时留一行日志：界面是乐观更新，没有"已保存"文案
-			qInfo().noquote() << "[Settings] default agent preset ->" << savedId;
+			qInfo().noquote() << "[Settings] default agent preset ->" << savedId;   // 只在成功时留一行日志：界面是乐观更新，没有"已保存"文案
 			m_presetFeedback.clear();
 			emit presetsChanged();
 		},
@@ -176,13 +176,13 @@ void SettingsController::saveServerUrl(const QString& url)
 	SettingsStore::setServerUrl(url.trimmed());
 	m_serverUrl = SettingsStore::serverUrl();
 	emit serverUrlChanged();
-	emit serverRestartRequested();  // 旧壳：Settings::serverSettingsSaved -> ServerManager::restart
+	emit serverRestartRequested();   // Settings::serverSettingsSaved -> ServerManager::restart
 }
 
 void SettingsController::loadAppearance()
 {
 	QVariantList rows;
-	QVariantMap follow;  // 第 0 项固定是"跟随系统"（数据为空串），与旧壳一致
+	QVariantMap follow;   // 第 0 项固定是"跟随系统"（数据为空串），保持一致
 	follow.insert(QStringLiteral("name"), qtTrId("settings_language_follow_system"));
 	follow.insert(QStringLiteral("code"), QString());
 	rows.append(follow);
@@ -209,8 +209,7 @@ void SettingsController::setLanguage(const QString& code)
 		m_appearanceFeedback = qtTrId("settings_language_switched");
 	}
 	else {
-		// 语言包缺失：退回原文并把原因说清楚（不是错误）
-		m_appearanceFeedback = qtTrId("settings_language_pack_missing_fmt")
+		m_appearanceFeedback = qtTrId("settings_language_pack_missing_fmt")   // 语言包缺失：退回原文并把原因说清楚（不是错误）
 			.arg(code.isEmpty() ? qtTrId("settings_language_system_name") : code);
 	}
 	emit languageChanged();
@@ -221,7 +220,7 @@ void SettingsController::resetStyles()
 	ThemeManager::instance().resetStylePack();
 
 	// 风格包重置后让 QML 侧热重载 token：本类在 common（领域层），**不许**直接调 qmlbridge 的
-	// ThemeBridge，于是发信号、由 qmlbridge/QmlBridge 接住落地（等价于搬家前在这里直接调
+	// ThemeBridge，于是发信号、由 qmlbridge/QmlBridge 接住落地（等价于在这里直接调
 	// ThemeBridge::reload()；M8 起 ThemeManager 不再发信号，这条通路只能由本类主动发）。
 	emit stylesReset();
 	m_appearanceFeedback = qtTrId("settings_styles_reset_done");
@@ -267,8 +266,7 @@ void SettingsController::setFormFeedback(const QString& text)
 
 QString SettingsController::routeHint(const QString& provider) const
 {
-	// 与旧壳 ModelListPanel::routeHint 逐句一致
-	const ConfigurableProvider* entry = findProvider(provider);
+	const ConfigurableProvider* entry = findProvider(provider);   // 与现有实现 ModelListPanel::routeHint 逐句一致
 	if (!entry)
 		return qtTrId("model_no_configurable_provider");
 
@@ -285,8 +283,7 @@ QString SettingsController::routeHint(const QString& provider) const
 		QString::number(models.size())));
 
 	if (routeIsPiAi(provider)) {
-		// pi-ai 的 models 是整体替换，会收窄公布范围
-		if (!userDeclared)
+		if (!userDeclared)   // pi-ai 的 models 是整体替换，会收窄公布范围
 			parts.append(qtTrId("model_write_warning_desc"));
 	}
 	else {
@@ -325,8 +322,7 @@ void SettingsController::writeModel(const ConfigurableProvider& provider, const 
 
 void SettingsController::submitModelForm(const QString& provider, const QString& modelId, const QString& displayName, const QString& contextWindow, const QString& maxTokens, const QString& efforts, const QString& apiKey)
 {
-	// 校验顺序与文案沿用旧壳（ModelListPanel::submitForm）
-	if (provider.isEmpty()) {
+	if (provider.isEmpty()) {   // 校验顺序与文案沿用（ModelListPanel::submitForm）
 		setFormFeedback(qtTrId("model_select_provider_first"));
 		return;
 	}
@@ -347,8 +343,7 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 	request.id = modelId.trimmed();
 	request.name = displayName.trimmed();
 
-	// 可选整数：空 = 不写；非法 = 拒绝（旧壳 parseOptionalInt）
-	const auto parseOptional = [](const QString& text, bool* has, int* value) {
+	const auto parseOptional = [](const QString& text, bool* has, int* value) {   // 可选整数：空 = 不写；非法 = 拒绝
 		const QString trimmed = text.trimmed();
 		if (trimmed.isEmpty()) {
 			*has = false;
@@ -388,13 +383,13 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 		}
 	}
 
-	// 凭据引用：profile 点名的优先，否则按约定派生并记入配置（旧壳 refreshCredentialRow + 1410 行）
+	// 凭据引用：profile 点名的优先，否则按约定派生并记入配置
 	const QString declared = ModelSelectionService::profileApiKeyEnv(*ns, entry->settingsPath);
 	const QString ref = declared.isEmpty()
 		? ModelSelectionService::deriveKeyRef(entry->provider)
 		: declared;
 
-	bool replacing = false;  // 同 ID 已存在 = 覆盖（旧壳据此选 model_updated_fmt / model_added_fmt）
+	bool replacing = false;   // 同 ID 已存在 = 覆盖
 	const QJsonArray existing = ModelSelectionService::configuredModels(*ns, entry->settingsPath);
 	for (const QJsonValue& value : existing) {
 		if (value.toObject().value(QStringLiteral("id")).toString() == request.id) {
@@ -433,7 +428,7 @@ void SettingsController::refresh()
 	setBusy(true);
 	setStatus(QString());
 
-	loadAgentPresets();  // 同旧壳 Settings::refreshOnOpen：每次打开重同步服务端地址、预设、模型目录
+	loadAgentPresets();   // 同一行为 Settings::refreshOnOpen：每次打开重同步服务端地址、预设、模型目录
 	loadAppearance();
 	m_serverUrl = SettingsStore::serverUrl();
 	if (m_serverUrl.isEmpty())
@@ -488,8 +483,7 @@ void SettingsController::rebuildProviders()
 		row.insert(QStringLiteral("active"), provider.active);
 		row.insert(QStringLiteral("declared"), provider.declared);
 
-		// 下拉项文案：与旧壳 syncFormToRoute 同规则（displayName + 路由后缀 + 未启用后缀）
-		QString label = provider.displayName;
+		QString label = provider.displayName;   // 下拉项文案：与现有实现 syncFormToRoute 同规则（displayName + 路由后缀 + 未启用后缀）
 		if (label != provider.provider)
 			label += qtTrId("model_provider_route_suffix_fmt").arg(provider.provider);
 		if (!provider.active)
@@ -506,8 +500,7 @@ void SettingsController::rebuildProviders()
 		row.insert(QStringLiteral("keyDeclaredByProfile"), declaredByProfile);
 		row.insert(QStringLiteral("namespaceFound"), ns != nullptr);
 
-		// 凭据状态：还没查到时按"未知"呈现（不能当成只读）
-		bool known = false;
+		bool known = false;   // 凭据状态：还没查到时按"未知"呈现（不能当成只读）
 		bool configured = false;
 		bool writable = false;
 		QString source;
@@ -544,7 +537,7 @@ void SettingsController::rebuildProviders()
 
 	m_providers = rows;
 
-	// 模型页的行：与旧壳 ModelListPanel 一样，用 buildModelInfos 把"目录公布的模型"与
+	// 模型页的行：与现有实现 ModelListPanel 一样，用 buildModelInfos 把"目录公布的模型"与
 	// "settings 里声明的条目"join 成展示行（容量、写回地址只有 settings 侧知道）
 	QVariantList modelRows;
 	const QVector<ModelInfo> infos = ModelSelectionService::buildModelInfos(m_view);
@@ -669,8 +662,7 @@ void SettingsController::addModel(const QString& provider, const QString& modelI
 	request.provider = entry->provider;
 	request.id = modelId.trimmed();
 	request.name = displayName.trimmed();
-	// 容量等字段留给"发现"回来的数值（addModel 会按 pi-ai / 非 pi-ai 两种形态写条目）
-	for (const DiscoveredModel& model : m_discovered) {
+	for (const DiscoveredModel& model : m_discovered) {   // 容量等字段留给"发现"回来的数值（addModel 会按 pi-ai / 非 pi-ai 两种形态写条目）
 		if (model.id != request.id)
 			continue;
 		request.hasContextWindow = model.hasContextWindow;
@@ -685,7 +677,7 @@ void SettingsController::addModel(const QString& provider, const QString& modelI
 		[this, provider, modelId](const SettingsNamespace&) {
 			setBusy(false);
 			setStatus(qtTrId("model_added_fmt").arg(modelId));
-			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器（旧壳 ULinHub.043）
+			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器
 			refresh();
 		},
 		[this](const DshApiClient::RpcError& error) {

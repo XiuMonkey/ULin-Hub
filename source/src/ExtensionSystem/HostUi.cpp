@@ -2,7 +2,6 @@
 
 #include "common/shell/PanelBarDockModel.h"
 
-
 #include <QDebug>
 #include <QFileInfo>
 #include <QQmlComponent>
@@ -46,8 +45,7 @@ bool HostUi::registerItem(const QString& name, QObject* item)
 		return false;
 	}
 	if (!qobject_cast<QQuickItem*>(item)) {
-		// 扩展注入靠 setParentItem，所以宿主对象必须是 Item；不是就明确拒绝，别让它静默失效
-		qWarning("[HostUi] registerItem(%s): 不是 QQuickItem，拒绝", qPrintable(name));
+		qWarning("[HostUi] registerItem(%s): 不是 QQuickItem，拒绝", qPrintable(name));   // 扩展注入靠 setParentItem，所以宿主对象必须是 Item；不是就明确拒绝，别让它静默失效
 		return false;
 	}
 	if (m_items.value(name).data() == item)
@@ -159,8 +157,7 @@ void HostUi::dropAt(int index)
 {
 	const Mounted entry = m_mounted.at(index);
 	m_mounted.removeAt(index);
-	// 顺序：先删注入项（它可能引用 context），再删 context
-	if (entry.item) {
+	if (entry.item) {   // 顺序：先删注入项（它可能引用 context），再删 context
 		entry.item->setParentItem(nullptr);
 		delete entry.item;
 	}
@@ -226,8 +223,7 @@ bool HostUi::SetBlockBackend(const QString& owner, const QString& kind, QObject*
 void HostUi::ClearBlockBackend(const QString& owner, const QString& kind)
 {
 	const auto found = m_blockBackends.constFind(kind);
-	// 只撤自己登记的：别的扩展顶上来之后，旧扩展的卸载不该把新登记清掉
-	if (found == m_blockBackends.constEnd() || found.value().owner != owner)
+	if (found == m_blockBackends.constEnd() || found.value().owner != owner)   // 只撤自己登记的：别的扩展顶上来之后，旧扩展的卸载不该把新登记清掉
 		return;
 
 	m_blockBackends.remove(kind);
@@ -258,10 +254,8 @@ int HostUi::releaseBlockBackends(const QString& owner)
 	}
 
 	return removed;
-
 }
 
-// ---- VirtualBlockBackendHost 末尾追加那两条：纯转发，底下是块模型本来就有的方法 ----
 void HostUi::RegisterLauncher(const char* kind, const char* label, const char* hint)
 {
 	PanelBarDockModel::instance().registerLauncher(
@@ -315,7 +309,6 @@ bool HostUi::CloseBlock(const QString& blockId)
 		qInfo().noquote() << QStringLiteral("[HostUi] CloseBlock: 已关块 %1").arg(blockId);
 	return closed;
 }
-// ---------------- 顶层窗口（扩展的独立界面 / 网页兜底落点） ----------------
 
 QQmlEngine* HostUi::anyEngine() const
 {
@@ -388,8 +381,7 @@ QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const Q
 	entry.context = windowContext;
 	m_windows.insert(owner, entry);
 
-	// 挂到主窗口上：① 始终浮在主窗口之上 ② 主窗口一关，这些窗口一起关
-	if (QWindow* main = mainWindow()) {
+	if (QWindow* main = mainWindow()) {   // 挂到主窗口上：① 始终浮在主窗口之上 ② 主窗口一关，这些窗口一起关
 		window->setTransientParent(main);
 		if (!m_mainHooked) {
 			m_mainHooked = true;
@@ -404,8 +396,7 @@ QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const Q
 		}
 	}
 
-	// 用户点 × / 代码 close 都会走到这里：回收上下文与窗口对象
-	QObject::connect(window, &QWindow::visibleChanged, this, [this, owner, window](bool visible) {
+	QObject::connect(window, &QWindow::visibleChanged, this, [this, owner, window](bool visible) {   // 用户点 × / 代码 close 都会走到这里：回收上下文与窗口对象
 		if (visible)
 			return;
 		auto it = m_windows.find(owner);
@@ -444,8 +435,7 @@ QString HostUi::OpenWebWindow(const char* ownerC, const char* urlC, const char* 
 		qWarning("[HostUi] openWebWindow: owner / url 有空值，拒绝");
 		return QString();
 	}
-	// 通用兜底落点：宿主自带的 WebEngine 窗口去解析这个 URL（宿主不认识任何插件）
-	QVariantMap initial;
+	QVariantMap initial;   // 通用兜底落点：宿主自带的 WebEngine 窗口去解析这个 URL（宿主不认识任何插件）
 	initial.insert(QStringLiteral("initialUrl"), page);
 	return openWindowImpl(owner, QUrl(QStringLiteral("qrc:/qml/basic/browser/WebWindow.qml")),
 		initial, QString::fromUtf8(titleC ? titleC : ""));

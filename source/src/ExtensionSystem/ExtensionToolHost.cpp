@@ -51,8 +51,7 @@ ExtensionToolHost::ExtensionToolHost(QObject* parent)
 ExtensionToolHost::~ExtensionToolHost()
 {
 	stop();
-	// 无超时：任务体捕获了 this，必须等它们彻底结束；DllCaller 析构本来也要等在途归零。
-	m_pool->waitForDone();
+	m_pool->waitForDone();   // 无超时：任务体捕获了 this，必须等它们彻底结束；DllCaller 析构本来也要等在途归零
 }
 
 bool ExtensionToolHost::start(const QString& profileDir, const QString& pipeName)
@@ -98,8 +97,7 @@ void ExtensionToolHost::stop()
 	m_running = false;
 	m_draining = true;
 
-	// 先关管道：停收新请求。在途的仍会跑完，但 socket 已被 bridge 释放，回包会按"丢弃"处理。
-	m_bridge->stop();
+	m_bridge->stop();   // 先关管道：停收新请求。在途的仍会跑完，但 socket 已被 bridge 释放，回包会按"丢弃"处理
 	drainPending();
 
 	m_draining = false;
@@ -172,8 +170,7 @@ void ExtensionToolHost::onRequestReceived(int id, const QString& tool, const QJs
 
 	++m_inFlight;
 
-	// 任务体只碰 DllCaller 与值类型；回投 GUI 线程后才写 socket（QLocalSocket 属于主线程）。
-	auto* task = new ToolCallRunnable([this, id, tool, args, guard]() {
+	auto* task = new ToolCallRunnable([this, id, tool, args, guard]() {   // 任务体只碰 DllCaller 与值类型；回投 GUI 线程后才写 socket（QLocalSocket 属于主线程）
 		QJsonObject result;
 		QString error;
 		const bool ok = m_caller.callTool(tool, args, result, &error);

@@ -1,6 +1,6 @@
 // 设置 · Server设置（按原版 Settings.cpp 的 serverPanel 复刻）：
-//   标签 settings_server_address + 输入框（占位 http://127.0.0.1:3080）+ 说明 settings_server_address_hint
-//   + 按钮 settings_save_and_restart（保存后重启服务端生效）。
+// 标签 settings_server_address + 输入框（占位 http://127.0.0.1:3080）+ 说明 settings_server_address_hint
+// + 按钮 settings_save_and_restart（保存后重启服务端生效）。
 
 import QtQuick
 import ULinHub 1.0
@@ -9,8 +9,7 @@ import "../../widgets"
 Item {
     id: page
 
-    // 草稿：打开设置时用服务端当前地址填一次（原版 refreshOnOpen 里做同一件事）
-    property string draft: Hub.settings.serverUrl
+    property string draft: Hub.settings.serverUrl   // 草稿：打开设置时用服务端当前地址填一次（原版 refreshOnOpen 里做同一件事）
 
     Connections {   // 草稿回填，页内逻辑 ⇒ 不登记（登记等于把 id 暴露成可被接管的目标）
         target: Hub.settings
@@ -39,7 +38,7 @@ Item {
             radius: Theme.radius.control
             color: Theme.color.panelBg
             border.width: 1
-            // 聚焦描边走中性灰 textSecondary（原来是强调蓝 accent）：与输入卡片（Composer）的聚焦态同款；
+
             // 静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`（输入类控件那一档）
             border.color: urlInput.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
 

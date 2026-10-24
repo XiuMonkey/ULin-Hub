@@ -7,8 +7,7 @@
 
 namespace
 {
-	// dsh 0.1.5：斜杠 endpoint。
-	const char* const kListMethod = "agentPresets/list";
+	const char* const kListMethod = "agentPresets/list";   // dsh 0.1.5：斜杠 endpoint
 	const char* const kSettingsUpdateMethod = "settings/update";
 }
 
@@ -20,8 +19,7 @@ namespace AgentPresetService
 		if (!api)
 			return;
 
-		// dsh 0.1.5：命名空间变成复数 agentPresets，且该端点无参数（args 为空）
-		api->callMethod(QLatin1String(kListMethod), SessionCommands::emptyArgs(),
+		api->callMethod(QLatin1String(kListMethod), SessionCommands::emptyArgs(),   // dsh 0.1.5：命名空间变成复数 agentPresets，且该端点无参数（args 为空）
 			[onLoaded](const QJsonObject& value) {
 				if (onLoaded)
 					onLoaded(parsePresets(value));

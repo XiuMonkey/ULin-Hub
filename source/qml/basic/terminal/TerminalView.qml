@@ -1,18 +1,11 @@
-// 终端网格视图：把 TerminalVtModel（→ TerminalVt → libvterm）的网格逐格画出来。
-//
-// 分层：本文件**只画**，不解析、不联网。要画什么全从 model 拿：
-//   · model.rowSegments(first, last) —— 一段行（结构化；为空时退回 rowsJson），行内是"同样式合并后的段" [文本, fg, bg, flags]；
-//   · model.dirtyRowsChanged(rows) —— 哪几行变了（只重画那几行，别整屏重建）；
-//   · model.cursorRow/cursorCol/cursorVisible —— 光标（闪烁在 QML 侧）；
-//   · model.state/statusText —— 顶部状态行（连接中/只读/错误都靠它）。
-//
-// 为什么每个可见行一个 Canvas（而不是整屏一个 Canvas / Repeater + Text）：
-//   · 整屏一个 Canvas 时，"只脏一行"也得整屏重画 —— 一屏 2400 格的字形布局每秒几十次，稳不住；
-//   · Repeater + 每格一个 Text 是一屏 2400 个 item，创建/布局的代价比画还大；
-//   · 每行一个 Canvas 正好对上 TerminalVt 的脏行粒度（damage 按行合并），只有脏行的 canvas 会重绘，
-//     非脏行连 item 树都不动。行内再按"段"画，一段一次 drawText（不是一格一次）。
-//
-// 宽字符：模型把宽字符的**续格**给成空文本段，这里必须跳过（首格已占两格宽）—— 否则中日韩整行错位。
+// 终端网格视图：把 TerminalVtModel（→ TerminalVt → libvterm）的网格逐格画出来。本文件只画，不解析、不联网：
+// model.rowSegments(first,last) 取一段行（同样式合并后的段 [文本, fg, bg, flags]；空时退回 rowsJson）、
+// model.dirtyRowsChanged(rows) 只重画脏行、model.cursorRow/Col/Visible 画光标（闪烁在 QML 侧）、
+// model.state/statusText 是顶部状态行（连接中/只读/错误）。
+// 为什么每行一个 Canvas（而不是整屏一个 Canvas / Repeater+Text）：整屏 Canvas 时"只脏一行"也得整屏重画
+// （一屏 2400 格字形布局每秒几十次，稳不住）；Repeater + 每格一个 Text 是一屏 2400 个 item，创建/布局比画还贵；
+// 每行一个 Canvas 正好对上 TerminalVt 的脏行粒度，只有脏行的 canvas 会重绘，非脏行连 item 树都不动。
+// ⚠️ 宽字符：模型把宽字符的**续格**给成空文本段，这里必须跳过（首格已占两格宽），否则中日韩整行错位。
 
 import QtQuick
 import ULinHub 1.0
@@ -24,52 +17,39 @@ pragma ComponentBehavior: Bound
 Item {
     id: root
 
-    // ---- 外部契约（TerminalPanel 给）----
-    // 块的稳定 id：键盘路径要用它把输入路由回 Terminal.flushInput（与 model 是同一个块）
     property string blockId: ""
-    // 网格模型（TerminalVtModel*）；null = 还没绑定上（画空屏）
-    property var model: null
-    // 等宽字体族：Cascadia Mono 是 Windows 终端默认，Consolas 兜底
-    property string fontFamily: "Cascadia Mono"
+    property var model: null   // 网格模型（TerminalVtModel*）；null = 还没绑定上（画空屏）
+    property string fontFamily: "Cascadia Mono"   // 等宽字体族：Cascadia Mono 是 Windows 终端默认，Consolas 兜底
     property var fontFallbacks: ["Consolas", "Courier New", "Microsoft YaHei UI"]
     property int fontSize: 13
     property int lineHeight: Math.round(fontSize * 1.35)
-    // 主题：终端默认前景/背景 + ANSI 16 色（"dark"/"light" 各一套）
-    property bool darkTheme: true
-    // 光标闪烁
-    property bool cursorBlink: true
+    property bool darkTheme: true   // 主题：终端默认前景/背景 + ANSI 16 色（"dark"/"light" 各一套）
+    property bool cursorBlink: true   // 光标闪烁
 
     // 面板尺寸算出来的网格。
     // ⚠️ 首帧/尺寸未定时 flick 的宽高还是 0，算式会算出负数 —— 必须夹掉"没有布局"的情形：
-    //    否则会把 2×1 这种退化尺寸推给 VT，而 libvterm 的 screen_resize 遇到这种尺寸会直接 abort
-    //    （实测："screen_resize failed to update cursor position" + 0xC0000409）。所以宽高不够就是 0，
-    //    pushGridSize() 见 0 直接跳过，等布局真出来再推一次。
+    // 否则会把 2×1 这种退化尺寸推给 VT，而 libvterm 的 screen_resize 遇到这种尺寸会直接 abort
+    // pushGridSize() 见 0 直接跳过，等布局真出来再推一次。
     readonly property int gridCols: (flick.width > padding * 2 && cellWidth > 1)
                                     ? Math.max(2, Math.floor((flick.width - padding * 2) / cellWidth)) : 0
     readonly property int gridRows: (flick.height > padding * 2 + lineHeight)
                                     ? Math.max(1, Math.floor((flick.height - padding * 2) / lineHeight)) : 0
     readonly property real cellWidth: metrics.advanceWidth
 
-    // 网格量宽用：等宽字体里 "M" 的advance 就是格宽；宽字符按两格算（CJK 在等宽字体里正好两倍）
-    TextMetrics {
+    TextMetrics {   // 网格量宽用：等宽字体里 "M" 的advance 就是格宽；宽字符按两格算（CJK 在等宽字体里正好两倍）
         id: metrics
         font.family: root.fontFamily
         font.pixelSize: root.fontSize
         text: "M"
     }
 
-    // ---- 配色 ----
-    // 暗色用 xterm 的默认 16 色（与旧页面 xterm.js 的观感一致），亮色用 xterm 的 light 一套。
-    // 索引语义固定：0 黑 1 红 2 绿 3 黄 4 蓝 5 品 6 青 7 白 / 8-15 亮色。
-    // ⚠️ 写成**单行**数组：QML 的 JS 在 `[` 换行后按语句结束处理（换行即 ASI），多行字面量是语法错。
     readonly property var ansiDark: ["#000000", "#CD3131", "#0DBC79", "#E5E510", "#2472C8", "#BC3FBC", "#11A8CD", "#E5E5E5", "#666666", "#F14C4C", "#23D18B", "#F5F543", "#3B8EEA", "#D670D6", "#29B8DB", "#FFFFFF"]
     readonly property var ansiLight: ["#000000", "#CD3131", "#00BC00", "#949800", "#0451A5", "#BC05BC", "#0598BC", "#555555", "#666666", "#CD3131", "#14CE14", "#B5BA00", "#0451A5", "#BC05BC", "#0598BC", "#A5A5A5"]
     readonly property color defaultFg: darkTheme ? "#E5E5E5" : "#333333"
     readonly property color defaultBg: darkTheme ? "#000000" : "#F7F7F7"
     readonly property color selectionBg: darkTheme ? "#264F78" : "#ADD6FF"
 
-    // 位与 TermStyle::Flag 一致（见 include/common/terminal/TerminalVt.h）
-    readonly property int fFgDefault: 1
+    readonly property int fFgDefault: 1   // 位与 TermStyle::Flag 一致（见 include/common/terminal/TerminalVt.h）
     readonly property int fBgDefault: 2
     readonly property int fBold: 4
     readonly property int fItalic: 8
@@ -79,33 +59,23 @@ Item {
     readonly property int fConceal: 128
     readonly property int fStrike: 256
 
-    // ---- 每一行的内容缓存 ----
-    // rows: JS 数组，每项 = 该行的段数组。只在收到脏行通知时替换那几项（不重建数组本身）。
     property var rows: []
     property int padding: 6
-    // 光标闪烁相位（只在需要重画光标时才动）
-    property bool cursorOn: true
+    property bool cursorOn: true   // 光标闪烁相位（只在需要重画光标时才动）
 
     clip: true
+
     // 键盘入口：**本视图必须拿到 active focus**，Keys.onPressed 才会来（这是"输入不进去"的第一现场）。
     // focus:true 只是"在本作用域里声明想要焦点"，真正生效要靠 forceActiveFocus()：
-    // 壳里 Composer / 输入框 / Popup 都会抢焦点，光靠 focus:true 拿不到（实测 Window.activeFocusItem
     // 一直是 null / QQuickRootItem）。所以下面还有三处主动要焦点：建好模型、绑上块、以及点一下视图。
     focus: true
-    // Tab 必须留给 PTY（补全/切换焦点在 shell 里是 Tab 键的活），所以不参与 Tab 焦点导航
-    activeFocusOnTab: false
+    activeFocusOnTab: false   // Tab 必须留给 PTY（补全/切换焦点在 shell 里是 Tab 键的活），所以不参与 Tab 焦点导航
 
-    // 主动要焦点：建好模型/换块之后，用户一打开终端就能直接打字
-    function grabFocus() {
+    function grabFocus() {   // 主动要焦点：建好模型/换块之后，用户一打开终端就能直接打字
         root.forceActiveFocus()
         cursorOn = true
     }
 
-    // ---- 底色：**铺满整个视图**（含四周留白、最后一行之下的空隙）----
-    // 不这么铺的话，底色只由"每行 Canvas"画出来：行宽 = 面板宽 − 2×padding、行数 = 网格行数，
-    // 于是四周留一圈面板底色、底部还空一条 —— 观感就是"终端没铺满面板"。
-    // 这一层在**面板裁切层之内**（PanelBar.body 用 MultiEffect + mask 按卡片圆角裁过下缘两角），
-    // 所以它铺到边角时会被面板的圆角切掉，自然贴合；视图自己**不加**圆角/阴影（否则与面板重复）。
     Rectangle {
         anchors.fill: parent
         color: root.defaultBg
@@ -113,8 +83,7 @@ Item {
     }
 
     function rgbOf(value) {
-        // 0xRRGGBB → "#rrggbb"
-        return "#" + ("000000" + (value >>> 0).toString(16)).slice(-6)
+        return "#" + ("000000" + (value >>> 0).toString(16)).slice(-6)   // 0xRRGGBB → "#rrggbb"
     }
 
     function paletteColor(index) {
@@ -122,15 +91,12 @@ Item {
         return (index >= 0 && index < table.length) ? table[index] : root.defaultFg
     }
 
-    // 重新取一段行（含越界钳制）。整屏重画时 first=0/last=rows-1。
-    function reloadRows(first, last) {
+    function reloadRows(first, last) {   // 重新取一段行（含越界钳制）。整屏重画时 first=0/last=rows-1
         if (!model)
             return
-        // 优先拿 C++ 的结构化数据（QVariantList），解析不再放 QML（分层：逻辑在 C++）。
-        var parsed = model.rowSegments(first, last)
+        var parsed = model.rowSegments(first, last)   // 优先拿 C++ 的结构化数据（QVariantList），解析不再放 QML（分层：逻辑在 C++）
         if (!parsed || parsed.length === 0) {
-            // 兜底：结构化返回为空就退回旧路 —— 保证"分层优化"永远不会把终端变成空白屏。
-            var json = model.rowsJson(first, last)
+            var json = model.rowsJson(first, last)   // 兜底：结构化返回为空就退回旧路 —— 保证"分层优化"永远不会把终端变成空白屏
             if (!json || json.length === 0)
                 return
             parsed = JSON.parse(json)
@@ -153,12 +119,12 @@ Item {
         rowRepeater.model = count
     }
 
-    // 可见行数上限：模型尺寸变了就跟着变
-    property int maxRows: 0
+    property int maxRows: 0   // 可见行数上限：模型尺寸变了就跟着变
 
     Component.onCompleted: {
         if (model)
             reloadAll()
+
         // 建好就要焦点（打开终端块后直接能打字）。callLater：让同一帧里别处的 focus 请求先落定，
         // 我们再"抢"回来 —— 否则会被 Composer 之类后到的请求盖掉。
         Qt.callLater(root.grabFocus)
@@ -172,8 +138,7 @@ Item {
         }
     }
 
-    // 脏行通知 → 只重取那几行（rows 赋值会带着 Repeater 里对应 delegate 的 rowCells 一起重绑）
-    Connections {
+    Connections {   // 脏行通知 → 只重取那几行（rows 赋值会带着 Repeater 里对应 delegate 的 rowCells 一起重绑）
         target: root.model
         ignoreUnknownSignals: true
 
@@ -185,8 +150,7 @@ Item {
                 root.reloadAll()
                 return
             }
-            // 脏行一定升序：按"连续区间"归并成几段，少过几次 QML↔C++ 边界
-            var start = dirty[0]
+            var start = dirty[0]   // 脏行一定升序：按"连续区间"归并成几段，少过几次 QML↔C++ 边界
             var previous = dirty[0]
             for (var i = 1; i < dirty.length; ++i) {
                 if (dirty[i] !== previous + 1) {
@@ -202,16 +166,12 @@ Item {
         function onTitleChanged() { /* 标题由状态行显示，见下 */ }
     }
 
-    // 网格尺寸变化（面板拉伸/字体变化）：先告诉模型，再整屏重取
-    onGridColsChanged: { gridPushTimer.restart(); reloadAll() }
+    onGridColsChanged: { gridPushTimer.restart(); reloadAll() }   // 网格尺寸变化（面板拉伸/字体变化）：先告诉模型，再整屏重取
     onGridRowsChanged: { gridPushTimer.restart(); reloadAll() }
     onFontSizeChanged: pushGridSize()
-    // 首帧常见路径：属性没"变化"（一直是 0）、尺寸是后来才出来的 —— 宽度一变就再算一次
     onCellWidthChanged: pushGridSize()
 
-    // 防抖：布局收敛期间 gridCols 会连续变（实测 50ms 内 35->39 连跳 5 次），
-    // 每跳一次就 pushGridSize() 等于连续 resize PTY 五次 => shell 输出被打断，画面只剩前几行。
-    Timer {
+    Timer {   // 每跳一次就 pushGridSize() 等于连续 resize PTY 五次 => shell 输出被打断，画面只剩前几行
         id: gridPushTimer
         interval: 150
         running: false
@@ -220,21 +180,17 @@ Item {
     }
 
     function pushGridSize() {
-        // gridCols/gridRows 为 0 = 还没有真实布局（见上面的夹取理由）
-        if (!model || gridCols < 2 || gridRows < 1)
+        if (!model || gridCols < 2 || gridRows < 1)   // gridCols/gridRows 为 0 = 还没有真实布局（见上面的夹取理由）
             return
         model.resizeGrid(gridRows, gridCols)
+
         // 把"视图量出来的网格"也推给桥：**引擎/PTY 的 cols 必须与本地 VT 是同一个数**。
         // 不一致时 shell 按它的宽度折行、VT 按另一个宽度折行，光标行列随后错位 ——
-        // 表现正是"用箭头移动后再输入会跳到行前/盖住已打印输出"（2026-10-17 用户报的那条）。
         // ⚠️ 参数顺序是 (blockId, cols, rows)，与 TerminalSession::resize(cols, rows) /
-        //    terminal/resize 的 args{cols, rows} 一致；而 resizeGrid 是 (rows, cols)。别弄反。
-        // ⚠️ 也**不能**用 `typeof Terminal !== "undefined"` 来防"没有桥"：QML 单例不是 JS 全局，
-        //    typeof 恒为 "undefined"，那样这行永远不执行（踩过）。
+        // terminal/resize 的 args{cols, rows} 一致；而 resizeGrid 是 (rows, cols)。别弄反。
         Terminal.applyGridSize(root.blockId, gridCols, gridRows)
     }
 
-    // ---- 光标闪烁 ----
     Timer {
         id: blinkTimer
         interval: 530
@@ -244,16 +200,10 @@ Item {
         onTriggered: root.cursorOn = !root.cursorOn
     }
 
-    // ---- 键盘 ----
-    // 把"一个按键"翻成终端字节并交给桥。抽成函数（而不是全写在 Keys.onPressed 里）有两个好处：
-    //   ① 按键翻译只有一份，测试/自检可以直接喂 (key, text, modifiers) 调它，不必伪造 QKeyEvent；
-    //   ② Keys.onPressed 只剩"接住事件 + accepted"，焦点相关的行为一眼看清。
-    // 参数就是 QKeyEvent 的三个字段：key = Qt::Key_*，text = 可打印文本（可能为空），modifiers = Qt 的修饰位。
     function handleKey(key, text, modifiers) {
         if (!root.model)
             return
 
-        // 打字时光标回到实时画面（在历史里打字容易"看不到自己打的字"）
         root.model.scrollToBottom()
 
         var mods = 0
@@ -270,15 +220,12 @@ Item {
             // 大写码点（Qt::Key_A = 'A'），小写/大小写与符号全靠 text。按 key 发的话敲 a 会得到 A。
             root.model.typeText(text)
         } else {
-            // 特殊键（方向/编辑/翻页/功能键）、Ctrl 组合、以及非 ASCII 之外的兜底都走键盘表
-            root.model.sendQtKey(key, mods)
-            // 非 ASCII 文本（中文/IME 提交的串）：sendQtKey 刻意只认 ASCII，这里补发一次
-            if (isPlainText && text.length > 0 && first > 0x7f)
+            root.model.sendQtKey(key, mods)   // 特殊键（方向/编辑/翻页/功能键）、Ctrl 组合、以及非 ASCII 之外的兜底都走键盘表
+            if (isPlainText && text.length > 0 && first > 0x7f)   // 非 ASCII 文本（中文/IME 提交的串）：sendQtKey 刻意只认 ASCII，这里补发一次
                 root.model.typeText(text)
         }
 
-        // 把模型攒好的字节交给桥（→ TerminalSession::writeBytes → terminal/write 或扩展后端）
-        Terminal.flushInput(root.blockId)
+        Terminal.flushInput(root.blockId)   // 把模型攒好的字节交给桥（→ TerminalSession::writeBytes → terminal/write 或扩展后端）
     }
 
     // 键盘入口：本视图独占焦点，事件才会到这里；**必须 accepted = true**，
@@ -288,6 +235,7 @@ Item {
             event.accepted = false
             return
         }
+
         // 粘贴：Ctrl+V / Ctrl+Shift+V（Ctrl+C 仍留给 shell 当 中断，复制以后走 Ctrl+Shift+C）。
         if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
             Terminal.pasteFromClipboard(root.blockId)
@@ -307,8 +255,6 @@ Item {
             Terminal.log(blockId, "[视角] 终端视图失去键盘焦点（点击视图或用 Tab 切回来即可继续输入）")
     }
 
-    // ---- 状态行：连接中/只读/错误 ----
-    // state == "attached" 时收起来（画面本身够说明问题）；其余状态都给一行提示
     Rectangle {
         id: statusBar
         anchors.left: parent.left
@@ -334,8 +280,7 @@ Item {
         }
     }
 
-    // 只读角标（输入被另一个窗口接管时）
-    Rectangle {
+    Rectangle {   // 只读角标（输入被另一个窗口接管时）
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 6
@@ -356,7 +301,6 @@ Item {
         }
     }
 
-    // ---- 网格本体 ----
     Flickable {
         id: flick
         anchors.fill: parent
@@ -381,12 +325,10 @@ Item {
                     width: flick.width - root.padding * 2
                     height: root.lineHeight
 
-                    // 本行的段（来自 root.rows[index]）；整屏重画/脏行更新都会换掉这个数组引用
-                    property var rowCells: (index >= 0 && index < root.rows.length)
+                    property var rowCells: (index >= 0 && index < root.rows.length)   // 本行的段（来自 root.rows[index]）；整屏重画/脏行更新都会换掉这个数组引用
                                            ? root.rows[index] : null
 
-                    // 光标画在哪一格（只有光标所在那一行需要它）
-                    property bool cursorHere: root.model !== null
+                    property bool cursorHere: root.model !== null   // 光标画在哪一格（只有光标所在那一行需要它）
                                               && root.model.cursorVisible
                                               && root.model.cursorRow === index
                                               && root.model.cursorCol >= 0
@@ -400,14 +342,12 @@ Item {
                         var ctx = getContext("2d")
                         ctx.reset()
                         ctx.clearRect(0, 0, width, height)
-                        // 底色：整行画一次默认背景（段里的 bg 再覆盖）
-                        ctx.fillStyle = root.defaultBg
+                        ctx.fillStyle = root.defaultBg   // 底色：整行画一次默认背景（段里的 bg 再覆盖）
                         ctx.fillRect(0, 0, width, height)
 
                         if (!rowCells)
                             return
 
-                        // 字体
                         ctx.font = "normal " + root.fontSize + "px \"" + root.fontFamily + "\""
                         ctx.textBaseline = "middle"
                         var y = height / 2 + 1
@@ -420,8 +360,7 @@ Item {
                             var text = seg[0]
                             var flags = seg[3]
 
-                            // 宽字符续格：占位但不画（首格已经占了两格）—— 用空格占宽度即可
-                            if (text.length === 0) {
+                            if (text.length === 0) {   // 宽字符续格：占位但不画（首格已经占了两格）—— 用空格占宽度即可
                                 cellX.push(penX)
                                 penX += root.cellWidth
                                 continue
@@ -441,8 +380,7 @@ Item {
                             }
 
                             var runWidth = cells * root.cellWidth
-                            // 默认底色：第 ① 遍已经把整行铺成 defaultBg，这里只画"非默认"的段
-                            if (!bgDefault || reverse) {
+                            if (!bgDefault || reverse) {   // 默认底色：第 ① 遍已经把整行铺成 defaultBg，这里只画"非默认"的段
                                 ctx.fillStyle = bg
                                 ctx.fillRect(penX, 0, runWidth, height)
                             }
@@ -497,15 +435,11 @@ Item {
         }
     }
 
-    // ---- 鼠标：滚轮 → 视口偏移（历史）；**左键点一下 → 抢焦点** ----
-    // ⚠️ 这个 MouseArea 必须声明在**网格之后**（同 z 时后声明者在上层）：网格里没有别的可交互项
-    //    （Canvas 不吃鼠标事件），由它独占点击/滚轮。放在网格之前会先被 Flickable 那片区域压住。
     MouseArea {
         id: inputArea
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
-        // 只"要焦点"，不拦别的事：以后要加选区的拖动也走这里，不至于把焦点弄丢
-        onPressed: root.grabFocus()
+        onPressed: root.grabFocus()   // 只"要焦点"，不拦别的事：以后要加选区的拖动也走这里，不至于把焦点弄丢
         onClicked: root.grabFocus()
         onWheel: (wheel) => {
             if (!root.model)

@@ -1,17 +1,10 @@
-// 轨迹视图（对照官方 @deepseek-ai/dsh-client-ui-trajectory）。
-//
-// 官方那套是 React 的"记录表 + 可拖拽时间轴 + 14 页检查器"。这里是 QML 的落地版，保留三件最有用的事：
-//   1) 按轮次 / 步骤分组的事件记录表（谁、什么工具、多久、多少 token、成功还是失败）；
-//   2) 每条记录的耗时 / TTFT / token 用量（数据来自账本事件的 time 与 stream.time0+dt）；
-//   3) 点开看这一条的**原文 JSON**（相当于官方的 Inspect，只是把 14 页压成一份原文）。
-// 刻意不做的：时间轴拖拽缩放、搜索过滤、分页窗口。记录表本身就在 ListView 里，几千行也只是滚动。
-//
+// 轨迹视图（对照官方 @deepseek-ai/dsh-client-ui-trajectory）：按轮次/步骤分组的记录表 +
+// 每条的耗时/TTFT/token 用量 + 点开看原文 JSON（相当于官方 Inspect 压成一份原文）。
+// 刻意不做：时间轴拖拽缩放、搜索过滤、分页窗口 —— 记录表本身在 ListView 里，几千行也只是滚动。
 // 数据面是 Hub.trace（common/session/TraceModel）：与消息列表吃同一条 session/follow 流，
 // 所以"对话"和"轨迹"永远同一份账本，不会两边对不上。
-//
-// 布局上避开一个坑：记录行里"左侧徽标 + 中间两行文字 + 右侧指标"不要用 Row 硬算宽度
-// （Row 的 width 由子项决定，给子项写 parent.width - xxx 会形成绑定环）；这里一律用锚定，
-// 中间那列吃掉剩余宽度。
+// ⚠️ 记录行"左侧徽标 + 中间两行文字 + 右侧指标"不要用 Row 硬算宽度（Row 的 width 由子项决定，
+// 给子项写 parent.width - xxx 会形成绑定环）；一律用锚定，中间那列吃掉剩余宽度。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -21,32 +14,48 @@ import "../../widgets"
 Item {
     id: traceRoot
 
-    // 当前打开检查面板的行（-1 = 收起）
-    property int selectedIndex: -1
-    // 选中时把这一行的角色值抄一份出来 —— 检查面板不用再按 index 回查模型（省掉角色编号魔法值）
-    property string selectedDetail: ""
+    property int selectedIndex: -1   // 当前打开检查面板的行（-1 = 收起）
+    property string selectedDetail: ""   // 选中时把这一行的角色值抄一份出来 —— 检查面板不用再按 index 回查模型（省掉角色编号魔法值）
     property string selectedMeta: ""
 
     readonly property var summary: Hub.traceSummary
 
-    // 贴底跟随（流式时新记录不断追加）。用户一上手就停，松手时在底部附近才恢复。
     property bool followBottom: true
 
     // 列表宽度是否正被外层驱动（右栏开合 / 拖右栏宽度；Shell 注入 shell.contentWidthDriven）。
     // 与 MessageListView 同一语义：动画期间宽度持续在变，旧行为是每次变化都重排后立刻 pinToBottom
-    // （一次 positionViewAtIndex = 多一整趟布局）；动画期间只欠着，落定补一次。
+    // （一次定位 = 多一整趟布局）；动画期间只欠着，落定补一次。
     property bool widthAnimating: false
+
+    // 跟随状态只有一个入口：跟随 ⇄ 不跟随的同时把"暂停投影"一起切。
+    // 不跟随时新事件只记账不建行（Hub.setTracePaused）—— 否则表还在长、行号还在变，
+    // 用户正在检查的那一条会被挤走。
+    function setFollow(on) {
+        if (followBottom === on)
+            return
+        followBottom = on
+        Hub.setTracePaused(!on)
+    }
 
     function scheduleFollowPin() {
         if (followBottom && !widthAnimating)
-            Qt.callLater(pinToBottom)
+            Qt.callLater(list.pinBottom)
     }
-    onWidthAnimatingChanged: if (!widthAnimating && followBottom) Qt.callLater(pinToBottom)
+    onWidthAnimatingChanged: if (!widthAnimating) scheduleFollowPin()
 
     function pinToBottom() {
-        if (list.width <= 0 || list.height <= 0 || list.count <= 0)
-            return
-        list.positionViewAtIndex(list.count - 1, ListView.End)
+        list.pinBottom()
+    }
+
+    Connections {   // 换会话：账本整份换掉，跟随意图与贴底目标都得作废（否则新会话停在上一份的坐标上）
+        target: Hub
+        function onCurrentSessionChanged() {
+            traceRoot.followBottom = true
+            Hub.setTracePaused(false)
+            list.pinAttempts = 0
+            list.pinTargetY = -1
+            Qt.callLater(traceRoot.pinToBottom)
+        }
     }
 
     function selectRow(index, detail, meta) {
@@ -59,7 +68,6 @@ Item {
         selectedIndex = index
     }
 
-    // ---- 顶部概览：轮次 / 步骤 / 工具 / token / 时长 ----
     Item {
         id: summaryBar
 
@@ -105,8 +113,7 @@ Item {
             }
         }
 
-        // 有失败记录时把数字点出来（官方也有这条错误计数）
-        Text {
+        Text {   // 有失败记录时把数字点出来（官方也有这条错误计数）
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             visible: (traceRoot.summary.errors || 0) > 0
@@ -117,7 +124,6 @@ Item {
         }
     }
 
-    // ---- 记录表 ----
     ListView {
         id: list
 
@@ -130,27 +136,194 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         model: Hub.trace
         spacing: 1
-        cacheBuffer: 900
+        readonly property int fullBuildRowLimit: 40   // 与消息列表同一取舍：一屏之内全建（contentHeight 才是真值 ⇒ 滚动条长度不跳），超了才虚拟化
+        cacheBuffer: count <= fullBuildRowLimit ? 100000 : Math.round(Math.max(600, height) * 2)
         ScrollBar.vertical: AppScrollBar { }
         topMargin: 2
         bottomMargin: Theme.spacing.labelGap
         leftMargin: Theme.spacing.cardPadding
         rightMargin: Theme.spacing.cardPadding
 
-        onMovementStarted: {
-            traceRoot.followBottom = false
-            // 往回翻时暂停追加：否则每条新事件都整表重建，滚动位置会被打回去
-            Hub.setTracePaused(true)
+        readonly property real builtBottom: {   // 已建委托里最靠下的底边（内容坐标；-1 = 一条都没建）
+            var b = -1
+            var kids = contentItem ? contentItem.children : []
+            for (var i = 0; i < kids.length; ++i) {
+                var c = kids[i]
+                if (!c || !c.visible)
+                    continue
+                if (c.y + c.height > b)
+                    b = c.y + c.height
+            }
+            return b
         }
-        onMovementEnded: {
-            if (list.height <= 0)
+
+        readonly property int lastBuiltIndex: {   // 已建委托里最大的行号（contentItem 里只有委托带 index）
+            var idx = -1
+            var kids = contentItem ? contentItem.children : []
+            for (var i = 0; i < kids.length; ++i) {
+                var c = kids[i]
+                if (c && c.visible && c.index !== undefined && c.index > idx)
+                    idx = c.index
+            }
+            return idx
+        }
+
+        readonly property bool lastRowBuilt: count > 0 && lastBuiltIndex === count - 1   // 最后一条已实例化 ⇒ builtBottom 才是整表内容底；否则只是"缓冲区底"
+
+        // ListView 自己的合法下界；originY 在"上方还有未建行"时会被挪动，取 min() 不让它变正数
+        readonly property real minContentY: Math.min(-topMargin, originY - topMargin)
+
+        readonly property real maxContentY: {   // 合法上界：最后一条已建 ⇒ 精确；否则先用"已建区域底"兜住，绝不滚进未建区域（那片是估值）
+            var flickMax = contentHeight - height + originY + bottomMargin
+            var b = builtBottom
+            if (b < 0)
+                return Math.max(minContentY, flickMax)
+            return Math.max(minContentY, Math.min(flickMax, b + bottomMargin - height))
+        }
+
+        property real pinTargetY: -1         // 上一次贴底落点（真实底部；-1 = 还不知道）
+        property bool pinning: false         // 贴底过程中：此时 contentY 的变化不算"用户滚动"
+        property bool clampingY: false
+        property int pinAttempts: 0
+        readonly property int pinRetryLimit: 12
+
+        function pinBottom() {
+            if (widthAnimating)          // 动画期间不每帧贴底，落定后 onWidthAnimatingChanged 补
                 return
-            const atBottom = (list.contentY >= list.contentHeight - list.height - 48)
-            traceRoot.followBottom = atBottom
-            // 回到贴近底部才恢复跟随并补投影（暂停期间的事件已经收进模型，不会丢）
-            Hub.setTracePaused(!atBottom)
+            if (width <= 0 || height <= 0 || count <= 0)
+                return
+            if (!traceRoot.followBottom)
+                return
+            stopWheelAnim()              // 贴底优先级最高
+            pinAttempts = 0
+            pinning = true
+            advancePin()
         }
-        onContentHeightChanged: traceRoot.scheduleFollowPin()
+
+        function advancePin() {   // 逐帧逼近末尾：末尾还没实例化时先请 ListView 朝末尾走一趟，再按"已建底"往下推
+            if (!traceRoot.followBottom || widthAnimating) {
+                pinning = false
+                return
+            }
+            if (lastRowBuilt) {
+                var target = maxContentY
+                if (Math.abs(contentY - target) > 0.5)
+                    contentY = target
+                pinTargetY = contentY
+                pinning = false
+                return
+            }
+            if (pinAttempts === 0) {
+                positionViewAtIndex(count - 1, ListView.End)
+            } else {
+                var ceiling = Math.max(minContentY, contentHeight - height + originY + bottomMargin)
+                var advance = builtBottom + Math.round(height * 0.8) + bottomMargin - height
+                if (advance > contentY + 0.5)
+                    contentY = Math.min(advance, ceiling)
+            }
+            pinTargetY = contentY
+            if (++pinAttempts <= pinRetryLimit) {
+                Qt.callLater(advancePin)
+                return
+            }
+            var settle = Math.max(minContentY, builtBottom + bottomMargin - height)   // 推不动了（委托异常）：退回已建区域底，至少不许留在空白里
+            if (contentY > settle + 0.5)
+                contentY = settle
+            pinTargetY = contentY
+            pinning = false
+        }
+
+        readonly property real wheelStepPx: 120
+        property real wheelTargetY: -1
+
+        NumberAnimation {
+            id: wheelAnim
+            target: list
+            property: "contentY"
+            duration: 110
+            easing.type: Easing.OutCubic
+            onStopped: list.wheelTargetY = -1
+        }
+
+        function stopWheelAnim() {
+            if (wheelAnim.running)
+                wheelAnim.stop()
+            wheelTargetY = -1
+        }
+
+        function wheelScroll(angleY, pixelY) {   // 一次滚轮 → 返回实际采用的 dy（0 = 没东西可滚）
+            var dy = (pixelY !== 0) ? pixelY : (angleY / 120) * wheelStepPx   // 只放大 angleDelta；pixelDelta 是触控板的真实像素，放大反而会飘
+            if (dy === 0)
+                return 0
+
+            var base = wheelTargetY >= 0 ? wheelTargetY : contentY
+            var lo = minContentY
+            var hi = Math.max(maxContentY, contentY)   // 不许把自己往回拉（滚动途中上界会滞后）
+            var next = Math.max(lo, Math.min(hi, base - dy))
+
+            wheelAnim.stop()        // 打断上一段（onStopped 会把 wheelTargetY 归 -1）
+            wheelTargetY = next
+            wheelAnim.from = contentY
+            wheelAnim.to = next
+            wheelAnim.start()
+
+            var bottom = pinTargetY >= 0 ? pinTargetY : (contentHeight - height + originY + bottomMargin)
+            traceRoot.setFollow(next >= bottom - 24)
+            return dy
+        }
+
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function (event) {
+                if (list.wheelScroll(event.angleDelta.y, event.pixelDelta.y) !== 0)
+                    event.accepted = true
+            }
+        }
+
+        onMovementStarted: {   // 用户一上手就停跟随。拖滚动条不发这个信号，但拖拽本身是 movement ⇒ 两路都覆盖了
+            stopWheelAnim()          // 拖动优先于滚轮动画，别两股力打架
+            traceRoot.setFollow(false)
+        }
+
+        onMovementEnded: {
+            var bottom = pinTargetY >= 0 ? pinTargetY : (contentHeight - height + originY + bottomMargin)
+            if (height > 0 && contentY >= bottom - 24)
+                traceRoot.setFollow(true)
+        }
+
+        // 所有"用户滚动"（滚轮 / 触摸拖动 / 拖滚动条把手）都会走到这里 —— contentY 变了。
+        // 自己贴底（pinning）与夹取（clampingY）引起的变化要跳过，否则会把跟随状态判反。
+        onContentYChanged: {
+            if (pinning || clampingY || widthAnimating || height <= 0 || count <= 0)
+                return
+
+            var flickMax = contentHeight - height + originY + bottomMargin
+            if (lastRowBuilt && contentY > maxContentY + 0.5) {
+                clampingY = true
+                contentY = maxContentY
+                clampingY = false
+                pinTargetY = contentY
+            }
+            if (contentY < minContentY - 0.5) {
+                clampingY = true
+                contentY = minContentY
+                clampingY = false
+            }
+
+            var bottom = pinTargetY >= 0 ? pinTargetY : flickMax   // 拖到底时 contentY 会受估值影响略过头，所以判据带 24px 容差；真的到底了就恢复跟随
+            traceRoot.setFollow(contentY >= bottom - 24)
+        }
+
+        onContentHeightChanged: {
+            traceRoot.scheduleFollowPin()
+
+            // 内容变矮时 contentY 可能停在旧底部之外（contentY 本身没变 ⇒ onContentYChanged 不会兜底）
+            if (traceRoot.followBottom && !pinning && contentY > maxContentY + 0.5) {
+                clampingY = true
+                contentY = Math.max(minContentY, maxContentY)
+                clampingY = false
+            }
+        }
         onCountChanged: traceRoot.scheduleFollowPin()
         onHeightChanged: traceRoot.scheduleFollowPin()
 
@@ -177,7 +350,6 @@ Item {
             width: Math.max(160, list.width - list.leftMargin - list.rightMargin)
             height: isTurn ? turnRow.implicitHeight : (isStep ? stepRow.implicitHeight : recordRow.implicitHeight)
 
-            // ---- 轮次分隔 ----
             Rectangle {
                 id: turnRow
                 visible: rowRoot.isTurn
@@ -227,7 +399,6 @@ Item {
                 }
             }
 
-            // ---- 步骤 ----
             Item {
                 id: stepRow
                 visible: rowRoot.isStep
@@ -264,7 +435,6 @@ Item {
                 }
             }
 
-            // ---- 普通记录 ----
             Rectangle {
                 id: recordRow
                 visible: !rowRoot.isTurn && !rowRoot.isStep
@@ -295,8 +465,7 @@ Item {
                     }
                 }
 
-                // 右侧指标：从右往左锚，宽度由内容决定；中间那列吃掉剩下的
-                Row {
+                Row {   // 右侧指标：从右往左锚，宽度由内容决定；中间那列吃掉剩下的
                     id: rightChips
                     anchors.right: parent.right
                     anchors.rightMargin: 10
@@ -320,8 +489,7 @@ Item {
                         font.family: "Cascadia Mono"
                         font.pixelSize: Theme.font.small
                     }
-                    // 状态灯：进行中=强调色，失败/警告=危险色，成功=第三档文字色（不抢眼）
-                    Rectangle {
+                    Rectangle {   // 状态灯：进行中=强调色，失败/警告=危险色，成功=第三档文字色（不抢眼）
                         width: 6
                         height: 6
                         radius: 3
@@ -388,7 +556,6 @@ Item {
             }
         }
 
-        // ---- 空态 ----
         Text {
             anchors.centerIn: parent
             visible: list.count === 0
@@ -399,8 +566,6 @@ Item {
         }
     }
 
-    // ---- 检查面板：某条记录的原文 ----
-    // 浮在右侧（不挤占记录表宽度 ⇒ 打开/关闭不会让行重排、滚动位置也不会跳）
     Rectangle {
         id: detailPane
 
@@ -417,8 +582,7 @@ Item {
         border.width: 0.5
         border.color: Theme.color.border
 
-        // 吃掉点击与滚轮：否则会穿透到下面被遮住的那一行（点空白处 ⇒ 选中了看不见的行）
-        MouseArea {
+        MouseArea {   // 吃掉点击与滚轮：否则会穿透到下面被遮住的那一行（点空白处 ⇒ 选中了看不见的行）
             anchors.fill: parent
             acceptedButtons: Qt.AllButtons
             onClicked: {}
@@ -514,8 +678,7 @@ Item {
                     selectedTextColor: Theme.color.textPrimary
                     font.family: "Cascadia Mono"
                     font.pixelSize: Theme.font.small
-                    // 比视口矮时也要能铺满：contentHeight 取两者的大值由 Flickable 负责
-                    height: Math.max(detailScroll.height, contentHeight)
+                    height: Math.max(detailScroll.height, contentHeight)   // 比视口矮时也要能铺满：contentHeight 取两者的大值由 Flickable 负责
                 }
             }
 
@@ -561,7 +724,6 @@ Item {
         }
     }
 
-    // ---- 小工具：类型徽标（文案/配色都在 QML，模型只给 kind） ----
     function kindLabel(kind) {
         switch (kind) {
         case "turn": return qsTrId("trace_kind_turn")

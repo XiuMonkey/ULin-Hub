@@ -32,4 +32,5 @@
   <file name="Qt6QuickControls2BasicStyleImpld.dll" />
   <file name="Qt6QuickTemplates2d.dll" />
   <file name="Qt6QuickEffectsd.dll" />
+  <file name="Qt6Svgd.dll" />
 </assembly>

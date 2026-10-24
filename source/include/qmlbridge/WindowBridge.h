@@ -1,15 +1,12 @@
 #pragma once
 
-// 分层（领域归位 2026-10-15）：本类**留在 qmlbridge/** —— 它是窗口意图的接线面（QML 只发意图，
+// 分层：本类**留在 qmlbridge/** —— 它是窗口意图的接线面（QML 只发意图，
 // 窗口级状态与原生判定全在 common/platform/win/NativeWindowFilter 里），正好符合"qmlbridge 只做接线"。
-//
 // QML 壳的窗口桥：QML 侧只发意图（拖动/最小化/最大化/关闭/缩放），窗口级状态与原生判定都落在
 // NativeWindowFilter 里；本类只是"能被 QML 调到的那一面" + 可绑定属性。
-//
-// 与旧控件壳的分工一致（TitleBar 只发信号、落地逻辑在后面；旧壳那份 WindowFrame 已删除），只是跨了 QML/C++ 边界。
-//
+// 与当前实现的分工一致，只是跨了 QML/C++ 边界。
 // 例外的一处"观察"：最近一次鼠标点击的位置（recentPointerPos）。它既不是意图也不是可绑定状态，
-// 而是**弹窗需要的上下文** —— 弹窗没有"触发控件"可言（open() 可能是键盘 / 定时器 / 任何代码调的），
+// 而是**弹窗需要的上下文** —— 弹窗没有"触发控件"可言（open 可能是键盘 / 定时器 / 任何代码调的），
 // 要走"从点击处长出来"的动画就只能由窗口层记住那个点。做法是事件过滤器**旁观**鼠标事件：
 // 不改写、不拦截、不参与命中测试，所以对现有交互零影响（这也是它必须在这里、而不能在 QML 里做
 // 一个铺满窗口的 HoverHandler 的原因：后者会成为最上层接受 hover 的项，把下面所有控件的悬停吃掉）。
@@ -44,15 +41,6 @@ public:
 	// 根 Window 的 Component.onCompleted 里调一次：记窗口、装原生样式位、接帧状态信号
 	Q_INVOKABLE void attachWindow(QObject* window);
 
-	// **附加**窗口（右栏副窗口在 Component.onCompleted 里调）：只给它补同一套原生样式位
-	// （WS_THICKFRAME/WS_CAPTION + 关 Win11 系统圆角），让它和主窗口走同一条 DWM 非客户区路径
-	// —— 无边框窗口每帧改原生尺寸时"露出还没画的那块"（黑块）正是缺了这排样式位。
-	//
-	// ⚠️ **主窗口行为一个字都不变**：本方法不碰 m_window（那是"主窗口"的语义），窗口动作
-	//    （minimize/toggleMaximize/closeWindow/startSystemMove/startSystemResize）、可绑定属性
-	//    （maximized/fullScreen/contentInset/nativeWindowButtons/isDark）与最近点击位置仍然只服务主窗口；
-	//    附加窗口自己没有标题栏/窗口按钮，也就不需要那些。
-	// 幂等：同一扇窗重复调只是刷一遍样式位（applyNativeStyle 自己按样式位判重）。
 	Q_INVOKABLE void attachAuxWindow(QObject* window);
 
 	// 自绘标题栏与窗口按钮登记（语义见 NativeWindowFilter 的同名方法）
@@ -70,9 +58,6 @@ public:
 	// 主题/外观被外部改过（扩展换风格包、系统深色切换）后由宿主调一次
 	Q_INVOKABLE void notifyThemeChanged();
 
-	// ---- 拖动跟手用的两个**纯查询**（转发 NativeWindowFilter，见那边的说明）----
-	// 右栏"拿起来"之后内容在另一扇窗里、鼠标捕获还在主窗口 ⇒ 那扇窗收不到鼠标消息，
-	// "跟到哪儿了 / 松没松手"只能这样直接问系统。不碰窗口、不改状态，可以在拖动里高频调（~120Hz）。
 	Q_INVOKABLE QPoint cursorScreenPos() const;
 	Q_INVOKABLE bool leftButtonDown() const;
 
@@ -104,7 +89,7 @@ private:
 
 	QPointer<QQuickWindow> m_window;
 
-	// 最近一次点击的位置与它距今多久（isValid() == false = 窗口起来之后还没见过点击）。
+	// 最近一次点击的位置与它距今多久（isValid == false = 窗口起来之后还没见过点击）。
 	// 只记**主窗口**的：它是"弹出位置"的上下文（覆盖页/弹窗都长在主窗口里）
 	QPointF m_pointerPos;
 	QElapsedTimer m_pointerAge;

@@ -57,6 +57,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             text: root.checked ? "✓" : ""
             horizontalAlignment: Text.AlignHCenter
+
             // 选中钩走 textPrimary 灰黑而不是 accent 蓝：本控件**只**被 ModelSelectorChip 的弹层用到
             // （grep 全仓：唯一调用点就是 basic/chat/ModelSelectorChip.qml 的两处 delegate），
             // 而输入区整体不用蓝色 —— 见 Composer.qml 顶部"视觉约定"。

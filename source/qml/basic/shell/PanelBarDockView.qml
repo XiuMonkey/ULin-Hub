@@ -1,24 +1,14 @@
-// 右栏的"面板坞"：顶部一条块（页签）+ 主界面按钮，下面是当前块的内容或启动器。
-//
-// 交互（按需求）：
-//   · 打开右栏**不是**直接进浏览器，而是先看到启动器：终端 / 网页浏览 / 文件浏览；
-//   · 点其中一个就**在顶部开一个块**（页签），内容 = 该块的界面；
-//   · 顶部左侧的 ⌂ 主界面：回到启动器，**已开的块保留**，可以再开新块；
-//   · 块可以关（页签上的 ✕），关光了自动回主界面。
-//
-// 本文件是**纯 delegate**：块列表（增删、同类编号、活动索引收敛、关光了回主界面、kind 的中文名）
-// 全在 C++ 模型 source/src/common/shell/PanelBarDockModel.cpp，QML 面是单例 `PanelBarDock`；
-// 这里只剩布局/绘制与那几个交互细节（✕ 的命中区、内容重放动画、内容路由）。
-//
-// ⚠️ 网页/终端块需要 Qt WebEngine：它是**运行时** QML 模块依赖（vcxproj 的 webenginequick +
-//    main.cpp 的 QtWebEngineQuick::initialize()）。缺了它这两个块会被降级成说明页，判定在
-//    C++ 侧（PanelBarDockModel::viewFor）—— 未 initialize 的构建里建 WebEngineView 是直接崩，
-//    不是报错，所以不能"先试后错"，判定权必须在决定装载之前。
-//
-// 子界面一律经 Style.url() 装载（本仓库的既有范式），**不用相对 import** —— 相对 import 拿不到
-// 风格包的遮蔽能力。所以本文件不 import ../browser 与 ../terminal，视图路径由 C++ 的视图表给。
+// 右栏的"面板坞"：顶部块页签 + 主界面按钮，下面是当前块内容或启动器。
+// 打开右栏先进启动器（终端 / 网页浏览 / 文件浏览），点一项在顶部开块；⌂ 回启动器且保留已开块；
+// ✕ 关块，关光自动回主界面。
+// 本文件是纯 delegate：块列表、增删、活动索引、kind 中文名都在 C++ 的 PanelBarDockModel
+// （QML 单例 `PanelBarDock`），这里只剩布局/绘制、命中区、内容重放动画与内容路由。
+// ⚠️ 网页/终端块需要 Qt WebEngine（运行时 QML 模块依赖：vcxproj 的 webenginequick + main.cpp 的
+// initialize）：缺了会降级成说明页，判定必须在决定装载之前 —— 未 initialize 时建 WebEngineView 直接崩。
+// 子界面一律经 Style.url() 装载（不用相对 import，否则拿不到风格包的遮蔽能力）。
 
 import QtQuick
+import QtQuick.Controls.Basic   // ScrollBar.vertical（启动器条目多了要能滚动；与其它列表同一套）
 import ULinHub 1.0
 import "../../widgets"
 
@@ -26,16 +16,14 @@ Item {
     id: dock
 
     // 块列表 / 显示状态都在模型里；这两个只读镜像**只为接信号**：
-    // 值一变（开块、切块、回主界面）就重放一次内容动画。判定语义与搬家前一致 ——
+    // 值一变（开块、切块、回主界面）就重放一次内容动画。判定语义保持一致 ——
     // 模型侧"值没变不发通知"，所以点当前块不会白播一次动画。
     readonly property int activeIndex: PanelBarDock.activeIndex
     readonly property bool homeVisible: PanelBarDock.homeVisible
 
     // （这里曾有 activeDetached：判断"当前块是否已脱离成独立窗口"，读 PanelBarDock.detachedBlocks。
-    //   那是"按块脱离"那条链的东西 —— 抓手现在拖的是**整个右栏**，链已删除。）
 
-    // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
-    property real contentT: 1
+    property real contentT: 1   // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
 
     NumberAnimation {
         id: contentIn
@@ -59,35 +47,57 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // ---- ① 顶部：主界面按钮 + 三个点抓手 + 块（页签）----
         Item {
             id: tabStrip
             width: parent.width
-            height: 38
+            height: 40
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.color.border
+            }
 
             IconButton {
                 id: homeButton
                 anchors.left: parent.left
-                anchors.leftMargin: 4
+                anchors.leftMargin: 5
                 anchors.verticalCenter: parent.verticalCenter
+                boxSize: 26
                 glyph: "⌂"
+                glyphSize: Theme.font.body
                 tooltip: "主界面"
                 selected: dock.homeVisible
                 onClicked: PanelBarDock.showHome()   // ⌂ 只切显示，块保留
             }
 
+            IconButton {   // 这里给一个 ＋，语义就是"回主界面（启动器）"，块一个不关
+                id: addButton
+                anchors.right: parent.right
+                anchors.rightMargin: 5
+                anchors.verticalCenter: parent.verticalCenter
+                boxSize: 26
+                iconSize: 14
+                iconSource: "qrc:/ULinHub/icons/ui/plus.svg"
+                iconColor: Theme.color.iconButtonText
+                tooltip: "打开面板"
+                onClicked: PanelBarDock.showHome()
+            }
+
             // 块：横向排，多了可滚动
             // ⚠️ 这条 Flickable 锚在 `⌂` 右边 4px 且**声明在最后** —— 同 z 时后声明者在上层。
-            //    原来那只三个点抓手也锚在同一片区域（`⌂` 右边 6px）、声明在它前面，于是被它整个盖住
-            //    （"用户看不见三点"就是这个原因，不是尺寸/颜色问题）。抓手已搬到 PanelBar.qml 的
-            //    标题行，页签条里不再有与它重叠的锚定兄弟。
+            // （"用户看不见三点"就是这个原因，不是尺寸/颜色问题）。抓手已搬到 PanelBar.qml 的
+            // 标题行，页签条里不再有与它重叠的锚定兄弟。
             Flickable {
+                id: tabFlick
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 anchors.left: homeButton.right
                 anchors.leftMargin: 4
-                anchors.right: parent.right
+                anchors.right: addButton.left
                 anchors.rightMargin: 4
-                anchors.verticalCenter: parent.verticalCenter
-                height: 26
                 contentWidth: row.implicitWidth
                 clip: true
                 flickableDirection: Flickable.HorizontalFlick
@@ -98,60 +108,98 @@ Item {
                     height: parent.height
                     spacing: 4
 
-                    // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 PanelBarDock.activeKind）
-                    Repeater {
+                    Repeater {   // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 PanelBarDock.activeKind）
+                        id: blockRepeater
                         model: PanelBarDock
 
-                        delegate: Rectangle {
+                        delegate: Item {
                             id: block
                             required property string title
                             required property string kind
                             required property string blockId
                             required property int index
 
-                            // ✕ 命中区宽度：右侧这一条点下去是"关块"，其余地方是"切到该块"
-                            readonly property real closeZone: 22
+                            readonly property real closeZone: 22   // ✕ 命中区宽度：右侧这一条点下去是"关块"，其余地方是"切到该块"
                             readonly property bool closeHover: blockMouse.containsMouse
                                                                && blockMouse.mouseX > width - closeZone
+                            readonly property bool current: !dock.homeVisible
+                                && block.index === PanelBarDock.activeIndex
 
                             height: row.height
-                            width: Math.min(150, blockLabel.implicitWidth + 34)
-                            radius: Theme.radius.small
-                            color: (!dock.homeVisible && block.index === PanelBarDock.activeIndex)
-                                   ? Theme.color.hoverBg : "transparent"
-                            border.width: 1
-                            // 当前块的那圈提示线走 inputBorder(10% 黑)：border 已收到 4%，当"选中提示"太浅
-                            border.color: (!dock.homeVisible && block.index === PanelBarDock.activeIndex)
-                                          ? Theme.color.inputBorder : "transparent"
+
+                            // 标签多了先按可用宽度均分收缩；每个标签仍优先用自己的自然宽，
+                            // 只有放不下时才压到 max(64, 均分宽)，文字由 blockLabel 的 ElideRight 吃掉。
+                            readonly property real naturalWidth: blockLabel.implicitWidth + 50
+                            readonly property real equalWidth: {
+                                const count = Math.max(1, blockRepeater.count)
+                                return (tabFlick.width - row.spacing * (count - 1)) / count
+                            }
+                            width: Math.min(174, Math.min(naturalWidth, Math.max(64, equalWidth)))
+
+                            Rectangle {   // 悬停淡面：四边内缩一点（不顶满 40 高，免得上下贴死卡头/分隔线）
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                radius: Theme.radius.small
+                                color: !block.current && blockMouse.containsMouse
+                                    ? Theme.color.hoverBg : "transparent"
+
+                                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+                            }
+
+                            Rectangle {   // 选中指示：accent 色 2px 下划线，压在条的下沿分隔线上（下划线式页签）
+                                anchors.left: parent.left
+                                anchors.leftMargin: 6
+                                anchors.right: parent.right
+                                anchors.rightMargin: 6
+                                anchors.bottom: parent.bottom
+                                height: 2
+                                radius: 1
+                                color: Theme.color.accent
+                                opacity: block.current ? 1 : 0
+
+                                Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+                            }
+
+                            LineIcon {   // 按 kind 给一颗小图标：终端/浏览器/文件，和"工作台"设计里的标签一致
+                                id: blockIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: block.kind === "terminal" ? "terminal"
+                                    : block.kind === "browser" ? "browser" : "file"
+                                size: 12
+                                color: block.current ? Theme.color.accent : Theme.color.textTertiary
+                            }
 
                             Text {
                                 id: blockLabel
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
+                                anchors.left: blockIcon.right
+                                anchors.leftMargin: 5
                                 anchors.right: closeGlyph.left
                                 anchors.rightMargin: 4
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: block.title
                                 elide: Text.ElideRight
-                                color: Theme.color.textSecondary
+                                color: block.current ? Theme.color.textPrimary : Theme.color.textSecondary
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.caption
+                                font.weight: block.current ? Theme.font.weightMedium : Font.Normal
                             }
 
-                            Text {
+                            LineIcon {
                                 id: closeGlyph
                                 anchors.right: parent.right
                                 anchors.rightMargin: 6
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "✕"
+                                name: "close"
+                                size: 10
                                 color: block.closeHover ? Theme.color.textPrimary : Theme.color.textTertiary
-                                font.family: "Segoe UI Symbol"
-                                font.pixelSize: Theme.font.small
+                                opacity: block.current || blockMouse.containsMouse ? 1 : 0.55
                             }
 
                             // 块内**唯一**的 MouseArea：右侧 closeZone 那条是"关块"，其余是"切到该块"。
                             // ⚠️ 别给 ✕ 单独放 MouseArea：同级里后声明的铺满 MouseArea 在更上层，
-                            //    会把 ✕ 的点击整个吃掉（"关闭按钮点了没反应"就是这个原因）。
+                            // 会把 ✕ 的点击整个吃掉（"关闭按钮点了没反应"就是这个原因）。
                             MouseArea {
                                 id: blockMouse
                                 anchors.fill: parent
@@ -175,95 +223,166 @@ Item {
             }
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.color.border
-        }
+        // 下面 body 的高度也跟着只减 tabStrip.height。）
 
-        // ---- ② 内容：启动器 或 当前块 ----
         Item {
             id: body
             width: parent.width
-            // ⚠️ 夹 0 下界：这行原本是 `parent.height - tabStrip.height - 1`，而**首帧/尺寸未定**时
-            //    父链（右栏卡片的 Column）还没有高度，算式会算出负数 —— 真机日志里出现过
-            //    `PanelBarDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
-            //    （启动器列、内容 Loader 都锚在它上面）会跟着变成负高；夹到 0 之后是"暂时没地方画
-            //    内容"，可见行为与负高一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
-            height: Math.max(0, parent.height - tabStrip.height - 1)
 
-            // 出现/切换时淡入 + 轻微放大（顶栏那条块不动，只动内容区）
-            opacity: dock.contentT
+            // ⚠️ 夹 0 下界：**首帧/尺寸未定**时父链（右栏卡片的 Column）还没有高度，直接算
+            // `parent.height - tabStrip.height - 1` 会得到负数 —— 真机日志里出现过
+            // `PanelBarDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
+            // （启动器列、内容 Loader 都锚在它上面）会跟着变成负高；夹到 0 之后是"暂时没地方画
+            // 内容"，可见行为与负高一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
+            height: Math.max(0, parent.height - tabStrip.height)
+
+            opacity: dock.contentT   // 出现/切换时淡入 + 轻微放大（顶栏那条块不动，只动内容区）
             scale: 0.985 + 0.015 * dock.contentT
 
             // 启动器（主界面）：目录也来自模型（三种块的中文名只有 C++ 那一份）
-            Column {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: Theme.spacing.columnClearance
-                anchors.topMargin: Theme.spacing.columnClearance
-                spacing: 8
+            // · 分区标题按设置页的分组头写（11px / textTertiary / 粗一档 + 一点字距）；
+            // · 每项 = 28×28 的图标底 + 名称/说明 + 右侧 chevron（悬停才明显），
+            // 悬停时卡片从 panelBg 抬到 hoverBg 并加一圈描边，命中范围一眼可见；
+            // · 外面套 Flickable：扩展还能登记启动项（registerLauncher），
+            // 条目多了会溢出面板，这里给滚动而不是让它压到卡片外。
+            Flickable {
+                id: launcherScroll
+
+                anchors.fill: parent
                 visible: dock.homeVisible
+                contentWidth: width
+                contentHeight: launcherColumn.height + 2 * Theme.spacing.columnClearance
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: AppScrollBar { }
 
-                Text {
-                    text: "打开一个块"
-                    color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
-                    font.pixelSize: Theme.font.caption
-                }
+                Column {
+                    id: launcherColumn
+                    x: Theme.spacing.columnClearance
+                    y: Theme.spacing.columnClearance
+                    width: Math.max(0, launcherScroll.width - 2 * Theme.spacing.columnClearance)
+                    spacing: Theme.spacing.buttonGap
 
-                Repeater {
-                    model: PanelBarDock.launcherItems
-
-                    delegate: Rectangle {
-                        id: launcherRow
-                        required property var modelData
-
+                    Text {
                         width: parent.width
-                        height: 44
-                        radius: Theme.radius.control
-                        color: launcherMouse.containsMouse ? Theme.color.hoverBg : "transparent"
-                        border.width: 1
-                        border.color: launcherMouse.containsMouse ? Theme.color.border : "transparent"
+                        text: "打开一个面板"
+                        color: Theme.color.textTertiary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.small
+                        font.weight: Theme.font.weightBold
+                        font.letterSpacing: 0.4
+                        topPadding: 2
+                        leftPadding: 2
+                        bottomPadding: 2
+                    }
 
-                        Column {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            anchors.right: parent.right
-                            anchors.rightMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 2
+                    Repeater {
+                        model: PanelBarDock.launcherItems
 
-                            Text {
-                                text: launcherRow.modelData.label
-                                color: Theme.color.textPrimary
-                                font.family: "Microsoft YaHei UI"
-                                font.pixelSize: Theme.font.body
+                        delegate: Rectangle {
+                            id: launcherRow
+                            required property var modelData
+
+                            // kind 决定图标：与块页签同一套映射，末位兜底给"扩展"（扩展登记的行）
+                            readonly property string iconName: modelData.kind === "terminal" ? "terminal"
+                                : modelData.kind === "browser" ? "browser"
+                                : (modelData.kind === "files" ? "folder" : "extensions")
+
+                            width: launcherColumn.width
+                            height: 52
+                            radius: Theme.radius.control
+                            color: launcherMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                            border.width: 1
+                            border.color: launcherMouse.containsMouse
+                                ? Theme.color.inputBorder : Theme.color.menuBorder
+
+                            Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+
+                            Rectangle {   // 图标底：浅面小方块（设置页徽章那一档），把图标从"一行字里的符号"变成"一项的标识"
+                                id: iconTile
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 28
+                                height: 28
+                                radius: Theme.radius.control
+                                color: Theme.color.buttonBg
+
+                                LineIcon {
+                                    anchors.centerIn: parent
+                                    name: launcherRow.iconName
+                                    size: 15
+                                    color: launcherMouse.containsMouse
+                                        ? Theme.color.textPrimary : Theme.color.textSecondary
+                                }
                             }
-                            Text {
-                                width: parent.width
-                                text: launcherRow.modelData.hint
-                                elide: Text.ElideRight
-                                color: Theme.color.textTertiary
-                                font.family: "Microsoft YaHei UI"
-                                font.pixelSize: Theme.font.caption
+
+                            LineIcon {
+                                id: hintChevron
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: "chevron-right"
+                                size: 12
+                                color: Theme.color.textSecondary
+                                opacity: launcherMouse.containsMouse ? 1 : 0
+                                Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+                            }
+
+                            Column {
+                                anchors.left: iconTile.right
+                                anchors.leftMargin: 10
+                                anchors.right: hintChevron.left
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: launcherRow.modelData.label
+                                    color: Theme.color.textPrimary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+                                    font.weight: Theme.font.weightMedium
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: launcherRow.modelData.hint
+                                    elide: Text.ElideRight
+                                    color: Theme.color.textTertiary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.caption
+                                }
+                            }
+
+                            MouseArea {
+                                id: launcherMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: PanelBarDock.open(launcherRow.modelData.kind)
                             }
                         }
+                    }
 
-                        MouseArea {
-                            id: launcherMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: PanelBarDock.open(launcherRow.modelData.kind)
-                        }
+                    // 页脚一句说明：右栏的块与会话是解绑的（切块/收右栏不会杀进程），
+                    // 这句放这儿比藏在 tooltip 里更有效 —— 它是这一页最容易被误解的语义。
+                    Text {
+                        width: parent.width
+                        topPadding: 6
+                        leftPadding: 2
+                        text: "面板会保留在右栏，可随时切换；关闭右栏不会结束终端会话。"
+                        wrapMode: Text.WordWrap
+                        color: Theme.color.textCaption
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.small
+                        lineHeight: 1.3
                     }
                 }
             }
 
-            // 当前块
-            Loader {
+            Loader {   // 当前块
                 id: tabContent
                 anchors.fill: parent
                 visible: !dock.homeVisible
@@ -280,8 +399,7 @@ Item {
                 }
             }
 
-            // 纯 url 视图：路径来自 C++ 的视图表，这里只过风格包解析（<exe>/ui/ 同名文件优先于 qrc）
-            Component {
+            Component {   // 纯 url 视图：路径来自 C++ 的视图表，这里只过风格包解析（<exe>/ui/ 同名文件优先于 qrc）
                 id: plainComp
                 Loader {
                     anchors.fill: parent
@@ -291,8 +409,6 @@ Item {
                     // 的 startUrl —— 与 blockScopedComp 把 blockId 绑给终端同一个手法：切到另一块同类
                     // 视图时 Loader 不重建，靠活绑定把新地址推下去。
                     // 用户自己开的浏览器块 URL 是空串 ⇒ openExternal 直接返回，行为与从前一致。
-                    // ⚠️ 防御：<exe>/ui/ 下的旧风格包可能还是老版 WebBrowserPanel.qml（没有
-                    //    openExternal/startUrl），这时什么都不推，比抛 TypeError 好。
                     onLoaded: {
                         if (item && typeof item.openExternal === "function")
                             item.startUrl = Qt.binding(function () { return PanelBarDock.activeViewUrl })
@@ -302,9 +418,8 @@ Item {
 
             // 要跟着"当前块"走的视图（终端）：url 同样来自视图表，但面板还要拿到当前块的稳定 id。
             // ⚠️ 用 Qt.binding 而不是 setSource 的初始属性：切到另一个同类块时宿主**不重建** item
-            //    （契约与路径都没变），靠这条活绑定把新块推给面板（TerminalPanel.onBlockIdChanged
-            //    → 换绑会话）。初始属性只能给一次快照，切块就会串台。
-            //    传的是**稳定 id** 而不是索引：关掉前面那块时索引会前移，拿索引当会话 key 会串台。
+            // （契约与路径都没变），靠这条活绑定把新块推给面板（TerminalPanel.onBlockIdChanged
+            // → 换绑会话）。初始属性只能给一次快照，切块就会串台。
             Component {
                 id: blockScopedComp
                 Loader {
@@ -318,8 +433,7 @@ Item {
                 }
             }
 
-            // 没有视图的块：标题照常是块名，说明文案由 C++ 给（与中文块名同一层，QML 不拼）
-            Component {
+            Component {   // 没有视图的块：标题照常是块名，说明文案由 C++ 给（与中文块名同一层，QML 不拼）
                 id: placeholderComp
                 PanelPlaceholder {
                     anchors.fill: parent

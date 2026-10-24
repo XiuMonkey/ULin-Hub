@@ -16,8 +16,7 @@
 
 namespace
 {
-	// 内置包在 qrc 里的位置（见 source/qml/qml.qrc 的 prefix）
-	const char kBuiltinDir[] = ":/qml/";
+	const char kBuiltinDir[] = ":/qml/";   // 内置包在 qrc 里的位置（见 source/qml/qml.qrc 的 prefix）
 	const char kBuiltinUrl[] = "qrc:/qml/";
 	const char kPackFileName[] = "pack.json";
 }
@@ -43,9 +42,7 @@ void StyleResolver::init(const QString& stylesDir)
 
 void StyleResolver::ensureDefaults() const
 {
-	// (M8) 风格包的释放已归 ThemeManager 管（它的老职责就是"释放样式资源"，以前释放 QSS，现在释放 QML）。
-	// 这里只转发，规则与日志都在 ThemeManager::ensureStylePack()。
-	ThemeManager::instance().ensureStylePack();
+	ThemeManager::instance().ensureStylePack();   // 这里只转发，规则与日志都在 ThemeManager::ensureStylePack()
 }
 
 void StyleResolver::inspectPack()
@@ -85,9 +82,9 @@ void StyleResolver::inspectPack()
 	m_packVersion = object.value(QStringLiteral("packVersion")).toString();
 
 	const int abi = object.value(QStringLiteral("uiAbi")).toInt(-1);
-	if (abi != kStylePackUiAbi) {
+	if (abi != ClientInfo::kUiAbi) {
 		m_packAccepted = false;
-		qWarning().noquote() << "[Style] 风格包 uiAbi 不匹配，包内=" << abi << " 本版本需要=" << kStylePackUiAbi;
+		qWarning().noquote() << "[Style] 风格包 uiAbi 不匹配，包内=" << abi << " 本版本需要=" << ClientInfo::kUiAbi;
 		m_rejectReason = qtTrId("style_pack_abi_mismatch");
 	}
 
@@ -100,8 +97,7 @@ QString StyleResolver::url(const QString& logicalPath) const
 	if (logicalPath.isEmpty())
 		return QString();
 
-	// QML 侧同一个路径会反复问（每个 Loader 一次），缓存掉文件系统探测
-	const auto cached = m_urlCache.constFind(logicalPath);
+	const auto cached = m_urlCache.constFind(logicalPath);   // QML 侧同一个路径会反复问（每个 Loader 一次），缓存掉文件系统探测
 	if (cached != m_urlCache.constEnd())
 		return cached.value();
 
@@ -127,7 +123,7 @@ bool StyleResolver::reset()
 		return false;
 
 	// 只删"属于包"的文件：内置树里有的那些 + pack.json。
-	// 刻意不删 theme-*.json 与 *.qss —— 它们由 ThemeManager 释放，删了会让旧控件壳掉样式。
+	// 刻意不删 theme-*.json 与 *.qss —— 它们由 ThemeManager 释放，删了会让控件壳掉样式。
 	const int prefixLength = static_cast<int>(qstrlen(kBuiltinDir));
 	QDirIterator it(QString::fromLatin1(kBuiltinDir), QDir::Files, QDirIterator::Subdirectories);
 	while (it.hasNext()) {
@@ -137,8 +133,7 @@ bool StyleResolver::reset()
 			qWarning().noquote() << "[Style] 重置时删不掉：" << target;
 	}
 	QFile::remove(m_stylesDir + QLatin1Char('/') + QLatin1String(kPackFileName));
-	// 释放基线也清掉：否则下次启动会拿旧基线去比，用户改过的文件会被当成"内置没变"而跳过
-	QFile::remove(m_stylesDir + QLatin1Char('/') + QStringLiteral("release-manifest.json"));
+	QFile::remove(m_stylesDir + QLatin1Char('/') + QStringLiteral("release-manifest.json"));   // 释放基线也清掉：否则下次启动会拿旧基线去比，用户改过的文件会被当成"内置没变"而跳过
 
 	ensureDefaults();
 	inspectPack();

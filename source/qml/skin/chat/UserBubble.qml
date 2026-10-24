@@ -1,19 +1,27 @@
-// 用户消息气泡：右对齐、圆角、色取自 userBubble* token（与旧壳 #userUnit 同源）。
+// 用户消息气泡：右对齐、圆角，颜色取自 userBubble* token。
 
 import QtQuick
+import QtQuick.Controls.Basic
 import ULinHub 1.0
 
 Item {
     id: root
 
     property string text: ""
-    // [{ id, mediaType }]：消息里的图片附件（源由 Hub.attachmentSource 取）
-    property var images: []
+    readonly property string copyText: text
+    property var images: []   // [{ id, mediaType }]，源由 Hub.attachmentSource 取
 
-    // 宽度上限与旧壳 UserMessageUnit 的 MaxWidth 语义一致：长消息不铺满整行
+    function copyAll() {
+        if (root.copyText.length === 0)
+            return
+        clipboardHelper.selectAll()
+        clipboardHelper.copy()
+        clipboardHelper.deselect()
+    }
+
     implicitHeight: bubble.implicitHeight + (imagesRow.visible ? imagesRow.height + 8 : 0)
 
-    // 图片：贴在气泡上方（右对齐，与气泡同缘）
+    // 图片贴在气泡上方（右对齐）；单图按原比例限制 240px 长边，多图用 120px 方图裁切。
     Row {
         id: imagesRow
         anchors.right: parent.right
@@ -21,28 +29,35 @@ Item {
         anchors.bottomMargin: 8
         spacing: 6
         visible: root.images.length > 0
-        height: visible ? 120 : 0
+        height: visible ? Math.max(120, implicitHeight) : 0
 
         Repeater {
             model: root.images
-
             Rectangle {
+                id: imageTile
                 required property var modelData
-                width: 120
-                height: 120
+                readonly property bool single: root.images.length === 1
+                readonly property real ratio: (img.implicitWidth > 0 && img.implicitHeight > 0)
+                    ? Math.min(4, Math.max(0.25, img.implicitWidth / img.implicitHeight))
+                    : 1
+                width: single ? (ratio >= 1 ? 240 : 240 * ratio) : 120
+                height: single ? (ratio >= 1 ? 240 / ratio : 240) : 120
                 radius: Theme.radius.small
                 color: Theme.color.inputBg
                 clip: true
-
                 Image {
+                    id: img
                     anchors.fill: parent
                     anchors.margins: 1
                     asynchronous: true
-                    fillMode: Image.PreserveAspectFit
-                    // Hub.attachmentRevision 是依赖项：字节到位后重取一次
+                    fillMode: imageTile.single ? Image.PreserveAspectFit : Image.PreserveAspectCrop
+                    // 本地预览优先，历史图片由 attachmentSource 异步取
                     source: {
                         var rev = Hub.attachmentRevision
-                        return rev >= 0 ? Hub.attachmentSource(modelData.id) : ""
+                        var preview = modelData.preview ? String(modelData.preview) : ""
+                        if (preview.length > 0)
+                            return preview
+                        return rev >= 0 && modelData.id ? Hub.attachmentSource(modelData.id) : ""
                     }
                 }
             }
@@ -57,27 +72,21 @@ Item {
         implicitHeight: content.contentHeight + 2 * Theme.spacing.buttonPadY
         radius: Theme.radius.panel
         color: Theme.color.userBubbleBg
-        // 无描边：原版 sidebar/chat.qss 的 `#userUnit` 只有 `background-color + border-radius: 12px`，
-        // 一条 border 都没有（见 build/temp/ui-texture/original-borders.txt）。气泡靠 userBubbleBg 的面自己立住。
 
-        // 量宽度专用：Text 的 implicitWidth 是"不换行时的自然宽度"，
-        // 而 TextEdit 在宽度定下来之前**不提供可用的 implicitWidth/Height**（上一版把行高算成 0 就栽在这）。
+        // 量宽度专用：Text 的 implicitWidth 在设宽前不可用，不能直接用 TextEdit 量。
         Text {
             id: measure
             visible: false
             text: root.text
             textFormat: Text.MarkdownText
             font.family: "Microsoft YaHei UI"
-            // 13px（用户要"小一些"）：与 Agent 正文同档，两个气泡的观感才一致
-            font.pixelSize: Theme.font.body
+            font.pixelSize: Theme.font.body   // 与 Agent 正文同档
         }
-
-        // 只读但可选中/复制（Text 不可选，这里必须是 TextEdit）
         TextEdit {
             id: content
             objectName: "bubbleText"
             anchors.centerIn: parent
-            width: Math.min(measure.implicitWidth, Math.max(40, root.width * 0.72 - 2 * Theme.spacing.cardPadding))
+            width: Math.min(measure.implicitWidth, Math.max(40, root.width * 0.72 - 2 * Theme.spacing.cardPadding))   // 长消息不铺满整行
             height: contentHeight
             text: root.text
             textFormat: TextEdit.MarkdownText
@@ -85,12 +94,82 @@ Item {
             readOnly: true
             selectByMouse: true
             persistentSelection: true
-            activeFocusOnPress: false
+            activeFocusOnPress: true
             color: Theme.color.userBubbleText
             selectionColor: Theme.color.selectionBg
             selectedTextColor: content.color
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
+        }
+    }
+
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        readOnly: true
+        textFormat: TextEdit.PlainText
+        text: root.copyText
+        width: 1
+        height: 1
+    }
+
+    Popup {
+        id: copyMenu
+        parent: root
+        width: 156
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            radius: 8
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: copyMenu.width - 12
+            spacing: 2
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
+                color: copyMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("context_copy_all")
+                    color: Theme.color.textSecondary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+
+                MouseArea {
+                    id: copyMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.copyAll()
+                        copyMenu.close()
+                    }
+                }
+            }
+        }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: (eventPoint) => {
+            var p = eventPoint.position
+            copyMenu.x = Math.max(8, Math.min(root.width - copyMenu.width - 8, p.x))
+            copyMenu.y = Math.max(8, Math.min(root.height - copyMenu.height - 8, p.y))
+            copyMenu.open()
         }
     }
 }

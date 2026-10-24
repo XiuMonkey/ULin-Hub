@@ -1,10 +1,8 @@
 // 设置（按原版 ui/Settings.cpp + ui/PopupWindow.cpp 复刻）
-//
-//   弹窗外壳：可见卡片 632×432（原版窗口 680×480 含 CardShadow level3 的阴影留白
-//             24/16/24/32），radius 16，标题 #popupTitle 16px + 28×28 关闭按钮（tooltip common_close）。
-//   主体：左导航（宽 120、每项最小高 36、可 check，选中/悬停 = hoverBg）+ 右内容（间距 12）。
-//   导航顺序与原版一致：模型列表 / Agent预设 / Server设置 / 外观设置。
-//
+// 弹窗外壳：可见卡片 632×432（原版窗口 680×480 含 CardShadow level3 的阴影留白
+// 24/16/24/32），radius 16，标题 #popupTitle 16px + 28×28 关闭按钮（tooltip common_close）。
+// 主体：左导航（宽 120、每项最小高 36、可 check，选中/悬停 = hoverBg）+ 右内容（间距 12）。
+// 导航顺序与原版一致：模型列表 / Agent预设 / Server设置 / 外观设置。
 // 文案一律用原版既有 id（qsTrId），不写字面量。
 
 import QtQuick
@@ -14,17 +12,13 @@ import "../../widgets"
 Item {
     id: page
 
-    // 卡片目标尺寸（= 原来那个 Card 的宽高）：PageOverlay 按它算"长到多大、停在哪儿"
     implicitWidth: 632
     implicitHeight: 432
 
-    // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
-    // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
-    Item {
+    Item {   // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容
         id: popup
         anchors.fill: parent
 
-        // ---- 标题行（原版 #popupBody 的标题行：spacing 8、关闭按钮 28×28）----
         Item {
             id: titleRow
             anchors.left: parent.left
@@ -56,7 +50,6 @@ Item {
             }
         }
 
-        // ---- 主体：左导航 + 右内容（原版主布局边距 20,16,20,20、spacing 12）----
         Row {
             id: layout
             anchors.left: parent.left
@@ -69,65 +62,101 @@ Item {
             anchors.bottomMargin: 20
             spacing: 12
 
-            Column {
-                id: nav
+            // 导航列：整列铺一块浅面（#F7F8F9）并加圆角，与右侧纯白内容分栏。
+            // 原版只有"几行灰字"，选中项又是一块和 hover 同色的灰，看不出"导航 / 内容"的分界，
+            // 也分不清当前停在哪一页 —— 这里把选中项反过来做成"白底浮在面上"。
+            Item {
+                id: navColumn
                 width: 120
-                spacing: 4
+                height: layout.height
 
-                Repeater {
-                    model: [
-                        qsTrId("model_list_title"),
-                        qsTrId("settings_agent_preset_tab"),
-                        qsTrId("settings_server_tab"),
-                        qsTrId("settings_appearance_tab")
-                    ]
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radius.card
+                    color: Theme.color.windowBg
+                    border.width: 1
+                    border.color: Theme.color.border
+                }
 
-                    delegate: Item {
-                        id: navItem
+                Column {
+                    id: nav
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 6
+                    spacing: 2
 
-                        required property string modelData
-                        required property int index
+                    Repeater {
+                        model: [   // 图标名 = assets/resources/icons/ui/<name>.svg（model / bot / server / theme）
+                            { label: qsTrId("model_list_title"), icon: "model" },
+                            { label: qsTrId("settings_agent_preset_tab"), icon: "bot" },
+                            { label: qsTrId("settings_server_tab"), icon: "server" },
+                            { label: qsTrId("settings_appearance_tab"), icon: "theme" }
+                        ]
 
-                        width: nav.width
-                        implicitHeight: Math.max(36, navLabel.implicitHeight + 16)
+                        delegate: Item {
+                            id: navItem
 
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: Theme.radius.control
-                            color: (Hub.settings.page === navItem.index || navMouse.containsMouse)
-                                ? Theme.color.hoverBg
-                                : "transparent"
-                        }
+                            required property var modelData
+                            required property int index
 
-                        Text {
-                            id: navLabel
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.leftMargin: 16
-                            anchors.rightMargin: 16
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: navItem.modelData
-                            wrapMode: Text.WordWrap
-                            color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
-                            font.pixelSize: Theme.font.title
-                        }
+                            readonly property bool selected: Hub.settings.page === navItem.index
 
-                        MouseArea {
-                            id: navMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: Hub.settings.setPage(navItem.index)
+                            width: nav.width
+                            implicitHeight: Math.max(34, navLabel.implicitHeight + 14)
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: Theme.radius.small
+                                color: navItem.selected
+                                    ? Theme.color.panelBg
+                                    : (navMouse.containsMouse ? Theme.color.activeBg : "transparent")
+                                border.width: navItem.selected ? 1 : 0
+                                border.color: Theme.color.border
+                            }
+
+                            Row {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.leftMargin: 9
+                                anchors.rightMargin: 9
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 8
+
+                                LineIcon {
+                                    name: navItem.modelData.icon
+                                    size: 14
+                                    color: navItem.selected ? Theme.color.textPrimary : Theme.color.textSecondary
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                Text {
+                                    id: navLabel
+                                    width: parent.width - 22   // 14 图标 + 8 间距
+                                    text: navItem.modelData.label
+                                    elide: Text.ElideRight
+                                    color: navItem.selected ? Theme.color.textPrimary : Theme.color.textSecondary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+                                    font.weight: navItem.selected ? Theme.font.weightBold : Font.Normal
+                                }
+                            }
+
+                            MouseArea {
+                                id: navMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Hub.settings.setPage(navItem.index)
+                            }
                         }
                     }
                 }
             }
 
-            // 右内容区：四页叠放，按 page 显隐（原版也是四块一起建、切换只改可见性）
-            Item {
+            Item {   // 右内容区：四页叠放，按 page 显隐（原版也是四块一起建、切换只改可见性）
                 id: content
-                width: layout.width - nav.width - layout.spacing
+                width: layout.width - navColumn.width - layout.spacing
                 height: layout.height
 
                 Loader {

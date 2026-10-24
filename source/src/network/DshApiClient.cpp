@@ -30,8 +30,7 @@ DshApiClient::JsonParseRunnable::JsonParseRunnable(DshApiClient* client, QString
 {
 }
 
-// 只做纯 JSON 解析、不碰回调，完成后回投主线程
-void DshApiClient::JsonParseRunnable::run()
+void DshApiClient::JsonParseRunnable::run()   // 只做纯 JSON 解析、不碰回调，完成后回投主线程
 {
 	const QJsonDocument doc = QJsonDocument::fromJson(m_body);
 	m_body.clear();
@@ -45,8 +44,7 @@ void DshApiClient::JsonParseRunnable::run()
 		Qt::QueuedConnection);
 }
 
-// 只有 /api/remote.mux 一条 mux，各逻辑流都跑在它上面
-DshApiClient::DshApiClient(QObject* parent)
+DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 mux，各逻辑流都跑在它上面
 	: QObject(parent)
 	, m_nam(new QNetworkAccessManager(this))
 	, m_stream(new QWebSocket)
@@ -67,11 +65,16 @@ DshApiClient::DshApiClient(QObject* parent)
 		sendStreamOpen(QStringLiteral("workspace/follow"), m_workspaceStreamId);
 		m_controlStreamId = nextStreamId(QStringLiteral("control"));
 		sendStreamOpen(QStringLiteral("session/control"), m_controlStreamId);
-		if (!m_followedSessionId.isEmpty()) {
-			const QString sessionId = m_followedSessionId;
-			// 子代理要按 subagent address 重开；丢了这两段就会退回 session 形状（引擎回 agent-busy）
-			const QString parentSessionId = m_followedParentSessionId;
-			const QString mode = m_followedMode;
+
+		// 重连后**必须重开 session/follow（+ job/list）**：openStreams() 里的 closeStreams() 已经把
+		// m_followed* 清空了（那是"当前有没有活着的流"的账），所以这里只能看 m_resumeFollow*。
+		// 两本账混成一本的后果：内置引擎重启（发布包首启会重启一次）或任何一次网络抖动之后，
+		// follow 再也不打开 ⇒ 客户端收不到任何消息事件 ⇒ 用户看到"模型不回复"，
+		// 而回合其实已经在服务端跑完了（session/*.jsonl 里有 assistant/message）。
+		if (!m_resumeFollowId.isEmpty()) {
+			const QString sessionId = m_resumeFollowId;
+			const QString parentSessionId = m_resumeFollowParent;   // 子代理要按 subagent address 重开；丢了这两段就会退回 session 形状（引擎回 agent-busy）
+			const QString mode = m_resumeFollowMode;
 			m_followedSessionId.clear();
 			m_followedParentSessionId.clear();
 			m_followedMode.clear();
@@ -87,13 +90,11 @@ DshApiClient::DshApiClient(QObject* parent)
 		m_eventsReady = false;
 		qInfo().noquote() << "[DshApi] DSH stream disconnected closeCode=" << code
 			<< "reason=" << reason << "wasConnected=" << wasConnected;
-		// 终端附着流随 mux 一起没了：清账并告诉调用方（它会在 connected() 后用新 attachmentId 重开）
-		if (!m_terminalStreamId.isEmpty()) {
+		if (!m_terminalStreamId.isEmpty()) {   // 终端附着流随 mux 一起没了：清账并告诉调用方（它会在 connected() 后用新 attachmentId 重开）
 			const QString ended = m_terminalStreamId;
 			m_terminalStreamId.clear();
 			emit terminalStreamEnded(ended);
 		}
-		// 后台任务名册随 mux 一起失效：清空名册（别让顶栏一直挂着上次会话的旧任务）
 		if (!m_jobsStreamId.isEmpty()) {
 			m_jobsStreamId.clear();
 			emit jobRosterReady(QJsonArray());
@@ -115,10 +116,6 @@ DshApiClient::~DshApiClient()
 	closeStreams();
 	delete m_stream;
 }
-
-// ------------------------------------------------------------------
-// VirtualMain 里**宿主还没实现**的三条（其余 11 条是纯转发，内联在头文件里）
-// ------------------------------------------------------------------
 
 // 只刷标题不动选择：见头文件那段说明 —— DshApiClient 这条线上没有对应端点，
 // ShellController::refreshSessions() 会重建目录（可能换掉当前选中会话）⇒ 刻意不接。
@@ -142,8 +139,7 @@ void DshApiClient::ExternalHideOverlay(QWidget* popup)
 	Q_UNUSED(popup);
 }
 
-// 服务端给的是带 ?token= 的认证 URL；令牌单独存，基础 URL 保持干净
-void DshApiClient::setBaseUrl(const QUrl& url)
+void DshApiClient::setBaseUrl(const QUrl& url)   // 服务端给的是带 ?token= 的认证 URL；令牌单独存，基础 URL 保持干净
 {
 	if (m_takenover) {  // 接管态忽略它：否则仍会做 token→cookie 握手、连真 DSH
 		qInfo().noquote() << "[DshApi] setBaseUrl ignored (backend taken over):"
@@ -174,8 +170,7 @@ QUrl DshApiClient::baseUrl() const
 	return m_baseUrl;
 }
 
-// 用启动令牌换 cookie；必须禁止自动跟随重定向，否则拿不到 Set-Cookie
-void DshApiClient::startAuthHandshake()
+void DshApiClient::startAuthHandshake()   // 用启动令牌换 cookie；必须禁止自动跟随重定向，否则拿不到 Set-Cookie
 {
 	if (m_destroyed || m_authInFlight)
 		return;
@@ -235,8 +230,7 @@ void DshApiClient::startAuthHandshake()
 		});
 }
 
-// 补发走的还是 post()，此时已认证，不会再入队
-void DshApiClient::flushAuthQueue()
+void DshApiClient::flushAuthQueue()   // 补发走的还是 post()，此时已认证，不会再入队
 {
 	if (m_authQueue.isEmpty())
 		return;
@@ -259,8 +253,7 @@ void DshApiClient::failAuthQueue(const QString& code, const QString& message)
 	}
 }
 
-// 带令牌但没换到 cookie 时先握手（成功后回到这里）
-void DshApiClient::openStreams()
+void DshApiClient::openStreams()   // 带令牌但没换到 cookie 时先握手（成功后回到这里）
 {
 	if (m_takenover) {  // 接管态流归扩展负责，宿主不开 mux
 		qInfo().noquote() << "[DshApi] openStreams ignored (backend taken over)";
@@ -285,8 +278,7 @@ void DshApiClient::openStreams()
 	qInfo().noquote() << "[DshApi] opening mux stream:" << m_baseUrl.toString();
 }
 
-// 流 id 每次 open 必须唯一：重复 streamId 会让服务端 close(1008)
-QString DshApiClient::nextStreamId(const QString& prefix)
+QString DshApiClient::nextStreamId(const QString& prefix)   // 流 id 每次 open 必须唯一：重复 streamId 会让服务端 close(1008)
 {
 	++m_streamSeq;
 	return QStringLiteral("%1-%2").arg(prefix).arg(m_streamSeq);
@@ -380,6 +372,7 @@ void DshApiClient::followSession(const QString& sessionId, const QString& parent
 {
 	if (sessionId.isEmpty())
 		return;
+
 	// 同一目标重复调用不重开流；父会话 id / mode 一起比，避免"同一个 id 但地址形状变了"被误判为重复
 	if (sessionId == m_followedSessionId && parentSessionId == m_followedParentSessionId
 		&& mode == m_followedMode)
@@ -391,6 +384,9 @@ void DshApiClient::followSession(const QString& sessionId, const QString& parent
 	m_followedSessionId = sessionId;
 	m_followedParentSessionId = parentSessionId;
 	m_followedMode = mode;
+	m_resumeFollowId = sessionId;   // 愿望账：mux 断了也要记住"该跟谁"，重连时靠它重开（见 connected() 里那段）
+	m_resumeFollowParent = parentSessionId;
+	m_resumeFollowMode = mode;
 
 	qInfo().noquote() << "[DshApi] follow target =" << sessionId
 		<< (parentSessionId.isEmpty() ? QStringLiteral("(session)")
@@ -412,7 +408,7 @@ void DshApiClient::followSession(const QString& sessionId, const QString& parent
 	// 后台任务名册（job/list）：跟 session/follow 同生命周期开/关。参数是引擎 Remote 的命名参数
 	// `request: JobListRequest`（payload.args = { request: { sessionId } }），帧是 JobListFrame。
 	// ⚠️ 这条流只在该会话被跟随期间才需要：名册是"该会话能看到的任务集合"（含无主任务），
-	//    换会话必须跟着换，否则顶栏计数会串会话。
+	// 换会话必须跟着换，否则顶栏计数会串会话。
 	QJsonObject jobsRequest;
 	jobsRequest.insert(QStringLiteral("sessionId"), sessionId);
 	QJsonObject jobsArgs;
@@ -439,6 +435,10 @@ void DshApiClient::pageSession(const QString& sessionId, int throughSeq, int max
 
 void DshApiClient::unfollowSession()
 {
+	m_resumeFollowId.clear();   // 真正"不跟了"：愿望账也一起清掉 —— 否则重连会把刚取消的会话又拉回来（用户已经切走了）
+	m_resumeFollowParent.clear();
+	m_resumeFollowMode.clear();
+
 	if (m_takenover) {  // 接管态：通知扩展收掉 follow
 		if (!m_followedSessionId.isEmpty()) {
 			QJsonObject frame;
@@ -459,8 +459,7 @@ void DshApiClient::unfollowSession()
 		sendStreamCancel(m_sessionStreamId);
 	m_sessionStreamId.clear();
 
-	// 名册流跟着 follow 一起收：换会话时新的名册会由 followSession 重开
-	if (!m_jobsStreamId.isEmpty())
+	if (!m_jobsStreamId.isEmpty())   // 名册流跟着 follow 一起收：换会话时新的名册会由 followSession 重开
 		sendStreamCancel(m_jobsStreamId);
 	m_jobsStreamId.clear();
 
@@ -502,12 +501,10 @@ void DshApiClient::closeTerminalStream()
 		return;
 
 	sendStreamCancel(m_terminalStreamId);
-	// 本端主动关：不发 terminalStreamEnded，调用方自己知道（发它会让"关块"流程再走一遍收尾）
-	m_terminalStreamId.clear();
+	m_terminalStreamId.clear();   // 本端主动关：不发 terminalStreamEnded，调用方自己知道（发它会让"关块"流程再走一遍收尾）
 }
 
-// = mux 已打开且 $events 已收到 ready 帧
-bool DshApiClient::isConnected() const
+bool DshApiClient::isConnected() const   // = mux 已打开且 $events 已收到 ready 帧
 {
 	if (m_takenover)  // 接管态恒 true：传输归扩展，宿主没有"没连上"的判据
 		return true;
@@ -573,6 +570,11 @@ void DshApiClient::callMethodArgs(const QString& method, const QJsonValue& args,
 // 通道 POST /api/$events/result；rpcId 就是帧里的 eventId
 void DshApiClient::respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess, std::function<void(const RpcError& error)> onError)
 {
+	respondValue(rpcId, QJsonValue(value), std::move(onSuccess), std::move(onError));
+}
+
+void DshApiClient::respondValue(const QString& rpcId, const QJsonValue& value, std::function<void(const QJsonObject& receipt)> onSuccess, std::function<void(const RpcError& error)> onError)
+{
 	if (!m_takenover && m_clientId.isEmpty()) {  // 接管态必须绕过：接管后 m_clientId 恒空，应答会被吞掉
 		qWarning().noquote() << "[DshApi] respond ignored: $events stream not ready";
 		if (onError) {
@@ -622,8 +624,6 @@ void DshApiClient::post(const QString& path, const QJsonObject& body, std::funct
 		return;
 	}
 
-	// 只要还没认证就排队 —— 原来额外要求 m_launchToken 非空，可引擎刚启动时 token 还没到，
-	// 那时条件为假 ⇒ 直接发 ⇒ 必然 401（实测终端与插件市场都栽在这里）。
 	if (!m_authenticated) {
 		static constexpr int kMaxQueuedCalls = 256;
 		if (m_authQueue.size() >= kMaxQueuedCalls) {
@@ -736,8 +736,7 @@ void DshApiClient::handleParsedResponse(const QString& rpcId, const QJsonDocumen
 // 分工：插件 → 宿主走本类实现的 VirtualApiHost；宿主 → 插件走 VirtualApiSink::OnOutboundRequest，
 // 回填只能靠 rpcId（std::function 不是 metatype，传不出去）
 
-// 现取不缓存：注册表的值是 QPointer，插件 unload 时会自动置空
-VirtualApiSink* DshApiClient::apiSink() const
+VirtualApiSink* DshApiClient::apiSink() const   // 现取不缓存：注册表的值是 QPointer，插件 unload 时会自动置空
 {
 	QObject* const root = CommonRegistry::instance().FindFromRegistry(QString::fromUtf8(DshHostIndex::kApiSink)).data();
 	if (!root)
@@ -745,8 +744,7 @@ VirtualApiSink* DshApiClient::apiSink() const
 	return qobject_cast<VirtualApiSink*>(root);
 }
 
-// 返回 false = 没有接收端，调用方应当场失败掉这条请求
-bool DshApiClient::sendToSink(const QString& rpcId, const QString& method, const QJsonObject& args)
+bool DshApiClient::sendToSink(const QString& rpcId, const QString& method, const QJsonObject& args)   // 返回 false = 没有接收端，调用方应当场失败掉这条请求
 {
 	VirtualApiSink* const sink = apiSink();
 	if (!sink) {
@@ -819,8 +817,7 @@ void DshApiClient::failTakeoverPending(const QString& code, const QString& messa
 		failPending(rpcId, code, message);
 }
 
-// 接管路径唯一的兜底：扩展不回填 = 调用方永久挂着且无任何报错
-void DshApiClient::sweepTakeoverTimeouts()
+void DshApiClient::sweepTakeoverTimeouts()   // 接管路径唯一的兜底：扩展不回填 = 调用方永久挂着且无任何报错
 {
 	if (!m_takenover || m_pending.isEmpty())
 		return;
@@ -875,8 +872,7 @@ void DshApiClient::enterTakenoverState()
 		m_takeoverSweep->start();
 }
 
-// 刻意不重启内置 DSH：要不要拉回来由用户决定
-void DshApiClient::leaveTakenoverState()
+void DshApiClient::leaveTakenoverState()   // 刻意不重启内置 DSH：要不要拉回来由用户决定
 {
 	if (m_takeoverSweep)
 		m_takeoverSweep->stop();
@@ -887,8 +883,7 @@ void DshApiClient::leaveTakenoverState()
 	m_streamClosing = false;
 }
 
-// waterfall 是需要回执的审批/提问，翻成旧帧交给 UI
-void DshApiClient::handleEventsItem(const QJsonValue& value)
+void DshApiClient::handleEventsItem(const QJsonValue& value)   // waterfall 是需要回执的审批/提问，翻成旧帧交给 UI
 {
 	const QJsonObject item = value.toObject();
 	const QString type = item.value(QStringLiteral("type")).toString();
@@ -938,9 +933,13 @@ void DshApiClient::handleWorkspaceItem(const QJsonValue& value)
 
 	if (type == QStringLiteral("baseline")) {
 		const QJsonObject baseline = frame.value(QStringLiteral("value")).toObject();
+
+		// 三个 payload 同源同帧：items + archivedSessionIds + pinnedSessionIds（置顶集合，保序、最近置顶的在前）。
+		// ⚠️ pinnedSessionIds 必须一起转：漏掉它侧栏"置顶"段永远出不来。
 		emit workspaceSnapshotReady(
 			baseline.value(QStringLiteral("items")).toArray(),
-			baseline.value(QStringLiteral("archivedSessionIds")).toArray());
+			baseline.value(QStringLiteral("archivedSessionIds")).toArray(),
+			baseline.value(QStringLiteral("pinnedSessionIds")).toArray());
 		return;
 	}
 
@@ -959,6 +958,11 @@ void DshApiClient::handleWorkspaceItem(const QJsonValue& value)
 		return;
 	}
 
+	if (type == QStringLiteral("pinned")) {   // 置顶集合增量帧：帧里是完整集合（不是 diff），接收方整体替换即可
+		emit workspacePinnedChanged(frame.value(QStringLiteral("pinnedSessionIds")).toArray());
+		return;
+	}
+
 	if (type == QStringLiteral("order")) {
 		QStringList workspaceIds;
 		for (const auto& value : frame.value(QStringLiteral("workspaceIds")).toArray())
@@ -968,8 +972,7 @@ void DshApiClient::handleWorkspaceItem(const QJsonValue& value)
 	}
 }
 
-// baseline 是活会话的现算投影快照，之后靠 projection 帧推送；冷会话由 follow 快照兜底
-void DshApiClient::handleControlItem(const QJsonValue& value)
+void DshApiClient::handleControlItem(const QJsonValue& value)   // baseline 是活会话的现算投影快照，之后靠 projection 帧推送；冷会话由 follow 快照兜底
 {
 	const QJsonObject frame = value.toObject();
 	const QString type = frame.value(QStringLiteral("type")).toString();
@@ -996,8 +999,7 @@ void DshApiClient::handleControlItem(const QJsonValue& value)
 	}
 }
 
-// 记录翻成旧的 session/event 帧，复用既有渲染路径
-void DshApiClient::handleSessionItem(const QJsonValue& value)
+void DshApiClient::handleSessionItem(const QJsonValue& value)   // 记录翻成旧的 session/event 帧，复用既有渲染路径
 {
 	const QJsonObject frame = value.toObject();
 	const QString type = frame.value(QStringLiteral("type")).toString();
@@ -1146,12 +1148,14 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 		const QString code = streamError.value(QStringLiteral("code")).toString();
 		const QString detail = streamError.value(QStringLiteral("message")).toString();
 		qWarning().noquote() << "[DshApi] stream error" << streamId << code << detail;
+
 		// 终端流的错误按流级上抛（terminal/unavailable、terminal/control-unavailable、gateway/* …），
 		// 别混进通用的 transportError：那些错误不该被当成"传输断了"去驱动重连。
 		if (!m_terminalStreamId.isEmpty() && streamId == m_terminalStreamId) {
 			m_terminalStreamId.clear();
 			emit terminalStreamError(streamId, code, detail);
 		}
+
 		// 名册流失败（典型：profile 里没挂 job-controller ⇒ gateway/service-unavailable）：
 		// 发一次空名册让顶栏退回空态，再走下面的通用 transportError 记到状态行。
 		if (!m_jobsStreamId.isEmpty() && streamId == m_jobsStreamId) {

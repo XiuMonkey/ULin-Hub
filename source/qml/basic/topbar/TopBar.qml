@@ -12,30 +12,30 @@ Item {
     // 扩展注入点：扩展用 HostUi.item("topBar") 拿到本对象后 setParentItem 进来（见 HostExports.h 的名字契约）
     Component.onCompleted: HostUi.registerItem("topBar", this)
 
-    // ⚠️ 保留这个信号与 `qml.topbar.toolsFilter` 登记项：宿主侧栏/扩展里还有人用"请求打开工具过滤"
-    //    这条通用入口（自己直接开面板就成了）；改名的代价大于收益。
-    signal toolsFilterRequested()
-    // 右侧栏开合（面板本体在 basic/panel/PanelBar.qml，由 Shell.qml 装载；这里只发"点了一下"）
-    signal panelBarRequested()
+    signal toolsFilterRequested()   // ⚠️ 保留这个信号与 `qml.topbar.toolsFilter` 登记项：宿主侧栏/扩展里还有人用"请求打开工具过滤"
+    signal panelBarRequested()   // 右侧栏开合（面板本体在 basic/panel/PanelBar.qml，由 Shell.qml 装载；这里只发"点了一下"）
 
-    // ---- 视图胶囊：对话 / 轨迹 ----
-    // activeView 取值只有两个：'conversation'（对话）/ 'trace'（轨迹）。
-    // 切换的落点在 Shell.qml（它按 activeView 决定会话区装 MessageListView 还是 TraceView）；
-    // 本文件**不关心**会话区长什么样，只维护这个值 + 发 viewSelected。
+    // 左侧栏开合：只在侧栏**收起**时露出（展开时那颗收起键在侧栏自己右上角）。
+    // 语义与 panelBarRequested 对称，动作归 Shell（左边列宽 / 侧栏位置都是壳层的布局）
+    signal sessionBarRequested()
+
+    property bool sessionBarCollapsed: false   // 左侧栏是否已收起（Shell 注入）：收起时标题/页签行右移，给"展开侧栏"键腾出位置
+
+    // 展开键占的位置（键宽 + 一个 buttonGap；收起才占，展开时归零 ⇒ 展开态布局与改动前逐像素一致）
+    // 取按钮的 implicitWidth 而不是写死 26：按钮尺寸改了这里自动跟上
+    readonly property int sessionBarSlot: sessionBarCollapsed
+        ? Math.round(sessionBarButton.implicitWidth + Theme.spacing.buttonGap) : 0
+
+    // 标题行/页签行的左缩进。走数值属性 + Behavior（Behavior 挂不到 anchors.leftMargin 上）：
+    // 展开键出现与标题右移是同一段短过渡，不会在收起第一帧"啪"地跳 32px。
+    property real titleLeftMargin: Theme.spacing.columnClearance + sessionBarSlot
+    Behavior on titleLeftMargin {
+        NumberAnimation { duration: Theme.motion.fast; easing.type: Easing.OutCubic }
+    }
+
     property string activeView: "conversation"
     signal viewSelected(string view)
 
-    // ---- 入口 chip + 主/子页签：数据全部由 Shell 从 Hub 绑进来（本文件不碰 RPC）----
-    // 形状与交互参考官方两个 session-header 触发器（ui-subagent 的后代数量、ui-jobs 的任务列表，
-    // 都注册在 conversation.session.header.actions）：12px 标签 + 数字 + ▾，running 时带状态点。
-    // 位置按本项目要求放在视图胶囊右侧（官方是在标题行的操作带里，我们这里没有面包屑那一层）。
-    //
-    // 数据来源（都是引擎真实数据，客户端不造）：
-    //   · peerTabs = 当前"页签组主会话"的直接子智能体目录（会话投影 subagentCatalog）：
-    //     既是「子智能体」下拉框的列表，也是页签第二颗（当前子代理）的来源；
-    //   · jobItems = 当前会话能看到的后台任务名册（job/list 流）。
-    // 它们由 Shell 从 Hub.peerTabs / Hub.jobs 绑；Hub 上没有这些属性时兜底空值，
-    // 老宿主/引擎不可用时只是入口显示 0 与空态，不会崩。
     property var peerTabs: []
     property string peerRootId: ""
     property string peerRootTitle: ""
@@ -46,8 +46,7 @@ Item {
     property bool jobRunning: false
     signal subagentRequested()
     signal jobsRequested()
-    // 点主/子页签（或子智能体列表里的一行）：Shell 接到 Hub.selectSession(id)
-    signal peerSelected(string sessionId)
+    signal peerSelected(string sessionId)   // 点主/子页签（或子智能体列表里的一行）：Shell 接到 Hub.selectSession(id)
 
     // 内容列宽度是否正被外层驱动（右栏开合 / 拖右栏宽度，由 Shell 注入 contentWidthDriven）。
     // 这一档里列宽每帧在变，`chipsWrap` 可能中途翻档 —— 若仍让两条 Behavior 补间，顶栏高度/
@@ -55,22 +54,10 @@ Item {
     // 动画期间直接禁掉补间：变化全部落在开合的那 200ms 里，落定后不再二次布局。
     property bool widthAnimating: false
 
-    // ---- 两行的高度 ----
-    // 44 = 原来那一条顶栏的高度，标题与两颗图标按钮的垂直居中基准；**别改它**，
-    // 改了标题/按钮会跟着整块高度一起沉。
-    // 下面那条视图切换行按官方分段控件收小（轨道高 28 = 标签 22 + 上下各 3）：
-    // 它仍是副信息，不能把顶栏撑回早期那版 82 的高度。
     readonly property int headerRowHeight: 44
     readonly property int viewRowHeight: 22
     readonly property int viewRowBottomMargin: 8
 
-    // ---- 两个入口（子代理 / 后台任务）的排布 ----
-    // 右栏展开会把顶栏卡片压窄（Shell.qml 的 contentColumn.rightMargin 跟着 panelBarInset 走），
-    // 这一排跟其它控件一样**跟着容器走**，不做"藏起来"：
-    //   ① 一行放得下（胶囊 + 两枚 chip）      ⇒ 与胶囊同一行，靠右；
-    //   ② 放不下                              ⇒ 整排换到胶囊下面一行，右对齐，顶栏随之长高一行；
-    //   ③ 换行后还放不下（窗口极窄）          ⇒ 再降级成「计数 + ▾」，tooltip 里仍有全名。
-    // 三级都是"位置/尺寸跟着让"，任何一级都不会让入口消失。
     readonly property real rowAvailable: width - 2 * Theme.spacing.columnClearance
     readonly property real chipsFullWidth: subagentChip.fullWidth + jobsChip.fullWidth + entryRow.spacing
     readonly property real chipsCompactWidth: subagentChip.compactWidth + jobsChip.compactWidth
@@ -90,14 +77,13 @@ Item {
     }
 
     // 页签行什么时候接管标题（否则用下面那条普通标题）：
-    //   · 当前在子代理上（current ≠ 组根）⇒ 必显示，两颗里第二颗就是它自己；
-    //   · 父会话有子代理目录              ⇒ 显示，一颗父标题，子代理从下拉框进；
-    //   · 其余（普通会话 / 空态）          ⇒ 普通标题。
+    // · 当前在子代理上（current ≠ 组根）⇒ 必显示，两颗里第二颗就是它自己；
+    // · 父会话有子代理目录              ⇒ 显示，一颗父标题，子代理从下拉框进；
+    // · 其余（普通会话 / 空态）          ⇒ 普通标题。
     readonly property bool showPeerTabs: topBar.peerRootId.length > 0
         && (topBar.peerTabs.length > 0 || Hub.currentSessionId !== topBar.peerRootId)
 
-    // 选中一颗：值真的变了才发信号（连点同一颗不产生事件，外面接命令时不会被重复触发）
-    function selectView(view) {
+    function selectView(view) {   // 选中一颗：值真的变了才发信号（连点同一颗不产生事件，外面接命令时不会被重复触发）
         if (view !== "conversation" && view !== "trace")
             return
         if (activeView === view)
@@ -106,8 +92,6 @@ Item {
         viewSelected(view)
     }
 
-    // ---- 入口弹层的行数据（引擎数据 → EntryChip 的 {key,title,subtitle,tone}）----
-    // 文案只在这里按界面语言取（qsTrId 在绑定里，切语言会自动重取）；C++ 侧只给原始字段。
     function subagentModeLabel(mode) {
         if (mode === "one-shot")
             return qsTrId("subagent_mode_one_shot")
@@ -165,8 +149,7 @@ Item {
     }
 
     // 标题行：整块顶栏里"上半部分"的坐标原点。
-    // ⚠️ 标题与两颗按钮**必须**挂在这一层里居中：它们原来按 parent（= 整块顶栏）垂直居中，
-    //    顶栏变高之后若还挂 parent，会整体沉到多加出来的那半截上（实测偏下 19px）。
+    // ⚠️ 标题与两颗按钮**必须**挂在这一层里居中：挂到 parent（整块顶栏）上会沉到多出来的那半截。
     Item {
         id: headerRow
 
@@ -175,22 +158,60 @@ Item {
         anchors.top: parent.top
         height: topBar.headerRowHeight
 
-        Text {
-            id: titleText
+        Column {
+            id: titleBlock
+
             // 页签行接管时，这颗普通标题让位（见 topBar.showPeerTabs）；
-            // 没有页签时还是这条普通标题（与接线前完全一致）。
+            // 没有页签时显示标题 + 工作区/模型副行。
             visible: !topBar.showPeerTabs
             anchors.left: parent.left
-            anchors.leftMargin: Theme.spacing.columnClearance
-            anchors.right: panelBarButton.left
+            anchors.leftMargin: topBar.titleLeftMargin
+
+            // 右边界 = 两颗按钮里**左边那颗**（换位之后是 toolsButton）：
+            // 锚到 panelBarButton 会把标题压到工具按钮底下（那两颗现在顺序反了）。
+            anchors.right: toolsButton.left
             anchors.rightMargin: Theme.spacing.columnClearance
             anchors.verticalCenter: parent.verticalCenter
-            text: Hub.currentSessionTitle.length > 0 ? Hub.currentSessionTitle : "ULin Hub"
-            color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
-            font.pixelSize: Theme.font.title
-            font.weight: Theme.font.weightMedium
-            elide: Text.ElideRight
+            spacing: 1
+
+            Text {
+                id: titleText
+                anchors.left: parent.left
+                anchors.right: parent.right
+                text: Hub.currentSessionTitle.length > 0 ? Hub.currentSessionTitle : "ULin Hub"
+                color: Theme.color.textPrimary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.title
+                font.weight: Theme.font.weightMedium
+                elide: Text.ElideRight
+            }
+
+            Row {
+                spacing: 4
+                height: Theme.size.statsLineHeight
+
+                Text {
+                    text: "●"
+                    color: Hub.streaming ? Theme.color.accent : Theme.color.textTertiary
+                    font.pixelSize: 7
+                }
+                Text {
+                    text: {
+                        const parts = []
+                        if (Hub.currentWorkspaceTitle.length > 0)
+                            parts.push(Hub.currentWorkspaceTitle)
+                        if (Hub.currentModelName.length > 0)
+                            parts.push(Hub.currentModelName)
+                        if (Hub.currentLevelName.length > 0)
+                            parts.push(Hub.currentLevelName)
+                        return parts.join(" · ")
+                    }
+                    color: Theme.color.textTertiary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.small
+                    elide: Text.ElideRight
+                }
+            }
         }
 
         // 父 ↔ 子页签（点标题切会话）：父会话只有一颗父标题，子代理才显示两颗。
@@ -199,8 +220,8 @@ Item {
             id: peerTabsBar
 
             anchors.left: parent.left
-            anchors.leftMargin: Theme.spacing.columnClearance
-            anchors.right: panelBarButton.left
+            anchors.leftMargin: topBar.titleLeftMargin
+            anchors.right: toolsButton.left   // 同 titleBlock：右边界跟着"两颗里左边那颗"
             anchors.rightMargin: Theme.spacing.columnClearance
             anchors.verticalCenter: parent.verticalCenter
 
@@ -214,13 +235,34 @@ Item {
             onSelected: (sessionId) => topBar.peerSelected(sessionId)
         }
 
-        // 右侧栏开关：开合状态直接读 Hub.panelBarOpen（面板开着时高亮，当开关的手感）
+        // 左侧栏展开键：**只在侧栏收起时出现**（展开时收起入口是侧栏右上角那颗）。
+        // 图标沿用 panel-collapse.svg：顶栏那颗右栏开关也是开/合同一个图标，这里保持一致；
+        // 图标本身是"左栏 + 朝左的箭头"，这里不镜像 —— 点击的语义由 tooltip 说清楚（展开侧栏）。
+        IconButton {
+            id: sessionBarButton
+            visible: topBar.sessionBarCollapsed
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.spacing.columnClearance
+            anchors.verticalCenter: parent.verticalCenter
+            boxSize: 26
+            iconSize: 15
+            iconSource: "qrc:/ULinHub/icons/ui/panel-collapse.svg"
+            iconColor: Theme.color.iconButtonText
+            tooltip: qsTrId("sessionBar_expand")
+            onClicked: topBar.sessionBarRequested()
+        }
+
+        // 右侧栏开关：开合状态直接读 Hub.panelBarOpen（面板开着时高亮，当开关的手感）。
+        // 工具过滤退到它左边。顺序 = 触发对象离它所影响的区域越近越靠右，视觉上更好找。
         IconButton {
             id: panelBarButton
-            anchors.right: toolsButton.left
-            anchors.rightMargin: Theme.spacing.buttonGap
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.spacing.columnClearance
             anchors.verticalCenter: parent.verticalCenter
-            glyph: "◫"
+            boxSize: 26
+            iconSize: 15
+            iconSource: "qrc:/ULinHub/icons/ui/panel-collapse.svg"
+            iconColor: Hub.panelBarOpen ? Theme.color.accent : Theme.color.iconButtonText
             tooltip: qsTrId("topbar_panelBar_tip")
             selected: Hub.panelBarOpen
             onClicked: topBar.panelBarRequested()
@@ -228,16 +270,18 @@ Item {
 
         IconButton {
             id: toolsButton
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacing.columnClearance
+            anchors.right: panelBarButton.left
+            anchors.rightMargin: Theme.spacing.buttonGap
             anchors.verticalCenter: parent.verticalCenter
-            glyph: "☰"
+            boxSize: 26
+            iconSize: 15
+            iconSource: "qrc:/ULinHub/icons/ui/tools.svg"
+            iconColor: Hub.toolsFilterOpen ? Theme.color.accent : Theme.color.iconButtonText
             tooltip: qsTrId("toolfilter_title")
-            // 面板开着时高亮这颗按钮（当开关用的手感）
-            selected: Hub.toolsFilterOpen
-            // ⚠️ 只发信号，**不要**在这里同时直调 Hub.openToolsFilter()：
-            //    信号在 Shell.qml 里已经接到 Hub.openToolsFilter() 上了，两处都调 = 一次点击开一次又收一次，
-            //    表现就是"点了没反应"（实测日志：同一次点击出现两条 openToolsFilter: open=false / open=true）。
+            selected: Hub.toolsFilterOpen   // 面板开着时高亮这颗按钮（当开关用的手感）
+
+            // ⚠️ 只发信号，**不要**在这里同时直调 Hub.openToolsFilter()：Shell 已经接管该信号，
+            // 两处都调 = 一次点击开一次又收一次，表现就是"点了没反应"。
             onClicked: topBar.toolsFilterRequested()
         }
     }
@@ -269,15 +313,12 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: Theme.spacing.columnClearance
         spacing: Theme.spacing.buttonGap
-        // 同一行 ⇒ 与胶囊垂直居中；换行 ⇒ 贴在胶囊下方 6px。
-        // （原来用 anchors.verticalCenter 只能表达第一种；换成 y 绑定才做得成两种形态。）
-        y: topBar.chipsWrap
+        y: topBar.chipsWrap   // 同一行 ⇒ 与胶囊垂直居中；换行 ⇒ 贴在胶囊下方 6px
             ? headerRow.height + viewRow.height + 6
             : headerRow.height + (viewRow.height - height) / 2
 
         Behavior on y {
-            // 与 implicitHeight 同一条理由：宽度被驱动时不做第二段补间
-            enabled: !topBar.widthAnimating
+            enabled: !topBar.widthAnimating   // 与 implicitHeight 同一条理由：宽度被驱动时不做第二段补间
             NumberAnimation { duration: Theme.motion.fast; easing.type: Easing.OutCubic }
         }
 
@@ -292,6 +333,7 @@ Item {
             tooltip: qsTrId("topbar_subagent_tip")
             popupTitle: qsTrId("topbar_subagent")
             emptyHint: qsTrId("topbar_subagent_empty")
+
             // 打开下拉前刷一次运行态：running 只存在于 session.list（引擎按 agents.status 现算），
             // 客户端不会自己变 —— 否则列表里永远写着"未在运行"。
             onClicked: {
@@ -299,8 +341,7 @@ Item {
                     Hub.refreshSessionStates()
                 topBar.subagentRequested()
             }
-            // 点列表里的一行 = 切到那个子智能体会话（与点页签同一条路）
-            onItemActivated: (id) => topBar.peerSelected(id)
+            onItemActivated: (id) => topBar.peerSelected(id)   // 点列表里的一行 = 切到那个子智能体会话（与点页签同一条路）
         }
 
         EntryChip {

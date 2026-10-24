@@ -11,8 +11,7 @@
 #include <QtGlobal>
 
 namespace {
-	// 内部日志级别（与 logs/<module>/ 下的 5 个文件按序对应）；多出的 LogTypeCount 只当数组维数用
-	enum LogType
+	enum LogType   // 内部日志级别（与 logs/<module>/ 下的 5 个文件按序对应）；多出的 LogTypeCount 只当数组维数用
 	{
 		LogDebug = 0,
 		LogInfo,
@@ -37,54 +36,44 @@ namespace {
 		return LogInfo;
 	}
 
-	// 消息开头 [Tag]（或 Qt category）到模块文件夹名的映射。
-	struct ModuleRule
+	struct ModuleRule   // 消息开头 [Tag]（或 Qt category）到模块文件夹名的映射
 	{
 		const char* tag;
 		const char* folder;
 	};
 
 	const ModuleRule kModuleRules[] = {
-		// 会话
-		{ "History", "session" },
+		{ "History", "session" },   // 会话
 		{ "MessageHost", "session" },
 		{ "MessageQuery", "session" },
 		{ "CacheManager", "session" },
 		{ "SessionPrefetcher", "session" },
-		// 模型选择
-		{ "ModelSelector", "model" },
+		{ "ModelSelector", "model" },   // 模型选择
 		{ "ModelList", "model" },
 		{ "ModelSelection", "model" },
-		// 插件市场
-		{ "Market", "plugin" },
+		{ "Market", "plugin" },   // 插件市场
 		{ "PluginMarketClient", "plugin" },
 		{ "dsh-market-log", "plugin" },
 		{ "market-installer", "plugin" },
-		// 扩展管理
-		{ "ExtensionLoader", "extension" },
+		{ "ExtensionLoader", "extension" },   // 扩展管理
 		{ "ExtensionManager", "extension" },
 		{ "ExtensionRegistry", "extension" },
 		{ "DllCaller", "extension" },
 		{ "DSH DllCaller", "extension" },
-		// 客户端扩展（装进本进程的 QPlugin DLL）：宿主侧装载器与插件自身各一个标签
-		{ "ClientExtension", "extension" },
+		{ "ClientExtension", "extension" },   // 客户端扩展（装进本进程的 QPlugin DLL）：宿主侧装载器与插件自身各一个标签
 		{ "QPlugin", "extension" },
-		// 服务端 / 网络
-		{ "ServerManager", "server" },
+		{ "ServerManager", "server" },   // 服务端 / 网络
 		{ "DshApi", "server" },
 		{ "DSH Server", "server" },
 		{ "DSH Pipe", "server" },
 		{ "DshNamedPipeBridge", "server" },
-		// UI / 界面
-		{ "Translation", "ui" },
+		{ "Translation", "ui" },   // UI / 界面
 		{ "Theme", "ui" },
 		{ "LayoutTrace", "ui" },
 		{ "Render", "ui" },
 		{ "ToolsFilter", "ui" },
-		// 耗时打点
-		{ "Timing", "timing" },
-		// 应用整体
-		{ "ULin Hub", "app" },
+		{ "Timing", "timing" },   // 耗时打点
+		{ "ULin Hub", "app" },   // 应用整体
 	};
 
 	const int kRuleCount = static_cast<int>(sizeof(kModuleRules) / sizeof(kModuleRules[0]));
@@ -132,8 +121,7 @@ namespace {
 		return &g_modules[kGeneralModuleIndex];
 	}
 
-	// 从消息开头的 [Tag]（找不到则尝试 Qt category）解析模块文件夹。
-	const char* moduleFolderFor(const QMessageLogContext& context, const QString& message)
+	const char* moduleFolderFor(const QMessageLogContext& context, const QString& message)   // 从消息开头的 [Tag]（找不到则尝试 Qt category）解析模块文件夹
 	{
 		if (message.startsWith(QLatin1Char('['))) {
 			const int close = message.indexOf(QLatin1Char(']'));

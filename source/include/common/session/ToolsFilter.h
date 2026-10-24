@@ -1,23 +1,21 @@
 #pragma once
 
 // ToolsFilter —— 工具过滤器（对应 DSH 侧 `ToolsFilterPlugin` 暴露的 `/api/tools-filter`）。
-//
-// 本类由旧壳的 `common/appearance/TopBarTools.{h,cpp}` 迁移而来（2026-10-10），原来那套名字退役。
+// 本类由 `common/appearance/TopBarTools.{h,cpp}` 迁移而来，原来那套名字退役。
 // 迁移的同时**吸收了两块原先散在外面的职责**：
-//   · 形状计算：插件目录 + 已存配置 → 界面用的目录树（原 ToolsFilter::buildDirectories 等静态函数）；
-//   · 委托模型：把目录树摊平成 QML 的 ListView 行（行有两种：目录头 / 工具行）——原在 Widgets 的
-//     ToolsFilterDirectoryEntry 里靠控件树表达，QML 侧必须由模型表达。
+//  · 形状计算：插件目录 + 已存配置 → 界面用的目录树（原 ToolsFilter::buildDirectories 等静态函数）；
+//  · 委托模型：把目录树摊平成 QML 的 ListView 行（行有两种：目录头 / 工具行）——原在 Widgets 的
+//  ToolsFilterDirectoryEntry 里靠控件树表达，QML 侧必须由模型表达。
 // 于是本类 = 数据层（HTTP/JSON）+ 视图模型（QAbstractListModel），QML 只画。
-//
 // 协议事实（别按记忆改）：
-//   GET  ?session=<id> → { tools:[{name,description,parameters,directory}], degraded, configFound,
-//                          dropGuidance, hideContexts, visibleCount }
-//   POST { sessionId, config: { FilterList, DropGuidance } }  整份写回 ToolsFilterConfig.json
+//  GET ?session=<id> → { tools:[{name,description,parameters,directory}], degraded, configFound,
+//  dropGuidance, hideContexts, visibleCount }
+//  POST { sessionId, config: { FilterList, DropGuidance } } 整份写回 ToolsFilterConfig.json
 // 三条陷阱（都来自旧实现，血泪）：
-//   ① 隐藏只能靠 `IsVisible:"False"`；把条目从 `ToolsList` 里删掉**表达不了**隐藏。
-//   ② 目录的 `IsExpanded` 是**筛选语义**（"False" = 整组隐藏），不是界面上的展开/收起；
-//      界面展开态在本类里是 `expanded`（纯显示，不落盘，默认收起）。
-//   ③ `HideContexts` / `DropGuidance` 必须**原样带回**，否则整份替换会冲掉它们。
+//  ① 隐藏只能靠 `IsVisible:"False"`；把条目从 `ToolsList` 里删掉**表达不了**隐藏。
+//  ② 目录的 `IsExpanded` 是**筛选语义**（"False" = 整组隐藏），不是界面上的展开/收起；
+//  界面展开态在本类里是 `expanded`（纯显示，不落盘，默认收起）。
+//  ③ `HideContexts` / `DropGuidance` 必须**原样带回**，否则整份替换会冲掉它们。
 
 #include <QAbstractListModel>
 #include <QByteArray>
@@ -92,7 +90,6 @@ signals:
 	void summaryChanged();
 
 private:
-	// ---- 数据形状（迁移自 TopBarTools 的 ToolFilterDirectory / ToolFilterEntry）----
 	struct Tool
 	{
 		QString name;
@@ -106,7 +103,7 @@ private:
 		QString name;
 		QString description;
 		bool groupHidden = false;  // 配置里的 IsExpanded == "False"
-		bool expanded = false;     // 界面展开态（旧壳是"默认全折叠"）
+		bool expanded = false;   // 界面展开态
 		QVector<Tool> tools;
 	};
 

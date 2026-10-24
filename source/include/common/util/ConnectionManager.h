@@ -31,10 +31,6 @@ public:
 	static ConnectionManager& instance();
 	~ConnectionManager() override;
 
-	// ===================== 插件面 =====================
-	// Q_INVOKABLE 只标在参数能被 QML 构造的那几个上：QByteArray 在 QML 里映射到 ArrayBuffer，const char* 不在转换表里。
-	// HostConnections 是同一个实例的 QML 单例，注入式扩展的 QML 与宿主共用引擎 ⇒ 这里开放的能力扩展也能调。
-
 	Q_INVOKABLE void TakeoverConnection(QString index, QObject* receiver, const QString& slot) { TakeoverConnection(index, receiver, slot.toUtf8()); }  // QML 适配重载
 
 	Q_INVOKABLE void ProtectedRegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)  // QML 适配重载
@@ -73,7 +69,7 @@ public:
 	{
 		const auto found = ConnectionRegistry.find(index);  // 非 const：挂起后要清 HasHandle，让"没有活连接"成为明确状态
 		if (found == ConnectionRegistry.end())
-			return;  // 未登记的 index 必须早退：对 end() 取 value() 是未定义行为（实测 0xC0000005）
+			return;   // 未登记的 index 必须早退：对 end 取 value 是未定义行为
 		if (found.value().Slot == "Lambda") {
 			if (found.value().HasHandle)
 				QObject::disconnect(found.value().Handle);
@@ -102,7 +98,7 @@ public:
 		}
 		SuspendConnection(index);
 		// 留底：把**当前整行**拷一份挂到 Prev 上（链式栈 ⇒ 反复接管可逐层回卷）。Lambda 槽没名字、重连不回来，
-		// 不建底。⚠️ 必须在 SuspendConnection 之后、且用 found.value() 拷贝：RegisterConnection 会先删行。
+		// 不建底。⚠️ 必须在 SuspendConnection 之后、且用 found.value 拷贝：RegisterConnection 会先删行。
 		// 具名赋值：ConnectionGroup 不是聚合初始化的安全目标（按成员位置对位，插字段就整体错位）。
 		ConnectionGroup group;
 		group.Sender = found.value().Sender;
@@ -156,10 +152,8 @@ public:
 		return released;
 	}
 
-	// ===================== 登记 =====================
-
 	// QML 可调：签名由 QML **手写**（前缀 '2'/'1' 不用写）。⚠️ 槽的参数必须带类型标注 —— 未标注的参数在元对象里
-	// 是 QVariant，接不上 QString 信号（实测报 Incompatible sender/receiver arguments）。
+	// 是 QVariant，接不上 QString 信号（报 Incompatible sender/receiver arguments）。
 	// 之所以只能是这样一个非模板重载：moc 不支持函数模板（标 Q_INVOKABLE 也是空操作），且 QML 构造不出 ConnectionGroup。
 	Q_INVOKABLE void RegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)
 	{
@@ -243,7 +237,7 @@ private:
 		return who.isEmpty() ? QString::fromLatin1(receiver->metaObject()->className()) : who;
 	}
 
-	// （2026-10-10 删）PrivateRemoveConnection 两个重载：从旧版本保留至今、全仓无人调用，
+	// PrivateRemoveConnection 两个重载：保留至今、全仓无人调用，
 	// 与 PublicRemoveConnection / SuspendConnection 的职责重叠，已整对删除。
 	// 退役清单见 docs/retired-interfaces.md。
 

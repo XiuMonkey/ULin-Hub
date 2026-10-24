@@ -1,14 +1,10 @@
-// 提问 / 工具审批面板（M4b）
-//
-// 旧壳把面板塞进消息列表（MessageHost::handleMuxFrame → InteractionHandler 建 QWidget 插进布局）。
-// QML 侧等价物：这个面板排在输入区上方，出现/收起由 Hub.questionActive / Hub.approvalActive 驱动。
-//
-// 字段与应答结构**照搬旧壳 InteractionHandler**，一个都不能改：
-//   提问帧：{ rpcId, payload: { sessionId, questions:[{id, multiSelect, header, question,
-//            options:[{label, description}]}] } }
-//   应答  ：{ sessionId, answer: { answers: [ {id, selected:[label…], custom?} ] } }
-//   审批帧：{ rpcId, payload: { sessionId, approvalId, toolName, reason } }
-//   应答  ：{ sessionId, approvalId, outcome: "allowed-once" | "rejected" }
+// 提问 / 工具审批面板（M4b）：排在输入区上方，出现/收起由 Hub.questionActive / Hub.approvalActive 驱动。
+// ⚠️ 字段与应答结构沿用既有 InteractionHandler，一个都不能改：
+// 提问帧：{ rpcId, payload: { sessionId, questions:[{id, multiSelect, header, question,
+// options:[{label, description}]}] } }
+// 应答  ：{ sessionId, answer: { answers: [ {id, selected:[label…], custom?} ] } }
+// 审批帧：{ rpcId, payload: { sessionId, approvalId, toolName, reason } }
+// 应答  ：{ sessionId, approvalId, outcome: "allowed-once" | "rejected" }
 // 文案全部用既有 id（ask_confirm_questions / ask_submit_answer / ask_answer_placeholder /
 // ask_tool_approval_title / ask_tool_fmt / ask_reason_fmt / common_reject / ask_allow_once）。
 
@@ -24,8 +20,7 @@ Item {
     visible: activePanel
     implicitHeight: activePanel ? card.implicitHeight : 0
 
-    // 每个问题一项 { id, selected: [label…], custom: "" }
-    property var selection: []
+    property var selection: []   // 每个问题一项 { id, selected: [label…], custom: "" }
 
     function resetSelection() {
         var built = []
@@ -33,8 +28,7 @@ Item {
         for (var i = 0; i < qs.length; ++i) {
             var opts = qs[i].options ? qs[i].options : []
             var pre = []
-            // 与旧壳一致：单选且只有一个选项时默认选中
-            if (opts.length === 1 && !qs[i].multiSelect)
+            if (opts.length === 1 && !qs[i].multiSelect)   // 保持一致：单选且只有一个选项时默认选中
                 pre = [opts[0].label]
             built.push({ id: qs[i].id, selected: pre, custom: "" })
         }
@@ -111,7 +105,6 @@ Item {
             anchors.topMargin: 12
             spacing: 8
 
-            // ================= 提问 =================
             Text {
                 visible: Hub.questionActive
                 text: qsTrId("ask_confirm_questions")
@@ -133,8 +126,8 @@ Item {
                     width: column.width
                     implicitHeight: qcol.implicitHeight + 20
                     radius: Theme.radius.card
+
                     // 原版 `#interactionPanel QFrame#questionCard { background: {{hoverBg}}; border-radius: 10px }`
-                    // —— 只有灰面 + 圆角，没有描边；本版原来在灰面/白面上又加了一条 #E5E7EB 硬线，去掉。
                     color: Theme.color.hoverBg
 
                     readonly property var options: modelData.options ? modelData.options : []
@@ -169,8 +162,7 @@ Item {
                             wrapMode: Text.WordWrap
                         }
 
-                        // 选项（单选=圆点，多选=方框；与旧壳 QRadioButton/QCheckBox 的语义一致）
-                        Repeater {
+                        Repeater {   // 选项
                             model: questionCard.options
 
                             delegate: Item {
@@ -237,8 +229,7 @@ Item {
                             }
                         }
 
-                        // 没有选项 = 让用户自由填写（旧壳用 QLineEdit + ask_answer_placeholder）
-                        TextField {
+                        TextField {   // 没有选项 = 让用户自由填写
                             id: customEdit
                             width: parent.width
                             visible: questionCard.options.length === 0
@@ -259,6 +250,7 @@ Item {
                                 radius: Theme.radius.input
                                 color: Theme.color.panelBg
                                 border.width: 1
+
                                 // 输入类控件：静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`；
                                 // 聚焦保留克制可见的中性灰 textSecondary
                                 border.color: customEdit.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
@@ -268,8 +260,7 @@ Item {
                 }
             }
 
-            // Column 的子项不能用 anchors —— 提交按钮包一层整宽 Item 再右对齐
-            Item {
+            Item {   // Column 的子项不能用 anchors —— 提交按钮包一层整宽 Item 再右对齐
                 width: column.width
                 height: 34
                 visible: Hub.questionActive
@@ -284,7 +275,6 @@ Item {
                 }
             }
 
-            // ================= 工具审批 =================
             Text {
                 visible: Hub.approvalActive
                 text: qsTrId("ask_tool_approval_title")

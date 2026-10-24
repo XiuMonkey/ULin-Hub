@@ -1,10 +1,9 @@
 // 模态弹窗：遮罩 + 居中 + 标题栏 + 关闭按钮 + 进出场淡入淡出。
-// 取代旧壳的 PopupWindow/StatusPopupWindow 与 common/WindowFrame 的"铺遮罩 + 居中"那套（QML 里
+// 取代 PopupWindow/StatusPopupWindow 与 common/WindowFrame 的"铺遮罩 + 居中"那套（QML 里
 // 遮罩由 Overlay.modal 负责，不需要宿主再算几何）。
-//
 // 用法：
-//   AppPopup { id: p; title: "设置"; bodyWidth: 560; bodyHeight: 420; contentComponent: ... }
-//   p.open()
+// AppPopup { id: p; title: "设置"; bodyWidth: 560; bodyHeight: 420; contentComponent: ... }
+// p.open()
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -14,8 +13,7 @@ Popup {
     id: root
 
     property string title
-    // 内容：给 contentComponent 或直接写子项（都会被塞进 body 里）
-    property Component contentComponent
+    property Component contentComponent   // 内容：给 contentComponent 或直接写子项（都会被塞进 body 里）
     default property alias content: contentHolder.data
 
     property int bodyWidth: 560
@@ -48,8 +46,7 @@ Popup {
     contentItem: Column {
         spacing: 0
 
-        // 标题栏
-        Item {
+        Item {   // 标题栏
             implicitWidth: root.bodyWidth
             implicitHeight: 44
 
@@ -77,8 +74,7 @@ Popup {
             }
         }
 
-        // 内容区
-        Item {
+        Item {   // 内容区
             implicitWidth: root.bodyWidth
             implicitHeight: root.bodyHeight
 

@@ -38,9 +38,8 @@ bool CommandController::looksLikeCommand(const QString& line)
 QVariantList CommandController::matching(const QString& text) const
 {
 	// 注意：这里**不能用执行用的严格文法**（commandLinePattern 要求名字至少一个字符，且
-	// `(?:\\s|$)` 会把空格吃进整段匹配）—— 两处都在试装台里被实测打脸过：
-	//   · 只打一个 `/` 时名字还没开始，严格文法不匹配 ⇒ 菜单永不出现（而"打开命令列表"正是它的用途）；
-	//   · 名字后打了空格时 `capturedEnd(0)` 已经越过空格 ⇒ 菜单赖着不走，挡住参数输入。
+	// · 只打一个 `/` 时名字还没开始，严格文法不匹配 ⇒ 菜单永不出现（而"打开命令列表"正是它的用途）；
+	// · 名字后打了空格时 `capturedEnd(0)` 已经越过空格 ⇒ 菜单赖着不走，挡住参数输入。
 	// 所以这里单独解析：`/` + 名字前缀（可为空），一旦出现空白就说明名字已敲定，收菜单。
 	if (!text.startsWith(QLatin1Char('/')))
 		return QVariantList();

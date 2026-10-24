@@ -7,6 +7,9 @@
     <Filter Include="..\assets\translations">
       <UniqueIdentifier>{b77b7005-935f-4c90-9a67-0b17c2dfe161}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\common">
+      <UniqueIdentifier>{7c1a5f02-93b4-4c6d-8a11-52f0e9d3b1a4}</UniqueIdentifier>
+    </Filter>
     <Filter Include="include\common\appearance">
       <UniqueIdentifier>{8e9f52e7-588a-4a8f-96e4-f0c305e00373}</UniqueIdentifier>
     </Filter>
@@ -305,8 +308,8 @@
     <ClInclude Include="include\common\appearance\CardShadow.h">
       <Filter>include\common\appearance</Filter>
     </ClInclude>
-    <ClInclude Include="include\common\appearance\UiAbi.h">
-      <Filter>include\common\appearance</Filter>
+    <ClInclude Include="include\common\ClientInfo.h">
+      <Filter>include\common</Filter>
     </ClInclude>
     <ClInclude Include="include\VirtualClass\VirtualCommon.h">
       <Filter>src\core</Filter>

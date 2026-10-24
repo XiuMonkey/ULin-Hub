@@ -38,8 +38,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 			m_haveRegistry = true;   // 之后打开市场直接用这份，不再重取（见 openPage）
 			setBusy(false);
 
-			// 三种来源的文案与旧壳一致（快照 / 缓存 / 实时）
-			if (source == QLatin1String("snapshot"))
+			if (source == QLatin1String("snapshot"))   // 三种来源的文案保持一致（快照 / 缓存 / 实时）
 				setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
 			else if (source == QLatin1String("cache"))
 				setStatus(qtTrId("plugin_loaded_cached_fmt").arg(m_all.size()));
@@ -52,20 +51,20 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 	connect(m_client, &PluginMarketClient::registryFailed, this,
 		[this](const QString& error, int status) {
 			setBusy(false);
+
 			// 401 = 宿主还没完成 DSH 登录握手（装完市场引擎重启后必然发生一次）。
 			// 这时不该报错：等 cookie 到手后自动重来几次即可（用户手动重开面板能好，说明就是这个原因）。
 			if (status == 401) {
 			    static int sAuthRetries = 0;
 			    if (++sAuthRetries <= 8) {
-			        setStatus(QStringLiteral("正在登录 DSH，请稍候…"));
+			        setStatus(QStringLiteral("正在登录服务，请稍候…"));
 			        QTimer::singleShot(1200, this, [this] { refresh(); });
 			        return;
 			    }
 			    sAuthRetries = 0;
 			}
 			setStatus(qtTrId("plugin_load_failed_fmt").arg(error));
-			// 404 = /dsh-market/* 不存在 ⇒ 市场包没装：自动安装（旧壳 PluginsManager 同路）
-			if (status == 404 && !m_marketInstallTried)
+			if (status == 404 && !m_marketInstallTried)   // 404 = /dsh-market/* 不存在 ⇒ 市场包没装：自动安装
 			{
 				m_marketInstallTried = true;
 				startMarketInstall();
@@ -78,7 +77,6 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 			}
 		});
 
-	// ---- 市场包自动安装（pnpm add dshmarket）----
 	connect(m_installer, &PluginMarketInstaller::installStarted, this, [this] {
 		m_installing = true;
 		m_installLog.clear();
@@ -136,8 +134,7 @@ void PluginMarketController::startMarketInstall()
 	if (!m_installer || m_installing)
 		return;
 
-	// 市场包已存在、或安装已在进行中时返回 false（调用方无需做任何事）
-	if (!m_installer->ensureInstalled(QCoreApplication::applicationDirPath()))
+	if (!m_installer->ensureInstalled(QCoreApplication::applicationDirPath()))   // 市场包已存在、或安装已在进行中时返回 false（调用方无需做任何事）
 		return;
 
 	setBusy(true);
@@ -146,10 +143,8 @@ void PluginMarketController::startMarketInstall()
 void PluginMarketController::updateBaseUrl() {
 	if (m_api) {
 		m_client->setBaseUrl(m_api->baseUrl());
-		// 关键：复用同一个 NAM ⇒ 带上宿主完成 launch token 握手后得到的鉴权 cookie。
-		m_client->setNetworkAccessManager(m_api->networkAccessManager());
+		m_client->setNetworkAccessManager(m_api->networkAccessManager());   // 关键：复用同一个 NAM ⇒ 带上宿主完成 launch token 握手后得到的鉴权 cookie
 		m_client->setAuthToken(m_api->launchToken());   // 引擎认宿主靠 ?token=（新版市场 401 时必需）
-		// 等认证就绪再发：实测「市场请求先发 ⇒ 401，6 秒后 auth cookie 才到手」。每 400ms 重试，最多 ~10s。
 		static int sAuthRetry = 0;
 		if (m_api && !m_api->authenticated() && ++sAuthRetry <= 25) { QTimer::singleShot(400, this, [this] { refresh(); }); return; }
 		if (m_api && m_api->authenticated()) sAuthRetry = 0;
@@ -176,8 +171,7 @@ void PluginMarketController::setStatus(const QString& text)
 
 QString PluginMarketController::pageLabel() const
 {
-	// 旧壳：plugin_page_fmt = "第 %1 / %2 页"
-	return qtTrId("plugin_page_fmt").arg(m_page + 1).arg(m_pageCount);
+	return qtTrId("plugin_page_fmt").arg(m_page + 1).arg(m_pageCount);   // plugin_page_fmt = "第 %1 / %2 页"
 }
 
 void PluginMarketController::openPage()
@@ -190,12 +184,8 @@ void PluginMarketController::openPage()
 
 	// ⚠️ 打开时**不要无条件** refresh()：启动后 1.8 秒已经预热过一次（见构造函数里的 singleShot），
 	// 再刷一次只是把同一个查询重发一遍 —— 数据 1.5 秒后回来时 models 整体 reset、ListView 一次性
-	// 建出十几张卡 ⇒ 正好在"打开后 1.5 秒"卡一下（实测单帧 51ms，用户体感就是打开不流畅，且
 	// 5 天前没有这个行为）。有数据就直接用缓存；只有"还没拿到过"时才去取。
-	// 先显示**手上已有的**（上次拿到的快照/结果），别等网络；再后台拉最新的。
 	// 用户的要求："先显示快照，然后后台慢慢拉" —— 数据到达后 registryLoaded 会整体替换并更新状态。
-	// 先把手上的数据铺出来：有上次结果就直接用；没有就读插件包自带的快照（毫秒级）。
-	// 然后后台慢慢拉最新的 —— 界面从不等待网络。
 	if (!m_all.isEmpty()) {
 		setBusy(false);
 		setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
@@ -231,7 +221,7 @@ void PluginMarketController::setSearch(const QString& keyword)
 		return;
 
 	m_search = keyword;
-	m_page = 0;   // 旧壳：搜索词变化回到第 0 页
+	m_page = 0;   // 搜索词变化回到第 0 页
 	rebuild();
 }
 
@@ -338,8 +328,7 @@ bool PluginMarketController::loadLocalSnapshot()
 }
 void PluginMarketController::rebuild()
 {
-	// 市场列表：过滤 + 分页（都在 PluginMarketModel 里）
-	m_filtered = PluginMarketModel::filter(m_all, m_search);
+	m_filtered = PluginMarketModel::filter(m_all, m_search);   // 市场列表：过滤 + 分页（都在 PluginMarketModel 里）
 	const PluginMarketModel::Page page = PluginMarketModel::paginate(m_filtered.size(), kPageSize, m_page);
 	m_page = page.index;
 	m_pageCount = page.count;
@@ -351,8 +340,7 @@ void PluginMarketController::rebuild()
 		row.insert(QStringLiteral("name"), plugin.name);
 		row.insert(QStringLiteral("category"), plugin.category);
 		row.insert(QStringLiteral("url"), plugin.url);
-		// 中文优先、回落英文（PluginMarketModel::displayDescription）
-		row.insert(QStringLiteral("description"), plugin.displayDescription());
+		row.insert(QStringLiteral("description"), plugin.displayDescription());   // 中文优先、回落英文（PluginMarketModel::displayDescription）
 		market.append(row);
 	}
 	m_marketItems = market;

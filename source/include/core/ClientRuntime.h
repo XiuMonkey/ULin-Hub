@@ -2,18 +2,15 @@
 
 // ClientRuntime —— 客户端运行期：内置服务端 + 出站客户端 + 会话目录的生命周期与 RPC 业务。
 // **不含任何 QML 面向的接线**（Q_PROPERTY / Q_INVOKABLE / QML 模型都不在这里）。
-//
-// 拆自 src/qmlbridge/ShellController.cpp（2026-10-10）。原来那个类三件事混在一起：QML 单例的
+// 拆自 src/qmlbridge/ShellController.cpp。原来那个类三件事混在一起：QML 单例的
 // 属性与转发（接线）、服务端与 API 客户端生命周期、会话/工作区的 RPC 业务。本类只承担后两者。
-//
 // 职责边界（改这里之前先问"这是不是接线"）：
-//   ✅ 建/起/重启内置服务端、建 DshApiClient、把 baseUrl 交出去并开流、退出时关流、
-//      状态机（statusText / serverState / initializing）、拥有 SessionCatalog、
-//      会话与工作区的 RPC（刷新列表 / 新建会话 / 归档会话 / 删工作区 / 建工作区 / follow）
-//   ❌ QML 面向的属性与转发、任何 QML 模型（SessionListModel / MessageListModel）
-//
+//  ✅ 建/起/重启内置服务端、建 DshApiClient、把 baseUrl 交出去并开流、退出时关流、
+//  状态机（statusText / serverState / initializing）、拥有 SessionCatalog、
+//  会话与工作区的 RPC（刷新列表 / 新建会话 / 归档会话 / 删工作区 / 建工作区 / follow）
+//  ❌ QML 面向的属性与转发、任何 QML 模型（SessionListModel / MessageListModel）
 // 宿主 index 登记也在本类（不是接线，是"谁被登记"的归属）：kApiClient 与 kMainWindow 都指向
-// apiClient()。2026-10-01 补：此前这两个 index 从没登记过 ⇒ 接管型扩展拿不到出站客户端。
+// apiClient。 补：此前这两个 index 从没登记过 ⇒ 接管型扩展拿不到出站客户端。
 
 #include "common/session/SessionCatalog.h"
 
@@ -42,13 +39,12 @@ public:
 	DshApiClient* apiClient() const { return m_api; }
 	ServerManager* server() const { return m_server; }
 	// 扩展工具宿主（命名管道 → DllCaller）：扩展管理页装/卸工具扩展时要它 reload/unload。
-	// 在内置服务端 start() 之后创建；接管态下同样存在（桥与后端是不是 DSH 无关）。
+	// 在内置服务端 start 之后创建；接管态下同样存在（桥与后端是不是 DSH 无关）。
 	ExtensionToolHost* toolHost() const { return m_toolHost; }
 	// ⚠️ SessionCatalog 是**值成员**（它不是 QObject、没有 parent 机制），但所有权在语义上属于本类：
-	//    common/session/SessionListModel 只拿指针来读数（见那边的构造参数）。
+	//  common/session/SessionListModel 只拿指针来读数（见那边的构造参数）。
 	SessionCatalog* catalog() { return &m_catalog; }
 
-	// ---- 会话 / 工作区 RPC ----
 	void refreshSessions();
 	// 轻量重拉：只更新每个会话的 running（子代理页签那颗"运行中"点靠它），不重建列表、不动选中项。
 	// 变了会发 peerCatalogChanged —— 与 subagentCatalog 投影走同一条重画路径。
@@ -56,7 +52,7 @@ public:
 	// workspaceId 传空 = 未分组（服务端用默认 cwd）；侧栏的界面 key 在这里换算，UI 不用管
 	void createSession(const QString& workspaceId);
 	// 清空会话（侧栏那颗 danger 按钮）：抹掉本地会话数据（sessions 目录 + storages/workspace.json）与本地
-	// 目录，再把服务端注册表里的每个工作区逐个 workspace/delete 删掉，删完建一个新的默认会话。与旧壳
+	// 目录，再把服务端注册表里的每个工作区逐个 workspace/delete 删掉，删完建一个新的默认会话。与现有实现
 	// ULinHub::onClearConversationClicked 同路（Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）。
 	void clearAllSessions();
 	void archiveSession(const QString& sessionId);
@@ -67,8 +63,6 @@ public:
 	// "会话被旧进程占用"自愈用：重启服务端后，重发前要重新 follow
 	void refollow(const QString& sessionId);
 
-	// ---- 状态机（QmlBridge 把它转成 QML 属性信号）----
-	// 返回"值是否真的变了"：QML 属性不能无脑 emit，去重在这里做
 	bool setStatus(const QString& text);
 	bool setServerState(const QString& state);
 	bool setInitializing(bool value);

@@ -1,7 +1,7 @@
 // 主题切换过渡卡片（按原版 ThemeManager::switchTheme 里的 #themeSwitchBody 复刻）
-//   360×200 卡片 + radius 20 + shadowFloat；内边距 24/20/24/20、间距 12；
-//   40×40 spinner 居中 + themeSwitchLabel = theme_switching；无关闭按钮、无交互。
-// 旧壳是"过渡卡片 + 重建主窗口"；QML 壳不重建窗口，切模式后 token 热重载，卡片只闪一下。
+// 360×200 卡片 + radius 20 + shadowFloat；内边距 24/20/24/20、间距 12；
+// 40×40 spinner 居中 + themeSwitchLabel = theme_switching；无关闭按钮、无交互。
+// 当前是"过渡卡片 + 重建主窗口"；QML 壳不重建窗口，切模式后 token 热重载，卡片只闪一下。
 
 import QtQuick
 import ULinHub 1.0

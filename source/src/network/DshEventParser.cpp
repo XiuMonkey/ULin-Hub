@@ -13,7 +13,6 @@ QString extractEventText(const QJsonObject& event)
 	if (type == QStringLiteral("assistant/message")
 		|| type == QStringLiteral("user/message")) {
 		QJsonObject message = data.value(QStringLiteral("message")).toObject();
-		// 兼容历史记录里 user/message 直接把消息放在 data 下的情况
 		if (message.isEmpty())
 			message = data;
 		const QJsonValue content = message.value(QStringLiteral("content"));

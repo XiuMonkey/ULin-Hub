@@ -14,7 +14,6 @@ namespace CardShadow
 	namespace
 	{
 		// 缓存预算与单张上限（字节，按设备像素计）：高 DPI 下每条位图大 4 倍、放得下的条数就变少，这是内存上限该有
-		// 的行为（要保住命中率就按 dpr² 调大）。8MB 是实测值 —— 长回复气泡约 880×1250 逻辑像素、位图 4.3MB，旧
 		// 4MB 上限下每帧重建需 3.08ms（命中 0.175ms 的 17 倍）；单张超限不进缓存，一张巨图会顶掉整个预算。
 		constexpr qint64 kCacheBudget = 24 * 1024 * 1024;
 		constexpr qint64 kMaxEntry = 8 * 1024 * 1024;
@@ -69,9 +68,7 @@ namespace CardShadow
 			}
 		}
 
-		// 高斯尾 Q(x)=0.5*erfc(x/√2)：真实"模糊"阴影离形状边界 d 处的强度，d=0 处正好 0.5（模糊阴影的半高位置）；
-		// 旧版把边界处配成累积满峰值，于是贴着卡片是一条实边、观感像"又细又重的一条描边"。
-		qreal gaussTail(qreal x)
+		qreal gaussTail(qreal x)   // 高斯尾 Q(x)=0.5*erfc(x/√2)：真实"模糊"阴影离形状边界 d 处的强度，d=0 处正好 0.5（模糊阴影的半高位置）
 		{
 			return 0.5 * std::erfc(x / std::sqrt(2.0));
 		}
@@ -105,8 +102,7 @@ namespace CardShadow
 			painter.setRenderHint(QPainter::Antialiasing, true);
 			painter.setPen(Qt::NoPen);
 
-			// 必须由外向内叠加（累积公式假设外环先画）；整块阴影先按 dy 平移
-			const QRect base = cardRect.translated(0, spec.dy);
+			const QRect base = cardRect.translated(0, spec.dy);   // 必须由外向内叠加（累积公式假设外环先画）；整块阴影先按 dy 平移
 			for (int d = rings - 1; d >= 0; --d) {
 				const qreal ringAlpha = 1.0 - (1.0 - target(d)) / (1.0 - target(d + 1));
 				if (ringAlpha <= 0.0)
@@ -137,8 +133,7 @@ namespace CardShadow
 		}
 	} // namespace
 
-	// 阴影整体下移 dy：下侧要多留 dy，上侧相应少留（dy 超过 blur 时不留）
-	QMargins padding(const Spec& spec)
+	QMargins padding(const Spec& spec)   // 阴影整体下移 dy：下侧要多留 dy，上侧相应少留（dy 超过 blur 时不留）
 	{
 		const int blur = qMax(0, spec.blur);
 		return QMargins(blur, qMax(0, blur - spec.dy), blur, blur + qMax(0, spec.dy));
@@ -150,8 +145,7 @@ namespace CardShadow
 		if (trimmed.isEmpty())
 			return QColor();
 
-		// rgb() / rgba()：QColor 自己不会解析，这里补上
-		static const QRegularExpression fn(QStringLiteral(
+		static const QRegularExpression fn(QStringLiteral(   // rgb() / rgba()：QColor 自己不会解析，这里补上
 			"^rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*"
 			"(?:,\\s*([0-9]*\\.?[0-9]+)\\s*(%)?\\s*)?\\)$"));
 		const QRegularExpressionMatch m = fn.match(trimmed);

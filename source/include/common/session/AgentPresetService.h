@@ -20,13 +20,14 @@ struct AgentPreset
 
 namespace AgentPresetService
 {
-	// "默认预设"所在的服务端设置命名空间
-	inline constexpr const char* kSettingsNamespace = "agent-presets";
+	// "默认预设"所在的服务端设置命名空间（当前引擎：agent-preset-registry）
+	inline constexpr const char* kSettingsNamespace = "agent-preset-registry";
 
 	inline QJsonObject defaultPatch(const QString& presetId)
 	{
 		QJsonObject patch;
-		patch.insert(QStringLiteral("default"), presetId);
+		// 当前引擎 settings 适配器的字段是 selectedDefault；旧写法 { default } 不会生效。
+		patch.insert(QStringLiteral("selectedDefault"), presetId);
 		return patch;
 	}
 

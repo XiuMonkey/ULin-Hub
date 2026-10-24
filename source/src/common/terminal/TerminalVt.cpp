@@ -11,8 +11,7 @@ namespace
 // （见 3rdparty/libvterm/src/screen.c 的 vterm_screen_get_cell）。
 constexpr uint32_t kWideContinuation = 0xFFFFFFFFu;
 
-// 与 VTERM_MAX_CHARS_PER_CELL 同值；TermCell::chars 也是这个长度。
-constexpr int kCharsPerCell = 6;
+constexpr int kCharsPerCell = 6;   // 与 VTERM_MAX_CHARS_PER_CELL 同值；TermCell::chars 也是这个长度
 
 uint32_t rgb24(const VTermColor& color)
 {
@@ -49,8 +48,7 @@ VTermColor makeVTermColor(uint32_t rgb, bool isDefault, bool isForeground)
 	return color;
 }
 
-// 屏幕格 → 本类的格。宽字符的续格归一化成 width=0 / chars 全 0，渲染侧照此跳过。
-void toTermCell(const VTermScreenCell& src, VTermScreen* screen, TermCell& out)
+void toTermCell(const VTermScreenCell& src, VTermScreen* screen, TermCell& out)   // 屏幕格 → 本类的格。宽字符的续格归一化成 width=0 / chars 全 0，渲染侧照此跳过
 {
 	out = TermCell();
 	if (src.chars[0] == kWideContinuation)
@@ -98,8 +96,7 @@ TermCell blankCell()
 	return cell;
 }
 
-// 本类的格 → 屏幕格（sb_popline 用）
-void fromTermCell(const TermCell& src, VTermScreenCell& out)
+void fromTermCell(const TermCell& src, VTermScreenCell& out)   // 本类的格 → 屏幕格（sb_popline 用）
 {
 	std::memset(&out, 0, sizeof(out));
 	if (src.width == 0)
@@ -125,8 +122,7 @@ void fromTermCell(const TermCell& src, VTermScreenCell& out)
 	out.attrs.strike = src.style.test(TermStyle::Strike);
 }
 
-// 本类的 SpecialKey → libvterm 的 VTermKey
-VTermKey toVTermKey(TerminalVt::SpecialKey key)
+VTermKey toVTermKey(TerminalVt::SpecialKey key)   // 本类的 SpecialKey → libvterm 的 VTermKey
 {
 	switch (key)
 	{
@@ -167,8 +163,7 @@ VTermModifier toVTermModifier(int modifiers)
 // 只能集中在本 .cpp；靠 TerminalVt 的 friend 声明拿私有成员。
 struct TerminalVtCallbacks
 {
-	// 有格子变了。damage 已按行合并，所以 rect 的行范围就是要重画的行。
-	static int onDamage(VTermRect rect, void* user)
+	static int onDamage(VTermRect rect, void* user)   // 有格子变了。damage 已按行合并，所以 rect 的行范围就是要重画的行
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		for (int row = rect.start_row; row < rect.end_row; ++row)
@@ -176,8 +171,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// 整块搬移（滚屏等）：屏幕行号整体错位，脏行记录作废，直接判"整屏重画"。
-	static int onMoveRect(VTermRect dest, VTermRect src, void* user)
+	static int onMoveRect(VTermRect dest, VTermRect src, void* user)   // 整块搬移（滚屏等）：屏幕行号整体错位，脏行记录作废，直接判"整屏重画"
 	{
 		(void)dest;
 		(void)src;
@@ -185,8 +179,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// 光标移动：新旧两行都要重画（旧位置擦光标、新位置画光标）
-	static int onMoveCursor(VTermPos pos, VTermPos oldpos, int visible, void* user)
+	static int onMoveCursor(VTermPos pos, VTermPos oldpos, int visible, void* user)   // 光标移动：新旧两行都要重画（旧位置擦光标、新位置画光标）
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		self->m_cursorVisible = visible != 0;
@@ -197,8 +190,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// OSC 0/2 的窗口标题、光标可见性
-	static int onSetProp(VTermProp prop, VTermValue* value, void* user)
+	static int onSetProp(VTermProp prop, VTermValue* value, void* user)   // OSC 0/2 的窗口标题、光标可见性
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		if (!value)
@@ -211,7 +203,6 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// 一行被顶出屏幕 → 进回滚历史
 	static int onPushLine(int cols, const VTermScreenCell* cells, bool continuation, void* user)
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
@@ -224,18 +215,14 @@ struct TerminalVtCallbacks
 		while (static_cast<int>(self->m_scrollback.size()) > self->m_scrollbackLimit)
 			self->m_scrollback.pop_front();
 
-		// 滚在历史里时把偏移一起 +1：视口锚在内容上，不会因为新输出而往下溜
 		if (self->m_viewOffset > 0)
 			++self->m_viewOffset;
 
-		// 回滚一动，视口到屏幕的映射整体位移 ⇒ 脏行记录作废
-		self->m_fullRepaint = true;
+		self->m_fullRepaint = true;   // 回滚一动，视口到屏幕的映射整体位移 ⇒ 脏行记录作废
 		return 1;
 	}
 
-	// 屏幕想把一行要回去（上滚回退，如顶部的 \e[M；或**放大尺寸时回填顶部**，见 screen.c 的
-	// resize_buffer 结尾那段 "backfill rows by popping scrollback"）
-	static int onPopLine(int cols, VTermScreenCell* cells, void* user)
+	static int onPopLine(int cols, VTermScreenCell* cells, void* user)   // resize_buffer 结尾那段 "backfill rows by popping scrollback"）
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		if (self->m_scrollback.empty())
@@ -249,14 +236,13 @@ struct TerminalVtCallbacks
 			fromTermCell(line.cells[static_cast<size_t>(col)], cells[col]);
 
 		// ⚠️ 尾巴必须补满到 cols —— 这里是"放大尺寸后顶部吞字"的真正现场：
-		//   ① libvterm 拿这行是**按 old_cols 整行**搬进屏幕顶部的（resize_buffer 的回填循环读
-		//      `sb_buffer[pos.col]`，不看我们写了多少格），没写的格子就原样搬进屏幕，被当成正文画出来；
-		//   ② 没写的那段是 sb_buffer 里上一次塞进去的东西 —— 换列时 libvterm 会重新 malloc 这个缓冲
-		//      （screen.c 的 resize 里 new_cols != old_cols 两条分支），内容是未初始化内存或回收来的旧行；
-		//   ③ 更糟的是它按 `pos.col += sb_buffer[pos.col].width` 步进，碰上 width==0 就原地不动，
-		//      **整个 vterm_set_size 不再返回**（实测：60 列下打字 → 放大到 100 列 → 行数 20 改成 40
-		//      直接挂住；这正是脱离/回附时"变宽 + 变高"那一步）。
-		//    所以只要回滚行比 cols 窄，剩下的一律铺空白格。
+		// ① libvterm 拿这行是**按 old_cols 整行**搬进屏幕顶部的（resize_buffer 的回填循环读
+		// `sb_buffer[pos.col]`，不看我们写了多少格），没写的格子就原样搬进屏幕，被当成正文画出来；
+		// ② 没写的那段是 sb_buffer 里上一次塞进去的东西 —— 换列时 libvterm 会重新 malloc 这个缓冲
+		// （screen.c 的 resize 里 new_cols != old_cols 两条分支），内容是未初始化内存或回收来的旧行；
+		// ③ 更糟的是它按 `pos.col += sb_buffer[pos.col].width` 步进，碰上 width==0 就原地不动，
+		// 直接挂住；这正是脱离/回附时"变宽 + 变高"那一步）。
+		// 所以只要回滚行比 cols 窄，剩下的一律铺空白格。
 		for (int col = count; col < cols; ++col)
 			fromTermCell(blankCell(), cells[col]);
 
@@ -264,8 +250,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// \e[3J：清回滚
-	static int onClearScrollback(void* user)
+	static int onClearScrollback(void* user)   // \e[3J：清回滚
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		self->m_scrollback.clear();
@@ -274,8 +259,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	// 键盘编好的序列（vterm_output_set_callback 攒进来）
-	static void onKeyOutput(const char* bytes, size_t len, void* user)
+	static void onKeyOutput(const char* bytes, size_t len, void* user)   // 键盘编好的序列（vterm_output_set_callback 攒进来）
 	{
 		if (!bytes || len == 0)
 			return;
@@ -316,15 +300,12 @@ TerminalVt::TerminalVt(int rows, int cols, int scrollbackLines)
 	m_screen = vterm_obtain_screen(m_vt);
 	m_state = vterm_obtain_state(m_vt);
 
-	// 改尺寸时按内容重排折行（而不是硬裁），面板拉伸时画面才不错乱
-	vterm_screen_enable_reflow(m_screen, true);
+	vterm_screen_enable_reflow(m_screen, true);   // 改尺寸时按内容重排折行（而不是硬裁），面板拉伸时画面才不错乱
 	vterm_screen_enable_altscreen(m_screen, 1);
-	// damage 按行合并：够定位到行，又不像按格那样碎
-	vterm_screen_set_damage_merge(m_screen, VTERM_DAMAGE_ROW);
+	vterm_screen_set_damage_merge(m_screen, VTERM_DAMAGE_ROW);   // damage 按行合并：够定位到行，又不像按格那样碎
 
 	vterm_screen_set_callbacks(m_screen, screenCallbacks(), this);
-	// 必须在 set_callbacks 之后调：它看的是刚装上的 sb_pushline4；不调就退化成 3 参数的 sb_pushline
-	vterm_screen_callbacks_has_pushline4(m_screen);
+	vterm_screen_callbacks_has_pushline4(m_screen);   // 必须在 set_callbacks 之后调：它看的是刚装上的 sb_pushline4；不调就退化成 3 参数的 sb_pushline
 
 	vterm_screen_reset(m_screen, 1);
 
@@ -350,8 +331,7 @@ void TerminalVt::feed(const char* bytes, int len)
 	vterm_input_write(m_vt, bytes, static_cast<size_t>(len));
 	vterm_screen_flush_damage(m_screen);
 
-	// 光标位置以回调为准，这里再取一次兜住"引擎没送过任何光标移动"的初始态
-	VTermPos cursor = {};
+	VTermPos cursor = {};   // 光标位置以回调为准，这里再取一次兜住"引擎没送过任何光标移动"的初始态
 	vterm_state_get_cursorpos(m_state, &cursor);
 	m_cursorRow = cursor.row;
 	m_cursorCol = cursor.col;
@@ -370,8 +350,7 @@ void TerminalVt::reset()
 	m_cursorCol = 0;
 
 	vterm_screen_reset(m_screen, 1);
-	// 硬复位会把调色板冲回默认，覆盖过的要重放一次
-	if (m_paletteSet)
+	if (m_paletteSet)   // 硬复位会把调色板冲回默认，覆盖过的要重放一次
 		applyAnsiPalette();
 }
 
@@ -380,10 +359,7 @@ void TerminalVt::setSize(int rows, int cols)
 	if (rows < 1 || cols < 1 || (rows == m_rows && cols == m_cols))
 		return;
 
-	// 改尺寸会往回滚里塞行/从回滚里拿行（见 screen.c 的 resize_buffer），视口的"绝对行号"体系整体位移。
-	// 这里先把视口顶锚在哪一行记下来：滚在历史里的用户，改尺寸前后看的是同一段内容，不会被拽回底部。
-	// （原来无条件 m_viewOffset = 0 —— 脱离/回附时正好会把"正在看的几行"从屏幕上抽走，观感就是顶部换了一批字。）
-	const bool atBottom = (m_viewOffset == 0);
+	const bool atBottom = (m_viewOffset == 0);   // 改尺寸会往回滚里塞行/从回滚里拿行（见 screen.c 的 resize_buffer），视口的"绝对行号"体系整体位移
 	const int anchorLine = static_cast<int>(m_scrollback.size()) - m_viewOffset;
 
 	m_rows = rows;
@@ -449,8 +425,7 @@ int TerminalVt::absoluteLine(int viewRow) const
 {
 	if (viewRow < 0 || viewRow >= m_rows)
 		return -1;
-	// 视口是 [回滚 + 屏幕] 这个拼接条上一个高 rows 的窗口；viewOffset 把它从底部往上挪
-	return static_cast<int>(m_scrollback.size()) - m_viewOffset + viewRow;
+	return static_cast<int>(m_scrollback.size()) - m_viewOffset + viewRow;   // 视口是 [回滚 + 屏幕] 这个拼接条上一个高 rows 的窗口；viewOffset 把它从底部往上挪
 }
 
 void TerminalVt::readAbsoluteLine(int line) const
@@ -498,7 +473,6 @@ std::vector<int> TerminalVt::takeDirtyRows()
 {
 	std::vector<int> rows;
 
-	// 视口滚在历史里时，屏幕坐标的脏行与视口行不是一套编号 —— 整屏重画，别去映射
 	const bool all = m_fullRepaint || m_viewOffset != 0;
 	if (all)
 	{

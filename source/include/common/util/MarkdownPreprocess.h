@@ -1,6 +1,6 @@
 #pragma once
 
-// 交给 QTextDocument::setMarkdown() 之前做的 Markdown 预处理：绕开 Qt 6 导入器不支持 <br> 的坑。
+// 交给 QTextDocument::setMarkdown 之前做的 Markdown 预处理：绕开 Qt 6 导入器不支持 <br> 的坑。
 
 #include <QString>
 

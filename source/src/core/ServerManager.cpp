@@ -29,15 +29,13 @@
 
 namespace
 {
-	// 合法才算数：必须能解析且带 host，否则退回空 QUrl 交给调用方走内置服务端
-	QUrl usableServerUrl(const QString& text)
+	QUrl usableServerUrl(const QString& text)   // 合法才算数：必须能解析且带 host，否则退回空 QUrl 交给调用方走内置服务端
 	{
 		const QUrl url(text);
 		return url.isValid() && !url.host().isEmpty() ? url : QUrl();
 	}
 
-	// 环境变量优先于持久化配置
-	QUrl storedServerUrl()
+	QUrl storedServerUrl()   // 环境变量优先于持久化配置
 	{
 		const QUrl envUrl = usableServerUrl(qEnvironmentVariable("DSH_SERVER_URL").trimmed());
 		if (!envUrl.isEmpty())
@@ -46,9 +44,7 @@ namespace
 		return usableServerUrl(SettingsStore::serverUrl());
 	}
 
-	// 内置插件台账 .ulin-hub-builtin.json：revision 是插件源 SHA1 前缀，内容变了下次启动重装；
-	// 台账里有记录但被手工删掉的插件不重装
-	QString builtinMarkerPath(const QString& profileDir)
+	QString builtinMarkerPath(const QString& profileDir)   // 内置插件台账 .ulin-hub-builtin.json：revision 是插件源 SHA1 前缀，内容变了下次启动重装
 	{
 		return profileDir + QStringLiteral("/.ulin-hub-builtin.json");
 	}
@@ -165,10 +161,70 @@ namespace
 		return true;
 	}
 
-	// 出厂 settings.yaml 留空配置，让适配器提供其自带模型目录。
-	const char* const kFactorySettingsYaml = "# ULin Hub factory settings.\n";
+	const char* const kFactorySettingsYaml = "# ULin Hub factory settings.\n";   // 出厂 settings.yaml 留空配置，让适配器提供其自带模型目录
 
-	// 文件作用域静态而非成员：接管态须跨 ServerManager 实例存活（旧壳每窗口一份、切主题会新建）；
+	// 未分组会话的兜底：引擎只在 `initialized == false` 时按 session header 的 cwd 重建分组
+	// （dsh-workspace 的 bootstrap）。用户把所有工作区删光后 workspace.json 仍是 initialized=true +
+	// 让引擎自己的 bootstrap 按 cwd 重建分组：launch-root 的会话会自然落回 launch-root。
+	void reviveEmptyWorkspaceRegistry(const QString& dshHome)
+	{
+		const QString registryPath = dshHome + QStringLiteral("/storages/workspace.json");
+
+		QJsonObject root;
+		{
+			QFile file(registryPath);   // 读完就关：下面 QSaveFile 要覆盖同一个文件，Windows 上留着读句柄会让替换失败
+			if (!file.open(QIODevice::ReadOnly))
+				return;
+
+			const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+			if (!doc.isObject())
+				return;
+			root = doc.object();
+		}
+
+		QJsonObject state = root.value(QStringLiteral("global")).toObject();
+		if (!state.value(QStringLiteral("initialized")).toBool())
+			return;
+		if (!state.value(QStringLiteral("workspaceIds")).toArray().isEmpty())
+			return;
+
+		// 只有真的存在**可见的**已存会话才重置；没有任何会话、或全部都已归档时都返回。
+		// 后者很重要：删除最后一个工作区的默认链路是"先归档组内会话、再 workspace/delete"，
+		// 归档不会删 sessions/<project>/session-* 目录；若只看目录存在，就会每次启动都把
+		QStringList archived;
+		for (const auto& value : state.value(QStringLiteral("archivedSessionIds")).toArray())
+			archived.append(value.toString());
+
+		const QDir sessionsRoot(dshHome + QStringLiteral("/sessions"));
+		bool hasVisibleSession = false;
+		for (const QString& project : sessionsRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+			for (const QString& entry : QDir(sessionsRoot.filePath(project)).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+				if (entry.startsWith(QStringLiteral("session-")) && !archived.contains(entry)) {
+					hasVisibleSession = true;
+					break;
+				}
+			}
+			if (hasVisibleSession)
+				break;
+		}
+		if (!hasVisibleSession)
+			return;
+
+		state.insert(QStringLiteral("initialized"), false);
+		root.insert(QStringLiteral("global"), state);
+
+		QSaveFile out(registryPath);
+		if (!out.open(QIODevice::WriteOnly))
+			return;
+		out.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+		if (!out.commit())
+			return;   // commit 失败 = 放弃临时文件，注册表保持原样
+
+		qInfo().noquote() << QStringLiteral("[Workspace] 分组表为空但仍有历史会话："
+			"已重置 initialized，交给引擎按会话 cwd 重建分组");
+	}
+
+	// 文件作用域静态而非成员：接管态须跨 ServerManager 实例存活；
 	// 用成员的话，新实例的 start() 会把内置进程重新拉起（见 DshApiClient::Takenover）
 	bool g_backendTakenover = false;
 
@@ -212,7 +268,6 @@ ServerManager::~ServerManager()
 	// → ServerManager，析构发生在 main() 返回之后、QApplication 已经拆完的时候（每次退出日志里那句
 	// "QObject::startTimer: current thread's event dispatcher has already been destroyed" 就是那时打的）——
 	// 走到这儿已经太晚；崩溃 / 任务管理器强杀 / 调试器停止更是一步都走不到。
-	// 真正保证"应用没了 node 也跟着没"的是 Job Object（见 ensureExitJob()）。
 	stopBundledServer(QStringLiteral("对象析构"));
 	if (!m_processHandedOff)   // 进程已移交下一窗口：关 job 会连带杀掉别人接手的进程树
 		closeExitJob();
@@ -261,8 +316,7 @@ void ServerManager::restart()
 	m_restarting = true;
 
 	if (m_serverProcess) {
-		// 杀整棵树而不是只杀 node：终端 shell / MCP 子进程也是内置引擎起的，重启时要一起换掉
-		stopBundledServer(QStringLiteral("重启内置引擎"));
+		stopBundledServer(QStringLiteral("重启内置引擎"));   // 杀整棵树而不是只杀 node：终端 shell / MCP 子进程也是内置引擎起的，重启时要一起换掉
 		delete m_serverProcess;
 		m_serverProcess = nullptr;
 	}
@@ -313,15 +367,16 @@ void ServerManager::stopForExit()
 	// 单例对象要等 QApplication 拆完才轮到它，而 node 一旦活过那一刻就成了孤儿，继续占着会话写句柄
 	// （症状：下次启动 commands/list / 发消息全报 session/writer-held）。
 	stopBundledServer(QStringLiteral("应用退出"));
+
 	// 关句柄再兜一层：KILL_ON_JOB_CLOSE 会把 job 里可能残留的（含 node 自己起的子进程）一起带走。
 	// 只关**我们这个** job 的句柄，别人的 node（用户自己跑的 DSH 等）不在里面。
 	closeExitJob();
 }
 
 // 结束内置引擎的唯一实现：重启 / 接管 / 退出 / 析构四条路共用，行为因此一致（幂等）。
-//  1) 先礼：terminate()。
-//  2) 后兵：整棵进程树一起杀（job 里全都在 → TerminateJobObject；job 不可用 → taskkill /T）。
-//  3) 收尾：waitForFinished 等它真的没了，再把结果写进日志。
+// 1) 先礼：terminate()。
+// 2) 后兵：整棵进程树一起杀（job 里全都在 → TerminateJobObject；job 不可用 → taskkill /T）。
+// 3) 收尾：waitForFinished 等它真的没了，再把结果写进日志。
 void ServerManager::stopBundledServer(const QString& reason)
 {
 	if (!m_serverProcess)
@@ -335,8 +390,8 @@ void ServerManager::stopBundledServer(const QString& reason)
 	}
 
 	// 1) 先礼。注意 Windows 上 QProcess::terminate() 只是给"有顶层窗口"的进程 PostMessage(WM_CLOSE)，
-	//    而内置引擎是 Qt 用 CREATE_NO_WINDOW 拉起的无窗口控制台进程 —— 它收不到，等下去纯属白等 2 秒，
-	//    所以 Windows 上跳过宽限期直接进第 2 步（其它平台 terminate 是 SIGTERM，node 会真的处理，给 2 秒）。
+	// 而内置引擎是 Qt 用 CREATE_NO_WINDOW 拉起的无窗口控制台进程 —— 它收不到，等下去纯属白等 2 秒，
+	// 所以 Windows 上跳过宽限期直接进第 2 步（其它平台 terminate 是 SIGTERM，node 会真的处理，给 2 秒）。
 	m_serverProcess->terminate();
 #ifdef Q_OS_WIN
 	constexpr int kTerminateGraceMs = 0;
@@ -350,7 +405,7 @@ void ServerManager::stopBundledServer(const QString& reason)
 	}
 
 	// 2) 后兵：杀进程树。job 里有 node 和它起的全部子进程，TerminateJobObject 一把清；
-	//    job 建不出来/加不进去时才退回 taskkill /T /F（按 PID 点名，不碰别人的 node）。
+	// job 建不出来/加不进去时才退回 taskkill /T /F（按 PID 点名，不碰别人的 node）。
 	bool stopped = false;
 	if (terminateExitJob())
 		stopped = m_serverProcess->waitForFinished(2000);
@@ -361,8 +416,7 @@ void ServerManager::stopBundledServer(const QString& reason)
 	}
 #endif
 	if (!stopped && m_serverProcess->state() != QProcess::NotRunning) {
-		// 最后一条：进程自己的 kill()（TerminateProcess）。到这儿说明上面都没生效，别再不声不响地退出。
-		m_serverProcess->kill();
+		m_serverProcess->kill();   // 最后一条：进程自己的 kill()（TerminateProcess）。到这儿说明上面都没生效，别再不声不响地退出
 		stopped = m_serverProcess->waitForFinished(2000);
 	}
 
@@ -390,8 +444,7 @@ bool ServerManager::ensureExitJob()
 		return false;
 	}
 
-	// KILL_ON_JOB_CLOSE：job 的最后一个句柄关闭时（= 本进程没了，句柄随之释放）终止 job 内所有进程
-	JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};   // KILL_ON_JOB_CLOSE：job 的最后一个句柄关闭时（= 本进程没了，句柄随之释放）终止 job 内所有进程
 	info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 	if (!::SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
 		qWarning().noquote() << QStringLiteral(
@@ -407,8 +460,7 @@ bool ServerManager::ensureExitJob()
 		"内核都会连带终止内置引擎");
 	return true;
 #else
-	// 非 Windows 没有 job：退出清理全靠 aboutToQuit → stopBundledServer() 这条路
-	return false;
+	return false;   // 非 Windows 没有 job：退出清理全靠 aboutToQuit → stopBundledServer() 这条路
 #endif
 }
 
@@ -418,6 +470,7 @@ void ServerManager::adoptIntoExitJob(qint64 pid)
 		return;
 
 #ifdef Q_OS_WIN
+
 	// PROCESS_SET_QUOTA | PROCESS_TERMINATE 是 AssignProcessToJobObject 要求的最小权限组合
 	HANDLE process = ::OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
 		FALSE, static_cast<DWORD>(pid));
@@ -495,6 +548,7 @@ QProcess* ServerManager::takeProcess()
 	m_serverProcess = nullptr;
 	if (process) {
 		process->setParent(nullptr);
+
 		// 移交出去之后这个实例就不能再关 job 了：关句柄 = KILL_ON_JOB_CLOSE 会把接手方要用的进程树杀掉。
 		// （目前没有调用点，留着是为了不让 API 变成陷阱。）
 		m_processHandedOff = true;
@@ -546,8 +600,8 @@ void ServerManager::startBundledServer()
 	const QString appDir = QCoreApplication::applicationDirPath();
 
 	QString nodePath = appDir + QStringLiteral("/resources/server/node.exe");
+
 	// 入口脚本在发布目录的 resources/node/ 下：该目录结构与 assets/resources/node/ 一一对应
-	// （2026-10 素材整理时把 harness-node-entry.mjs 从 resources/ 顶层挪进了 node/），
 	// 发布/打包时 resources 这棵树要照搬仓库里的分目录结构。
 	QString entryPath = appDir + QStringLiteral("/resources/node/harness-node-entry.mjs");
 	QString dshEntry = appDir + QStringLiteral("/resources/server/node_modules/@deepseek-ai/dsh/lib/bin.js");
@@ -558,7 +612,7 @@ void ServerManager::startBundledServer()
 	m_dshHome = dshHome;
 
 	if (!QFile::exists(nodePath) || !QFile::exists(entryPath) || !QFile::exists(dshEntry)) {
-		// 捆绑服务端不完整：不猜地址兜底（历史上这里会发布 127.0.0.1:3080）。走到这里说明两个调用点
+		// 捆绑服务端不完整：不猜地址兜底（猜了会发布 127.0.0.1:3080）。走到这里说明两个调用点
 		// 都已先查过服务地址，故不发布 baseUrl 就让连接层停在未连接；缺哪个文件写日志，错误上屏走 errorLine
 		const QString missing = !QFile::exists(nodePath) ? nodePath
 			: !QFile::exists(entryPath) ? entryPath : dshEntry;
@@ -617,8 +671,7 @@ void ServerManager::startBundledServer()
 
 			QFile urlIndex(urlPrinterDir + QStringLiteral("/index.js"));
 			if (urlIndex.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-				// /api 需要启动令牌换来的认证 cookie，故打印机把认证 URL 打到 stdout
-				urlIndex.write("import z from \"@deepseek-ai/schemastery\";\n");
+				urlIndex.write("import z from \"@deepseek-ai/schemastery\";\n");   // /api 需要启动令牌换来的认证 cookie，故打印机把认证 URL 打到 stdout
 				urlIndex.write("const name = \"dsh-url-printer\";\n");
 				urlIndex.write("const inject = [\"webServer\", \"connection\"];\n");
 				urlIndex.write("const Config = z.object({});\n");
@@ -670,8 +723,10 @@ void ServerManager::startBundledServer()
 				patch.write("    - id: file-upload\n      name: '@deepseek-ai/dsh-client-file-upload'\n\n");
 				patch.write("    - id: api-remotes\n      name: '@deepseek-ai/dsh-api-remotes'\n\n");
 				patch.write("    - id: agent-presets\n      name: '@deepseek-ai/dsh-agent-presets'\n      config:\n        default: standard\n\n");
+
 				// 右栏「终端」块的 Host 侧实现：不给它上这一行，/api/terminal/* 全是 404（见 ensurePatchEntry 那段）
 				patch.write("    - id: api-terminal-controller\n      name: '@deepseek-ai/dsh-api-terminal-controller'\n");
+
 				// 顶栏"后台任务"入口的 Host 侧实现（job/list 名册 + job/follow 输出）：官方 web bundle 才有这一行，
 				// 精简 API-only profile 必须显式挂上，否则 /api/job/list 一律 service-unavailable
 				patch.write("    - id: job-controller\n      name: '@deepseek-ai/dsh-api-job-controller'\n");
@@ -773,12 +828,11 @@ void ServerManager::startBundledServer()
 		}
 
 		// 右栏「终端」块：交互式终端控制器（terminal/*）。包在引擎自带 node_modules 里，
-		// 但 profile 里没有挂它的行 —— 缺这一行时 /api/terminal/* 一律 404 not found（实测）。
+		// 但 profile 里没有挂它的行 —— 缺这一行时 /api/terminal/* 一律 404 not found。
 		// 与 session-stats 同样幂等补行：首次生成的模板已经带上它，这里兜的是"profile 早就生成好"的安装。
 		{
 			// 插件市场：dshmarket 是**标准插件**，它自己注册 /dsh-market/* 那一整批路由
 			// （registry / installed / install / uninstall / backup / restore / webdav …）。
-			// 包里带了它，但引擎 profile 不加载它 ⇒ 这些路由全部 404（实测 /dsh-market/registry
 			// 一直 404，界面只能退回内置快照，"正在等待最新数据"永远等不到）。与终端那条同样幂等补行。
 			{
 				const QString marketName = QStringLiteral("dshmarket");
@@ -870,6 +924,8 @@ void ServerManager::startBundledServer()
 	// 新装的行要等它重启才被读到
 	ensureBuiltinPlugins(dshHome + QStringLiteral("/profiles/web"));
 
+	reviveEmptyWorkspaceRegistry(dshHome);   // 必须在 node 起来之前改 workspace.json：引擎启动时才读它并决定是否 bootstrap
+
 	launchBundledServer(nodePath, entryPath, dshEntry, cwd, dshHome);
 }
 
@@ -946,16 +1002,35 @@ void ServerManager::launchBundledServer(const QString& nodePath, const QString& 
 	// 建本地 shim 并加进 PATH（已存在则不覆盖）
 	{
 		const QString nodeExe = QDir::toNativeSeparators(appDir + QStringLiteral("/resources/server/node.exe"));
-		const QString pnpmEntry = QDir::toNativeSeparators(appDir + QStringLiteral("/resources/server/node_modules/pnpm/bin/pnpm.cjs"));
+
+		// ⚠️ pnpm 包里 dist/pnpm.mjs 是坏 stub（SyntaxError: Unexpected end of input）；
+		// 真正能跑的完整 bundle 在 artifacts/exe/dist/pnpm.mjs（--version = 11.21.0）。
+		// 这里给 server 进程的 PATH shim 必须指向完整 bundle，否则 dshmarket 的 /install
+		// 会在 pnpm 探测阶段直接 502。PluginMarketInstaller 已用同一个路径。
+		QString pnpmEntryPath = appDir
+			+ QStringLiteral("/resources/server/node_modules/pnpm/artifacts/exe/dist/pnpm.mjs");
+		if (!QFile::exists(pnpmEntryPath))
+			pnpmEntryPath = appDir + QStringLiteral("/resources/server/node_modules/pnpm/bin/pnpm.cjs");
+		const QString pnpmEntry = QDir::toNativeSeparators(pnpmEntryPath);
 		const QString binDir = QDir::toNativeSeparators(dshHome + QStringLiteral("/.desktop-bin"));
 		QDir().mkpath(binDir);
 		const QString pnpmCmdPath = binDir + QStringLiteral("/pnpm.cmd");
-		if (!QFile::exists(pnpmCmdPath)) {
+		const QString shimText = QStringLiteral("@echo off\r\n\"%1\" \"%2\" %*\r\n")
+			.arg(nodeExe, pnpmEntry);
+
+		// 不只在缺失时写：旧安装里已经有一个指向坏 bin/pnpm.cjs 的 shim，
+		// 必须覆盖成 artifacts/exe 入口，否则用户升级后仍然 502。
+		bool shimNeedsWrite = true;
+		QFile oldShim(pnpmCmdPath);
+		if (oldShim.open(QIODevice::ReadOnly)) {
+			shimNeedsWrite = QString::fromUtf8(oldShim.readAll()).trimmed()
+				!= shimText.trimmed();
+			oldShim.close();
+		}
+		if (shimNeedsWrite) {
 			QFile shim(pnpmCmdPath);
 			if (shim.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-				shim.write(QStringLiteral("@echo off\r\n\"%1\" \"%2\" %*\r\n")
-					.arg(nodeExe, pnpmEntry)
-					.toUtf8());
+				shim.write(shimText.toUtf8());
 				shim.close();
 			}
 		}
@@ -1000,6 +1075,7 @@ void ServerManager::launchBundledServer(const QString& nodePath, const QString& 
 
 	m_serverProcess->start(nodePath, QStringList{ entryPath, dshEntry, QStringLiteral("web"),
 		QStringLiteral("--port"), QStringLiteral("0") });
+
 	// 进程是 start() 里同步创建的（Windows 上 CreateProcess 就在 start() 内完成，所以这里 processId() 已有值）。
 	// 立刻拉进 job：之后 node 自己起的子进程都会继承 job 成员身份，父进程怎么死内核都能一起收掉。
 	adoptIntoExitJob(m_serverProcess->processId());
@@ -1064,6 +1140,7 @@ void ServerManager::handleServerErrorOutput()
 			continue;
 		qWarning().noquote() << QStringLiteral("[DSH Server][stderr]") << line;
 		emit outputLine(line);
+
 		// 初始化期（baseUrl 还没发布）stderr 出现任何内容都算启动失败信号，转 errorLine 收掉初始化遮罩；
 		// 跑起来之后只有错误关键词行才上报，免得正常 warning 刷系统消息
 		if (m_baseUrl.isEmpty()

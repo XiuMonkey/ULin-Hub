@@ -15,7 +15,7 @@ public:
 	// 会被多次调用（同名扩展二次装载会再 attach 一次），实现要能重复挂载、别累积状态
 	virtual void attachHost() = 0;
 
-	// 【可选】退场钩子，实现为一个槽 `detachHost()`
+	// 【可选】退场钩子，实现为一个槽 `detachHost`
 	// 元对象层字符串契约、非本接口虚方法：写成虚方法会改 vtable 布局，已发布插件会踩空槽位
 	// 实现它 = 声明"之后宿主可安全 unload 我的 dll"，故必须同步删掉自己挂在宿主里的一切，不能 deleteLater
 	// 接管了后端的扩展必须在这里复位 Takenover(false)，否则界面永久停在加载中

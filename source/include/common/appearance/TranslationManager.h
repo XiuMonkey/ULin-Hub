@@ -5,7 +5,7 @@
 // 陷阱：源码里没有任何自然语言文案 ⇒ 所有语言（含出厂默认的中文）都需要语言包，没有"某个语言免翻译"的例外；
 // 查不到译文时兜底是 key 本身，界面会显示 topbar_settings 这样的代号 —— 刻意保留，缺哪条一眼可见。
 // 语言包从 exe 同目录 translations/ 读，装不上退回 qrc 内置（内置包启动时释放到外部目录、存在则不覆盖）；切换免
-// 重启：apply() 换掉 translator 后 Qt 给所有控件发 QEvent::LanguageChange，不是控件、收不到该事件的对象接
+// 重启：apply 换掉 translator 后 Qt 给所有控件发 QEvent::LanguageChange，不是控件、收不到该事件的对象接
 // TranslationNotifier::languageChanged。
 
 #include "VirtualClass/VirtualCommon.h"
@@ -22,7 +22,7 @@ struct LanguageInfo
 	QString name;  // 展示名，用该语言自己的写法（"English"、"日本語"）
 };
 
-// (M8) 旧壳的"控件文本快照 → 就地换文案"机制已删除，随之去掉 TranslationSource / WidgetTextSnapshot /
+// "控件文本快照 → 就地换文案"机制已删除，随之去掉 TranslationSource / WidgetTextSnapshot /
 // snapshotWidgetTexts / applyWidgetTextSnapshot / translationSources；QML 壳的文案由绑定自动重取。
 
 // 语言切换通知：不是控件、收不到 QEvent::LanguageChange 的对象接这个信号；
@@ -72,7 +72,7 @@ namespace Translation
 	// 可选语言：源语言（中文）在最前，其余按 .qm 出现情况列出
 	QVector<LanguageInfo> availableLanguages();
 
-	// 安装初始翻译。main() 里在 QApplication 之后、创建窗口之前调用。
+	// 安装初始翻译。main 里在 QApplication 之后、创建窗口之前调用。
 	void init();
 
 	// 立即切换语言（免重启）；languageCode 为空表示跟随系统。返回是否真的换了（没找到对应 .qm 时会退回源语言并返回 false）。

@@ -29,7 +29,7 @@ struct ReasoningMetadata
 	QString defaultLevelId; // 默认档位，可空
 };
 
-// 兜底四档（off/low/high/max）返回静态引用：currentLevel() 的指针地址必须稳定
+// 兜底四档（off/low/high/max）返回静态引用：currentLevel 的指针地址必须稳定
 inline const QVector<ReasoningLevel>& fallbackReasoningLevels()
 {
 	static const QVector<ReasoningLevel> levels = [] {

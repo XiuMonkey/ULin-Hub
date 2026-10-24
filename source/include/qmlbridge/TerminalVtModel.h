@@ -1,16 +1,13 @@
 #pragma once
 
 // TerminalVtModel —— 终端网格的 QML 可见桥：VT 状态（TerminalVt）与渲染（TerminalView.qml）之间那一层。
-//
 // 分层：TerminalSession（协议状态）→ TerminalVt（VT 状态）→ **本类（QML 面）** → TerminalView.qml（逐格画）。
 // 本类只做三件事：① 把会话身份/状态露给 QML（rows/cols/state/statusText/readOnly/title）；
 // ② 网格**按行**暴露 + 脏行通知（渲染只重画脏行）；③ 把 QML 的键盘事件翻译成回写 PTY 的字节。
 // 解析不在这里（TerminalVt），画也不在这里（QML）。
-//
 // 为什么"按行 + 按样式合并的段"而不是"每格一个 QVariantMap"：一屏 80×30 就是 2400 格，每帧重发
 // 2400 个 map 光构造就吃满主线程；合并成"同样式的一段"之后，一整行命令行的文本通常只剩个位数段，
 // QML 侧拿到的是小字符串。渲染侧缓存住整屏，脏行来了只换那几行。
-//
 // 为什么键盘编码放在 C++：libvterm 的键盘表（vterm_keyboard_key/unichar）是权威 —— 方向键在
 // "普通/DECCKM 应用模式"下序列不同、Ctrl/Alt 的组合规则也在库里，QML 只该做"KeyEvent → 码点/特殊键"。
 
@@ -40,8 +37,6 @@ class TerminalVtModel : public QObject
 public:
 	explicit TerminalVtModel(QObject* parent = nullptr);
 
-	// ---- 会话侧驱动（TerminalSession 调）----
-	// 灌一帧原始 PTY 字节。**逐 chunk 直接喂**：跨帧被切开的 UTF-8/转义序列由 libvterm 自己续。
 	void feed(const QByteArray& bytes);
 	// 快照帧：xterm 序列化重放串语义上就是"整屏重画"，先硬复位再喂（调色板会被重放）
 	void feedSnapshot(const QByteArray& bytes);
@@ -53,20 +48,10 @@ public:
 	// 网格尺寸跟着面板走：会话把引擎侧尺寸推给引擎，这里只同步本地 VT
 	void setGridSize(int rows, int cols);
 
-	// ---- QML 面：网格读取 ----
-	// 返回 [first, last] 闭区间内每行的**按样式合并段**，JSON 数组的数组：
-	//   [[[文本, fg, bg, flags], ...], ...]
-	// 文本为空串 = 宽字符的续格，渲染必须跳过这一格（宽字符首格占两格）。
-	// 越界行给空数组（渲染画成空行）。一次调用返回多行是刻意为之：整屏重画只走一次 QML↔C++ 边界。
-	// 按行给"同样式合并后的段"，**结构化**返回（不经 JSON 文本）：
-	// 每项 = 一行；行内每项 = [文本, fg, bg, flags]。QML 侧因此不需要 JSON.parse（那属于越界逻辑）。
-	// ⚠️ 返回空列表时调用方应退回 rowsJson（见 TerminalView.reloadRows 的兜底）。
 	Q_INVOKABLE QVariantList rowSegments(int first, int last) const;   // 注意别叫 rows()：本类已有 int rows() 返回行数，同名会让 QML 拿到 int
 
 	Q_INVOKABLE QString rowsJson(int first, int last) const;
 
-	// ---- QML 面：键盘 ----
-	// 可打印字符（含中文，QKeyEvent::text 给什么就发什么；Ctrl 组合传空串，由 sendKey 处理）
 	Q_INVOKABLE void typeText(const QString& text);
 	// 特殊键：name 见 TerminalVt::SpecialKey 的 kebab 名（enter/tab/backspace/escape/up/down/left/right/
 	// insert/delete/home/end/pageup/pagedown），modifiers = Shift 1 / Alt 2 / Ctrl 4 的或值
@@ -76,7 +61,6 @@ public:
 	// Qt::Key_* 里映射不到名字键的那批（Backspace/Tab/Return/Enter/Escape + 方向/编辑/翻页/功能键）
 	Q_INVOKABLE void sendQtKey(int qtKey, int modifiers);
 
-	// ---- QML 面：视口 / 尺寸 / 主题 ----
 	Q_INVOKABLE void scrollBy(int lines);        // 滚轮：正数 = 往历史里滚
 	Q_INVOKABLE void scrollToBottom();
 	Q_INVOKABLE void reset();
@@ -98,7 +82,7 @@ public:
 	bool readOnly() const { return m_readOnly; }
 
 signals:
-	// 自上次通知以来变化的视口行（升序、不重复；size() == rows() 表示整屏）
+	// 自上次通知以来变化的视口行（升序、不重复；size == rows 表示整屏）
 	void dirtyRowsChanged(const QVariantList& rows);
 	void sizeChanged();
 	void scrollbackChanged();

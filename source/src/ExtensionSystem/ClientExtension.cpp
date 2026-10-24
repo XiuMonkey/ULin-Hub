@@ -34,14 +34,12 @@ namespace ClientExtension
 			return app && QThread::currentThread() == app->thread();
 		}
 
-		// regulation.json5 是"已安装"的判据
-		QString regulationPath(const QString& dir)
+		QString regulationPath(const QString& dir)   // regulation.json5 是"已安装"的判据
 		{
 			return dir + QStringLiteral("/regulation.json5");
 		}
 
-		// 只认两种形状：带我们的标记文件，或没有 regulation.json5 但里面还有 dll
-		bool looksLikeRemovalLeftover(const QDir& dir)
+		bool looksLikeRemovalLeftover(const QDir& dir)   // 只认两种形状：带我们的标记文件，或没有 regulation.json5 但里面还有 dll
 		{
 			if (QFile::exists(dir.filePath(QLatin1String(kPendingRemovalMarker))))
 				return true;
@@ -50,7 +48,6 @@ namespace ClientExtension
 			return !dir.entryList({ QStringLiteral("*.dll") }, QDir::Files).isEmpty();
 		}
 
-		// 只在启动期（loadAll 之前）调用：那时 dll 不再被映射，删除必然成功
 		void sweepPendingRemovals()
 		{
 			QDir root(extensionDirectory());
@@ -126,8 +123,7 @@ namespace ClientExtension
 				qInfo("[ClientExtension] %s: 未实现 VirtualApiSink —— 它不能接管后端出站", qPrintable(name));
 			}
 
-			// 可选槽：插件要架空就必须知道自己的安装名（老插件没有也不踩空槽位）
-			if (root->metaObject()->indexOfMethod(kIdentitySlot) >= 0) {
+			if (root->metaObject()->indexOfMethod(kIdentitySlot) >= 0) {   // 可选槽：插件要架空就必须知道自己的安装名（老插件没有也不踩空槽位）
 				QMetaObject::invokeMethod(root, "setHostIdentity", Qt::DirectConnection, Q_ARG(QString, name));
 			}
 
@@ -190,10 +186,8 @@ namespace ClientExtension
 			if (canDetach) {
 				QMetaObject::invokeMethod(root, "detachHost", Qt::DirectConnection);
 
-				// 接管交还（2026-10-01）：扩展可能接管了宿主的入口（侧栏设置 / 插件市场按钮）。
-				// 不交还的话，扩展卸下之后那些按钮会变成"点了没反应" —— 它接的槽已经不存在了。
-				// 放在 unload() 之前：此刻插件还活着，断开的是它那条连接。
-				ConnectionManager::instance().ReleaseTakeoversFor(name);
+				ConnectionManager::instance().ReleaseTakeoversFor(name);   // 不交还的话，扩展卸下之后那些按钮会变成"点了没反应" —— 它接的槽已经不存在了
+
 				// 顶替面板坞块后端的登记同理要撤：不撤的话登记表里会留一具尸体 —— HasBlockBackend
 				// 一直报真（自省/界面提示据此说"已被扩展接管"），而 blockBackend 因 QPointer 置空
 				// 返回空指针，两边说法不一致。撤掉它，语义才回到"该 kind 用内置后端"。
@@ -217,11 +211,9 @@ namespace ClientExtension
 			}
 		}
 
-		// （2026-10-01 删）这里原本还有一次 UiStage::releaseForOwner(name)（"宿主强制收回架空"）：UiStage 整套（抢台 / 还台 / 自绘窗口条）
-		// 是旧控件壳的能力，它要 QMainWindow*，而现在的宿主是 QQmlApplicationEngine + QML Window、永远抢不到台，所以整套连同 WindowFrame 一起删了。
+		// 是控件壳的能力，它要 QMainWindow*，而现在的宿主是 QQmlApplicationEngine + QML Window、永远抢不到台，所以整套连同 WindowFrame 一起删了。
 
-		// 删判据文件即"已卸载"：不再出现在列表，下次启动也不会被装载
-		const QString regulation = regulationPath(dir);
+		const QString regulation = regulationPath(dir);   // 删判据文件即"已卸载"：不再出现在列表，下次启动也不会被装载
 		if (QFile::exists(regulation) && !QFile::remove(regulation)) {
 			if (error)
 				*error = QStringLiteral("cannot remove %1").arg(regulation);
@@ -233,7 +225,6 @@ namespace ClientExtension
 			return true;
 		}
 
-		// 还有文件删不掉（被本进程映射着、插件没声明可退场）：留标记，下次启动收尾；注意 Windows 上"改名/移动目录"也躲不开这个锁，所以不做那种花招
 		QFile marker(QStringLiteral("%1/%2").arg(dir, QLatin1String(kPendingRemovalMarker)));
 		if (!marker.open(QIODevice::WriteOnly | QIODevice::Truncate))
 			qWarning("[ClientExtension] cannot write removal marker: %s", qPrintable(marker.fileName()));
@@ -354,7 +345,6 @@ namespace ClientExtension
 				qInfo("[ClientExtension] exit: %s 没有 %s 槽，只摘出（插件未声明可安全退场）", qPrintable(name), kDetachSlot);
 			}
 
-			// 摘掉接管登记：插件不再受宿主调度，留着它会让退出路径上还有代码去调插件对象；（2026-10-01 删）原先这里也收一次架空舞台，UiStage 已随旧控件壳一起删除
 			if (root)
 				CommonRegistry::instance().Destroy(DshHostIndex::kApiSink, root);
 
@@ -368,5 +358,4 @@ namespace ClientExtension
 	}
 }
 
-// （2026-10-01 删）本文件末尾原先还有 namespace QQuickSupport 的整套实现（约 140 行：.ext 形式的 Qt Quick 运行时包安装 / 激活 / 移除）：
 // 宿主自己就是 QML 壳、Qt Quick 随宿主部署 ⇒ 运行时包与其 Subtype 预检一并退役，见 docs/codex-port-handover.md 工单 A。

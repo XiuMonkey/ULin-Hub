@@ -24,8 +24,7 @@ namespace
 		return QThread::currentThread() == app->thread();
 	}
 
-	// 仅首次告警（插件可能每个请求都调一次），并把"该怎么做"写在告警里。
-	void warnOffGuiThreadOnce(const char* symbol)
+	void warnOffGuiThreadOnce(const char* symbol)   // 仅首次告警（插件可能每个请求都调一次），并把"该怎么做"写在告警里
 	{
 		static bool warned = false;
 		if (warned)
@@ -39,8 +38,7 @@ namespace
 	}
 }
 
-// ABI 版本：常量，线程无关，插件启动时用它握手。
-ULINHUB_HOST_EXPORT unsigned int ULinHubHostAbiVersion(void)
+ULINHUB_HOST_EXPORT unsigned int ULinHubHostAbiVersion(void)   // ABI 版本：常量，线程无关，插件启动时用它握手
 {
 	return ULINHUB_HOST_ABI_VERSION;
 }

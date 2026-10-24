@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ULin Hub 单色线性图标：24×24、fill=none、描边纯白（#FFFFFF）、圆头/圆角。
+     运行时由 LineIcon.qml / IconButton.iconColor 按亮度染色，所以这里不要写死主题色。
+     用途：设置页左导航「模型列表」——立方体（模型/包）。 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3l8 4.4v9.2L12 21l-8-4.4V7.4z"/>
+  <path d="M4 7.4l8 4.4 8-4.4M12 11.8V21"/>
+</svg>

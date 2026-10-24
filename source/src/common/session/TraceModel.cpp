@@ -1,5 +1,4 @@
 // 见 include/common/session/TraceModel.h：会话事件账本 -> 轨迹记录表。
-//
 // 这里刻意**不碰 UI**：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
 // 模型只吐数据（kind + 数字 + 原文）。这样加语言不用改 C++，也不会出现"模型里塞中文"的老问题。
 
@@ -12,7 +11,6 @@
 
 namespace
 {
-	// 历史记录可能包一层 { event: {...} }（与 ChatController::unwrapRecord 同义）
 	QJsonObject unwrapRecord(const QJsonValue& value)
 	{
 		QJsonObject event = value.toObject();
@@ -26,8 +24,7 @@ namespace
 		return static_cast<qint64>(event.value(QStringLiteral("time")).toDouble());
 	}
 
-	// 内容块数组 -> 纯文本（只取 text 块；image / tool 等留给检查面板看原文）
-	QString blocksText(const QJsonValue& content)
+	QString blocksText(const QJsonValue& content)   // 内容块数组 -> 纯文本（只取 text 块；image / tool 等留给检查面板看原文）
 	{
 		if (content.isString())
 			return content.toString();
@@ -73,8 +70,7 @@ namespace
 		return parts.join(QLatin1Char('\n'));
 	}
 
-	// 单行预览：换行折成空格，超长截断（委托里还有 elide，这里只为不让模型带着整篇正文）
-	QString preview(const QString& text, int limit = 400)
+	QString preview(const QString& text, int limit = 400)   // 单行预览：换行折成空格，超长截断（委托里还有 elide，这里只为不让模型带着整篇正文）
 	{
 		const QString flat = text.simplified();
 		if (flat.size() > limit)
@@ -216,12 +212,12 @@ void TraceModel::clear()
 {
 	m_events.clear();
 	m_rows.clear();
+	m_pendingRows.clear();
+	m_touchedRows.clear();
 	m_summary.clear();
-	m_callRows.clear();
-	m_callEvents.clear();
-	m_callTimes.clear();
 	m_projectedCount = 0;
 	m_paused = false;   // 换会话时解除暂停：否则新会话的事件会一直攒着不显示
+	resetProjectionState();
 	beginResetModel();
 	endResetModel();
 	emit countChanged();
@@ -269,11 +265,12 @@ void TraceModel::appendEvent(const QJsonObject& event)
 
 	m_events.append(event);
 
-	// 暂停中：只记账不重建（用户在往回翻，重建会把滚动位置打回去）
-	if (m_paused)
+	if (m_paused)   // 暂停中：只记账不投影（用户在往回翻，表不该继续长、行号也不该继续变）
 		return;
 
-	rebuild();
+	// 增量投影：只把新事件变成行，用 beginInsertRows 追加 —— 不 reset，
+	// 否则 ListView 每次都要重建全部委托，滚动位置和滚动条长度会跟着抖。
+	projectPending();
 }
 
 void TraceModel::setPaused(bool paused)
@@ -281,17 +278,101 @@ void TraceModel::setPaused(bool paused)
 	if (m_paused == paused)
 		return;
 	m_paused = paused;
-	// 恢复时把暂停期间攒下的事件一次性投影出来（m_events 里已经在了，重建即可）
-	if (!m_paused && m_projectedCount != m_events.size())
-		rebuild();
+	if (!m_paused)   // 恢复时把暂停期间攒下的事件一次性补投影（走增量路径，已有行的位置不动）
+		projectPending();
 }
 
+// 整表重建：换会话、follow 首帧快照、上翻一页。
+// ⚠️ 只有这里允许 beginResetModel —— 流式追加绝不能走 reset：
+// ListView 在 reset 时把全部委托作废重排，行高不一时 contentHeight（估值）会来回修正
 void TraceModel::rebuild()
 {
 	beginResetModel();
 
 	m_rows.clear();
 	m_rows.reserve(m_events.size() + 8);
+	resetProjectionState();
+	projectRange(0);
+	for (const Row& row : m_pendingRows)
+		m_rows.append(row);
+	m_pendingRows.clear();
+	m_touchedRows.clear();
+	m_projectedCount = m_events.size();
+
+	endResetModel();
+	recomputeSummary();
+	emit countChanged();
+}
+
+// 增量投影：新行用 beginInsertRows 追加，被回填的旧行用 dataChanged 点对点通知。
+// 这样 ListView 的委托与滚动位置都保留，只有"表尾长了一截"。
+void TraceModel::projectPending()
+{
+	if (m_projectedCount >= m_events.size())
+		return;
+
+	projectRange(m_projectedCount);
+	m_projectedCount = m_events.size();
+	flushPendingRows();
+
+	recomputeSummary();
+	emit countChanged();
+}
+
+void TraceModel::projectRange(int fromEvent)
+{
+	m_pendingRows.clear();
+	m_touchedRows.clear();
+
+	const int begin = qMax(0, fromEvent);
+	for (int i = begin; i < m_events.size(); ++i)
+		projectEvent(m_events.at(i));
+}
+
+void TraceModel::flushPendingRows()
+{
+	const int first = m_rows.size();
+	const int added = m_pendingRows.size();
+
+	if (added > 0) {
+		beginInsertRows(QModelIndex(), first, first + added - 1);
+		m_rows.reserve(first + added);
+		for (const Row& row : m_pendingRows)
+			m_rows.append(row);
+		m_pendingRows.clear();
+		endInsertRows();
+	}
+
+	// 被回填的旧行（轮次/步骤结束时的耗时、工具结果）——只报真正动过的那些。
+	// 插进表里的新行不用报：它们插入时内容已经是最终的。
+	for (int rowIndex : m_touchedRows) {
+		if (rowIndex >= 0 && rowIndex < first)
+			emit dataChanged(index(rowIndex), index(rowIndex));
+	}
+	m_touchedRows.clear();
+}
+
+TraceModel::Row* TraceModel::rowAt(int rowIndex)
+{
+	if (rowIndex < 0)
+		return nullptr;
+	if (rowIndex < m_rows.size())
+		return &m_rows[rowIndex];
+
+	const int pendingIndex = rowIndex - m_rows.size();
+	if (pendingIndex < m_pendingRows.size())
+		return &m_pendingRows[pendingIndex];
+	return nullptr;
+}
+
+void TraceModel::markTouched(int rowIndex)
+{
+	if (rowIndex >= 0 && rowIndex < m_rows.size())
+		m_touchedRows.insert(rowIndex);
+}
+
+void TraceModel::resetProjectionState()
+{
 	m_callRows.clear();
 	m_callEvents.clear();
 	m_callTimes.clear();
@@ -309,15 +390,6 @@ void TraceModel::rebuild()
 	m_outputTokens = 0;
 	m_firstTimeMs = 0;
 	m_lastTimeMs = 0;
-
-	for (const QJsonObject& event : m_events)
-		projectEvent(event);
-
-	m_projectedCount = m_events.size();
-
-	endResetModel();
-	recomputeSummary();
-	emit countChanged();
 }
 
 void TraceModel::projectEvent(const QJsonObject& event)
@@ -334,9 +406,11 @@ void TraceModel::projectEvent(const QJsonObject& event)
 			m_lastTimeMs = timeMs;
 	}
 
+	// 新行先进 pending 区，本批投影结束后由 flushPendingRows() 统一 beginInsertRows 并进 m_rows。
+	// 行号按"m_rows + pending"的最终位置算，所以 m_currentTurnRow 之类照旧可以存/取。
 	const auto appendRow = [this](Row row) -> int {
-		m_rows.append(row);
-		return m_rows.size() - 1;
+		m_pendingRows.append(row);
+		return m_rows.size() + m_pendingRows.size() - 1;
 	};
 
 	if (type == QStringLiteral("turn/start")) {
@@ -359,19 +433,17 @@ void TraceModel::projectEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("turn/end")) {
-		if (m_currentTurnRow >= 0) {
-			Row& row = m_rows[m_currentTurnRow];
-			row.live = false;
-			row.statusKind.clear();
-			// ⚠️ 真实数据里 reason 是对象 { kind: "completed" }，不是字符串（2026-10-19 实测会话文件）；
-			//    早先按字符串取会得到空串，轮次行右侧的状态就永远不显示。
-			const QJsonValue reasonValue = data.value(QStringLiteral("reason"));
-			row.statusText = reasonValue.isObject()
+		if (Row* row = rowAt(m_currentTurnRow)) {
+			markTouched(m_currentTurnRow);
+			row->live = false;
+			row->statusKind.clear();
+			const QJsonValue reasonValue = data.value(QStringLiteral("reason"));   // 早先按字符串取会得到空串，轮次行右侧的状态就永远不显示
+			row->statusText = reasonValue.isObject()
 				? reasonValue.toObject().value(QStringLiteral("kind")).toString()
 				: reasonValue.toString();
 			if (timeMs > 0 && m_turnStartMs > 0)
-				row.durationText = elapsed(timeMs - m_turnStartMs);
-			row.detail = prettyJson(event);
+				row->durationText = elapsed(timeMs - m_turnStartMs);
+			row->detail = prettyJson(event);
 		}
 		return;
 	}
@@ -395,13 +467,13 @@ void TraceModel::projectEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("step/end")) {
-		if (m_currentStepRow >= 0) {
-			Row& row = m_rows[m_currentStepRow];
-			row.live = false;
-			row.statusKind.clear();
-			row.detail = prettyJson(event);
+		if (Row* row = rowAt(m_currentStepRow)) {
+			markTouched(m_currentStepRow);
+			row->live = false;
+			row->statusKind.clear();
+			row->detail = prettyJson(event);
 			if (timeMs > 0 && m_stepStartMs > 0)
-				row.durationText = elapsed(timeMs - m_stepStartMs);
+				row->durationText = elapsed(timeMs - m_stepStartMs);
 		}
 		return;
 	}
@@ -414,6 +486,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		const QString form = source.value(QStringLiteral("form")).toString();
 
 		Row row;
+
 		// 隐藏的上下文注入（snapshot/instructions/catalog）不是人发的 —— 标成 context，视觉上弱一档
 		row.kind = form.isEmpty() ? QStringLiteral("user") : QStringLiteral("context");
 		row.title = form;
@@ -443,8 +516,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 
 		Row row;
 		row.kind = QStringLiteral("assistant");
-		// 纯工具调用的步骤没有 text 块，退到 reasoning 当预览（否则整行只剩右侧的用量数字）
-		QString body = messageText(message);
+		QString body = messageText(message);   // 纯工具调用的步骤没有 text 块，退到 reasoning 当预览（否则整行只剩右侧的用量数字）
 		if (body.isEmpty())
 			body = reasoningText(message);
 		row.subtitle = preview(body);
@@ -456,8 +528,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 				+ QStringLiteral(" ↓") + compactCount(outputTokens);
 
 		if (firstToken > 0 && lastToken > firstToken) {
-			// TTFT 从"这一步开始"量（官方口径）；步骤起点未知时退化成只报生成耗时
-			const qint64 generation = lastToken - firstToken;
+			const qint64 generation = lastToken - firstToken;   // TTFT 从"这一步开始"量（官方口径）；步骤起点未知时退化成只报生成耗时
 			if (m_stepStartMs > 0 && firstToken >= m_stepStartMs) {
 				row.durationText = QStringLiteral("TTFT ") + elapsed(firstToken - m_stepStartMs)
 					+ QStringLiteral(" · ") + elapsed(generation);
@@ -498,8 +569,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		const QString name = data.value(QStringLiteral("name")).toString();
 		const QString arguments = data.value(QStringLiteral("arguments")).toString();
 
-		// arguments 是模型产出的**原始 JSON 字符串**（未解析）；能解析就美化，不能就原样
-		QString prettyArguments = arguments;
+		QString prettyArguments = arguments;   // arguments 是模型产出的**原始 JSON 字符串**（未解析）；能解析就美化，不能就原样
 		const QJsonDocument parsed = QJsonDocument::fromJson(arguments.toUtf8());
 		if (!parsed.isNull())
 			prettyArguments = QString::fromUtf8(parsed.toJson(QJsonDocument::Indented));
@@ -540,44 +610,41 @@ void TraceModel::projectEvent(const QJsonObject& event)
 			output = messageText(message);
 
 		const int rowIndex = m_callRows.value(callId, -1);
-		if (rowIndex >= 0 && rowIndex < m_rows.size()) {
-			Row& row = m_rows[rowIndex];
-			row.live = false;
-			// 结果预览比参数更贴近"这一行发生了什么"，有正文就换掉
-			if (!output.isEmpty())
-				row.subtitle = preview(output);
+		if (Row* row = rowAt(rowIndex)) {
+			markTouched(rowIndex);
+			row->live = false;
+			if (!output.isEmpty())   // 结果预览比参数更贴近"这一行发生了什么"，有正文就换掉
+				row->subtitle = preview(output);
 			if (failed) {
 				++m_errors;
-				row.statusKind = QStringLiteral("error");
-				row.statusText = error.value(QStringLiteral("code")).toString();
-				if (row.statusText.isEmpty())
-					row.statusText = error.value(QStringLiteral("name")).toString();
+				row->statusKind = QStringLiteral("error");
+				row->statusText = error.value(QStringLiteral("code")).toString();
+				if (row->statusText.isEmpty())
+					row->statusText = error.value(QStringLiteral("name")).toString();
 			} else {
-				row.statusKind = QStringLiteral("ok");
+				row->statusKind = QStringLiteral("ok");
 			}
 
-			// 耗时只能靠两条事件的 time 差（账本里没有专门计时字段）—— 官方 Inspect 的 Timing 页同口径
-			const qint64 startedAt = m_callTimes.value(callId, 0);
+			const qint64 startedAt = m_callTimes.value(callId, 0);   // 耗时只能靠两条事件的 time 差（账本里没有专门计时字段）—— 官方 Inspect 的 Timing 页同口径
 			if (startedAt > 0 && timeMs > startedAt)
-				row.durationText = elapsed(timeMs - startedAt);
+				row->durationText = elapsed(timeMs - startedAt);
 
 			QJsonObject detail;
 			detail.insert(QStringLiteral("call"), m_callEvents.value(callId));
 			detail.insert(QStringLiteral("result"), event);
-			row.detail = prettyJson(detail);
+			row->detail = prettyJson(detail);
 		} else {
-			// 结果没有对应的 call（历史被截断 / 分页边界）：单独成行，不要吞掉
-			Row row;
-			row.kind = QStringLiteral("tool");
-			row.title = message.value(QStringLiteral("name")).toString();
-			row.subtitle = preview(output);
-			row.timeText = timeText(timeMs);
-			row.depth = 2;
-			row.seq = seq;
-			row.statusKind = failed ? QStringLiteral("error") : QStringLiteral("ok");
-			row.statusText = error.value(QStringLiteral("code")).toString();
-			row.detail = prettyJson(event);
-			appendRow(row);
+			Row orphan;   // 结果没有对应的 call（历史被截断 / 分页边界）：单独成行，不要吞掉
+			orphan.kind = QStringLiteral("tool");
+			orphan.title = message.value(QStringLiteral("name")).toString();
+			orphan.subtitle = preview(output);
+			orphan.timeText = timeText(timeMs);
+			orphan.depth = 2;
+			orphan.seq = seq;
+			orphan.statusKind = failed ? QStringLiteral("error") : QStringLiteral("ok");
+			orphan.statusText = error.value(QStringLiteral("code")).toString();
+			orphan.detail = prettyJson(event);
+			appendRow(orphan);
 			if (failed)
 				++m_errors;
 		}

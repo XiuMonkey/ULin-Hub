@@ -1,21 +1,29 @@
 #pragma once
 
-// 把 Markdown 按"代码围栏"切成有序单元 —— 这是旧壳 AgentMessageUnit 的既定规则：
-// 同一气泡里正文与代码块严格按出现顺序排布，代码围栏切成**独立单元**（带语言标签、不换行、自带滚动），
-// 而不是整段塞进一个富文本控件。规则本身不变，只是渲染从 QTextBrowser 换成 QML 原生控件。
-//
+// C++ 侧 Markdown 解析/排版：
+//  ① 用 Qt 6 内置的 md4c（GitHub 方言）解析成 QTextDocument；
+//  ② 按 DSH 的排版规格改标题/列表/引用/代码块/表格的格式；
+//  ③ QML 的 MarkdownBody 直接持有这个 QTextDocument，增量插入 fragment。
+// split 保留旧规则：正文按代码围栏切成 prose/code 单元，代码块继续交给 CodeBlock.qml。
+// 因此拖选能跨段落/表格，但不能跨进代码块（不同 QML 控件）。
 // 产出单元（QVariantMap）：
-//   { kind: "prose", text }                                   —— 交给 Text{ textFormat: MarkdownText }
-//   { kind: "code", language, text, html }                     —— 交给 CodeBlock.qml（html 已高亮）
+//  { kind: "prose", text } —— 交给 MarkdownBody.qml
+//  { kind: "code", language, text, html } —— 交给 CodeBlock.qml
+// renderFragment 的 colors 键：text / secondary / codeBg / inlineBg / link。
 
 #include <QString>
+#include <QTextDocumentFragment>
 #include <QVariantList>
+#include <QVariantMap>
 
 namespace MarkdownSegmenter
 {
 	// 启动期调一次：装载语法高亮规则（qrc 里的 highlight-rules.json）。
-	// 规则缺失不报错，只是 code 单元的 html 退化为转义纯文本。
+	// 规则缺失不报错；C++ QTextDocument 渲染不依赖它，保留给旧 CodeBlock 调用点。
 	void ensureHighlightRulesLoaded();
 
 	QVariantList split(const QString& markdown);
+
+	// 增量流式用：把一小段 Markdown 排成可插入 QTextDocument 的 fragment。
+	QTextDocumentFragment renderFragment(const QString& markdown, const QVariantMap& colors);
 }

@@ -1,13 +1,16 @@
 // 插件市场（按原版 ui/PluginsManager.cpp + styles/plugin-market.qss 复刻）
-//
-//   820×600 弹窗：#popupBody 式圆角卡片 + 标题 plugin_market_title + 右上关闭
-//   工具栏：搜索框（plugin_search_placeholder）+ 刷新（common_refresh）+ 重启服务（plugin_restart_server）
-//   两个 Tab：市场（plugin_market_title）/ 已安装（plugin_installed）
-//   市场页：卡片（名称 14/600 + 分类徽章 tagBg + 描述 12px + 安装按钮 primary 样式）+ 分页（每页 20）
-//   已安装页：卡片（名称 + 版本，更新 hoverBg / 卸载 danger）
-//   底部状态行（三种加载态 + 操作反馈，全部用既有 id）
-//
+// 820×600 弹窗：#popupBody 式圆角卡片 + 标题 plugin_market_title + 右上关闭
+// 工具栏：搜索框（plugin_search_placeholder）+ 刷新（common_refresh）+ 重启服务（plugin_restart_server）
+// 两个 Tab：市场（plugin_market_title）/ 已安装（plugin_installed）
+// 市场页：卡片（名称 14/600 + 分类徽章 tagBg + 描述 12px + 安装按钮 primary 样式）+ 分页（每页 20）
+// 已安装页：卡片（名称 + 版本，更新 hoverBg / 卸载 danger）
+// 底部状态行（三种加载态 + 操作反馈，全部用既有 id）
 // 列表用 ListView（惰性建委托），不是 Flickable+Column+Repeater —— 理由见"列表区"那段注释。
+// 整页像一张表格。改版做了四件事（都不改数据与交互语义）：
+// ② 搜索框补一颗放大镜（SearchField 新增 leadingIcon，其它调用方默认不受影响）；
+// ③ 市场卡片：左侧 32×32 图标底 + 名称/分类/描述 + 右侧**实心**安装键（一页一个的主动作），
+// 悬停只把描边提到 inputBorder（不再整圈变蓝）；
+// 没有颜色语义的普通按钮）。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -17,19 +20,13 @@ import "../../widgets"
 Item {
     id: page
 
-    // 卡片目标尺寸（= 原来那个 Card 的宽高）：PageOverlay 按它算"长到多大、停在哪儿"
     implicitWidth: 820
     implicitHeight: 600
 
-    // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停，
-
-    // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容：
-    // 原来是 Card 的子项，现在挂在这层与卡片同尺寸的 Item 上，anchors 一行都不用改。
-    Item {
+    Item {   // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容
         id: popup
         anchors.fill: parent
 
-        // ---- 标题行 ----
         Item {
             id: titleRow
             anchors.left: parent.left
@@ -40,8 +37,18 @@ Item {
             anchors.topMargin: 16
             implicitHeight: 32
 
-            Text {
+            LineIcon {
+                id: titleIcon
                 anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                name: "plugin"
+                size: 16
+                color: Theme.color.textSecondary
+            }
+
+            Text {
+                anchors.left: titleIcon.right
+                anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("plugin_market_title")
                 color: Theme.color.textPrimary
@@ -54,12 +61,12 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                // 加载指示用**静态**文字，不用转圈（这是本轮实测的结论，不是偷懒）：
                 // 理由：转圈是常驻无限动画 ⇒ 每帧整窗重绘 ⇒ 加载期间整窗 ~30ms/帧；按时间门控
                 // 又必然要么盖住建卡（变卡）要么延迟（450ms）。静态文字立刻可见且永不重绘。
-                //   静态文字两项都满足：**立刻可见**（无延迟）、**永不重绘**（无掉帧）。
+                // 静态文字两项都满足：**立刻可见**（无延迟）、**永不重绘**（无掉帧）。
+                // ⚠️ Row 子项不写 verticalCenter 锚（Qt 会拒绝），按行高现算 y。
                 Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                    y: Math.round((parent.height - height) / 2)
                     visible: Hub.plugins.busy
                     text: (Hub.plugins.statusText && Hub.plugins.statusText.length > 0) ? Hub.plugins.statusText : "加载中…"
                     color: Theme.color.textTertiary
@@ -74,7 +81,6 @@ Item {
             }
         }
 
-        // ---- 工具栏 ----
         Row {
             id: toolbar
             anchors.left: parent.left
@@ -83,83 +89,56 @@ Item {
             anchors.leftMargin: 20
             anchors.rightMargin: 20
             anchors.topMargin: 12
+            height: 32
             spacing: 8
 
             SearchField {
                 id: search
+                y: 1
+                height: 30
+                leadingIcon: "search"
                 width: parent.width - refreshButton.width - restartButton.width - 2 * parent.spacing
                 placeholderText: qsTrId("plugin_search_placeholder")
                 onTextChanged: Hub.plugins.setSearch(text)
             }
 
-            IconButton {
+            ActionButton {
                 id: refreshButton
-                label: qsTrId("common_refresh")
+                width: 72
+                height: 30
+                y: 1
+                text: qsTrId("common_refresh")
+                variant: "ghost"
                 onClicked: Hub.plugins.refresh()
             }
 
-            IconButton {
+            ActionButton {
                 id: restartButton
-                label: qsTrId("plugin_restart_server")
+                width: 96
+                height: 30
+                y: 1
+                text: qsTrId("plugin_restart_server")
+                variant: "ghost"
                 onClicked: Hub.plugins.restartServer()
             }
         }
 
-        // ---- Tab ----
-        Row {
+        SegmentedTabs {
             id: tabs
             anchors.left: parent.left
             anchors.top: toolbar.bottom
             anchors.leftMargin: 20
             anchors.topMargin: 12
-            spacing: 8
-
-            Repeater {
-                model: [qsTrId("plugin_market_title"), qsTrId("plugin_installed")]
-
-                delegate: Rectangle {
-                    id: tabItem
-
-                    required property string modelData
-                    required property int index
-
-                    implicitWidth: tabLabel.implicitWidth + 36
-                    implicitHeight: 32
-                    radius: 10
-                    color: Hub.plugins.tab === index
-                        ? Theme.color.activeBg
-                        : (tabMouse.containsMouse ? Theme.color.hoverBg : "transparent")
-                    border.width: 1
-                    border.color: Theme.color.border
-
-                    Text {
-                        id: tabLabel
-                        anchors.centerIn: parent
-                        text: tabItem.modelData
-                        color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
-                        font.pixelSize: Theme.font.title
-                        font.weight: Hub.plugins.tab === tabItem.index ? Theme.font.weightBold : Font.Normal
-                    }
-
-                    MouseArea {
-                        id: tabMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Hub.plugins.setTab(tabItem.index)
-                    }
-                }
-            }
+            tabHeight: 26
+            currentKey: Hub.plugins.tab === 0 ? "market" : "installed"
+            model: [
+                { key: "market", label: qsTrId("plugin_market_title") },
+                { key: "installed", label: qsTrId("plugin_installed")   // "已安装"带上数量：两页之间切来切去时，这个数字是最有用的一条信息
+                    + (Hub.plugins.installedItems.length > 0 ? " " + Hub.plugins.installedItems.length : "") }
+            ]
+            onSelected: (key) => Hub.plugins.setTab(key === "market" ? 0 : 1)
         }
 
-        // ---- 列表区 ----
-        // ⚠️ 刻意**不用** Flickable + Column + Repeater：那套会在数据到达的那一帧把当页
-        //    **所有**卡片（最多 20 张，每张卡片又是几十个 item）一次建出来 —— 市场数据走快照 /
-        //    缓存时正好落在展开动画里（离屏试装台实测：那一帧 48ms，正常 16ms）⇒ 首开明显掉帧。
-        //    ListView 只建"可见的 + cacheBuffer 那点"，其余滚到了才建。
-        // 两个 Tab 各一个 ListView：非当前 Tab 那个把 model 置空 ⇒ 委托数为 0。
-        // ⚠️ 必须靠"空 model"而不是只靠 visible —— 不可见的 ListView 照样会为视口建委托。
         Item {
             id: listArea
             anchors.left: parent.left
@@ -177,8 +156,7 @@ Item {
                 boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: AppScrollBar { }
                 spacing: 8
-                // 只比一屏多留一张卡的余量：再大等于把"以后才要建的"提前到现在建
-                cacheBuffer: 160
+                cacheBuffer: 160   // 只比一屏多留一张卡的余量：再大等于把"以后才要建的"提前到现在建
                 model: Hub.plugins.tab === 0 ? Hub.plugins.marketItems : []
 
                 delegate: Rectangle {
@@ -186,11 +164,13 @@ Item {
                     required property var modelData
 
                     width: ListView.view.width
-                    implicitHeight: cardBody.implicitHeight + 24
+                    implicitHeight: Math.max(64, cardBody.implicitHeight + 24)
                     radius: Theme.radius.card
-                    color: Theme.color.panelBg
+                    color: cardMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
                     border.width: 1
-                    border.color: cardMouse.containsMouse ? Theme.color.accent : Theme.color.border
+                    border.color: cardMouse.containsMouse ? Theme.color.inputBorder : Theme.color.menuBorder
+
+                    Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
 
                     MouseArea {
                         id: cardMouse
@@ -199,17 +179,36 @@ Item {
                         acceptedButtons: Qt.NoButton
                     }
 
+                    Rectangle {   // 图标底：32×32 浅面方块（插件二字没有可用的分类图标，统一用 plugin 线性图）
+                        id: iconTile
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 32
+                        height: 32
+                        radius: Theme.radius.control
+                        color: Theme.color.buttonBg
+
+                        LineIcon {
+                            anchors.centerIn: parent
+                            name: "plugin"
+                            size: 16
+                            color: cardMouse.containsMouse ? Theme.color.textPrimary : Theme.color.textSecondary
+                        }
+                    }
+
                     Column {
                         id: cardBody
-                        anchors.left: parent.left
+                        anchors.left: iconTile.right
+
                         // 原版 createMarketCard：QHBoxLayout(contentsMargins 14,12,14,12; spacing 12)，
                         // 左侧 infoLayout 是 stretch=1、中间 12px 间隔、右侧安装按钮 stretch=0。
                         // 所以文字栏的右边必须停在按钮左侧，否则描述文字会跑到按钮底下（重合）。
                         anchors.right: installButton.left
                         anchors.verticalCenter: parent.verticalCenter
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 12
-                        spacing: 4
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 14
+                        spacing: 3
 
                         Row {
                             width: parent.width
@@ -217,7 +216,11 @@ Item {
 
                             Text {
                                 id: nameText
+                                width: Math.min(implicitWidth,   // 名称让位给分类徽章后自己省略（Row 不会"吃掉剩余宽度"，必须显式算）
+                                                parent.width - (categoryBadge.visible
+                                                    ? categoryBadge.implicitWidth + parent.spacing : 0))
                                 text: card.modelData.name
+                                elide: Text.ElideRight
                                 color: Theme.color.textPrimary
                                 font.family: "Microsoft YaHei UI"
                                 font.pixelSize: Theme.font.title
@@ -225,18 +228,19 @@ Item {
                             }
 
                             Rectangle {
+                                id: categoryBadge
                                 visible: card.modelData.category.length > 0
-                                implicitWidth: categoryText.implicitWidth + 16
-                                implicitHeight: categoryText.implicitHeight + 4
-                                radius: 6
-                                color: Theme.color.tagBg
-                                anchors.verticalCenter: parent.verticalCenter
+                                implicitWidth: categoryText.implicitWidth + 14
+                                implicitHeight: 18
+                                radius: height / 2
+                                color: Theme.color.buttonBg
+                                y: Math.round((parent.height - height) / 2)   // Row 里不写 verticalCenter 锚（会被 Qt 拒绝），按行高现算 y
 
                                 Text {
                                     id: categoryText
                                     anchors.centerIn: parent
                                     text: card.modelData.category
-                                    color: Theme.color.accent
+                                    color: Theme.color.textSecondary
                                     font.family: "Microsoft YaHei UI"
                                     font.pixelSize: Theme.font.small
                                 }
@@ -248,18 +252,24 @@ Item {
                             visible: card.modelData.description.length > 0
                             text: card.modelData.description
                             wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                            elide: Text.ElideRight
                             color: Theme.color.textSecondary
                             font.family: "Microsoft YaHei UI"
                             font.pixelSize: Theme.font.caption
+                            lineHeight: 1.25
                         }
                     }
 
-                    IconButton {
+                    ActionButton {
                         id: installButton
                         anchors.right: parent.right
                         anchors.rightMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        label: qsTrId("plugin_install_action")
+                        width: 64
+                        height: 28
+                        text: qsTrId("plugin_install_action")
+                        variant: "primary"
                         onClicked: Hub.plugins.install(card.modelData.url)
                     }
                 }
@@ -283,25 +293,70 @@ Item {
                     width: ListView.view.width
                     implicitHeight: 56
                     radius: Theme.radius.card
-                    color: Theme.color.panelBg
+                    color: installedHover.hovered ? Theme.color.hoverBg : Theme.color.panelBg
                     border.width: 1
-                    border.color: Theme.color.border
+                    border.color: installedHover.hovered ? Theme.color.inputBorder : Theme.color.menuBorder
 
-                    Text {
+                    HoverHandler { id: installedHover }
+
+                    Rectangle {
+                        id: installedIconTile
                         anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 28
+                        height: 28
+                        radius: Theme.radius.control
+                        color: Theme.color.buttonBg
+
+                        LineIcon {
+                            anchors.centerIn: parent
+                            name: "plugin"
+                            size: 14
+                            color: Theme.color.textSecondary
+                        }
+                    }
+
+                    Row {
+                        anchors.left: installedIconTile.right
+
                         // 原版 createInstalledCard：名字 label 是 stretch=1，右侧两个按钮 stretch=0。
                         // 所以名字要给按钮让位并省略号收尾，不能盖到按钮上。
                         anchors.right: buttonRow.left
-                        anchors.leftMargin: 14
+                        anchors.leftMargin: 12
                         anchors.rightMargin: 12
                         anchors.verticalCenter: parent.verticalCenter
-                        elide: Text.ElideRight
-                        text: installedCard.modelData.version.length > 0
-                            ? installedCard.modelData.name + "  " + installedCard.modelData.version
-                            : installedCard.modelData.name
-                        color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
-                        font.pixelSize: Theme.font.title
+                        spacing: 8
+
+                        Text {
+                            width: Math.min(implicitWidth,
+                                            parent.width - (versionBadge.visible
+                                                ? versionBadge.implicitWidth + parent.spacing : 0))
+                            text: installedCard.modelData.name
+                            elide: Text.ElideRight
+                            color: Theme.color.textPrimary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.title
+                        }
+
+                        Rectangle {
+                            id: versionBadge
+                            y: Math.round((parent.height - height) / 2)   // Row 子项不用锚点，y 现算（同市场卡片那颗徽章）
+                            visible: installedCard.modelData.version.length > 0
+                            implicitWidth: versionText.implicitWidth + 12
+                            implicitHeight: 18
+                            radius: height / 2
+                            color: Theme.color.buttonBg
+
+                            Text {
+                                id: versionText
+                                anchors.centerIn: parent
+                                text: installedCard.modelData.version
+                                color: Theme.color.textTertiary
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.small
+                            }
+                        }
                     }
 
                     Row {
@@ -309,19 +364,21 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 12
+                        spacing: 8
 
-                        IconButton {
-                            label: qsTrId("plugin_update_action")
+                        ActionButton {
+                            width: 56
+                            height: 28
+                            text: qsTrId("plugin_update_action")
+                            variant: "elevated"
                             onClicked: Hub.plugins.update(installedCard.modelData.name)
                         }
 
-                        IconButton {
-                            label: qsTrId("plugin_uninstall_action")
-                            // 色板里没有 dangerText 这个键（叫 danger）——写错的键名只会打 warning、
-                            // 颜色静默取默认值，所以这里按色板实际键名取。
-                            glyphColor: Theme.color.danger
-                            glyphColorHover: Theme.color.danger
+                        ActionButton {   // 卸载：透明面 + 危险色文字（危险动作不该是实心红块，也不该和"更新"长得一样）
+                            width: 56
+                            height: 28
+                            text: qsTrId("plugin_uninstall_action")
+                            variant: "ghostDanger"
                             onClicked: Hub.plugins.uninstall(installedCard.modelData.name)
                         }
                     }
@@ -329,17 +386,14 @@ Item {
             }
         }
 
-        // ---- 市场包自动安装（M6）：/dsh-market/* 回 404 时自动 pnpm add dshmarket ----
-        // 原版是 4px 进度条 + 状态行；这里同尺寸，安装中用往返动画表示"进行中"。
         Column {
             id: installBox
 
             anchors.left: parent.left
             anchors.right: parent.right
-            // 原来是 anchors.bottom: installBox.top —— 锚到自己，Qt 会丢弃这条锚点，
-            // installBox 于是塌到 y=0，连带 listArea.bottom(=installBox.top) 也变成 0，
-            // 列表区高度归零 ⇒ 市场数据拉到了也一条都显示不出来。
-            // 它应该贴在底部状态行（statusRow）之上，列表区随之正好让位。
+
+            // ⚠️ 不能锚到 installBox 自己（Qt 会丢弃这条锚点）：installBox 塌到 y=0 后列表区高度归零，
+            // 市场数据拉到了也一条都显示不出来。贴在底部状态行（statusRow）之上，列表区才正确让位。
             anchors.bottom: statusRow.top
             anchors.leftMargin: 20
             anchors.rightMargin: 20
@@ -395,7 +449,6 @@ Item {
             }
         }
 
-        // ---- 分页 + 状态行 ----
         Item {
             id: statusRow
             anchors.left: parent.left
@@ -410,25 +463,32 @@ Item {
                 id: pagerRow
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
+                height: 28
                 spacing: 8
                 visible: Hub.plugins.tab === 0
 
-                IconButton {
-                    label: qsTrId("common_prev_page")
+                ActionButton {
+                    width: 64
+                    height: 28
+                    text: qsTrId("common_prev_page")
+                    variant: "elevated"
                     enabled: Hub.plugins.canPrev
                     onClicked: Hub.plugins.prevPage()
                 }
 
                 Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                    y: Math.round((parent.height - height) / 2)   // Row 子项不用锚点：按行高居中的 y（同工具栏那条说明）
                     text: Hub.plugins.pageLabel
                     color: Theme.color.textSecondary
                     font.family: "Microsoft YaHei UI"
                     font.pixelSize: Theme.font.caption
                 }
 
-                IconButton {
-                    label: qsTrId("common_next_page")
+                ActionButton {
+                    width: 64
+                    height: 28
+                    text: qsTrId("common_next_page")
+                    variant: "elevated"
                     enabled: Hub.plugins.canNext
                     onClicked: Hub.plugins.nextPage()
                 }
@@ -438,10 +498,11 @@ Item {
                 id: statusText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+
                 // 限宽：左边界锚到翻页行（pagerRow）右侧 —— 文案再长也不会压住"上一页/下一页"，
                 // 右边界到卡片右边，超出部分尾部省略号。
                 anchors.left: pagerRow.right
-            anchors.leftMargin: 16
+                anchors.leftMargin: 16
                 horizontalAlignment: Text.AlignRight
                 text: Hub.plugins.status
                 elide: Text.ElideRight

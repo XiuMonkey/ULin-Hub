@@ -1,6 +1,9 @@
-// 侧栏：Logo + 新建会话 + 工作区/会话列表 + 底部图标行。
-// 数据来自 Hub.sessions（摊平的工作区/会话行模型，见 include/common/session/SessionListModel.h）。
-// 布局用锚点而不是 Column：列表要吃掉剩余高度，锚点比"减一圈高度"可靠。
+// 侧栏（Quiet Rail 版）：200×69 Logo + 唯一主按钮「新对话」+ 搜索 + 置顶/工作区/会话列表 + 底部工具条。
+// 视觉与结构照 build/temp/sidebar-redesign/index.html（concept a）+ styles.css 落地；
+// 外层圆角卡片（radius 12、窗口留白、Card 阴影）仍由 Shell.qml 的 sessionBarCard 提供，这里只排卡片内部。
+// 数据仍是 Hub.sessions（摊平的工作区/会话行模型，见 common/session/SessionListModel.h）：
+// UpdatedAtRole（updatedAtMs）/ filterText / setFilterText 都由模型直接提供；置顶段由模型给 kind="pinned"。
+// 命名契约：扩展注入点 "sessionBar" / "sessionBar.extDock" 与四条 HostConnections 保持不变
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -11,18 +14,18 @@ import "../../skin/session"
 Item {
     id: sessionBar
 
-    // 扩展注入点（名字契约见 assets/resources/docs/EXTENSION_DEV.zh-CN.md §11.3）；四条连接交给宿主建：
-    // 有真实 handle ⇒ 可挂起/恢复/接管/交还。
-    // 签名手写：带回参的信号要写全类型；接收端必须具名且**参数带类型标注**（未标注在元对象里是 QVariant，接不上）。
     Component.onCompleted: {
         HostUi.registerItem("sessionBar", this)
+        HostUi.registerItem("sessionBar.extDock", footer.extDock)   // 底排的扩展停靠位仍是 Row，注入项自动排在末尾
         HostConnections.RegisterConnection("qml.sessionBar.sessionCreateFailed", Hub, "sessionCreateFailed(QString)", sessionBar, "handleSessionCreateFailed(QString)")
         HostConnections.RegisterConnection("qml.sessionBar.openSettings", sessionBar, "openSettingsRequested()", sessionBar, "handleOpenSettings()")
         HostConnections.RegisterConnection("qml.sessionBar.openPluginMarket", sessionBar, "openPluginMarketRequested()", sessionBar, "handleOpenPluginMarket()")
-        // 清空会话与上面两条同一条路：默认处理器在本组件里，扩展可接管这条 index 换成自己的实现
         HostConnections.RegisterConnection("qml.sessionBar.clearSessions", sessionBar, "clearSessionsRequested()", sessionBar, "handleClearSessions()")
     }
+
     // 四条连接的默认处理器（没人接管时 = 宿主原本行为）
+    // 签名手写：带回参的信号要写全类型；接收端必须具名且参数带类型标注
+    // （未标注在元对象里是 QVariant，接不上）。
     function handleSessionCreateFailed(message: string) {
         sessionBar.notify(message)
     }
@@ -32,16 +35,14 @@ Item {
     function handleOpenPluginMarket() {
         Hub.plugins.openPage()
     }
-    // 清空会话：业务全在 core（ClientRuntime::clearAllSessions），这里只转调
-    function handleClearSessions() {
+    function handleClearSessions() {   // 清空会话：业务全在 core（ClientRuntime::clearAllSessions），这里只转调
         Hub.clearAllSessions()
     }
 
-    // 侧栏自己不弹 Toast：只把文案抛给壳层（Shell.qml 里统一放一个 Toast）
-    signal notify(string text)
+    signal notify(string text)   // 侧栏自己不弹 Toast：只把文案抛给壳层（Shell.qml 里统一放一个 Toast）
 
     // 操作失败（新建/删除工作区、目录非法…）：core 发 operationFailed，这里转成壳层 Toast。
-    // ⚠️ 这条线以前是断的（QmlBridge 里接了个空 lambda），所以"点了没反应"时用户拿不到任何原因。
+    // ⚠️ 缺了它，操作失败没有任何提示（用户只看到"点了没反应"）。
     Connections {
         target: Hub
 
@@ -50,18 +51,57 @@ Item {
         }
     }
 
-    // 两个入口的请求信号：按钮不直接开页面，谁响应由连接表决定（扩展接管后就换成扩展自己的面板）
     signal openSettingsRequested()
     signal openPluginMarketRequested()
-    // 清空会话（危险动作）：同样不直连，谁响应由连接表决定
-    signal clearSessionsRequested()
+    signal clearSessionsRequested()   // 清空会话（危险动作）：同样不直连，谁响应由连接表决定
 
-    // 背景与圆角由外层 Card 提供（Shell.qml）：这里再画一层方块会盖掉卡片的圆角。
-    // 侧栏只负责内部排布的留白。
+    // 收起侧栏：只发请求，开合的落点在壳层（Shell.setSessionBarCollapsed —— 侧栏往窗口左缘外滑、
+    // 内容列吃回它的宽度，与右栏开合同一套动效）。形态与其它入口一致：这里不自己改布局。
+    signal collapseRequested()
 
-    // ---- 顶部：Logo（居中）----
-    // 原版 SidebarLogo 是**横版标识**：ulin-hub-logo-tiny@2x.png 400×138、dpr=2 → 逻辑 200×69，
-    // 且用 addWidget(..., Qt::AlignHCenter) **居中**（Sidebar.cpp:42-48 / 516）。
+    function startNewSession() {
+        Hub.createSession("")   // 与现有实现「新建会话」同一条路：没有工作区参数 = 当前/默认工作区
+    }
+
+    // 工作区识别色：从 id/title 稳定散列出一个受控色相（蓝/绿/橙/紫），
+    // 只偏移 accent 的色相，不新增语义色 token（深浅主题都跟着 accent 走）。
+    function workspaceColorFor(key) {
+        if (!key || key.length === 0)
+            return Theme.color.accent
+        var hash = 0
+        for (var i = 0; i < key.length; ++i)
+            hash = (hash * 31 + key.charCodeAt(i)) % 997
+        var hueOffsets = [0.0, 0.72, 0.47, 0.17]
+        var hue = (Theme.color.accent.hsvHue + hueOffsets[hash % hueOffsets.length] + 1) % 1
+        return Qt.hsla(hue, 0.62, 0.64, 1.0)
+    }
+
+    // 会话行时间：updatedAtMs → 现在 / N 分钟前 / N 小时前 / N 天前 / 日期（7 天前改日期）。
+    // 调用方已按"ms > 0 才算已知"过滤，这里只管格式化。
+    function relativeTimeText(ms) {
+        var diff = Date.now() - ms
+        if (diff < 0)
+            diff = 0
+        var minute = 60 * 1000
+        var hour = 60 * minute
+        var day = 24 * hour
+        if (diff < minute)
+            return qsTrId("sessionBar_time_now")
+        if (diff < hour)
+            return qsTrId("sessionBar_time_minutes_fmt").arg(Math.floor(diff / minute))
+        if (diff < day)
+            return qsTrId("sessionBar_time_hours_fmt").arg(Math.floor(diff / hour))
+        if (diff < 7 * day)
+            return qsTrId("sessionBar_time_days_fmt").arg(Math.floor(diff / day))
+        return Qt.formatDate(new Date(ms), "yyyy-MM-dd")
+    }
+
+    function openRowContext(id, isWorkspace, y) {   // 右键/⋯ 删除：交给下面那套"贴行小按钮 + 确认卡"（原版形态，不遮罩）
+        sessionBar.pendingId = id
+        sessionBar.pendingIsWorkspace = isWorkspace
+        sessionBar.pendingY = y
+    }
+
     Item {
         id: topRow
         anchors.left: parent.left
@@ -87,132 +127,113 @@ Item {
         }
     }
 
-    // 原版顺序（Sidebar.cpp:517-518）：先「清空会话」(danger)，再「新建工作区」(主色)，都是全宽按钮
-    ActionButton {
-        id: clearButton
+    // 收起侧栏：浮在 Logo 右上角，不跟品牌抢位置（开合由壳层实现，见 Shell.setSessionBarCollapsed）
+    // 悬停只让图标直接变亮：不要 iconButtonHoverBg/PressedBg 那块深色方块 ——
+    // 否则鼠标移入/按下时会先出现一块深色底再恢复，视觉上"先变深再变浅"。
+    IconButton {
+        id: collapseButton
+        anchors.right: parent.right
+        anchors.rightMargin: 6
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        boxSize: 24
+        iconSize: 14
+        iconSource: "qrc:/ULinHub/icons/ui/panel-collapse.svg"
+        iconColor: collapseButton.hovered ? Theme.color.textPrimary : Theme.color.textTertiary
+        hoverBackground: "transparent"
+        pressedBackground: "transparent"
+        tooltip: qsTrId("sessionBar_collapse")
+        onClicked: sessionBar.collapseRequested()
+    }
+
+    Rectangle {
+        id: newChatButton
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: topRow.bottom
         anchors.topMargin: 4
         anchors.leftMargin: 10
         anchors.rightMargin: 10
-        text: qsTrId("sessionBar_clear_sessions")
-        // 用回实心 danger 胶囊（用户要"颜色还原"：静息 dangerButtonBg、悬停 danger、白字）
-        variant: "danger"
-        // 语义已核对（旧壳 Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）：
-        // 清本地会话数据 + 删服务端全部工作区 + 建一个新的默认会话。请求交给连接表，默认处理器是
-        // handleClearSessions（扩展可接管 "qml.sessionBar.clearSessions"）。
-        onClicked: sessionBar.clearSessionsRequested()
+        height: 36
+        radius: 10
+        color: newChatMouse.pressed
+            ? Theme.color.primaryButtonPressed
+            : (newChatMouse.containsMouse ? Theme.color.primaryButtonHover : Theme.color.primaryButtonBg)
+        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+
+        LineIcon {
+            id: newChatIcon
+            name: "plus"
+            size: 14
+            color: Theme.color.primaryButtonText
+            anchors.left: parent.left
+            anchors.leftMargin: 11
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Text {
+            id: newChatLabel
+            anchors.left: newChatIcon.right
+            anchors.leftMargin: 8
+            anchors.right: newChatKeycap.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            text: qsTrId("sessionBar_new_chat")
+            color: Theme.color.primaryButtonText
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.body
+            font.weight: Theme.font.weightBold
+            elide: Text.ElideRight
+        }
+
+        Text {
+            id: newChatKeycap
+            anchors.right: parent.right
+            anchors.rightMargin: 11
+            anchors.verticalCenter: parent.verticalCenter
+            text: qsTrId("sessionBar_shortcut_new_chat")
+            color: Theme.color.primaryButtonText
+            opacity: 0.55
+            font.family: "Cascadia Code"
+            font.pixelSize: Theme.font.small
+        }
+
+        MouseArea {
+            id: newChatMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: sessionBar.startNewSession()
+        }
     }
 
-    ActionButton {
-        id: newWorkspaceButton
+    Shortcut {   // Ctrl N = 新对话（与按钮同一条路）
+        sequence: "Ctrl+N"
+        onActivated: sessionBar.startNewSession()
+    }
+
+    SessionSearchBox {
+        id: searchBox
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: clearButton.bottom
-        anchors.topMargin: 4
+        anchors.top: newChatButton.bottom
+        anchors.topMargin: 8
         anchors.leftMargin: 10
         anchors.rightMargin: 10
-        text: qsTrId("sessionBar_new_workspace")
-        // elevated = 官方 secondary 面（buttonBg + 无描边 + textPrimary）；
-        // 不用 primary（近黑/近白实心）是因为两个全宽大胶囊并排时没有主次、也不像官方。
-        variant: "elevated"
-        onClicked: Hub.createWorkspace()
+        onTextEdited: (text) => Hub.sessions.setFilterText(text)
     }
 
-    // ---- 底排：原版是**横排**（QHBoxLayout、spacing 0、四个 32×32 键靠左，
-    //      末尾 addSpacing(15) 给扩展按钮留位，再 addStretch(1) 把它们顶到左边；
-    //      见 Sidebar.cpp:521-533）。我上一轮误读成竖排，这里改回横排。
-    Row {
-        id: navColumn
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: 10
-        anchors.bottomMargin: 10
-        spacing: 0
-
-        IconButton {
-            boxSize: 32
-            iconSize: 20
-            iconSource: "qrc:/ULinHub/icons/setting-icon.png"
-            tooltip: qsTrId("settings_title")
-            onClicked: sessionBar.openSettingsRequested()
-        }
-        IconButton {
-            boxSize: 32
-            iconSize: 20
-            iconSource: "qrc:/ULinHub/icons/plugin-icon.png"
-            tooltip: qsTrId("sessionBar_plugins")
-            onClicked: sessionBar.openPluginMarketRequested()
-        }
-        // 插件转译器的入口按钮**不在这里** —— 它归扩展自己（PluginTranspiler 自绘
-        // ui/EntryButton.qml，运行时注入下方的 extDock）。插件转译器不是宿主的功能，
-        // 宿主不该在扩展没装的时候就摆一颗点了没反应的哑按钮。
-        // 主题：原版 Sidebar::themeToggleRequested -> ULinHub::toggleTheme（切模式 + 过渡卡片）
-        IconButton {
-            boxSize: 32
-            iconSize: 20
-            iconSource: "qrc:/ULinHub/icons/theme-icon.png"
-            tooltip: qsTrId("sessionBar_switch_theme")
-            onClicked: Hub.toggleTheme()
-        }
-        IconButton {
-            boxSize: 32
-            iconSize: 20
-            iconSource: "qrc:/ULinHub/icons/extension-icon.png"
-            tooltip: qsTrId("ext_manager_title")
-            onClicked: Hub.extensions.openPage()
-        }
-    }
-
-    // 扩展按钮停靠位：宿主只给"一排空位"，**按钮与图标都归扩展自己**
-    //（PanelAnimDemo 的 ▤、PluginTranspiler 的 ⇄ 都注入到这里）。
-    // 它是 Row（位置器）⇒ 注入项自动左起排，扩展因此不用算 x/y，也不会跟宿主那几颗抢位。
-    // ⚠️ 与 navColumn 拆成两个 Row 是有意的：注入项只会**追加**到宿主 Row 的末尾，
-    //    混在一起的话扩展按钮会排到 spinner 后面去。
-    // ⚠️ 没有扩展装进来时这里宽度为 0，底排与"只有四个键"时一模一样。
-    Row {
-        id: extDock
-        anchors.left: navColumn.right
-        anchors.verticalCenter: navColumn.verticalCenter
-        spacing: 0
-        // 扩展注入点（名字契约见 assets/resources/docs/EXTENSION_DEV.zh-CN.md §11.3）
-        Component.onCompleted: HostUi.registerItem("sessionBar.extDock", extDock)
-    }
-
-    // 尾排：原版 addSpacing(15)（给扩展按钮留位）+ 初始化转圈
-    Row {
-        id: navTrailing
-        anchors.left: extDock.right
-        anchors.verticalCenter: navColumn.verticalCenter
-        spacing: 0
-
-        Item { width: 15; height: 1 }
-
-        BusySpinner {
-            anchors.verticalCenter: parent.verticalCenter
-            width: 16
-            height: 16
-            lineWidth: 2
-            running: Hub.initializing
-            visible: Hub.initializing
-        }
-    }
-
-    // ---- 会话列表（工作区表头与会话行在同一层，见 SessionListModel 的说明）----
-    // 原版侧栏内边距 10/10/10/10、列表行间距 2（Sidebar.cpp:514-515 / 300）
     ListView {
         id: list
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: newWorkspaceButton.bottom   // 必须排在两个按钮之下，否则被它们盖住
-        anchors.topMargin: 10
-        anchors.bottom: navColumn.top
-        anchors.bottomMargin: 10
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
+        anchors.top: searchBox.bottom
+        anchors.topMargin: 8
+        anchors.bottom: footer.top
+        anchors.bottomMargin: 8
+        anchors.leftMargin: 7
+        anchors.rightMargin: 7
         clip: true
-        spacing: 2
         boundsBehavior: Flickable.StopAtBounds
         model: Hub.sessions
         ScrollBar.vertical: AppScrollBar { }
@@ -229,26 +250,78 @@ Item {
             required property string title
             required property bool running
             required property bool selected
+            required property int index
+
+            // UpdatedAtRole（role 名 "updatedAtMs"，qint64）：
+            // `ReferenceError: model is not defined`），role 只有声明成 required property 才读得到。
+            // 数值约定：0 = 时间未知（行内不显示时间；undefined 比较也恒为 false）。
+            required property var updatedAtMs
 
             width: list.width
-            implicitHeight: (rowRoot.kind === "workspace")
-                ? workspaceHeader.implicitHeight
-                : sessionRow.implicitHeight
+            implicitHeight: {
+                if (rowRoot.kind === "workspace")
+                    return workspaceHeader.implicitHeight + (rowRoot.index === 0 ? 0 : 8)
+                if (rowRoot.kind === "pinned")
+                    return pinnedHeader.height
+                return sessionRow.implicitHeight
+            }
 
             WorkspaceHeader {
                 id: workspaceHeader
                 visible: rowRoot.kind === "workspace"
                 anchors.left: parent.left
                 anchors.right: parent.right
+                anchors.bottom: parent.bottom
                 title: rowRoot.workspaceTitle
                 expanded: rowRoot.expanded
+                sessionCount: rowRoot.sessionCount
+                workspaceColor: sessionBar.workspaceColorFor(
+                    rowRoot.workspaceId.length > 0 ? rowRoot.workspaceId : rowRoot.workspaceTitle)
                 onToggleRequested: Hub.sessions.toggleWorkspace(rowRoot.workspaceId)
                 onAddSessionRequested: Hub.createSession(rowRoot.workspaceId)
-                onDeleteRequested: {
-                    // 原版：右键就地弹出一个**小按钮**（不是菜单、不是遮罩）
-                    sessionBar.pendingId = rowRoot.workspaceId
-                    sessionBar.pendingIsWorkspace = true
-                    sessionBar.pendingY = rowRoot.y
+                onMenuRequested: sessionBar.openRowContext(rowRoot.workspaceId, true, rowRoot.y)
+                onDeleteRequested: sessionBar.openRowContext(rowRoot.workspaceId, true, rowRoot.y)
+            }
+
+            Item {
+                id: pinnedHeader
+                visible: rowRoot.kind === "pinned"
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 26
+
+                LineIcon {
+                    id: pinnedIcon
+                    name: "pin"
+                    size: 12
+                    color: Theme.color.textCaption
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    id: pinnedLabel
+                    anchors.left: pinnedIcon.right
+                    anchors.leftMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: rowRoot.workspaceTitle.length > 0   // 置顶标题由界面层翻译；模型对 pinned 行只给 kind（workspaceTitle 为空）
+                        ? rowRoot.workspaceTitle
+                        : qsTrId("sessionBar_pinned")
+                    color: Theme.color.textCaption
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: rowRoot.sessionCount > 0 ? String(rowRoot.sessionCount) : ""
+                    color: Theme.color.textCaption
+                    opacity: 0.7
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.small
                 }
             }
 
@@ -260,22 +333,30 @@ Item {
                 title: rowRoot.title
                 running: rowRoot.running
                 selected: rowRoot.selected
+                timeText: rowRoot.updatedAtMs > 0   // UpdatedAtRole（role 名 "updatedAtMs"）：0 = 未知（不显示时间）
+                    ? sessionBar.relativeTimeText(rowRoot.updatedAtMs)
+                    : ""
                 onSelectRequested: Hub.selectSession(rowRoot.sessionId)
-                onDeleteRequested: {
-                    sessionBar.pendingId = rowRoot.sessionId
-                    sessionBar.pendingIsWorkspace = false
-                    sessionBar.pendingY = rowRoot.y
-                }
+                onMenuRequested: sessionBar.openRowContext(rowRoot.sessionId, false, rowRoot.y)
+                onDeleteRequested: sessionBar.openRowContext(rowRoot.sessionId, false, rowRoot.y)
             }
         }
+    }
 
-        // 空列表时的引导
+    // 空列表引导：必须放在 ListView **外面**。挂在 ListView 里的声明子项会落到 contentItem（空列表时
+    // contentHeight≈0），anchors.centerIn 会跑到视口上方；这里用与 list 同几何的兄弟 Item 居中。
+    Item {
+        anchors.fill: list
+        visible: list.count === 0 && !Hub.initializing
+        z: 1
+
         Text {
             anchors.centerIn: parent
-            visible: list.count === 0 && !Hub.initializing
-            width: list.width - 2 * Theme.spacing.cardPadding
+            width: parent.width - 2 * Theme.spacing.cardPadding
             horizontalAlignment: Text.AlignHCenter
-            text: qsTrId("sessionBar_no_sessions")
+            text: Hub.sessions.filterText.length > 0
+                ? qsTrId("sessionBar_no_matches")
+                : qsTrId("sessionBar_no_sessions")
             color: Theme.color.textCaption
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
@@ -283,15 +364,28 @@ Item {
         }
     }
 
-    // ===================== 右键删除：原版形态 =====================
-    // 原版 Sidebar.cpp:159-200 是**贴鼠标的一个小按钮**（QDialog(Qt::Popup) 里只放一个
-    // QPushButton#sessionContextDeleteAction：panelBg 底、1px 边框、圆角 10、padding 8px 20px、
-    // 13px、hover 变 dangerBg 底 + danger 字）。它**不是菜单、更没有任何遮罩**。
-    //
-    // 这里刻意**不用 Popup**：Qt 的 Popup 会经 Overlay 铺一层（modal 时还是暗色），
-    // 想要"就是一个小按钮"最稳的做法是普通 Item 自己画。
-    //
-    // 点别处 = 关掉：用一个**透明**的全尺寸 MouseArea 接住点击（透明不等于遮罩，不画任何颜色）。
+    SessionFooter {
+        id: footer
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        busy: Hub.initializing
+        accountInitial: qsTrId("sessionBar_account_initial")
+        onSettingsRequested: sessionBar.openSettingsRequested()
+        onPluginsRequested: sessionBar.openPluginMarketRequested()
+        onThemeRequested: Hub.toggleTheme()
+        onExtensionsRequested: Hub.extensions.openPage()
+        onMoreRequested: overflowMenu.open()
+    }
+
+    SessionOverflowMenu {   // 溢出菜单：危险动作（清空会话）与低频动作（新建工作区）收在这里，不再常驻首屏
+        id: overflowMenu
+        parent: sessionBar
+        x: Math.round(sessionBar.width - width - 9)
+        y: Math.round(sessionBar.height - footer.height - height - 4)
+        onClearSessionsRequested: sessionBar.clearSessionsRequested()
+        onNewWorkspaceRequested: Hub.createWorkspace()
+    }
 
     property string pendingId: ""
     property bool pendingIsWorkspace: false
@@ -318,15 +412,17 @@ Item {
         radius: 10
         color: deleteHover.containsMouse ? Theme.color.dangerBg : Theme.color.panelBg
         border.width: 1
+
         // 浮在列表上的小按钮：走"面板级环线" inputBorder(10%)。border 已按官方 DSH 收到 4%，
         // 当浮层边缘太浅（官方浮层是 4% 环 + elevation 阴影，这里没有阴影，取深一档补回来）。
         border.color: Theme.color.inputBorder
         x: Math.max(4, sessionBar.width - width - 12)
         y: Math.max(4, Math.min(sessionBar.height - height - 4,
-            list.y + sessionBar.pendingY - list.contentY + list.spacing))
+            list.y + sessionBar.pendingY - list.contentY))
 
         Text {
             anchors.centerIn: parent
+
             // 会话与工作区各有一句删除确认（工作区是"只移出列表、不动它下面的会话"）
             text: sessionBar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
             color: deleteHover.containsMouse ? Theme.color.danger : Theme.color.textPrimary
@@ -343,8 +439,7 @@ Item {
         }
     }
 
-    // 确认：一张居中的小卡片，**不压暗背景**（原版 QMessageBox 也不压暗）
-    Rectangle {
+    Rectangle {   // 确认：一张居中的小卡片，**不压暗背景**（原版 QMessageBox 也不压暗）
         id: confirmCard
 
         z: 42
@@ -355,8 +450,7 @@ Item {
         radius: Theme.radius.panel
         color: Theme.color.panelBg
         border.width: 1
-        // 同上：确认卡是浮层，用面板级环线 inputBorder(10%)，别跟着 border(4%) 一起淡到看不见
-        border.color: Theme.color.inputBorder
+        border.color: Theme.color.inputBorder   // 同上：确认卡是浮层，用面板级环线 inputBorder(10%)，别跟着 border(4%) 一起淡到看不见
 
         Column {
             id: confirmColumn

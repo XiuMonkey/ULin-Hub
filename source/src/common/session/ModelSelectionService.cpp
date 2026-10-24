@@ -23,8 +23,7 @@ namespace
 	const char* const kCredentialsDescribeMethod = "credentials/describe";
 	const char* const kCredentialsSetMethod = "credentials/set";
 
-	// settings/mutate 的一个 set 操作
-	QJsonObject setOp(const QStringList& path, const QJsonValue& value)
+	QJsonObject setOp(const QStringList& path, const QJsonValue& value)   // settings/mutate 的一个 set 操作
 	{
 		QJsonObject op;
 		op.insert(QStringLiteral("op"), QStringLiteral("set"));
@@ -91,8 +90,7 @@ namespace ModelSelectionService
 			bool catalogDone = false;
 			bool delivered = false;
 
-			// 一个 RPC 有了着落；三个都回来且目录到手之后回调一次
-			void settle(const std::function<void(const ServerModelView&)>& onLoaded)
+			void settle(const std::function<void(const ServerModelView&)>& onLoaded)   // 一个 RPC 有了着落；三个都回来且目录到手之后回调一次
 			{
 				--pending;
 				if (delivered || pending > 0 || !catalogDone)

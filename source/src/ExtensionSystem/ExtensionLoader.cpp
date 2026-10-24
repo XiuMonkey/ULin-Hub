@@ -2,7 +2,7 @@
 
 #include "ExtensionSystem/ClientExtension.h"
 #include "ExtensionSystem/ExtensionRegistry.h"
-#include "common/appearance/UiAbi.h"   // kStylePackUiAbi：扩展 ui/ 的界面契约版本门控
+#include "common/ClientInfo.h"   // kUiAbi：扩展 ui/ 的界面契约版本门控
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
@@ -90,8 +90,7 @@ namespace
 		const QString code = QString::fromUtf8(file.readAll());
 		file.close();
 
-		// 工具注册形如：name: "pipe_ping"
-		const QRegularExpression re(QStringLiteral("name:\\s*\"([^\"]+)\""));
+		const QRegularExpression re(QStringLiteral("name:\\s*\"([^\"]+)\""));   // 工具注册形如：name: "pipe_ping"
 		QRegularExpressionMatchIterator it = re.globalMatch(code);
 		while (it.hasNext()) {
 			const QRegularExpressionMatch match = it.next();
@@ -266,18 +265,17 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 	if (!findFiles(rootDir, &loaded, error))
 		return false;
 
-	// regulation 里的 Type 决定走哪条路线（见头文件开头两条路线的说明）。
-	if (!readDescriptor(loaded.jsonPath, &loaded, error))
+	if (!readDescriptor(loaded.jsonPath, &loaded, error))   // regulation 里的 Type 决定走哪条路线（见头文件开头两条路线的说明）
 		return false;
 
 	// 界面契约门控（只对客户端扩展有意义）：扩展可以声明 ABIVersion，与宿主不符 ⇒ 只装 DLL，
 	// 不装它的 ui/ —— QML 陈旧（模型 role / 属性改名）会运行期报错，宁可少装不要装错。
 	// 未声明（uiAbi < 0）视为匹配：老扩展不受影响。
-	if (loaded.uiAbi >= 0 && loaded.uiAbi != kStylePackUiAbi) {
+	if (loaded.uiAbi >= 0 && loaded.uiAbi != ClientInfo::kUiAbi) {
 		loaded.uiAbiMatched = false;
 		qWarning().noquote() << QStringLiteral(
 			"[ExtensionLoader] ABIVersion %1 != host %2 —— 只装 DLL，跳过 ui/")
-			.arg(loaded.uiAbi).arg(kStylePackUiAbi);
+			.arg(loaded.uiAbi).arg(ClientInfo::kUiAbi);
 	}
 
 	if (ClientExtension::isClientExtensionType(loaded.type)) {
@@ -298,9 +296,6 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 			return false;
 		}
 
-		// **整包落地**：dll、regulation.json5 之外的文件与子目录也一并拷进去（客户端扩展可以带自己的资源，
-		// 例如扩展自己的 styles/ 文件夹），与下面工具扩展那条线（installPlugin 的持久化循环）做法一致。
-		// 例外：ui/ 是扩展的 QML 部分 —— 声明的 ABIVersion 与宿主不符时不落它（上面已置 uiAbiMatched=false）。
 		const QString packageRoot = QFileInfo(loaded.dllPath).absolutePath();
 		const QFileInfoList entries = QDir(packageRoot).entryInfoList(
 			QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
@@ -434,8 +429,7 @@ bool ExtensionLoader::extractArchive(const QString& extFilePath, const QString& 
 		if (markedDirectory)
 			directoryPaths.insert(normalizedPath);
 
-		// 有些 ZIP 工具既丢目录标志也丢结尾斜杠；此时凡是别的条目的父路径，都仍按目录对待。
-		qsizetype separator = normalizedPath.indexOf(QLatin1Char('/'));
+		qsizetype separator = normalizedPath.indexOf(QLatin1Char('/'));   // 有些 ZIP 工具既丢目录标志也丢结尾斜杠；此时凡是别的条目的父路径，都仍按目录对待
 		while (separator >= 0) {
 			directoryPaths.insert(normalizedPath.left(separator));
 			separator = normalizedPath.indexOf(QLatin1Char('/'), separator + 1);
@@ -443,8 +437,7 @@ bool ExtensionLoader::extractArchive(const QString& extFilePath, const QString& 
 	}
 
 	for (const QZipReader::FileInfo& info : infos) {
-		// 兼容某些打包工具生成的反斜杠路径（例如 Compress-Archive）。
-		QString entryPath = info.filePath;
+		QString entryPath = info.filePath;   // 兼容某些打包工具生成的反斜杠路径（例如 Compress-Archive）
 		entryPath.replace(QLatin1Char('\\'), QLatin1Char('/'));
 		entryPath = QDir::cleanPath(entryPath);
 		if (entryPath.isEmpty() || entryPath == QStringLiteral(".")
@@ -470,6 +463,7 @@ bool ExtensionLoader::extractArchive(const QString& extFilePath, const QString& 
 			}
 			continue;
 		}
+
 		// Windows 上 QZipReader 可能报出没有结尾斜杠、也没有目录标志的目录条目；这些父目录在解前面的
 		// 文件时可能已经建好，所以别把它当文件去打开。
 		if (QFileInfo(destPath).isDir())
@@ -603,9 +597,11 @@ bool ExtensionLoader::readDescriptor(const QString& jsonPath, LoadedExtension* o
 
 	out->declaredName = root.value(QStringLiteral("Name")).toString();
 	out->type = root.value(QStringLiteral("Type")).toString();
+
 	// 身份字段（ID / version / dependence / platform）：本版**只登记，不给行为**。
 	// 解析规则集中在 readIdentityFields（启动扫描已安装扩展时也走它）。
 	readIdentityFields(jsonPath, out);
+
 	// ABIVersion：可选（只影响 ui/ 是否装载，不拒绝整包）。缺省 = -1 ⇒ 视为匹配；
 	// JSON5 里写成字符串也认，免得扩展作者加引号就静默失配。
 	{
@@ -645,14 +641,15 @@ void ExtensionLoader::readIdentityFields(const QString& jsonPath, LoadedExtensio
 	if (!parseError.isEmpty())
 		return;
 
-	// ID：标识符（约定小写 + 连字符）。未声明就留空 —— 不报错、不拒绝整包。
-	out->declaredId = root.value(QStringLiteral("ID")).toString();
+	out->declaredId = root.value(QStringLiteral("ID")).toString();   // ID：标识符（约定小写 + 连字符）。未声明就留空 —— 不报错、不拒绝整包
+
 	// version：扩展自身版本。字符串与数字都认（JSON5 里忘加引号写成 1.0 时不至于变 0）。
 	{
 		const QJsonValue v = root.value(QStringLiteral("version"));
 		out->declaredVersion = v.isString() ? v.toString()
 		                    : (v.isDouble() ? QString::number(v.toDouble()) : QString());
 	}
+
 	// dependence：依赖的其它扩展 ID 数组。非数组、非字符串、空串一律忽略（这里不做依赖解析）。
 	{
 		const QJsonValue dep = root.value(QStringLiteral("dependence"));
@@ -663,6 +660,7 @@ void ExtensionLoader::readIdentityFields(const QString& jsonPath, LoadedExtensio
 			}
 		}
 	}
+
 	// platform：为跨平台做准备。字符串（"windows"）或数组（["windows","linux"]）两种写法都认；
 	// 空数组 = 未声明（本版视为不限平台）。同样不参与判定。
 	{
@@ -704,6 +702,7 @@ bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& se
 	const QString extRoot = profileDir.filePath(QStringLiteral("extensions"))
 		+ QStringLiteral("/") + out->pluginName;
 	QDir().mkpath(extRoot);
+
 	// 运行文件（main.dll / regulation.json5 / bin 等）持久化到 extRoot；AttachedPlugin 目录跳过，
 	// 下面单独拷进 node_modules。
 	const QString extRootDir = QFileInfo(out->dllPath).absolutePath();
@@ -735,8 +734,7 @@ bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& se
 		}
 	}
 
-	// 若别的已装插件暴露了同名工具，就跳过安装本插件，避免重复注册工具导致崩溃。
-	const QString newIndexPath = pluginPath + QStringLiteral("/index.js");
+	const QString newIndexPath = pluginPath + QStringLiteral("/index.js");   // 若别的已装插件暴露了同名工具，就跳过安装本插件，避免重复注册工具导致崩溃
 	const QSet<QString> newToolNames = extractToolNames(newIndexPath);
 	if (!newToolNames.isEmpty()) {
 		QSet<QString> existingToolNames;
