@@ -17,22 +17,22 @@ Item {
 
     property string text: ""
     property var tableLines: []
-    property bool tableLinesRefreshPending: false
+    property var inlineCodeRects: []
+    property bool decorationsRefreshPending: false
 
-    function scheduleRefreshTableLines() {
-        if (tableLinesRefreshPending)
+    function scheduleRefreshDecorations() {
+        if (decorationsRefreshPending)
             return
-        tableLinesRefreshPending = true
+        decorationsRefreshPending = true
         Qt.callLater(function () {
-            root.tableLinesRefreshPending = false
-            root.refreshTableLines()
+            root.decorationsRefreshPending = false
+            root.refreshDecorations()
         })
     }
 
     readonly property var colorTokens: ({   // 主题 token 一次性交给 C++；主题切换时重挂文档并重渲染
         text: Theme.color.textPrimary,
         secondary: Theme.color.textSecondary,
-        inlineBg: Theme.color.inlineCodeBg || Theme.color.inputBg,
         link: Theme.color.textSecondary
     })
 
@@ -44,13 +44,14 @@ Item {
         if (body.textDocument === null)
             return
         Hub.markdownUpdate(body.textDocument, root.text)
-        root.scheduleRefreshTableLines()
+        root.scheduleRefreshDecorations()
     }
 
-    function refreshTableLines() {
+    function refreshDecorations() {
         if (body.textDocument === null)
             return
         root.tableLines = Hub.markdownTableLines(body.textDocument)
+        root.inlineCodeRects = Hub.markdownInlineCodeRects(body.textDocument)
     }
 
     function reattach() {
@@ -78,12 +79,14 @@ Item {
             Hub.markdownDetach(body.textDocument)
     }
 
-    onTextChanged: renderTimer.restart()
+    // 流式节流：文本持续变化时不要 restart（那会一直等不到空档），
+    // 而是在固定 tick 上直接渲染最新文本。
+    onTextChanged: if (!renderTimer.running) renderTimer.start()
 
     // 气泡宽度变化会重排表格；C++ 的表格行线坐标是布局结果，必须重新取一次。
     // ⚠️ 宽度动画期间不要每次 width/contentHeight 变化都取：那会强制每个文档全篇布局，
     // 而 TextEdit 本来就已经在按新宽度重排了。动画落定后 contentHeight 的最后一次变化会补上。
-    onWidthChanged: scheduleRefreshTableLines()
+    onWidthChanged: scheduleRefreshDecorations()
 
     // colorTokens 已经依赖 Theme.color；这里不再额外 onColorTokensChanged + Theme.Connection
     // 双份 reattach（旧写法主题切换会整篇重建两次）。
@@ -94,9 +97,28 @@ Item {
 
     Timer {
         id: renderTimer
-        interval: 80
+        interval: 33
         repeat: false
         onTriggered: root.renderNow()
+    }
+
+    // QTextDocument 只能给 inline-code 画直角纯色底；圆角/内边距用这层矩形补。
+    // 声明在 TextEdit 之前，确保底块在文字下方，不盖住选中高亮。
+    Repeater {
+        model: 256
+        delegate: Rectangle {
+            required property int index
+            readonly property var rect: index < root.inlineCodeRects.length ? root.inlineCodeRects[index] : null
+            visible: rect !== null
+            x: rect ? rect.x : 0
+            y: rect ? rect.y : 0
+            width: rect ? rect.w : 0
+            height: rect ? rect.h : 0
+            radius: 4
+            color: Theme.color.inlineCodeBg || Theme.color.inputBg
+            border.width: 1
+            border.color: Theme.color.border
+        }
     }
 
     TextEdit {
@@ -117,10 +139,10 @@ Item {
                                 Theme.color.accent.b, Theme.isDark ? 0.30 : 0.16)
         selectedTextColor: Theme.color.textPrimary
         font.family: "Microsoft YaHei UI"
-        font.pixelSize: Theme.font.body
+        font.pixelSize: Theme.font.markdown || 13
 
         onLinkActivated: root.openLink(link)
-        onContentHeightChanged: root.scheduleRefreshTableLines()
+        onContentHeightChanged: root.scheduleRefreshDecorations()
     }
 
     // QML 的 QTextDocument 不画 table cell 边框；这里只覆盖旧 MarkdownTable 需要的那一条

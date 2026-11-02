@@ -9,12 +9,14 @@
         <file>basic/chat/Composer.qml</file>
         <file>basic/chat/InteractionPanel.qml</file>
         <file>basic/chat/ToolsFilterPanel.qml</file>
+        <file>basic/chat/SkillsManagerPage.qml</file>
         <file>basic/chat/MessageListView.qml</file>
         <!-- 轨迹：会话区的另一个视图（顶栏胶囊切换），数据面是 common/session/TraceModel -->
         <file>basic/trace/TraceView.qml</file>
         <file>basic/chat/ModelSelectorChip.qml</file>
         <file>basic/extensions/ExtensionManagerPage.qml</file>
         <file>basic/plugins/PluginMarketPage.qml</file>
+        <file>basic/account/AccountPage.qml</file>
         <file>basic/settings/AgentPresetPage.qml</file>
         <file>basic/settings/AppearancePage.qml</file>
         <file>basic/settings/ModelListPage.qml</file>
@@ -25,8 +27,10 @@
         <!-- 通用网页窗口：扩展的网页兜底落点（宿主只给窗口，不认识插件） -->
         <file>basic/browser/WebWindow.qml</file>
                 <file>basic/panelui/PluginDataPanel.qml</file>
+        <file>basic/files/FileBrowserPanel.qml</file>
         <file>basic/panel/PanelBar.qml</file>
         <file>basic/shell/PanelBarDockView.qml</file>
+        <file>basic/shell/DetachedBlockWindow.qml</file>
         <file>basic/shell/DockDropHint.qml</file>
         <!-- 右栏整体"拿起来"跟着光标走 / 脱离成**无边框**独立窗口（自绘标题栏与四边缩放；
              内容是 reparent 进去的同一份 PanelBar）-->

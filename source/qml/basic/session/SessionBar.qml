@@ -14,6 +14,9 @@ import "../../skin/session"
 Item {
     id: sessionBar
 
+    // 账户入口信号：内置逻辑默认开宿主账户页；接管扩展可 claim 后自行开窗口。
+    signal accountEntryRequested()
+
     Component.onCompleted: {
         HostUi.registerItem("sessionBar", this)
         HostUi.registerItem("sessionBar.extDock", footer.extDock)   // 底排的扩展停靠位仍是 Row，注入项自动排在末尾
@@ -375,7 +378,52 @@ Item {
         onPluginsRequested: sessionBar.openPluginMarketRequested()
         onThemeRequested: Hub.toggleTheme()
         onExtensionsRequested: Hub.extensions.openPage()
-        onMoreRequested: overflowMenu.open()
+        // 头像 = 账户管理入口：页面里显示真实登录态，未登录时页内按钮直接拉起登录窗口
+        // （workbuddy-backend 接管后 getState/startSignIn 都是真实数据，含"已登录防误登出"）
+        onAccountRequested: {
+            sessionBar.accountEntryRequested()
+            if (HostUi.accountEntryOwner.length === 0)
+                Hub.settings.openAccountPage()
+        }
+        onMoreRequested: {
+            overflowMenu.extensionEntries = footer.overflowEntries
+            overflowMenu.open()
+        }
+    }
+
+    Rectangle {
+        id: accountLoginBubble
+        visible: Hub.settings.accountLoginHint
+        z: 50
+        anchors.left: footer.left
+        anchors.leftMargin: 10
+        anchors.bottom: footer.top
+        anchors.bottomMargin: 8
+        width: Math.min(220, sessionBar.width - 20)
+        height: 42
+        radius: 11
+        color: Theme.color.menuBg
+        border.width: 1
+        border.color: Theme.color.menuBorder
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: 12
+            anchors.rightMargin: 10
+            text: "登录完成后点这里返回账户"
+            color: Theme.color.textPrimary
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.caption
+            wrapMode: Text.WordWrap
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: Hub.settings.openAccountPage()
+        }
     }
 
     SessionOverflowMenu {   // 溢出菜单：危险动作（清空会话）与低频动作（新建工作区）收在这里，不再常驻首屏
@@ -407,23 +455,21 @@ Item {
 
         z: 41
         visible: sessionBar.pendingId.length > 0 && !sessionBar.confirmOpen
-        width: 132
-        height: 36
-        radius: 10
-        color: deleteHover.containsMouse ? Theme.color.dangerBg : Theme.color.panelBg
+        width: Math.min(168, sessionBar.width - 16)
+        height: 38
+        radius: 8
+        color: deleteHover.containsMouse ? Theme.color.dangerBg : Theme.color.menuBg
         border.width: 1
-
-        // 浮在列表上的小按钮：走"面板级环线" inputBorder(10%)。border 已按官方 DSH 收到 4%，
-        // 当浮层边缘太浅（官方浮层是 4% 环 + elevation 阴影，这里没有阴影，取深一档补回来）。
-        border.color: Theme.color.inputBorder
-        x: Math.max(4, sessionBar.width - width - 12)
-        y: Math.max(4, Math.min(sessionBar.height - height - 4,
-            list.y + sessionBar.pendingY - list.contentY))
+        border.color: Theme.color.menuBorder
+        x: sessionBar.width - width - 8
+        readonly property real rowBottom: list.y + sessionBar.pendingY - list.contentY + 41
+        y: Math.max(8, Math.min(sessionBar.height - height - 8,
+            rowBottom + height <= sessionBar.height - 8 ? rowBottom : rowBottom - height - 49))
 
         Text {
-            anchors.centerIn: parent
-
-            // 会话与工作区各有一句删除确认（工作区是"只移出列表、不动它下面的会话"）
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
             text: sessionBar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
             color: deleteHover.containsMouse ? Theme.color.danger : Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
@@ -444,10 +490,15 @@ Item {
 
         z: 42
         visible: sessionBar.confirmOpen
-        anchors.centerIn: parent
         width: 320
+        x: Math.max(8, sessionBar.width - 160)
+        readonly property real rowTop: list.y + sessionBar.pendingY - list.contentY
+        y: Math.max(8, Math.min(sessionBar.height - height - 8,
+            rowTop + 42 + height <= sessionBar.height - 8
+                ? rowTop + 42
+                : rowTop - height - 8))
         implicitHeight: confirmColumn.implicitHeight + 28
-        radius: Theme.radius.panel
+        radius: 12
         color: Theme.color.panelBg
         border.width: 1
         border.color: Theme.color.inputBorder   // 同上：确认卡是浮层，用面板级环线 inputBorder(10%)，别跟着 border(4%) 一起淡到看不见

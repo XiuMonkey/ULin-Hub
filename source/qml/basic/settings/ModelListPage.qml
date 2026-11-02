@@ -9,6 +9,7 @@ import QtQuick.Controls.Basic
 import ULinHub 1.0
 import "../../widgets"
 import "../../skin/settings"
+import "../../skin/chat"
 
 Item {
     id: page
@@ -142,10 +143,10 @@ Item {
         anchors.fill: parent
         spacing: 3
 
-        Item {   // 标题行：页面主动作（添加模型）右对齐到这里，不再沉在滚动区下方和内容混在一起
+        Item {   // 标题行：只放标题，新增动作统一收在底部
             id: titleRow
             width: parent.width
-            implicitHeight: Math.max(titleLabel.implicitHeight, addButton.implicitHeight)
+            implicitHeight: titleLabel.implicitHeight
 
             Text {
                 id: titleLabel
@@ -156,19 +157,6 @@ Item {
                 font.family: "Microsoft YaHei UI"
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
-            }
-
-            IconButton {   // 原版可用性：settingsWritable && 有可配置提供方；禁用时 tooltip 说明原因
-                id: addButton
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                enabled: Hub.settings.writable && Hub.settings.providers.length > 0
-                label: qsTrId("model_add")
-                tooltip: enabled ? qsTrId("model_add") : qsTrId("model_add_requires_api")
-                onClicked: {
-                    page.formOpen = true
-                    page.candidatesVisible = false
-                }
             }
         }
 
@@ -203,7 +191,7 @@ Item {
         Flickable {
             id: scroller
             width: parent.width
-            height: Math.max(120, root.height - scroller.y)
+            height: Math.max(120, root.height - scroller.y - actionFooter.height - 4)
             contentHeight: listColumn.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -294,7 +282,9 @@ Item {
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textPrimary
                                                 font.family: "Microsoft YaHei UI"
-                                                font.pixelSize: Theme.font.title
+                                                // 行标题取 body(13)：原来和页面标题同为 14，
+                                                // 一屏里两个"14"抢层级，模型名反而比"模型列表"更显眼。
+                                                font.pixelSize: Theme.font.body
                                                 font.weight: Theme.font.weightMedium
                                             }
 
@@ -595,53 +585,63 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                 }
 
-                                indicator: Text {
-                                    x: providerCombo.width - Theme.size.dropdownArrowWidth
-                                        - Math.round(Theme.spacing.fieldPadX / 2)
-                                    y: Math.round((providerCombo.height - height) / 2)
-                                    width: Theme.size.dropdownArrowWidth
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: "\u25BE"
-                                    color: Theme.color.textSecondary
-                                    font.pixelSize: Theme.font.small
+                                contentItem: Text {
+                                    leftPadding: 10
+                                    rightPadding: 28
+                                    text: providerCombo.displayText
+                                    elide: Text.ElideRight
+                                    verticalAlignment: Text.AlignVCenter
+                                    color: Theme.color.textPrimary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+                                }
+
+                                indicator: LineIcon {
+                                    x: providerCombo.width - width - 9
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 12
+                                    height: 12
+                                    name: "chevron-down"
+                                    size: 12
+                                    color: providerCombo.activeFocus
+                                        ? Theme.color.textPrimary
+                                        : Theme.color.textSecondary
+                                    rotation: providerCombo.popup.visible ? 180 : 0
+                                    Behavior on rotation {
+                                        NumberAnimation { duration: Theme.motion.fast }
+                                    }
                                 }
 
                                 background: Rectangle {
                                     color: Theme.color.inputBg
                                     border.width: 1
-
-                                    // 悬停略深一档；聚焦（键盘走查）用 textSecondary，都是中性灰。
-                                    // 对齐官方 DSH `--dsw-alias-border-l2`。
                                     border.color: providerCombo.activeFocus
                                         ? Theme.color.textSecondary
                                         : (providerHover.hovered ? Theme.color.scrollbarHover : Theme.color.inputBorder)
                                     radius: Theme.radius.control
                                 }
 
-                                delegate: ItemDelegate {
-                                    id: providerOption
-
+                                delegate: MenuRow {
                                     required property var modelData
                                     required property int index
 
                                     width: ListView.view ? ListView.view.width : 0
-                                    text: providerOption.modelData.label
-                                    font.family: "Microsoft YaHei UI"
-                                    font.pixelSize: Theme.font.body
-
-                                    palette.text: Theme.color.textPrimary
-                                    palette.light: Theme.color.activeBg
-                                    palette.highlightedText: Theme.color.textPrimary
+                                    title: modelData.label
+                                    checked: providerCombo.currentIndex === index
+                                    onChosen: {
+                                        providerCombo.currentIndex = index
+                                        providerCombo.popup.close()
+                                    }
                                 }
 
                                 popup: Popup {
-                                    y: providerCombo.height + 2
+                                    y: providerCombo.height + 4
                                     width: providerCombo.width
-                                    implicitHeight: Math.min(contentItem.implicitHeight + 8, 260)
-                                    padding: 4
+                                    implicitHeight: Math.min(contentItem.implicitHeight + 12, 280)
+                                    padding: 6
 
                                     background: Rectangle {
-                                        radius: Theme.radius.control
+                                        radius: 12
                                         color: Theme.color.menuBg
                                         border.width: 1
                                         border.color: Theme.color.menuBorder
@@ -968,6 +968,37 @@ Item {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        Item {
+            id: actionFooter
+            width: parent.width
+            height: 34
+
+            ActionButton {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                width: 116
+                height: 30
+                // 新增模型的动作和表单都在页面底部，不再把入口放在标题栏。
+                text: page.formOpen ? qsTrId("common_cancel") : qsTrId("model_add")
+                variant: page.formOpen ? "ghost" : "elevated"
+                enabled: page.formOpen
+                    || (Hub.settings.writable && Hub.settings.providers.length > 0)
+                tooltip: enabled ? "" : qsTrId("model_add_requires_api")
+                onClicked: {
+                    if (page.formOpen) {
+                        page.formOpen = false
+                        page.candidatesVisible = false
+                        return
+                    }
+                    page.formOpen = true
+                    page.candidatesVisible = false
+                    Qt.callLater(function() {
+                        scroller.contentY = Math.max(0, scroller.contentHeight - scroller.height)
+                    })
                 }
             }
         }

@@ -55,7 +55,7 @@
   "textTertiary": "#81858C",
   "textCaption": "#A2A4A6",
   "chipHoverBg": "rgba(38,49,72,0.05)",
-  "menuBg": "#F8F9FA",
+  "menuBg": "#FFFFFF",
   "menuBorder": "rgba(0,0,0,0.06)",
 
   "windowBorder": "rgba(0,0,0,0.08)",
@@ -64,7 +64,7 @@
   "sessionBarBg": "#FFFFFF",
   "codeBlockBg": "#F9FAFB",
   "codeBlockBannerBg": "#F9FAFB",
-  "inlineCodeBg": "#FAFAFA",
+  "inlineCodeBg": "#F3F4F6",
   "trackBg": "rgba(38,49,72,0.05)",
   "indicatorBg": "#FFFFFF",
   "ringBg": "rgba(0,0,0,0.16)",

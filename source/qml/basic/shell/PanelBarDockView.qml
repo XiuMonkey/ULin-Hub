@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Controls.Basic   // ScrollBar.vertical（启动器条目多了要能滚动；与其它列表同一套）
+import QtQuick.Window
 import ULinHub 1.0
 import "../../widgets"
 
@@ -51,6 +52,7 @@ Item {
             id: tabStrip
             width: parent.width
             height: 40
+            z: dragGhost.visible ? 1000 : 0
 
             Rectangle {
                 anchors.left: parent.left
@@ -90,134 +92,274 @@ Item {
             // ⚠️ 这条 Flickable 锚在 `⌂` 右边 4px 且**声明在最后** —— 同 z 时后声明者在上层。
             // （"用户看不见三点"就是这个原因，不是尺寸/颜色问题）。抓手已搬到 PanelBar.qml 的
             // 标题行，页签条里不再有与它重叠的锚定兄弟。
-            Flickable {
-                id: tabFlick
+            // 横向 ListView 而不是 Row：ListView 对 rowsMoved 有 move/displaced 过渡，
+            // 拖动跨过邻居中点时直接 moveBlock，页签会平滑让位，不需要等松手。
+            ListView {
+                id: tabList
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 anchors.left: homeButton.right
                 anchors.leftMargin: 4
                 anchors.right: addButton.left
                 anchors.rightMargin: 4
-                contentWidth: row.implicitWidth
+                orientation: ListView.Horizontal
+                model: PanelBarDock
+                spacing: 4
                 clip: true
-                flickableDirection: Flickable.HorizontalFlick
+                interactive: false
                 boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.horizontal: AppScrollBar { }
+                // 短、直的位移，不要弹性/回弹；拖拽时只做 90ms 的线性让位，
+                // 避免长缓动与实时换位叠加成来回抖动。
+                move: Transition {
+                    NumberAnimation { properties: "x"; duration: 90; easing.type: Easing.Linear }
+                }
+                displaced: Transition {
+                    NumberAnimation { properties: "x"; duration: 90; easing.type: Easing.Linear }
+                }
 
-                Row {
-                    id: row
-                    height: parent.height
-                    spacing: 4
+                delegate: Item {
+                    id: block
+                    required property string title
+                    required property string kind
+                    required property string blockId
+                    required property int index
 
-                    Repeater {   // 模型角色有 kind / title 两个；这里只用得上 title（内容路由读 PanelBarDock.activeKind）
-                        id: blockRepeater
-                        model: PanelBarDock
+                    readonly property real closeZone: 22
+                    readonly property bool closeHover: blockMouse.containsMouse
+                                                       && blockMouse.mouseX > width - closeZone
+                    readonly property bool current: !dock.homeVisible
+                        && block.index === PanelBarDock.activeIndex
 
-                        delegate: Item {
-                            id: block
-                            required property string title
-                            required property string kind
-                            required property string blockId
-                            required property int index
+                    property bool dragging: false
+                    property bool suppressClick: false
+                    property bool reorderPending: false
+                    property real pressX: 0
+                    property real lastReorderX: 0
 
-                            readonly property real closeZone: 22   // ✕ 命中区宽度：右侧这一条点下去是"关块"，其余地方是"切到该块"
-                            readonly property bool closeHover: blockMouse.containsMouse
-                                                               && blockMouse.mouseX > width - closeZone
-                            readonly property bool current: !dock.homeVisible
-                                && block.index === PanelBarDock.activeIndex
+                    function beginGhost(pos) {
+                        dragGhostWindow.blockKind = block.kind
+                        dragGhostWindow.blockTitle = block.title
+                        dragGhostWindow.width = block.width
+                        dragGhostWindow.height = Math.max(24, block.height - 6)
+                        dragGhostWindow.visible = true
+                        updateGhost(pos)
+                    }
+                    function updateGhost(pos) {
+                        if (!dragGhostWindow.visible)
+                            return
+                        // 用屏幕坐标而不是侧栏内坐标：窗口是独立顶层，不受右侧栏 body 的 layer/mask 裁剪。
+                        const g = block.mapToGlobal(pos.x, pos.y)
+                        dragGhostWindow.x = Math.round(g.x - dragGhostWindow.width / 2)
+                        dragGhostWindow.y = Math.round(g.y - dragGhostWindow.height / 2)
+                    }
+                    function endGhost() {
+                        dragGhostWindow.visible = false
+                    }
 
-                            height: row.height
+                    height: tabList.height
+                    z: dragging ? 100 : 0
+                    opacity: dragging ? 0 : 1
 
-                            // 标签多了先按可用宽度均分收缩；每个标签仍优先用自己的自然宽，
-                            // 只有放不下时才压到 max(64, 均分宽)，文字由 blockLabel 的 ElideRight 吃掉。
-                            readonly property real naturalWidth: blockLabel.implicitWidth + 50
-                            readonly property real equalWidth: {
-                                const count = Math.max(1, blockRepeater.count)
-                                return (tabFlick.width - row.spacing * (count - 1)) / count
-                            }
-                            width: Math.min(174, Math.min(naturalWidth, Math.max(64, equalWidth)))
+                    readonly property real naturalWidth: blockLabel.implicitWidth + 50
+                    readonly property real equalWidth: {
+                        const count = Math.max(1, tabList.count)
+                        return (tabList.width - tabList.spacing * (count - 1)) / count
+                    }
+                    width: Math.min(174, Math.min(naturalWidth, Math.max(64, equalWidth)))
 
-                            Rectangle {   // 悬停淡面：四边内缩一点（不顶满 40 高，免得上下贴死卡头/分隔线）
-                                anchors.fill: parent
-                                anchors.margins: 4
-                                radius: Theme.radius.small
-                                color: !block.current && blockMouse.containsMouse
-                                    ? Theme.color.hoverBg : "transparent"
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        radius: Theme.radius.small
+                        color: !block.current && blockMouse.containsMouse
+                            ? Theme.color.hoverBg : "transparent"
+                        Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
+                    }
 
-                                Behavior on color { ColorAnimation { duration: Theme.motion.fast } }
-                            }
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 6
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6
+                        anchors.bottom: parent.bottom
+                        height: 2
+                        radius: 1
+                        color: Theme.color.accent
+                        opacity: block.current ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
+                    }
 
-                            Rectangle {   // 选中指示：accent 色 2px 下划线，压在条的下沿分隔线上（下划线式页签）
-                                anchors.left: parent.left
-                                anchors.leftMargin: 6
-                                anchors.right: parent.right
-                                anchors.rightMargin: 6
-                                anchors.bottom: parent.bottom
-                                height: 2
-                                radius: 1
-                                color: Theme.color.accent
-                                opacity: block.current ? 1 : 0
+                    LineIcon {
+                        id: blockIcon
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: block.kind === "terminal" ? "terminal"
+                            : block.kind === "browser" ? "browser" : "file"
+                        size: 12
+                        color: block.current ? Theme.color.accent : Theme.color.textTertiary
+                    }
 
-                                Behavior on opacity { NumberAnimation { duration: Theme.motion.fast } }
-                            }
+                    Text {
+                        id: blockLabel
+                        anchors.left: blockIcon.right
+                        anchors.leftMargin: 5
+                        anchors.right: closeGlyph.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: block.title
+                        elide: Text.ElideRight
+                        color: block.current ? Theme.color.textPrimary : Theme.color.textSecondary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                        font.weight: block.current ? Theme.font.weightMedium : Font.Normal
+                    }
 
-                            LineIcon {   // 按 kind 给一颗小图标：终端/浏览器/文件，和"工作台"设计里的标签一致
-                                id: blockIcon
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: block.kind === "terminal" ? "terminal"
-                                    : block.kind === "browser" ? "browser" : "file"
-                                size: 12
-                                color: block.current ? Theme.color.accent : Theme.color.textTertiary
-                            }
+                    LineIcon {
+                        id: closeGlyph
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "close"
+                        size: 10
+                        color: block.closeHover ? Theme.color.textPrimary : Theme.color.textTertiary
+                        opacity: block.current || blockMouse.containsMouse ? 1 : 0.55
+                    }
 
-                            Text {
-                                id: blockLabel
-                                anchors.left: blockIcon.right
-                                anchors.leftMargin: 5
-                                anchors.right: closeGlyph.left
-                                anchors.rightMargin: 4
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: block.title
-                                elide: Text.ElideRight
-                                color: block.current ? Theme.color.textPrimary : Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
-                                font.pixelSize: Theme.font.caption
-                                font.weight: block.current ? Theme.font.weightMedium : Font.Normal
-                            }
+                    Timer {
+                        id: reorderCooldown
+                        interval: 120
+                        repeat: false
+                        onTriggered: block.reorderPending = false
+                    }
 
-                            LineIcon {
-                                id: closeGlyph
-                                anchors.right: parent.right
-                                anchors.rightMargin: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: "close"
-                                size: 10
-                                color: block.closeHover ? Theme.color.textPrimary : Theme.color.textTertiary
-                                opacity: block.current || blockMouse.containsMouse ? 1 : 0.55
-                            }
+                    MouseArea {
+                        id: blockMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        preventStealing: true
+                        cursorShape: block.dragging ? Qt.ClosedHandCursor
+                            : block.closeHover ? Qt.PointingHandCursor : Qt.ArrowCursor
 
-                            // 块内**唯一**的 MouseArea：右侧 closeZone 那条是"关块"，其余是"切到该块"。
-                            // ⚠️ 别给 ✕ 单独放 MouseArea：同级里后声明的铺满 MouseArea 在更上层，
-                            // 会把 ✕ 的点击整个吃掉（"关闭按钮点了没反应"就是这个原因）。
-                            MouseArea {
-                                id: blockMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: block.closeHover ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: {
-                                    if (block.closeHover) {
-                                        // 关块：终端要真的收掉（terminal/close，之后 terminal/list 里没有它）。
-                                        // 切块/收右栏只是解绑，终端进程继续跑 —— 所以只在这一条路上调它。
-                                        // 后端被扩展顶替时也一样调：桥会把 closeBlock 转给扩展的后端
-                                        Terminal.closeBlock(block.blockId)
-                                        PanelBarDock.close(block.index)
-                                    }
-                                    else
-                                        PanelBarDock.activate(block.index)
+                        onPressed: (mouse) => {
+                            block.pressX = mouse.x
+                            block.lastReorderX = 0
+                            block.suppressClick = false
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (!pressed || block.closeHover)
+                                return
+                            const dx = mouse.x - block.pressX
+                            if (!block.dragging && Math.abs(dx) < 6)
+                                return
+                            block.dragging = true
+                            block.beginGhost(mouse)
+
+                            const cursorX = block.mapToItem(tabList.contentItem, mouse.x, 0).x
+                            let target = tabList.count - 1
+                            for (let i = 0; i < tabList.count; ++i) {
+                                const item = tabList.itemAtIndex(i)
+                                if (item && cursorX < item.x + item.width / 2) {
+                                    target = i
+                                    break
                                 }
                             }
+
+                            // 换位需要同时满足：不在动画冷却期、方向确实变了、
+                            // 且光标比上一次换位点又多走了 12px。后者是防抖滞回，
+                            // 否则鼠标停在中线附近时模型会反复左右换位。
+                            block.updateGhost(mouse)
+
+                            if (!block.reorderPending && target !== block.index
+                                    && (block.lastReorderX === 0
+                                        || Math.abs(cursorX - block.lastReorderX) >= 12)) {
+                                block.reorderPending = true
+                                block.lastReorderX = cursorX
+                                const from = block.index
+                                PanelBarDock.moveBlock(from, target)
+                                reorderCooldown.restart()
+                            }
                         }
+                        onReleased: {
+                            const wasDragging = block.dragging
+                            if (wasDragging) {
+                                // 拖出右栏边界 = 把这个块单独变成窗口；落在栏内仍按原逻辑重排。
+                                const p = block.mapToItem(dock, mouse.x, mouse.y)
+                                if (p.x < -8 || p.y < -8
+                                    || p.x > dock.width + 8 || p.y > dock.height + 8) {
+                                    block.dragging = false
+                                    block.reorderPending = false
+                                    reorderCooldown.stop()
+                                    block.endGhost()
+                                    PanelBarDock.detachBlock(block.blockId)
+                                    return
+                                }
+                            }
+                            block.dragging = false
+                            block.reorderPending = false
+                            reorderCooldown.stop()
+                            block.endGhost()
+                            if (wasDragging) {
+                                block.suppressClick = true
+                                Qt.callLater(function () { block.suppressClick = false })
+                            }
+                        }
+                        onCanceled: {
+                            block.dragging = false
+                            block.reorderPending = false
+                            reorderCooldown.stop()
+                            block.endGhost()
+                        }
+                        onClicked: {
+                            if (block.suppressClick)
+                                return
+                            if (block.closeHover) {
+                                Terminal.closeBlock(block.blockId)
+                                PanelBarDock.close(block.index)
+                            } else {
+                                PanelBarDock.activate(block.index)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: dragGhost
+                property string blockKind: ""
+                property string blockTitle: ""
+                visible: false
+                width: 0
+                height: 34
+                radius: Theme.radius.small
+                color: Theme.color.panelBg
+                border.width: 1
+                border.color: Theme.color.inputBorder
+                opacity: 0.97
+                z: 200
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 5
+
+                    LineIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: dragGhost.blockKind === "terminal" ? "terminal"
+                            : dragGhost.blockKind === "browser" ? "browser" : "file"
+                        size: 12
+                        color: Theme.color.accent
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, dragGhost.width - 42)
+                        text: dragGhost.blockTitle
+                        elide: Text.ElideRight
+                        color: Theme.color.textPrimary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                        font.weight: Theme.font.weightMedium
                     }
                 }
             }
@@ -439,6 +581,55 @@ Item {
                     anchors.fill: parent
                     title: PanelBarDock.activeTitle
                     detail: PanelBarDock.activeViewDetail
+                }
+            }
+        }
+    }
+
+
+
+    // 拖块时的浮层必须是独立顶层窗口：右栏 body 有 layer+mask，
+    // 把 ghost 留在栏内时一旦拖出侧栏就会被裁掉，看起来像“控件消失”。
+    Window {
+        id: dragGhostWindow
+        transientParent: null
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+        color: "transparent"
+        visible: false
+        width: 0
+        height: 34
+        property string blockKind: ""
+        property string blockTitle: ""
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radius.small
+            color: Theme.color.panelBg
+            border.width: 1
+            border.color: Theme.color.inputBorder
+            opacity: 0.97
+
+            Row {
+                anchors.centerIn: parent
+                spacing: 5
+
+                LineIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: dragGhostWindow.blockKind === "terminal" ? "terminal"
+                        : dragGhostWindow.blockKind === "browser" ? "browser" : "file"
+                    size: 12
+                    color: Theme.color.accent
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, dragGhostWindow.width - 42)
+                    text: dragGhostWindow.blockTitle
+                    elide: Text.ElideRight
+                    color: Theme.color.textPrimary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                    font.weight: Theme.font.weightMedium
                 }
             }
         }

@@ -7,13 +7,18 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import ULinHub 1.0
+import "../../widgets"
 
 Popup {
     id: root
 
-    width: 176
+    width: extensionEntries.length > 0 ? 224 : 176
     padding: 4
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    // 由 SessionFooter 传入：第 7 个及之后的扩展入口。每项形如
+    // { item, iconSource, label, description }，点击时调用原入口的 clicked 信号。
+    property var extensionEntries: []
 
     signal clearSessionsRequested()
     signal newWorkspaceRequested()
@@ -42,10 +47,132 @@ Popup {
         border.color: Theme.color.menuBorder
     }
 
+    function invokeExtensionItem(item, depth) {
+        if (!item || depth > 4)
+            return false
+        if (typeof item.clicked === "function") {
+            item.clicked()
+            return true
+        }
+        if (typeof item.trigger === "function") {
+            item.trigger()
+            return true
+        }
+        if (typeof item.invoke === "function") {
+            item.invoke()
+            return true
+        }
+        var kids = item.children
+        for (var i = 0; kids && i < kids.length; ++i) {
+            if (invokeExtensionItem(kids[i], depth + 1))
+                return true
+        }
+        return false
+    }
+
+    function invokeExtension(entry) {
+        if (!entry)
+            return
+        invokeExtensionItem(entry.item, 0)
+        root.close()
+    }
+
     contentItem: Column {
         id: menuColumn
         width: root.availableWidth
         spacing: 0
+
+        // 扩展溢出入口：左边图标，右边标题 + 描述；点击复用原入口的 clicked 信号。
+        Repeater {
+            model: root.extensionEntries
+            delegate: Item {
+                id: extItem
+
+                required property var modelData
+                readonly property bool hasDescription: modelData.description !== undefined
+                    && String(modelData.description).length > 0
+
+                width: menuColumn.width
+                height: 44
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radius.small
+                    color: extMouse.containsMouse ? Theme.color.activeBg : "transparent"
+                }
+
+                IconButton {
+                    width: 24
+                    height: 24
+                    anchors.left: parent.left
+                    anchors.leftMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    boxSize: 24
+                    iconSize: 17
+                    iconSource: modelData.iconSource && modelData.iconSource.length > 0
+                        ? modelData.iconSource
+                        : "qrc:/ULinHub/icons/ui/extensions.svg"
+                    iconColor: Theme.color.textSecondary
+                    hoverBackground: "transparent"
+                    pressedBackground: "transparent"
+                    enabled: false
+                }
+
+                Column {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 38
+                    anchors.right: parent.right
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 1
+
+                    Text {
+                        width: parent.width
+                        text: modelData.label && String(modelData.label).length > 0
+                            ? String(modelData.label)
+                            : qsTrId("ext_manager_title")
+                        color: Theme.color.textPrimary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.body
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: extItem.hasDescription
+                        text: extItem.hasDescription ? String(modelData.description) : ""
+                        color: Theme.color.textCaption
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                        elide: Text.ElideRight
+                    }
+                }
+
+                MouseArea {
+                    id: extMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.invokeExtension(extItem.modelData)
+                }
+            }
+        }
+
+        Rectangle {   // 扩展入口与低频动作之间
+            visible: root.extensionEntries.length > 0
+            height: 9
+            width: parent.width
+            color: "transparent"
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                height: 1
+                color: Theme.color.border
+            }
+        }
 
         Repeater {
             model: [

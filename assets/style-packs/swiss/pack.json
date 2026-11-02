@@ -1,0 +1,10 @@
+{
+  "packVersion": "1.0.0",
+  "uiAbi": 3,
+  "readme": [
+    "苏黎世 Swiss —— ULin Hub 风格包（不带壁纸，只改形状/描边/图案/颜色）。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/ui/（包内没有的文件保持内置），重启客户端。",
+    "覆盖件：Backdrop 是 48/12px 版面网格 + 两处红色定位块；Card 无圆角、2px 硬描边、零阴影；ActionButton 悬停变红；UserBubble 方框+左沿红块；SessionRow 选中整行反白；TitleBar 粗黑标题 + 2px 基线。",
+    "恢复默认：设置 → 外观 → 重置界面包，或删掉 <exe>/ui 后重启。"
+  ]
+}

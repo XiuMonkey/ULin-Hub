@@ -36,7 +36,11 @@ Item {
                 text: qsTrId("settings_title")
                 color: Theme.color.textPrimary
                 font.family: "Microsoft YaHei UI"
-                font.pixelSize: Theme.font.lead
+                // 弹窗标题：不取 lead(16)。16px 常规字重在 632 宽的卡片里像"放大的正文"，
+                // 和下面 14px 的页面标题只差 2px，两级标题挤在一起反而都不像标题。
+                // 收敛到 15 + 半粗，靠字重立起层级，靠字号与正文(13)拉开。
+                font.pixelSize: 15
+                font.weight: Theme.font.weightBold
             }
 
             IconButton {
@@ -182,6 +186,8 @@ Item {
                     visible: Hub.settings.page === 3
                     source: Style.url("basic/settings/AppearancePage.qml")
                 }
+
+
             }
         }
     }

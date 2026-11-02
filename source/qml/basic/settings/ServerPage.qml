@@ -24,11 +24,22 @@ Item {
         anchors.top: parent.top
         spacing: 6
 
+        // 页面标题：与模型列表页同档（14 + 半粗），四页统一。
         Text {
-            text: qsTrId("settings_server_address")
+            text: qsTrId("settings_server_tab")
             color: Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.title
+            font.weight: Theme.font.weightBold
+            bottomPadding: 2
+        }
+
+        Text {
+            text: qsTrId("settings_server_address")
+            color: Theme.color.textSecondary
+            font.family: "Microsoft YaHei UI"
+            // 字段标签取 caption(12) + 次级色，与 Agent 预设页同档。
+            font.pixelSize: Theme.font.caption
         }
 
         Rectangle {

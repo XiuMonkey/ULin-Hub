@@ -16,21 +16,37 @@ Item {
         anchors.top: parent.top
         spacing: 6
 
+        // 页面标题：四页统一到 14 + 半粗，让"设置 / 各页标题 / 字段标签 / 说明"成为四级。
+        // 原版这页没有标题，进来只有一行 14px 的字段标签，比导航项还轻，整页没有落点。
         Text {
-            text: qsTrId("settings_default_agent_preset")
+            text: qsTrId("settings_agent_preset_tab")
             color: Theme.color.textPrimary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.title
+            font.weight: Theme.font.weightBold
+            bottomPadding: 2
+        }
+
+        Text {
+            text: qsTrId("settings_default_agent_preset")
+            color: Theme.color.textSecondary
+            font.family: "Microsoft YaHei UI"
+            // 字段标签取 caption(12) + 次级色：它只是"说明下面这个框是什么"，
+            // 取 14/13 会和输入框里的内容同级，读起来分不清谁是标签谁是值。
+            font.pixelSize: Theme.font.caption
         }
 
         Item {
             width: Math.max(280, parent.width)
-            implicitHeight: 34
+            // 弹层完全落在父 Item 的几何范围内，避免“视觉上展开、命中测试只到 34px”，
+            // 下面几项看着能点但鼠标事件进不来。
+            implicitHeight: page.popupOpen ? 34 + popup.implicitHeight + 4 : 34
+            z: 100
 
             Rectangle {
                 id: presetButton
                 width: parent.width
-                height: parent.height
+                height: 34
                 radius: Theme.radius.control
                 color: presetMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
                 border.width: 1
@@ -85,7 +101,7 @@ Item {
                 border.width: 1
                 border.color: Theme.color.menuBorder
                 clip: true
-                z: 10
+                z: 100
 
                 ListView {
                     id: list

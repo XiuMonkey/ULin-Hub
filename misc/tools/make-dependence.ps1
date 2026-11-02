@@ -77,9 +77,9 @@ if (-not $Config) {
 	}
 }
 $manifestSrc = if ($Config -eq 'Debug') {
-	Join-Path $root 'source\dependence.debug.manifest'
+	Join-Path $root 'source\manifest\dependence.debug.manifest'
 } else {
-	Join-Path $root 'source\dependence.manifest'
+	Join-Path $root 'source\manifest\dependence.manifest'
 }
 if (-not (Test-Path -LiteralPath $manifestSrc)) { throw "找不到清单: $manifestSrc" }
 
@@ -165,3 +165,28 @@ foreach ($name in $webEngineResources) {
 	$addedResources++
 }
 if ($addedResources -gt 0) { Write-Host ("  本次补入 {0} 个 WebEngine 资源文件" -f $addedResources) }
+
+# WebEngine 的 locale 包：和 resources/webengine 同落点，main.cpp 用 QTWEBENGINE_LOCALES_PATH 指过去。
+# 不再依赖 <exe>/translations/qtwebengine_locales（那个目录不随 Release 发布）。
+$localeDst = Join-Path $resDst 'locales'
+$localeSrc = if ($QtBin) { Join-Path (Split-Path -Parent $QtBin) 'translations\qtwebengine_locales' } else { $null }
+if (-not $localeSrc -and $env:QTDIR) {
+    $localeSrc = Join-Path $env:QTDIR 'translations\qtwebengine_locales'
+}
+if (-not $localeSrc) {
+    # 本地开发兜底：旧部署脚本曾把 locale 放在 x64\translations；发布仍以 resources\webengine\locales 为准。
+    $candidate = Join-Path (Split-Path -Parent $Target) 'translations\qtwebengine_locales'
+    if (Test-Path -LiteralPath $candidate) { $localeSrc = $candidate }
+}
+if ($localeSrc -and (Test-Path -LiteralPath $localeSrc)) {
+    foreach ($name in @('en-US.pak', 'zh-CN.pak', 'en-GB.pak', 'zh-TW.pak')) {
+        $src = Join-Path $localeSrc $name
+        if (Test-Path -LiteralPath $src) {
+            New-Item -ItemType Directory -Path $localeDst -Force | Out-Null
+            Copy-Item -LiteralPath $src -Destination (Join-Path $localeDst $name) -Force
+            Write-Host "  WebEngine locale  $name"
+        }
+    }
+} else {
+    Write-Warning "  找不到 Qt WebEngine locales：预期 <Qt>\translations\qtwebengine_locales"
+}

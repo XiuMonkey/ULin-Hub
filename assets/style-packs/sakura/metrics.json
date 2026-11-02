@@ -1,0 +1,52 @@
+{
+  "_readme": "樱岚的几何档位：大圆角、松留白、柔投影。只列与内置不同的键。",
+  "radius": {
+    "window": 14,
+    "panel": 16,
+    "card": 16,
+    "inner": 14,
+    "control": 14,
+    "input": 14,
+    "small": 10,
+    "check": 6,
+    "tiny": 6,
+    "pill": 16,
+    "popup": 18,
+    "menu": 16,
+    "float": 22,
+    "composer": 26
+  },
+  "spacing": {
+    "cardPadding": 18,
+    "sectionGap": 14,
+    "buttonPadX": 18,
+    "fieldPadY": 8
+  },
+  "size": {
+    "titleBarHeight": 44,
+    "windowButtonWidth": 34,
+    "windowButtonHeight": 26,
+    "windowButtonTopMargin": 9,
+    "windowButtonRightMargin": 10,
+    "logoHeight": 18,
+    "scrollbarThickness": 10,
+    "scrollbarHandleWidth": 6,
+    "scrollbarHandleMin": 26
+  },
+  "shadow": {
+    "cardBlur": 26,
+    "cardDy": 6,
+    "cardRadius": 16,
+    "inputBlur": 20,
+    "inputDy": 5,
+    "inputRadius": 26,
+    "floatBlur": 34,
+    "floatDy": 10,
+    "floatRadius": 22
+  },
+  "motion": {
+    "fast": 130,
+    "normal": 240,
+    "slow": 360
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "packVersion": "1.0.0",
+  "uiAbi": 3,
+  "readme": [
+    "荧光屏 Phosphor —— ULin Hub 风格包（不带壁纸，只改形状/描边/图案/颜色）。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/ui/（包内没有的文件保持内置），重启客户端。",
+    "覆盖件：Backdrop 画扫描线+中心微光+暗角；Card 是直角面板带四角 L 形角标；ActionButton 是终端命令块；UserBubble 带 `>` 提示符与荧光条；SessionRow 用等宽字+方块光标；AppScrollBar 是直角电位器；TitleBar 是提示行标题。",
+    "dark 模式是主设定（CRT 黑底荧光绿）；light 模式是同一套形状的"纸质打印版"（白底深绿）。",
+    "恢复默认：设置 → 外观 → 重置界面包，或删掉 <exe>/ui 后重启。"
+  ]
+}

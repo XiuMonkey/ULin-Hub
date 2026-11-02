@@ -616,6 +616,12 @@
     <message id="plugin_uninstall_action">
         <translation>Uninstall</translation>
     </message>
+    <message id="common_minimize">
+        <translation>Minimize</translation>
+    </message>
+    <message id="common_maximize">
+        <translation>Maximize</translation>
+    </message>
     <message id="common_close">
         <translation>Close</translation>
     </message>
@@ -717,7 +723,7 @@
         <translation> · whole group hidden in config</translation>
     </message>
     <message id="toolfilter_title">
-        <translation>Tool filter</translation>
+        <translation>Agent filter</translation>
     </message>
     <message id="toolfilter_show_all">
         <translation>Show all</translation>
@@ -730,6 +736,33 @@
     </message>
     <message id="toolfilter_loading">
         <translation>Reading this session's tool catalog...</translation>
+    </message>
+    <message id="toolfilter_tab_tools">
+        <translation>Tools</translation>
+    </message>
+    <message id="toolfilter_tab_skills">
+        <translation>Skills</translation>
+    </message>
+    <message id="skillfilter_loading">
+        <translation>正在读取该会话的技能目录…</translation>
+    </message>
+    <message id="skillfilter_no_session">
+        <translation>还没有选中会话</translation>
+    </message>
+    <message id="skillfilter_empty">
+        <translation>该会话没有可用技能</translation>
+    </message>
+    <message id="skillfilter_summary_fmt">
+        <translation>%1 skills</translation>
+    </message>
+    <message id="skillfilter_load_failed">
+        <translation>Failed to load the skill catalog. Refresh to retry.</translation>
+    </message>
+    <message id="skilldetail_back">
+        <translation>Back to skills</translation>
+    </message>
+    <message id="skilldetail_failed">
+        <translation>Could not read SKILL.md</translation>
     </message>
     <message id="toolfilter_no_filterable_tools">
         <translation>This session has no filterable tools</translation>
@@ -751,6 +784,12 @@
     </message>
     <message id="placeholder_session_hint">
         <translation>Pick one from the list on the left, or click ＋ to create one</translation>
+    </message>
+    <message id="empty_conversation_title">
+        <translation>What can I help with?</translation>
+    </message>
+    <message id="empty_conversation_hint">
+        <translation>Type a task below, or use / to pick a skill.</translation>
     </message>
     <message id="panelBar_title">
         <translation>Panel</translation>
@@ -1064,6 +1103,18 @@ Click “New chat” above to start</translation>
     </message>
     <message id="job_status_failed">
         <translation>failed</translation>
+    </message>
+    <message id="plugin_build_scripts_blocked_fmt">
+        <translation>This plugin needs to run build scripts, which were blocked: %1. Allow them and the install will retry automatically.</translation>
+    </message>
+    <message id="plugin_approve_builds">
+        <translation>Allow build scripts and retry</translation>
+    </message>
+    <message id="plugin_approving_builds">
+        <translation>Allowing build scripts…</translation>
+    </message>
+    <message id="plugin_approve_builds_done">
+        <translation>Build scripts allowed. Please retry the install.</translation>
     </message>
 </context>
 </TS>

@@ -1,0 +1,11 @@
+{
+  "packVersion": "1.0.0",
+  "uiAbi": 3,
+  "readme": [
+    "霜玻 Frost —— ULin Hub 风格包（不带壁纸，只改形状/描边/图案/颜色）。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/ui/（包内没有的文件保持内置），重启客户端。",
+    "覆盖件：Backdrop 画三团环境光斑+细颗粒；Card 是半透明玻璃面（上亮下暗渐变）；ActionButton 是胶囊玻璃；UserBubble 是胶囊气泡；SessionRow 是胶囊行；TitleBar 是透明浮层+圆形窗口键。",
+    "注意：玻璃面必须靠色板里的 alpha 才能透出背景光斑，theme-*.json 中 panelBg / cardBg / sessionBarBg 都是 rgba(...)。",
+    "恢复默认：设置 → 外观 → 重置界面包，或删掉 <exe>/ui 后重启。"
+  ]
+}

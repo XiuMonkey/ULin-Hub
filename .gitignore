@@ -51,3 +51,6 @@ build_smoke/
 # 测试工程构建产物（归档在 misc/legacy-tests）
 misc/legacy-tests/*/x64/
 misc/release-build
+
+# stylepack-render 的中间工作目录（可重新生成）
+misc/tools/stylepack-render/_work/

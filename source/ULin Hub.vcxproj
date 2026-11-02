@@ -71,12 +71,13 @@
        DLL 清单在 source\dependence.manifest。加/换 DLL 时两处都要改。 -->
   <ItemDefinitionGroup>
     <Manifest>
-      <AdditionalManifestFiles>$(ProjectDir)dependence.deps.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+      <AdditionalManifestFiles>$(ProjectDir)manifest\dependence.deps.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
     <!-- 每次构建后把运行库收进 dependence\：那个私有程序集要求「清单与 dll 必须同在」，
          漏一个就是启动即失败（SxS），所以不能靠手工记得。缺 dll 时脚本只告警、不让构建失败。 -->
     <PostBuildEvent>
-      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\misc\tools\make-dependence.ps1" -Target "$(OutDir)." -Config $(Configuration)</Command>
+      <Command>powershell -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)..\misc\tools\make-dependence.ps1" -Target "$(OutDir)." -Config $(Configuration)
+if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(ProjectDir)..\assets\resources\office-viewer" "$(OutDir)resources\office-viewer\" &gt;nul</Command>
       <Message>把运行库收进 dependence\（私有程序集）</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -87,7 +88,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\shared;$(ProjectDir)include\windows-64;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
     </ClCompile>
@@ -95,14 +96,14 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PreprocessorDefinitions>QT_NO_DEPRECATED_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\shared;$(ProjectDir)include\windows-64;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MaxSpeed</Optimization>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\shared;$(ProjectDir)include\windows-64;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
@@ -116,7 +117,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include\shared;$(ProjectDir)include\windows-64;$(ProjectDir)3rdparty\libvterm\include;D:\Qt\6.11.2\msvc2022_64\include\QtCore\6.11.2;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
@@ -132,35 +133,39 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\common\util\ConnectionManager.cpp" />
+    <ClCompile Include="src\shared\common\util\ConnectionManager.cpp" />
     <QtRcc Include="..\assets\resources\ulinhub.qrc" />
     <!-- QML 壳的资源（source/qml/）。单独一份 qrc：一份 QML 目录 = 一个自洽的界面子树 -->
     <QtRcc Include="qml\qml.qrc" />
-    <ClCompile Include="src\common\platform\win\NativeWindowFilter.cpp" />
-    <ClCompile Include="src\qmlbridge\WindowBridge.cpp" />
-    <ClCompile Include="src\common\appearance\StyleResolver.cpp" />
-    <ClCompile Include="src\qmlbridge\ThemeBridge.cpp" />
-    <ClCompile Include="src\common\session\SessionListModel.cpp" />
-    <ClCompile Include="src\qmlbridge\QmlBridge.cpp" />
-    <ClCompile Include="src\qmlbridge\ThemeController.cpp" />
-    <ClCompile Include="src\common\session\MessageListModel.cpp" />
-    <ClCompile Include="src\common\session\TraceModel.cpp" />
-    <ClCompile Include="src\common\session\ChatController.cpp" />
-    <ClCompile Include="src\common\session\ToolsFilter.cpp" />
-    <ClCompile Include="src\common\util\MarkdownSegmenter.cpp" />
-    <ClCompile Include="src\common\settings\SettingsController.cpp" />
-    <ClCompile Include="src\common\PluginMarket\PluginMarketController.cpp" />
-    <ClCompile Include="src\common\session\CommandController.cpp" />
-    <ClCompile Include="src\qmlbridge\ExtensionManagerController.cpp" />
-    <ClCompile Include="src\common\util\UrlInput.cpp" />
-    <ClCompile Include="src\qmlbridge\UrlInputBridge.cpp" />
-    <ClCompile Include="src\common\shell\PanelBarDockModel.cpp" />
+    <ClCompile Include="src\windows-64\common\platform\win\NativeWindowFilter.cpp" />
+    <ClCompile Include="src\windows-64\qmlbridge\WindowBridge.cpp" />
+    <ClCompile Include="src\shared\common\appearance\StyleResolver.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\ThemeBridge.cpp" />
+    <ClCompile Include="src\shared\common\session\SessionListModel.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\QmlBridge.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\ThemeController.cpp" />
+    <ClCompile Include="src\shared\common\session\MessageListModel.cpp" />
+    <ClCompile Include="src\shared\common\session\TraceModel.cpp" />
+    <ClCompile Include="src\shared\common\session\ChatController.cpp" />
+    <ClCompile Include="src\shared\common\session\ToolsFilter.cpp" />
+    <ClCompile Include="src\shared\common\util\MarkdownSegmenter.cpp" />
+    <ClCompile Include="src\shared\common\settings\SettingsController.cpp" />
+    <ClCompile Include="src\shared\common\PluginMarket\PluginMarketController.cpp" />
+    <ClCompile Include="src\shared\common\session\CommandController.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\ExtensionManagerController.cpp" />
+    <ClCompile Include="src\shared\common\util\UrlInput.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\FileBrowserBridge.cpp" />
+    <ClCompile Include="src\shared\common\files\OfficeTextExtractor.cpp" />
+    <ClCompile Include="src\shared\common\files\OfficeConverter.cpp" />
+    <ClCompile Include="src\shared\common\files\FileBrowserService.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\UrlInputBridge.cpp" />
+    <ClCompile Include="src\shared\common\shell\PanelBarDockModel.cpp" />
     <!-- 右栏「终端」块的接线层（QML 单例 Terminal）：协议状态 + 网格模型的入口 -->
-    <ClCompile Include="src\qmlbridge\TerminalBridge.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\TerminalBridge.cpp" />
     <!-- 终端网格的 QML 桥：按行暴露 TerminalVt 的网格 + 脏行通知 + 键盘编码（视图是 TerminalView.qml） -->
-    <ClCompile Include="src\qmlbridge\TerminalVtModel.cpp" />
+    <ClCompile Include="src\shared\qmlbridge\TerminalVtModel.cpp" />
     <!-- 终端 VT 核心：把引擎给的字节流解析成网格。不依赖 Qt，见 include/common/terminal/TerminalVt.h -->
-    <ClCompile Include="src\common\terminal\TerminalVt.cpp" />
+    <ClCompile Include="src\shared\common\terminal\TerminalVt.cpp" />
     <!-- 内嵌的 VT 解析器（见 3rdparty\libvterm\README.md）。9 个编译单元全是 C99，上游文件零改动，
          所以工程侧要替它们做四件事（都是实测过的，别凭印象改）：
          ① CompileAsC —— 免得被工程级的 ConformanceMode / stdcpp17 带过去当 C++ 编（C99 会因隐式转换报错）；
@@ -222,42 +227,41 @@
       <SDLCheck>false</SDLCheck>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
-    <QtMoc Include="include\core\ServerManager.h" />
-    <QtMoc Include="include\core\ClientRuntime.h" />
-    <ClCompile Include="src\network\DshApiClient.cpp" />
-    <ClCompile Include="src\network\DshEventParser.cpp" />
-    <ClCompile Include="src\core\ServerManager.cpp" />
-    <ClCompile Include="src\core\ClientRuntime.cpp" />
-    <ClCompile Include="src\core\main.cpp" />
-    <ClCompile Include="src\ExtensionSystem\HostExports.cpp" />
-    <ClCompile Include="src\common\util\CodeHighlighter.cpp" />
-    <ClCompile Include="src\common\util\CommonRegistry.cpp" />
-    <ClCompile Include="src\common\util\MarkdownPreprocess.cpp" />
-    <ClCompile Include="src\common\appearance\InteractionHandler.cpp" />
-    <ClCompile Include="src\common\session\SessionCatalog.cpp" />
-    <ClCompile Include="src\common\session\SessionService.cpp" />
-    <ClCompile Include="src\common\settings\SettingsStore.cpp" />
-    <ClCompile Include="src\common\settings\ClientSettings.cpp" />
-    <ClCompile Include="src\common\session\AgentPresetService.cpp" />
-    <ClCompile Include="src\common\PluginMarket\PluginMarketClient.cpp" />
-    <ClCompile Include="src\common\PluginMarket\PluginMarketModel.cpp" />
-    <ClCompile Include="src\common\PluginMarket\PluginMarketInstaller.cpp" />
-    <ClCompile Include="src\common\session\ModelSelectionService.cpp" />
-    <ClCompile Include="src\common\appearance\TranslationManager.cpp" />
-    <ClCompile Include="src\network\SessionPrefetcher.cpp" />
-    <ClCompile Include="src\common\appearance\ThemeManager.cpp" />
-    <ClCompile Include="src\common\appearance\CardShadow.cpp" />
-    <ClCompile Include="src\common\util\Logger.cpp" />
-    <ClCompile Include="src\ExtensionSystem\DshNamedPipeBridge.cpp" />
-    <ClCompile Include="src\ExtensionSystem\DllCaller.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ComCaller.cpp" />
-    <ClCompile Include="src\ExtensionSystem\Thunk.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ExtensionLoader.cpp" />
-    <ClCompile Include="src\ExtensionSystem\HostUi.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ClientExtension.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ExtensionRegistry.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ExtensionInstallTask.cpp" />
-    <ClCompile Include="src\ExtensionSystem\ExtensionToolHost.cpp" />
+    <QtMoc Include="include\windows-64\core\ServerManager.h" />
+    <QtMoc Include="include\windows-64\core\ClientRuntime.h" />
+    <ClCompile Include="src\shared\network\DshApiClient.cpp" />
+    <ClCompile Include="src\shared\network\DshEventParser.cpp" />
+    <ClCompile Include="src\windows-64\core\ServerManager.cpp" />
+    <ClCompile Include="src\windows-64\core\ClientRuntime.cpp" />
+    <ClCompile Include="src\windows-64\core\main.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\HostExports.cpp" />
+    <ClCompile Include="src\shared\common\util\CodeHighlighter.cpp" />
+    <ClCompile Include="src\shared\common\util\CommonRegistry.cpp" />
+    <ClCompile Include="src\shared\common\appearance\InteractionHandler.cpp" />
+    <ClCompile Include="src\shared\common\session\SessionCatalog.cpp" />
+    <ClCompile Include="src\shared\common\session\SessionService.cpp" />
+    <ClCompile Include="src\shared\common\settings\SettingsStore.cpp" />
+    <ClCompile Include="src\shared\common\settings\ClientSettings.cpp" />
+    <ClCompile Include="src\shared\common\session\AgentPresetService.cpp" />
+    <ClCompile Include="src\shared\common\PluginMarket\PluginMarketClient.cpp" />
+    <ClCompile Include="src\shared\common\PluginMarket\PluginMarketModel.cpp" />
+    <ClCompile Include="src\shared\common\PluginMarket\PluginMarketInstaller.cpp" />
+    <ClCompile Include="src\shared\common\session\ModelSelectionService.cpp" />
+    <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp" />
+    <ClCompile Include="src\shared\network\SessionPrefetcher.cpp" />
+    <ClCompile Include="src\shared\common\appearance\ThemeManager.cpp" />
+    <ClCompile Include="src\shared\common\appearance\CardShadow.cpp" />
+    <ClCompile Include="src\shared\common\util\Logger.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\DshNamedPipeBridge.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\DllCaller.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ComCaller.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\Thunk.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ExtensionLoader.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\HostUi.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ClientExtension.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ExtensionRegistry.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ExtensionInstallTask.cpp" />
+    <ClCompile Include="src\windows-64\ExtensionSystem\ExtensionToolHost.cpp" />
     <None Include="..\assets\resources\config\highlight-rules.json" />
     <None Include="..\assets\resources\icons\ulin-hub-logo-tiny@2x.png" />
     <None Include="..\assets\resources\icons\ulin-hub-logo-tiny-dark@2x.png" />
@@ -266,68 +270,70 @@
     <ResourceCompile Include="..\assets\resources\ulin-hub.rc" />
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="include\common\util\CommonRegistry.h" />
-    <QtMoc Include="include\network\DshApiClient.h" />
-    <QtMoc Include="include\ExtensionSystem\DshNamedPipeBridge.h" />
-    <QtMoc Include="include\ExtensionSystem\ExtensionToolHost.h" />
-    <QtMoc Include="include\network\SessionPrefetcher.h" />
-    <QtMoc Include="include\common\PluginMarket\PluginMarketClient.h" />
-    <QtMoc Include="include\common\PluginMarket\PluginMarketInstaller.h" />
+    <QtMoc Include="include\shared\common\util\CommonRegistry.h" />
+    <QtMoc Include="include\shared\network\DshApiClient.h" />
+    <QtMoc Include="include\windows-64\ExtensionSystem\DshNamedPipeBridge.h" />
+    <QtMoc Include="include\windows-64\ExtensionSystem\ExtensionToolHost.h" />
+    <QtMoc Include="include\shared\network\SessionPrefetcher.h" />
+    <QtMoc Include="include\shared\common\PluginMarket\PluginMarketClient.h" />
+    <QtMoc Include="include\shared\common\PluginMarket\PluginMarketInstaller.h" />
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="include\common\util\ConnectionManager.h" />
-    <ClInclude Include="include\network\DshEventParser.h" />
-    <ClInclude Include="include\ExtensionSystem\ExtensionLoader.h" />
-    <ClInclude Include="include\ExtensionSystem\DllCaller.h" />
-    <ClInclude Include="include\ExtensionSystem\ComCaller.h" />
-    <ClInclude Include="include\ExtensionSystem\Thunk.h" />
-    <ClInclude Include="include\ExtensionSystem\ClientExtension.h" />
-    <ClInclude Include="include\ExtensionSystem\ExtensionRegistry.h" />
-    <ClInclude Include="include\ExtensionSystem\ExtensionInstallTask.h" />
-    <ClInclude Include="include\common\util\CodeHighlighter.h" />
-    <ClInclude Include="include\common\appearance\InteractionHandler.h" />
-    <ClInclude Include="include\common\appearance\CardShadow.h" />
-    <ClInclude Include="include\common\ClientInfo.h" />
-    <ClInclude Include="include\VirtualClass\VirtualCommon.h" />
-    <ClInclude Include="include\VirtualClass\VirtualApiTakeover.h" />
-    <QtMoc Include="include\ExtensionSystem\HostUi.h" />
-    <ClInclude Include="include\ExtensionSystem\HostExports.h" />
-    <ClInclude Include="include\ExtensionSystem\DshHostPlugin.h" />
-    <ClInclude Include="include\common\util\HostIndex.h" />
-    <ClInclude Include="include\common\util\Logger.h" />
-    <ClInclude Include="include\common\session\SessionCatalog.h" />
-    <ClInclude Include="include\common\session\SessionService.h" />
-    <ClInclude Include="include\common\settings\SettingsStore.h" />
-    <ClInclude Include="include\common\settings\ClientSettings.h" />
-    <ClInclude Include="include\common\session\AgentPresetService.h" />
-    <ClInclude Include="include\common\PluginMarket\PluginMarketModel.h" />
-    <ClInclude Include="include\common\session\ModelSelectionService.h" />
-    <QtMoc Include="include\common\appearance\ThemeManager.h" />
-    <QtMoc Include="include\common\appearance\TranslationManager.h" />
+    <QtMoc Include="include\shared\common\util\ConnectionManager.h" />
+    <ClInclude Include="include\shared\network\DshEventParser.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionLoader.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\DllCaller.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\ComCaller.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\Thunk.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\ClientExtension.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionRegistry.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionInstallTask.h" />
+    <ClInclude Include="include\shared\common\util\CodeHighlighter.h" />
+    <ClInclude Include="include\shared\common\appearance\InteractionHandler.h" />
+    <ClInclude Include="include\shared\common\appearance\CardShadow.h" />
+    <ClInclude Include="include\shared\common\ClientInfo.h" />
+    <ClInclude Include="include\shared\VirtualClass\VirtualCommon.h" />
+    <ClInclude Include="include\shared\VirtualClass\VirtualApiTakeover.h" />
+    <QtMoc Include="include\windows-64\ExtensionSystem\HostUi.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\HostExports.h" />
+    <ClInclude Include="include\windows-64\ExtensionSystem\DshHostPlugin.h" />
+    <ClInclude Include="include\shared\common\util\HostIndex.h" />
+    <ClInclude Include="include\shared\common\util\Logger.h" />
+    <ClInclude Include="include\shared\common\session\SessionCatalog.h" />
+    <ClInclude Include="include\shared\common\session\SessionService.h" />
+    <ClInclude Include="include\shared\common\settings\SettingsStore.h" />
+    <ClInclude Include="include\shared\common\settings\ClientSettings.h" />
+    <ClInclude Include="include\shared\common\session\AgentPresetService.h" />
+    <ClInclude Include="include\shared\common\PluginMarket\PluginMarketModel.h" />
+    <ClInclude Include="include\shared\common\session\ModelSelectionService.h" />
+    <QtMoc Include="include\shared\common\appearance\ThemeManager.h" />
+    <QtMoc Include="include\shared\common\appearance\TranslationManager.h" />
     <!-- QML 壳的窗口桥与 token：QML 单例注册要 moc -->
-    <QtMoc Include="include\qmlbridge\WindowBridge.h" />
-    <QtMoc Include="include\qmlbridge\ThemeBridge.h" />
-    <QtMoc Include="include\common\appearance\StyleResolver.h" />
-    <QtMoc Include="include\common\session\SessionListModel.h" />
-    <QtMoc Include="include\qmlbridge\QmlBridge.h" />
-    <QtMoc Include="include\qmlbridge\ThemeController.h" />
-    <QtMoc Include="include\common\session\MessageListModel.h" />
-    <QtMoc Include="include\common\session\TraceModel.h" />
-    <QtMoc Include="include\common\session\ChatController.h" />
-    <QtMoc Include="include\common\session\ToolsFilter.h" />
-    <QtMoc Include="include\common\settings\SettingsController.h" />
-    <QtMoc Include="include\common\PluginMarket\PluginMarketController.h" />
-    <QtMoc Include="include\common\session\CommandController.h" />
-    <QtMoc Include="include\qmlbridge\ExtensionManagerController.h" />
+    <QtMoc Include="include\windows-64\qmlbridge\WindowBridge.h" />
+    <QtMoc Include="include\shared\qmlbridge\ThemeBridge.h" />
+    <QtMoc Include="include\shared\common\appearance\StyleResolver.h" />
+    <QtMoc Include="include\shared\common\session\SessionListModel.h" />
+    <QtMoc Include="include\shared\qmlbridge\QmlBridge.h" />
+    <QtMoc Include="include\shared\qmlbridge\ThemeController.h" />
+    <QtMoc Include="include\shared\common\session\MessageListModel.h" />
+    <QtMoc Include="include\shared\common\session\TraceModel.h" />
+    <QtMoc Include="include\shared\common\session\ChatController.h" />
+    <QtMoc Include="include\shared\common\session\ToolsFilter.h" />
+    <QtMoc Include="include\shared\common\settings\SettingsController.h" />
+    <QtMoc Include="include\shared\common\PluginMarket\PluginMarketController.h" />
+    <QtMoc Include="include\shared\common\session\CommandController.h" />
+    <QtMoc Include="include\shared\qmlbridge\ExtensionManagerController.h" />
     <!-- 面板坞块列表 / 地址栏规范化：QML 单例注册都要 moc -->
-    <QtMoc Include="include\common\shell\PanelBarDockModel.h" />
-    <QtMoc Include="include\qmlbridge\UrlInputBridge.h" />
-    <QtMoc Include="include\qmlbridge\TerminalBridge.h" />
-    <QtMoc Include="include\qmlbridge\TerminalVtModel.h" />
-    <ClInclude Include="include\common\util\UrlInput.h" />
-    <ClInclude Include="include\common\platform\win\NativeWindowFilter.h" />
-    <ClInclude Include="include\common\util\MarkdownSegmenter.h" />
-    <ClInclude Include="include\common\terminal\TerminalVt.h" />
+    <QtMoc Include="include\shared\common\shell\PanelBarDockModel.h" />
+    <QtMoc Include="include\shared\qmlbridge\FileBrowserBridge.h" />
+    <QtMoc Include="include\shared\common\files\FileBrowserService.h" />
+    <QtMoc Include="include\shared\qmlbridge\UrlInputBridge.h" />
+    <QtMoc Include="include\shared\qmlbridge\TerminalBridge.h" />
+    <QtMoc Include="include\shared\qmlbridge\TerminalVtModel.h" />
+    <ClInclude Include="include\shared\common\util\UrlInput.h" />
+    <ClInclude Include="include\windows-64\common\platform\win\NativeWindowFilter.h" />
+    <ClInclude Include="include\shared\common\util\MarkdownSegmenter.h" />
+    <ClInclude Include="include\shared\common\terminal\TerminalVt.h" />
     <ClInclude Include="3rdparty\libvterm\include\vterm.h" />
     <ClInclude Include="3rdparty\libvterm\include\vterm_keycodes.h" />
     <ClInclude Include="3rdparty\libvterm\src\vterm_internal.h" />

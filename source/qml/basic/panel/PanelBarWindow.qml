@@ -15,6 +15,9 @@ import ULinHub 1.0
 
 Window {
     id: win
+    // 不挂到主窗口的 transient 链：否则 Windows 把副窗口当 tool/transient，
+    // 任务栏没有入口，最小化也只会缩成贴在主窗口上的条。
+    transientParent: null
 
     required property var host   // 由 Shell 注入：状态与几何都在壳层（本文件只把窗摆出来 + 自己拖/自己缩放）
 
@@ -37,111 +40,41 @@ Window {
     readonly property int minTotalW: Theme.size.panelBarMinWidth
     readonly property int minTotalH: 200
 
-    readonly property bool maximized: win.visibility === Window.Maximized   // 最大化态（= 真窗口状态，图标与"能不能拖/缩放"都看它）
-    property rect windowedGeometry: Qt.rect(0, 0, 0, 0)
-    property rect liftGeometry: Qt.rect(0, 0, 0, 0)   // 「拿起来」的目标几何：由 Shell 在 prepareForLift 里给（见 normalizeForLift 的说明）
+    readonly property bool maximized: win.visibility === Window.Maximized   // 窗口状态仍由 Qt 报，按钮图标用
 
-    // 唯一的几何写入口：八条缩放热区（以及"拿起来/跟手"）都走它。
-    // 面板头部拖动热区（PanelBar.qml 的 headerDragArea）与三点抓手直接写 win.x/win.y（拖动不碰宽高，
-    // 同一套"按下时位置 + 屏幕位移"算法）。⚠️ 这里**不**给自己写 x/y/width/height 的绑定：
-    // 绑上去会被拖动摘掉，或反过来每帧盖回来。
+    // 窗口几何/最大化/缩放的算法在 WindowBridge（C++）；QML 只负责把热区事件转过去。
     function applyGeometry(x, y, w, h) {
-        win.x = Math.round(x)
-        win.y = Math.round(y)
-        win.width = Math.round(w)
-        win.height = Math.round(h)
+        WindowBridge.auxApplyGeometry(x, y, w, h)
     }
 
-    // 「拿起来」的收尾（Shell 按序调，见 Shell.liftPanelBarForDrag）：prepareForLift 先记下目标几何，
-    // normalizeForLift 再保证窗口是普通态 —— 上一次可能是最大化/最小化被收起的（隐藏时 Qt 只把
-    // visibility 记成 Hidden，平台窗口还留着放大的摆放），showNormal() 会还原"最大化前的几何"，
-    // 所以它之后再按目标几何摆一次。
     function prepareForLift(x, y, w, h) {
-        win.liftGeometry = Qt.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
-        win.windowedGeometry = Qt.rect(0, 0, 0, 0)
+        WindowBridge.auxPrepareLift(x, y, w, h)
     }
 
     function normalizeForLift() {
-        win.showNormal()   // 无条件回普通态：隐藏时 Qt 只记 visibility=Hidden，平台窗口可能还留着最大化摆放
-        const g = win.liftGeometry
-        if (g.width > 0 && g.height > 0)
-            win.applyGeometry(g.x, g.y, g.width, g.height)
+        WindowBridge.auxNormalizeLift()
     }
 
-    function minimizeWindow() {   // 最小化 = showMinimized()（需求 ③ 原话）
-        win.showMinimized()
+    function minimizeWindow() {
+        WindowBridge.auxMinimize()
     }
 
-    function toggleMaximize() {   // 最大化/还原 = Window.Maximized / Window.Windowed（需求 ③ 原话）+ 自己记的还原几何
-        if (win.maximized) {
-            const g = win.windowedGeometry   // 先记好的那个几何；真窗口状态回普通态时 Qt 也会还原一次，这里再显式写一遍更稳
-            win.visibility = Window.Windowed
-            if (g.width > 0 && g.height > 0)
-                win.applyGeometry(g.x, g.y, g.width, g.height)
-        }
-        else {
-            win.windowedGeometry = Qt.rect(win.x, win.y, win.width, win.height)
-            win.visibility = Window.Maximized
-        }
+    function toggleMaximize() {
+        WindowBridge.auxToggleMaximize()
     }
 
-    // 关闭 = 回附 + 关窗：与 `onClosing`（系统 ✕ / Alt+F4 / 任务栏关闭）**同一语义**，
-    // 于是"关闭后再点 ◫ = 默认以附着状态打开"这条三态语义不破（内容 reparent 回槽位、窗口隐藏）。
+    // 关闭 = 回附 + 关窗：与 `onClosing`（系统 ✕ / Alt+F4 / 任务栏关闭）**同一语义**。
     function closeWindow() {
         if (win.host)
             win.host.attachPanelBar(false)
     }
 
-    property real resizePressScreenX: 0
-    property real resizePressScreenY: 0
-    property rect resizePressGeom: Qt.rect(0, 0, 0, 0)
-    property bool resizeHandedOff: false
-
     function resizeBegin(sx, sy) {
-        win.resizePressScreenX = sx
-        win.resizePressScreenY = sy
-        win.resizePressGeom = Qt.rect(win.x, win.y, win.width, win.height)
-        win.resizeHandedOff = false
+        WindowBridge.auxResizeBegin(sx, sy)
     }
 
-    // edges 用 Qt.LeftEdge / Qt.TopEdge / Qt.RightEdge / Qt.BottomEdge 的位或
-    // 两档实现，用 handOffToSystem 选（默认 = 跟手自己算，见下）：
-    // · true  —— 交系统 sizing loop（`Window.startSystemResize`）。只在**真有按下**的手势里有效
-    // · false —— 自己按屏幕坐标差算 x/y/w/h 写回窗口（**当前默认**）。它每帧改一次原生窗口尺寸，
-    // 于是**必须有**原生样式位（见文件头 attachAuxWindow），否则每帧露出黑块。
     function resizeApply(edges, sx, sy, handOffToSystem) {
-        if (handOffToSystem) {
-            if (win.resizeHandedOff)
-                return
-            win.resizeHandedOff = true
-            win.startSystemResize(edges)
-            return
-        }
-        const dx = sx - win.resizePressScreenX   // 位移一律用**屏幕坐标差**（热区自己会跟着窗口动，用局部坐标会自己追自己 —— 同 PanelGrip 那条坑）
-        const dy = sy - win.resizePressScreenY
-        let x = win.resizePressGeom.x
-        let y = win.resizePressGeom.y
-        let w = win.resizePressGeom.width
-        let h = win.resizePressGeom.height
-
-        // 左/上边：动的同时改宽/高；到下限就把那条边钳住。
-        // ⚠️ 必须自己钳死：请求一旦低于 Qt 的 minimumWidth/Height，Qt 会钳**宽**而 x 照走
-        // （右边不动、左边跟着鼠标 ⇒ 看着像"缩放坏了"）。
-        if (edges & Qt.LeftEdge) {
-            const right = win.resizePressGeom.x + win.resizePressGeom.width
-            x = Math.min(win.resizePressGeom.x + dx, right - win.minTotalW)
-            w = right - x
-        } else if (edges & Qt.RightEdge) {
-            w = Math.max(win.minTotalW, win.resizePressGeom.width + dx)
-        }
-        if (edges & Qt.TopEdge) {
-            const bottom = win.resizePressGeom.y + win.resizePressGeom.height
-            y = Math.min(win.resizePressGeom.y + dy, bottom - win.minTotalH)
-            h = bottom - y
-        } else if (edges & Qt.BottomEdge) {
-            h = Math.max(win.minTotalH, win.resizePressGeom.height + dy)
-        }
-        win.applyGeometry(x, y, w, h)
+        WindowBridge.auxResizeApply(edges, sx, sy, handOffToSystem, win.minTotalW, win.minTotalH)
     }
 
     Item {

@@ -1,0 +1,76 @@
+{
+  "_readme": "iOS 玻璃的几何档位：连续大圆角 + 8pt 栅格留白 + 低对比柔影。只列与内置不同的键（其余自动回退内置默认值）。",
+  "radius": {
+    "window": 14,
+    "panel": 14,
+    "card": 14,
+    "inner": 12,
+    "control": 10,
+    "input": 10,
+    "small": 8,
+    "check": 6,
+    "tiny": 5,
+    "dot": 9,
+    "chip": 12,
+    "pill": 14,
+    "popup": 14,
+    "menu": 14,
+    "float": 18,
+    "composer": 18
+  },
+  "font": {
+    "title": 15,
+    "body": 13,
+    "caption": 12,
+    "small": 11,
+    "lead": 16,
+    "display": 20,
+    "weightBold": 600,
+    "weightMedium": 500
+  },
+  "spacing": {
+    "cardPadding": 16,
+    "sectionGap": 14,
+    "buttonGap": 8,
+    "buttonPadY": 9,
+    "buttonPadX": 16,
+    "fieldPadY": 8,
+    "fieldPadX": 10,
+    "fieldPadWideY": 10,
+    "fieldPadWideX": 12,
+    "labelGap": 8
+  },
+  "size": {
+    "titleBarHeight": 46,
+    "titleBarPadLeft": 16,
+    "windowButtonWidth": 30,
+    "windowButtonHeight": 30,
+    "windowButtonTopMargin": 10,
+    "windowButtonRightMargin": 12,
+    "logoHeight": 18,
+    "logoTextGap": 8,
+    "scrollbarThickness": 12,
+    "scrollbarHandleWidth": 6,
+    "scrollbarHandleMin": 30,
+    "panelBarWidth": 300,
+    "listItemMinHeight": 36,
+    "selectorChipHeight": 24,
+    "sendButton": 32
+  },
+  "shadow": {
+    "cardBlur": 18,
+    "cardDy": 2,
+    "cardRadius": 16,
+    "inputBlur": 18,
+    "inputDy": 4,
+    "inputRadius": 24,
+    "floatBlur": 26,
+    "floatDy": 5,
+    "floatRadius": 20
+  },
+  "motion": {
+    "fast": 160,
+    "normal": 260,
+    "slow": 420
+  }
+}

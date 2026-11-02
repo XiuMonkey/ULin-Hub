@@ -39,6 +39,18 @@
         <file>icons/ui/chat.svg</file>
         <file>icons/ui/close.svg</file>
         <file>icons/ui/file.svg</file>
+        <file>icons/ui/window-minimize.svg</file>
+        <file>icons/ui/window-maximize.svg</file>
+        <file>icons/ui/window-restore.svg</file>
+        <file>icons/ui/window-close.svg</file>
+        <file>icons/ui/file-generic.svg</file>
+        <file>icons/ui/file-pdf.svg</file>
+        <file>icons/ui/file-doc.svg</file>
+        <file>icons/ui/file-sheet.svg</file>
+        <file>icons/ui/file-slide.svg</file>
+        <file>icons/ui/file-code.svg</file>
+        <file>icons/ui/file-archive.svg</file>
+        <file>icons/ui/file-image.svg</file>
         <file>icons/ui/folder.svg</file>
         <file>icons/ui/refresh.svg</file>
         <file>icons/ui/terminal.svg</file>
@@ -73,5 +85,10 @@
              misc/tools/extract-xterm.README.txt（@xterm/xterm 6.0.0 + addon-fit 0.11.0，MIT）。
              （原 WebEngine + xterm.js 页面已随自绘终端接入而删除）
              （现在终端由 TerminalVt + TerminalView 自绘，不再有页面与 QWebChannel）-->
+        <file>office-viewer/viewer.html</file>
+        <file>office-viewer/viewer.js</file>
+        <file>office-viewer/pdf.min.js</file>
+        <file>office-viewer/pdf.worker.min.js</file>
+        <file>server/harness/profiles/web/cordis.patch.yml</file>
     </qresource>
 </RCC>

@@ -1,0 +1,63 @@
+{
+  "_readme": "荧光屏的几何档位：全直角、更窄的行高与滚动条、更快的动效。只列与内置不同的键。",
+  "radius": {
+    "window": 2,
+    "panel": 0,
+    "card": 0,
+    "inner": 0,
+    "control": 0,
+    "input": 0,
+    "small": 0,
+    "check": 0,
+    "tiny": 0,
+    "chip": 0,
+    "pill": 0,
+    "popup": 0,
+    "menu": 0,
+    "float": 0,
+    "composer": 0
+  },
+  "font": {
+    "title": 13,
+    "body": 12,
+    "caption": 11,
+    "small": 10,
+    "glyph": 12,
+    "lead": 15,
+    "display": 17,
+    "weightBold": 600,
+    "weightMedium": 500
+  },
+  "spacing": {
+    "cardPadding": 14,
+    "sectionGap": 10,
+    "buttonPadX": 12,
+    "fieldPadY": 6,
+    "fieldPadWideY": 7
+  },
+  "size": {
+    "titleBarHeight": 38,
+    "windowButtonWidth": 30,
+    "windowButtonHeight": 24,
+    "windowButtonTopMargin": 7,
+    "windowButtonRightMargin": 6,
+    "logoHeight": 16,
+    "scrollbarThickness": 8,
+    "scrollbarHandleWidth": 8,
+    "scrollbarHandleMin": 18,
+    "listItemMinHeight": 30
+  },
+  "shadow": {
+    "cardBlur": 0,
+    "cardDy": 0,
+    "inputBlur": 0,
+    "inputDy": 0,
+    "floatBlur": 0,
+    "floatDy": 0
+  },
+  "motion": {
+    "fast": 60,
+    "normal": 120,
+    "slow": 200
+  }
+}

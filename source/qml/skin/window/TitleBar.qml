@@ -6,6 +6,7 @@
 
 import QtQuick
 import ULinHub 1.0
+import "../../widgets"
 
 Item {
     id: bar
@@ -64,9 +65,9 @@ Item {
                 implicitWidth: Theme.size.windowButtonWidth
                 implicitHeight: Theme.size.windowButtonHeight
 
-                readonly property string glyph: kind === "min"   // 字形保持一致（Segoe UI Symbol：− / □ / ❐ / ✕）
-                    ? "−"
-                    : (kind === "close" ? "✕" : (WindowBridge.maximized ? "❐" : "□"))
+                readonly property string iconName: kind === "min" ? "window-minimize"
+                    : (kind === "close" ? "window-close"
+                        : (WindowBridge.maximized ? "window-restore" : "window-maximize"))
 
                 Component.onCompleted: WindowBridge.addWindowControl(button, kind)   // 命中测试约定：登记后这些 item 不算标题栏拖动区（否则鼠标落在按钮上会被当成拖动）
                 Component.onDestruction: WindowBridge.removeWindowControl(button)
@@ -76,28 +77,28 @@ Item {
                     radius: Theme.radius.small   // 三个窗口按钮在 main-window.qss 里是 6px 圆角（= small 档，不是通用控件的 control 8px）
                     color: {
                         if (button.kind === "close") {
+                            const danger = Theme.color.danger
                             if (button.pressed)
-                                return Theme.color.danger
+                                return Qt.rgba(danger.r, danger.g, danger.b, 0.16)
                             if (button.hovered)
-                                return Theme.color.dangerButtonBg
+                                return Qt.rgba(danger.r, danger.g, danger.b, 0.09)
                             return "transparent"
                         }
                         if (button.pressed)
-                            return Theme.color.primaryButtonPressed
+                            return Theme.color.iconButtonPressedBg
                         if (button.hovered)
-                            return Theme.color.captionHoverBg
+                            return Theme.color.iconButtonHoverBg
                         return "transparent"
                     }
                 }
 
-                Text {
+                LineIcon {
                     anchors.centerIn: parent
-                    text: button.glyph
-                    font.family: "Segoe UI Symbol"
-                    font.pixelSize: Theme.font.glyph
-                    color: (button.kind === "close" && (button.hovered || button.pressed))
-                        ? Theme.color.textOnAccent
-                        : (button.hovered ? Theme.color.textPrimary : Theme.color.textSecondary)
+                    name: button.iconName
+                    size: 13
+                    color: button.kind === "close"
+                        ? ((button.hovered || button.pressed) ? Theme.color.danger : Theme.color.textSecondary)
+                        : ((button.hovered || button.pressed) ? Theme.color.textPrimary : Theme.color.textSecondary)
                 }
 
                 MouseArea {

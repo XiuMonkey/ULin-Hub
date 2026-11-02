@@ -219,7 +219,7 @@ Item {
     Rectangle {
         id: bubble
         anchors.left: parent.left
-        width: Math.round(root.width * 0.82)   // 左侧留出气泡感
+        width: Math.min(Math.round(root.width * 0.82), 748)   // Web 聊天正文列默认 748px，窗口再宽也不拉满
         implicitHeight: inner.implicitHeight + 2 * Theme.spacing.buttonPadY
         radius: Theme.radius.card
         color: Theme.color.panelBg

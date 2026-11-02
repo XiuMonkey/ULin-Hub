@@ -1,0 +1,55 @@
+{
+  "_readme": "霜玻的几何档位：大圆角 + 更松的留白 + 更柔的投影。只列与内置不同的键（其余键自动回退内置默认值）。",
+  "radius": {
+    "window": 16,
+    "panel": 18,
+    "card": 16,
+    "inner": 14,
+    "control": 14,
+    "input": 14,
+    "small": 10,
+    "check": 6,
+    "tiny": 6,
+    "chip": 12,
+    "pill": 16,
+    "popup": 18,
+    "menu": 16,
+    "float": 22,
+    "composer": 26
+  },
+  "spacing": {
+    "cardPadding": 18,
+    "sectionGap": 14,
+    "buttonPadX": 16,
+    "fieldPadY": 8,
+    "fieldPadWideY": 9
+  },
+  "size": {
+    "titleBarHeight": 44,
+    "windowButtonWidth": 36,
+    "windowButtonHeight": 28,
+    "windowButtonTopMargin": 8,
+    "windowButtonRightMargin": 8,
+    "logoHeight": 18,
+    "scrollbarThickness": 10,
+    "scrollbarHandleWidth": 6,
+    "scrollbarHandleMin": 28,
+    "panelBarWidth": 310
+  },
+  "shadow": {
+    "cardBlur": 24,
+    "cardDy": 6,
+    "cardRadius": 16,
+    "inputBlur": 18,
+    "inputDy": 4,
+    "inputRadius": 26,
+    "floatBlur": 32,
+    "floatDy": 10,
+    "floatRadius": 22
+  },
+  "motion": {
+    "fast": 120,
+    "normal": 220,
+    "slow": 340
+  }
+}

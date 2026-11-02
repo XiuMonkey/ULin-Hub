@@ -1,4 +1,4 @@
-﻿# VT 核心自检一键跑（cl 编译 libvterm + TerminalVt + selfcheck）—— 覆盖范围见同目录 README.txt。
+﻿﻿# VT 核心自检一键跑（cl 编译 libvterm + TerminalVt + selfcheck）—— 覆盖范围见同目录 README.txt。
 #
 # ⚠️ 本文件必须存成 **UTF-8 带 BOM**（与 misc\tools\*.ps1 一致）：Windows PowerShell 5.1 读无 BOM 的
 #    .ps1 会按 ANSI/GBK 解，中文注释会把字符串引号吃坏、脚本直接解析失败。
@@ -36,7 +36,7 @@ $env:PATH = "$VsMsvcDir\bin\Hostx64\x64;$SdkDir\bin\$SdkVersion\x64;$env:PATH"
 
 # 传给 cl 的路径统一用正斜杠：路径里有空格（"ULin Hub"）时 PowerShell 会给参数加引号，
 # 而"结尾是反斜杠"会被 C 运行时当成转义引号（经典坑）；正斜杠结尾没这个问题，cl 也认。
-$incFwd = (Join-Path $src 'include') -replace '\\', '/'
+$incFwd = (Join-Path $src 'include\shared') -replace '\\', '/'
 $vtermFwd = (Join-Path $src '3rdparty\libvterm\include') -replace '\\', '/'
 $workFwd = $work -replace '\\', '/'
 
@@ -59,7 +59,7 @@ Write-Host "== selfcheck =="
 & cl.exe /nologo /std:c++17 /Zc:__cplusplus /permissive- /utf-8 /EHsc /MD /O2 /W3 /sdl `
 	"/I$incFwd" "/I$vtermFwd" "/Fo$workFwd/" "/Fe$workFwd/vt-selfcheck.exe" `
 	(Join-Path $PSScriptRoot 'selfcheck.cpp') `
-	(Join-Path $src 'src\common\terminal\TerminalVt.cpp') `
+	(Join-Path $src 'src\shared\common\terminal\TerminalVt.cpp') `
 	$libObjs
 if ($LASTEXITCODE -ne 0) { Write-Host "自检编译/链接失败（exit=$LASTEXITCODE）"; exit $LASTEXITCODE }
 

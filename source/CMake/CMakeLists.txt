@@ -79,10 +79,19 @@ qt_standard_project_setup()
 #
 # include/ 下的头文件必须一并交给 target：AUTOMOC 只扫描「出现在 target 源文件
 # 列表里」的头文件，而本项目头文件与 .cpp 不同目录，不满足「同名同目录」的推断规则。
+if(WIN32)
+	set(ULINHUB_PLATFORM "windows-64")
+else()
+	message(FATAL_ERROR "ULin Hub: 还没有为当前平台提供 src/${ULINHUB_PLATFORM}/ 实现")
+endif()
+
 file(GLOB_RECURSE ULINHUB_SOURCES CONFIGURE_DEPENDS
-	"${ULINHUB_ROOT}/src/*.cpp"
-	"${ULINHUB_ROOT}/src/*.h"
-	"${ULINHUB_ROOT}/include/*.h")
+	"${ULINHUB_ROOT}/src/shared/*.cpp"
+	"${ULINHUB_ROOT}/src/shared/*.h"
+	"${ULINHUB_ROOT}/include/shared/*.h"
+	"${ULINHUB_ROOT}/src/${ULINHUB_PLATFORM}/*.cpp"
+	"${ULINHUB_ROOT}/src/${ULINHUB_PLATFORM}/*.h"
+	"${ULINHUB_ROOT}/include/${ULINHUB_PLATFORM}/*.h")
 
 # 内嵌的 VT 解析器（3rdparty/libvterm）：9 个 C99 编译单元，零外部依赖。
 # 与 .vcxproj 的 9 条 <ClCompile> 一一对应 —— 那边是手工列举，新增文件时两边都要动。
@@ -137,7 +146,8 @@ set_target_properties(ulinhub PROPERTIES
 	AUTORCC ON)
 
 target_include_directories(ulinhub PRIVATE
-	"${ULINHUB_ROOT}/include"
+	"${ULINHUB_ROOT}/include/shared"
+	"${ULINHUB_ROOT}/include/${ULINHUB_PLATFORM}"
 	# libvterm 只公开这一层头（src/ 内部头是相对同目录包含的）
 	"${ULINHUB_ROOT}/3rdparty/libvterm/include"
 	# resources/ 只为下面 rc.exe 解析 "icons/ulin-hub.ico" 的相对路径用
@@ -183,7 +193,7 @@ if(WIN32)
 # 默认**不搜索 exe 的子目录**，靠这段 manifest 声明才会去找。DLL 清单在 source/dependence.manifest，
 # 加/换 DLL 时清单与依赖声明的 version 都要改。
 if (MSVC)
-    target_link_options(ulinhub PRIVATE "/MANIFESTINPUT:${ULINHUB_ROOT}/dependence.deps.manifest")
+    target_link_options(ulinhub PRIVATE "/MANIFESTINPUT:${ULINHUB_ROOT}/manifest/dependence.deps.manifest")
     # 构建后把运行库收进 dependence\（私有程序集要求清单与 dll 同在）。
     # CMake 的构建目录里本来没有 Qt dll，所以让脚本从 QTDIR\bin 取（见 misc/tools/rebuild.sh）。
     add_custom_command(TARGET ulinhub POST_BUILD
@@ -313,7 +323,7 @@ if(ULINHUB_BUILD_TESTS)
 # 默认**不搜索 exe 的子目录**，靠这段 manifest 声明才会去找。DLL 清单在 source/dependence.manifest，
 # 加/换 DLL 时清单与依赖声明的 version 都要改。
 if (MSVC)
-    target_link_options(ulinhub_tests PRIVATE "/MANIFESTINPUT:${ULINHUB_ROOT}/dependence.deps.manifest")
+    target_link_options(ulinhub_tests PRIVATE "/MANIFESTINPUT:${ULINHUB_ROOT}/manifest/dependence.deps.manifest")
     # 构建后把运行库收进 dependence\（私有程序集要求清单与 dll 同在）。
     # CMake 的构建目录里本来没有 Qt dll，所以让脚本从 QTDIR\bin 取（见 misc/tools/rebuild.sh）。
     add_custom_command(TARGET ulinhub_tests POST_BUILD

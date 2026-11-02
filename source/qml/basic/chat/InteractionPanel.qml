@@ -20,70 +20,25 @@ Item {
     visible: activePanel
     implicitHeight: activePanel ? card.implicitHeight : 0
 
-    property var selection: []   // 每个问题一项 { id, selected: [label…], custom: "" }
-
-    function resetSelection() {
-        var built = []
-        var qs = Hub.questions
-        for (var i = 0; i < qs.length; ++i) {
-            var opts = qs[i].options ? qs[i].options : []
-            var pre = []
-            if (opts.length === 1 && !qs[i].multiSelect)   // 保持一致：单选且只有一个选项时默认选中
-                pre = [opts[0].label]
-            built.push({ id: qs[i].id, selected: pre, custom: "" })
-        }
-        root.selection = built
-    }
-
+    // 选择态、默认项、payload 组装都在 ChatController；QML 只负责渲染和转发点击。
     function isSelected(qIndex, label) {
-        var item = root.selection[qIndex]
+        var item = Hub.answerSelections[qIndex]
         if (!item)
             return false
         return item.selected.indexOf(label) >= 0
     }
 
-    function toggle(qIndex, label, multi) {
-        var next = root.selection.slice()
-        var item = next[qIndex]
-        if (!item)
-            return
-        var copy = { id: item.id, selected: item.selected.slice(), custom: item.custom }
-        if (multi) {
-            var at = copy.selected.indexOf(label)
-            if (at >= 0)
-                copy.selected.splice(at, 1)
-            else
-                copy.selected.push(label)
-        }
-        else {
-            copy.selected = (copy.selected.length === 1 && copy.selected[0] === label) ? [] : [label]
-        }
-        next[qIndex] = copy
-        root.selection = next
+    function toggle(qIndex, label) {
+        Hub.toggleAnswerOption(qIndex, label)
     }
 
     function setCustom(qIndex, text) {
-        var next = root.selection.slice()
-        var item = next[qIndex]
-        if (!item)
-            return
-        next[qIndex] = { id: item.id, selected: item.selected.slice(), custom: text }
-        root.selection = next
+        Hub.setAnswerCustom(qIndex, text)
     }
 
     function submitAnswers() {
-        Hub.submitAnswers(root.selection)
+        Hub.submitAnswerSelections()
     }
-
-    // 登记进统一连接表（选择态复位是面板内部逻辑 ⇒ 不允许接管）
-    Connections {   // 页内联动，没有管理价值 ⇒ 不登记（登记等于把 id 暴露成可被接管的目标）
-        target: Hub
-        function onInteractionChanged() {
-            root.resetSelection()
-        }
-    }
-
-    Component.onCompleted: resetSelection()
 
     Rectangle {
         id: card

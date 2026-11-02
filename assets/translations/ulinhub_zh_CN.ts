@@ -616,6 +616,12 @@
     <message id="plugin_uninstall_action">
         <translation>卸载</translation>
     </message>
+    <message id="common_minimize">
+        <translation>最小化</translation>
+    </message>
+    <message id="common_maximize">
+        <translation>最大化</translation>
+    </message>
     <message id="common_close">
         <translation>关闭</translation>
     </message>
@@ -717,7 +723,7 @@
         <translation> · 配置里整组隐藏</translation>
     </message>
     <message id="toolfilter_title">
-        <translation>工具过滤</translation>
+        <translation>Agent 过滤器</translation>
     </message>
     <message id="toolfilter_show_all">
         <translation>全部显示</translation>
@@ -730,6 +736,33 @@
     </message>
     <message id="toolfilter_loading">
         <translation>正在读取该会话的工具目录…</translation>
+    </message>
+    <message id="toolfilter_tab_tools">
+        <translation>工具</translation>
+    </message>
+    <message id="toolfilter_tab_skills">
+        <translation>技能</translation>
+    </message>
+    <message id="skillfilter_loading">
+        <translation>正在读取该会话的技能目录…</translation>
+    </message>
+    <message id="skillfilter_no_session">
+        <translation>还没有选中会话</translation>
+    </message>
+    <message id="skillfilter_empty">
+        <translation>该会话没有可用技能</translation>
+    </message>
+    <message id="skillfilter_summary_fmt">
+        <translation>%1 个技能</translation>
+    </message>
+    <message id="skillfilter_load_failed">
+        <translation>技能目录加载失败，请刷新重试</translation>
+    </message>
+    <message id="skilldetail_back">
+        <translation>返回技能列表</translation>
+    </message>
+    <message id="skilldetail_failed">
+        <translation>无法读取 SKILL.md</translation>
     </message>
     <message id="toolfilter_no_filterable_tools">
         <translation>该会话没有可过滤的工具</translation>
@@ -751,6 +784,12 @@
     </message>
     <message id="placeholder_session_hint">
         <translation>在左侧列表里选一个，或点 ＋ 新建</translation>
+    </message>
+    <message id="empty_conversation_title">
+        <translation>有什么可以帮你？</translation>
+    </message>
+    <message id="empty_conversation_hint">
+        <translation>从下方输入任务，或使用 / 命令选择技能。</translation>
     </message>
     <message id="panelBar_title">
         <translation>右栏</translation>
@@ -1064,6 +1103,18 @@
     </message>
     <message id="job_status_failed">
         <translation>已失败</translation>
+    </message>
+    <message id="plugin_build_scripts_blocked_fmt">
+        <translation>插件需要执行构建脚本，已被拦截：%1。允许后会自动重试安装。</translation>
+    </message>
+    <message id="plugin_approve_builds">
+        <translation>允许构建脚本并重试</translation>
+    </message>
+    <message id="plugin_approving_builds">
+        <translation>正在允许构建脚本…</translation>
+    </message>
+    <message id="plugin_approve_builds_done">
+        <translation>已允许构建脚本，请重试安装。</translation>
     </message>
 </context>
 </TS>

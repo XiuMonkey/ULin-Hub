@@ -1,0 +1,63 @@
+{
+  "_readme": "苏黎世的几何档位：全直角、紧字距、无阴影。只列与内置不同的键。",
+  "radius": {
+    "window": 0,
+    "panel": 0,
+    "card": 0,
+    "inner": 0,
+    "control": 0,
+    "input": 0,
+    "small": 0,
+    "check": 0,
+    "tiny": 0,
+    "chip": 0,
+    "pill": 0,
+    "popup": 0,
+    "menu": 0,
+    "float": 0,
+    "composer": 0
+  },
+  "font": {
+    "title": 14,
+    "body": 13,
+    "caption": 12,
+    "small": 11,
+    "glyph": 12,
+    "lead": 16,
+    "display": 18,
+    "weightBold": 700,
+    "weightMedium": 600
+  },
+  "spacing": {
+    "cardPadding": 20,
+    "sectionGap": 16,
+    "windowMargin": 28,
+    "buttonPadX": 18
+  },
+  "size": {
+    "titleBarHeight": 44,
+    "windowButtonWidth": 36,
+    "windowButtonHeight": 26,
+    "windowButtonTopMargin": 9,
+    "windowButtonRightMargin": 10,
+    "logoHeight": 18,
+    "scrollbarThickness": 12,
+    "scrollbarHandleWidth": 12,
+    "scrollbarHandleMin": 32,
+    "panelBarWidth": 320
+  },
+  "shadow": {
+    "cardBlur": 0,
+    "cardDy": 0,
+    "inputBlur": 0,
+    "inputDy": 0,
+    "floatBlur": 12,
+    "floatDy": 4,
+    "floatRadius": 0
+  },
+  "motion": {
+    "fast": 90,
+    "normal": 150,
+    "slow": 240
+  }
+}

@@ -5,6 +5,7 @@
 
 import QtQuick
 import QtQuick.Window
+import QtQuick.Effects
 import ULinHub 1.0
 
 Window {
@@ -21,6 +22,11 @@ Window {
     height: Theme.size.preferredWindowHeight + Theme.size.titleBarHeight
     minimumWidth: Theme.size.minWindowWidth
     minimumHeight: Theme.size.minWindowHeight
+
+    // 拖入文件时 0→1；内容层虚化和落点遮罩都跟这个值走，进入/退出都是短促渐变。
+    property real dropT: fileDropArea.containsDrag ? 1 : 0
+    Behavior on dropT { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
 
     Component.onCompleted: {
         // 高 DPI 小屏（2560x1600 @200% => 逻辑仅 1280x800）上任何写死的宽/高都会让窗口超出屏幕，
@@ -51,8 +57,16 @@ Window {
             source: Style.url("skin/window/Backdrop.qml")
         }
 
+
         Column {
+            id: mainColumn
             anchors.fill: parent
+            layer.enabled: root.dropT > 0.001
+            layer.effect: MultiEffect {
+                blurEnabled: true
+                blur: 0.85 * root.dropT
+                autoPaddingEnabled: false
+            }
 
             // 标题栏：可覆盖单元。整块在原生侧被登记为窗口拖动区（WM_NCHITTEST -> HTCAPTION）。
             // 覆盖页的抓手（三个点）会把自己也登记进原生命中测试（WindowBridge.addWindowControl），
@@ -72,6 +86,78 @@ Window {
                 width: parent.width
                 height: parent.height - titleBar.height
                 source: Style.url("basic/shell/Shell.qml")   // M3 起客户区是壳层（侧栏 + 顶栏 + 会话区占位）；同样走 Style 以便整块被风格包覆盖
+            }
+        }
+
+        // 拖入文件的落点层：背景内容已由 mainColumn 的 layer 做模糊，
+        // 这里只叠遮罩和提示，自身不参加交互（enabled:false），避免挡住 DropArea。
+        Item {
+            id: fileDropOverlay
+            anchors.fill: parent
+            z: 500
+            visible: root.dropT > 0.001
+            opacity: root.dropT
+            enabled: false
+
+            Rectangle {
+                anchors.fill: parent
+                color: "#FFFFFF"
+                opacity: 0.74
+            }
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 12
+                transform: Translate { y: (1 - root.dropT) * 10 }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 64
+                    height: 64
+                    radius: 18
+                    color: "#F7F8FA"
+                    border.width: 1
+                    border.color: "#D8DBE0"
+
+                    Image {
+                        anchors.centerIn: parent
+                        width: 40
+                        height: 40
+                        source: "qrc:/ULinHub/icons/ui/file-generic.svg"
+                        sourceSize.width: 80
+                        sourceSize.height: 80
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "松开以添加文件"
+                    color: "#0F1115"
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.lead
+                    font.weight: Theme.font.weightBold
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "图片会内联显示，其他文件以附件卡片加入"
+                    color: "#61666B"
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+            }
+        }
+
+        // 整个窗口都能接文件；放最后保证它是拖放命中目标。
+        DropArea {
+            id: fileDropArea
+            anchors.fill: parent
+            keys: ["text/uri-list"]
+            onDropped: (drop) => {
+                if (drop.hasUrls)
+                    Hub.addAttachments(drop.urls)
             }
         }
     }

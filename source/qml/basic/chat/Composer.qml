@@ -173,7 +173,6 @@ Item {
     ]
 
     implicitHeight: shadowHost.height + Theme.size.statsLineHeight
-
     function submit() {
         const text = editor.text
         if (text.trim().length === 0)
@@ -311,51 +310,59 @@ Item {
                 id: pendingRow
                 width: parent.width
                 visible: Hub.pendingAttachments.length > 0
-                height: visible ? 54 : 0
+                height: visible ? 68 : 0
                 clip: true
 
                 Row {
                     x: root.cardPadH
                     width: Math.max(0, parent.width - 2 * root.cardPadH)
-                    spacing: 8
+                    spacing: 10
 
                 Repeater {
                     model: Hub.pendingAttachments
 
                     Rectangle {
+                        id: attachmentTile
                         required property var modelData
                         required property int index
-                        width: 52
-                        height: 52
-                        radius: 8
-                        color: Theme.isDark ? "#232427" : "#F2F3F5"
-                        border.width: 1
-                        border.color: Theme.isDark ? "#3A3D42" : "#D8DBE0"
-                        clip: true
 
-                        // 圆角遮罩：clip 只能裁矩形，圆角处会露方角
+                        readonly property bool isImage: modelData.kind === "image"
+                            || (modelData.kind === undefined
+                                && modelData.preview !== undefined && modelData.preview.length > 0)
+
+                        // 与 DSH FileCard 同构：240×64、极细描边、输入区同色底。
+                        width: isImage ? 64 : 240
+                        height: 64
+                        radius: Theme.radius.panel
+                        color: isImage ? (Theme.isDark ? "#232427" : "#F2F3F5")
+                            : (Theme.color.composerBg || Theme.color.panelBg)
+                        border.width: 0.5
+                        border.color: Theme.color.inputBorder
+                        clip: isImage
+
                         Rectangle {
                             id: thumbMask
                             anchors.fill: parent
-                            anchors.margins: 1
-                            radius: 7
+                            anchors.margins: 0.5
+                            radius: Theme.radius.panel
                             visible: false
-                            layer.enabled: true
+                            layer.enabled: attachmentTile.isImage
                         }
 
                         Image {
                             id: thumb
                             anchors.fill: parent
-                            anchors.margins: 1
+                            anchors.margins: 0.5
+                            visible: attachmentTile.isImage
                             fillMode: Image.PreserveAspectCrop
                             source: modelData.preview !== undefined ? modelData.preview : ""
-                            layer.enabled: true
+                            layer.enabled: attachmentTile.isImage
                             layer.effect: MultiEffect {
                                 maskEnabled: true
                                 maskSource: thumbMask
                             }
 
-                            property int retry: 0   // 解码失败时带 cache-bust 重试
+                            property int retry: 0
 
                             onStatusChanged: {
                                 if (status === Image.Error && retry < 3)
@@ -375,13 +382,70 @@ Item {
                             }
                         }
 
+                        HoverHandler {
+                            id: chipHover
+                        }
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 22
+                            anchors.topMargin: 8
+                            anchors.bottomMargin: 8
+                            spacing: 10
+                            visible: !attachmentTile.isImage
+
+                            Image {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 28
+                                height: 28
+                                source: "qrc:/ULinHub/icons/ui/"
+                                    + (modelData.icon !== undefined && modelData.icon.length > 0
+                                        ? modelData.icon : "file-generic") + ".svg"
+                                sourceSize.width: 64
+                                sourceSize.height: 64
+                                fillMode: Image.PreserveAspectFit
+                                smooth: true
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(0, parent.width - 38)
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: modelData.name !== undefined ? modelData.name : ""
+                                    elide: Text.ElideMiddle
+                                    color: Theme.color.textPrimary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+                                    font.weight: Theme.font.weightMedium
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: {
+                                        const suffix = modelData.suffix !== undefined && modelData.suffix.length > 0
+                                            ? modelData.suffix.toUpperCase() : "FILE"
+                                        const size = modelData.sizeLabel !== undefined ? modelData.sizeLabel : ""
+                                        return size.length > 0 ? suffix + " · " + size : suffix
+                                    }
+                                    elide: Text.ElideRight
+                                    color: Theme.color.textTertiary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.caption
+                                }
+                            }
+                        }
+
                         Rectangle {
-                            width: 16
-                            height: 16
-                            radius: 8
+                            width: 18
+                            height: 18
+                            radius: 9
                             anchors.top: parent.top
                             anchors.right: parent.right
-                            anchors.margins: 2
+                            anchors.margins: 3
                             color: Theme.color.overlayBg
 
                             Text {

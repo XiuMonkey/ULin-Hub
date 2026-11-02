@@ -23,6 +23,39 @@ Item {
     implicitWidth: 820
     implicitHeight: 600
 
+    property double nowMs: Date.now()
+
+    function taskActionLabel(action) {
+        if (action === "install") return qsTrId("plugin_install_action")
+        if (action === "update") return qsTrId("plugin_update_action")
+        if (action === "uninstall") return qsTrId("plugin_uninstall_action")
+        if (action === "market") return "插件市场"
+        if (action === "approve") return "允许构建"
+        if (action === "restart") return "重启服务端"
+        return action
+    }
+
+    function taskStateLabel(task) {
+        if (task.state === "running") return "进行中"
+        if (task.state === "blocked") return "等待批准"
+        if (task.state === "ok") return "已完成"
+        if (task.state === "failed") return "失败"
+        return task.state
+    }
+
+    function taskElapsed(task) {
+        if (task.state !== "running")
+            return ""
+        return Math.max(0, Math.floor((nowMs - task.startedAt) / 1000)) + "s"
+    }
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: Hub.plugins.activeTaskCount > 0
+        onTriggered: page.nowMs = Date.now()
+    }
+
     Item {   // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容
         id: popup
         anchors.fill: parent
@@ -400,9 +433,135 @@ Item {
             anchors.bottomMargin: 8
             spacing: 6
 
-            readonly property bool installVisible: Hub.plugins.installing || Hub.plugins.installStatus.length > 0
+            readonly property bool installVisible: Hub.plugins.installTasks.length > 0
+                || Hub.plugins.installing
+                || Hub.plugins.installStatus.length > 0
+                || Hub.plugins.blockedBuilds.length > 0
             visible: installVisible
             height: installVisible ? implicitHeight : 0
+
+            Text {
+                width: parent.width
+                visible: Hub.plugins.installTasks.length > 0
+                text: "安装任务" + (Hub.plugins.activeTaskCount > 0 ? " · " + Hub.plugins.activeTaskCount + " 个进行中" : "")
+                color: Theme.color.textSecondary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.caption
+            }
+
+            Repeater {
+                model: Hub.plugins.installTasks
+
+                delegate: Rectangle {
+                    required property var modelData
+                    required property int index
+
+                    visible: index < 5
+                    width: parent.width
+                    height: taskContent.implicitHeight + 14
+                    radius: Theme.radius.control
+                    color: Theme.color.inputBg
+                    border.width: 1
+                    border.color: modelData.state === "failed" ? Theme.color.danger
+                        : (modelData.state === "blocked" ? Theme.color.inputBorder : Theme.color.menuBorder)
+
+                    Column {
+                        id: taskContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: 8
+                        spacing: 2
+
+                        Row {
+                            width: parent.width
+                            spacing: 8
+
+                            Text {
+                                id: taskAction
+                                text: page.taskActionLabel(modelData.action)
+                                color: Theme.color.textPrimary
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.caption
+                                font.weight: Theme.font.weightBold
+                            }
+                            Text {
+                                id: taskState
+                                text: page.taskStateLabel(modelData)
+                                color: modelData.state === "failed" ? Theme.color.danger
+                                    : (modelData.state === "ok" ? Theme.color.textSecondary : Theme.color.accent)
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.caption
+                                font.weight: Theme.font.weightBold
+                            }
+                            Text {
+                                id: taskName
+                                width: Math.max(0, parent.width - taskAction.width - taskState.width
+                                    - taskElapsed.width - 3 * parent.spacing)
+                                text: modelData.name
+                                elide: Text.ElideRight
+                                color: Theme.color.textSecondary
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.caption
+                            }
+                            Text {
+                                id: taskElapsed
+                                text: page.taskElapsed(modelData)
+                                color: Theme.color.textTertiary
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.small
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: modelData.message
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            wrapMode: Text.NoWrap
+                            color: Theme.color.textTertiary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: blockedColumn.implicitHeight + 16
+                visible: Hub.plugins.blockedBuilds.length > 0
+                radius: Theme.radius.control
+                color: Theme.color.inputBg
+                border.width: 1
+                border.color: Theme.color.inputBorder
+
+                Column {
+                    id: blockedColumn
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 8
+                    spacing: 6
+
+                    Text {
+                        width: parent.width
+                        text: qsTrId("plugin_build_scripts_blocked_fmt").arg(Hub.plugins.blockedBuilds.join(", "))
+                        wrapMode: Text.WordWrap
+                        color: Theme.color.textSecondary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                    }
+
+                    ActionButton {
+                        width: 150
+                        height: 28
+                        text: qsTrId("plugin_approve_builds")
+                        variant: "primary"
+                        onClicked: Hub.plugins.approveBuilds()
+                    }
+                }
+            }
 
             Rectangle {
                 width: parent.width

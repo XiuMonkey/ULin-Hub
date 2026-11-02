@@ -3,6 +3,7 @@
 
 import QtQuick
 import QtQuick.Window
+import QtQml.Models
 import ULinHub 1.0
 import "../../widgets"
 // 跨目录使用裸组件名必须显式 import。
@@ -312,10 +313,14 @@ Item {
         radius: Theme.radius.panel
         padding: 0
         shadowEnabled: true
+        // 删除按钮/确认卡是侧栏内的浮层；侧栏本身默认 z=0，会被右侧输入卡盖住。
+        // 出现待删除项时把整张侧栏抬到内容区之上，确认卡才能跨出侧栏边界显示。
+        z: (sessionBarView.pendingId.length > 0 || sessionBarView.confirmOpen) ? 50 : 0
         color: Theme.color.sessionBarBg || Theme.color.cardBg   // 与内容面区分一档
         bordered: false   // 原版侧栏没有描边
 
         SessionBar {
+            id: sessionBarView
             anchors.fill: parent
             onNotify: shell.notify(text)
             onCollapseRequested: shell.setSessionBarCollapsed(true)
@@ -400,6 +405,7 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 0   // 底部对齐会话栏
                 height: item ? item.implicitHeight : 0
+
                 visible: Hub.currentSessionId.length > 0
                 source: Style.url("basic/chat/Composer.qml")
                 // 用 typeof 探测属性，兼容旧风格包。
@@ -478,9 +484,61 @@ Item {
                     Qt.callLater(item.pinToBottom)
             }
 
+            // 已有会话但还没有任何消息：显示欢迎空状态。
+            // ConversationPlaceholder 只管“没选中会话”；选中了空会话时不能跟着空着。
+            Item {
+                id: emptyConversation
+                anchors.fill: messageLoader
+                visible: Hub.currentSessionId.length > 0
+                    && Hub.messageCount === 0
+                    && !Hub.sessionLoading
+                    && topBar.activeView !== "trace"
+                z: 3
+
+                Column {
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - 2 * Theme.spacing.windowMargin, 460)
+                    spacing: Theme.spacing.sectionGap
+
+                    Image {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 54
+                        height: 54
+                        source: Theme.isDark
+                            ? "qrc:/ULinHub/icons/ulin-hub-icon-dark.png"
+                            : "qrc:/ULinHub/icons/ulin-hub-icon.png"
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: qsTrId("empty_conversation_title")
+                        horizontalAlignment: Text.AlignHCenter
+                        color: Theme.color.textPrimary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.title
+                        font.weight: Theme.font.weightMedium
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: qsTrId("empty_conversation_hint")
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: Theme.color.textTertiary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                        lineHeight: 1.4
+                    }
+                }
+            }
+
             ConversationPlaceholder {
                 anchors.fill: parent
-                visible: Hub.currentSessionId.length === 0
+                // 启动/自动选会话期间 currentSessionId 短暂为空，这不是“请开始会话”；
+                // 只有初始化结束且确实没有会话时才显示占位。
+                visible: Hub.currentSessionId.length === 0 && !Hub.initializing
             }
         }
     }
@@ -682,7 +740,27 @@ Item {
         source: Style.url("basic/settings/SettingsPage.qml")
     }
 
+    // 璐︽埛绠＄悊锛氬乏涓嬭澶村儚鎵撳紑锛堟槸鐙珛 PageOverlay锛屼笉鍦ㄨ缃〉閲岋級
+    PageOverlay {
+        anchors.fill: parent
+        z: 32
+        shown: Hub.settings.accountOpen
+        source: Style.url("basic/account/AccountPage.qml")
+    }
+
     // 工具过滤面板：顶栏 ☰ 打开，整壳覆盖。
+    // 工具过滤面板：顶栏图标打开，沿用 PageOverlay 的统一遮罩/卡片动画。
+    // 单块脱离为独立窗口：模型只存 id，窗口内容仍走 PanelBarDock 的 kind→view 路由。
+    Instantiator {
+        model: PanelBarDock.detachedBlocks
+        delegate: Component {
+            DetachedBlockWindow {
+                required property string modelData
+                blockId: modelData
+            }
+        }
+    }
+
     PageOverlay {
         anchors.fill: parent
         z: 36

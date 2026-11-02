@@ -1,0 +1,1003 @@
+// 见 SettingsController.h：设置页数据面。
+
+#include "common/settings/SettingsController.h"
+
+#include "common/appearance/ThemeManager.h"
+#include "common/appearance/TranslationManager.h"
+#include "common/session/AgentPresetService.h"
+#include "common/settings/SettingsStore.h"
+#include "network/DshApiClient.h"
+
+#include <QJsonArray>
+#include <QCoreApplication>
+#include <QDateTime>
+#include <memory>
+#include <QDesktopServices>
+#include <QLocale>
+#include <QUrl>
+#include <QJsonObject>
+#include <QTimer>
+#include <QVariantMap>
+
+SettingsController::SettingsController(DshApiClient* api, QObject* parent)
+	: QObject(parent)
+	, m_api(api)
+{
+	m_noticeTimer = new QTimer(this);  // 列表级瞬时提示：与原版 modelListNotice 一样 4 秒后自隐
+	m_noticeTimer->setSingleShot(true);
+	m_noticeTimer->setInterval(4000);
+	connect(m_noticeTimer, &QTimer::timeout, this, [this]() {
+		if (m_notice.isEmpty())
+			return;
+		m_notice.clear();
+		emit noticeChanged();
+		});
+
+	m_account.insert(QStringLiteral("status"), QStringLiteral("signed-out"));
+	m_account.insert(QStringLiteral("signedIn"), false);
+	m_account.insert(QStringLiteral("busy"), false);
+	m_account.insert(QStringLiteral("balances"), QVariantList());
+	m_account.insert(QStringLiteral("error"), QString());
+	for (const char* key : {"name", "contact", "avatarUrl", "balanceText", "bonusText",
+		"attemptPhase", "attemptId", "usageUrl", "topUpUrl", "authorizeUrl"})
+		m_account.insert(QString::fromLatin1(key), QString());
+	// 语言列表必须在**任何 QML 绑定之前**就位。
+	// openPage() 的顺序是"先 emit openChanged()（QML 的 Loader 同步开始装载设置页，
+	// 语言下拉当场绑定 Hub.settings.languages）、后 refresh() → loadAppearance() 填数据"，
+	// 所以在第一次打开设置页时绑定到的是空列表；配合 CONSTANT 属性就是"永远空白且不报错"。
+	loadAppearance();
+}
+
+namespace
+{
+QJsonObject accountClientMetadata()
+{
+	QJsonObject client;
+	const QString version = QCoreApplication::applicationVersion().isEmpty()
+		? QStringLiteral("0.2.0") : QCoreApplication::applicationVersion();
+	client.insert(QStringLiteral("version"), version);
+	QString locale = QLocale::system().name();
+	locale.replace(QLatin1Char('_'), QLatin1Char('-'));
+	client.insert(QStringLiteral("locale"), locale);
+	client.insert(QStringLiteral("timezoneOffsetSeconds"),
+		QDateTime::currentDateTime().offsetFromUtc());
+	return client;
+}
+
+QJsonObject accountClientArgs()
+{
+	QJsonObject args;
+	args.insert(QStringLiteral("client"), accountClientMetadata());
+	return args;
+}
+
+QString walletText(const QJsonArray& wallets)
+{
+	QStringList parts;
+	for (const QJsonValue& value : wallets)
+	{
+		const QJsonObject wallet = value.toObject();
+		const QString balance = wallet.value(QStringLiteral("balance")).toString();
+		const QString currency = wallet.value(QStringLiteral("currency")).toString();
+		if (balance.isEmpty())
+			continue;
+		parts.append(currency == QLatin1String("CNY")
+			? QStringLiteral("¥%1").arg(balance)
+			: QStringLiteral("%1 %2").arg(balance, currency));
+	}
+	return parts.join(QStringLiteral(" · "));
+}
+} // namespace
+
+void SettingsController::openAccountPage()
+{
+	m_accountLoginHint = false;
+	emit accountLoginHintChanged();
+	if (m_accountOpen)
+		return;
+	m_accountOpen = true;
+	emit accountOpenChanged();
+	refreshAccount();
+}
+
+void SettingsController::dismissAccountLoginHint()
+{
+	if (!m_accountLoginHint)
+		return;
+	m_accountLoginHint = false;
+	emit accountLoginHintChanged();
+}
+
+void SettingsController::closeAccountPage()
+{
+	if (!m_accountOpen)
+		return;
+	m_accountOpen = false;
+	emit accountOpenChanged();
+}
+
+void SettingsController::refreshAccount()
+{
+	if (!m_api || m_accountBusy)
+		return;
+	m_accountBusy = true;
+	m_account.insert(QStringLiteral("busy"), true);
+	m_account.insert(QStringLiteral("error"), QString());
+	emit accountChanged();
+
+	m_api->callMethod(QStringLiteral("account/getState"), QJsonObject(),
+		[this](const QJsonObject& value) {
+			m_account.insert(QStringLiteral("status"),
+				value.value(QStringLiteral("status")).toString());
+			const bool signedIn = value.value(QStringLiteral("status")).toString()
+				== QLatin1String("credential-stored");
+			m_account.insert(QStringLiteral("signedIn"), signedIn);
+			if (signedIn && m_accountLoginHint)
+			{
+				m_accountLoginHint = false;
+				emit accountLoginHintChanged();
+			}
+			const QJsonObject links = value.value(QStringLiteral("links")).toObject();
+			m_account.insert(QStringLiteral("usageUrl"),
+				links.value(QStringLiteral("usageUrl")).toString());
+			m_account.insert(QStringLiteral("topUpUrl"),
+				links.value(QStringLiteral("topUpUrl")).toString());
+			const QJsonObject attempt = value.value(QStringLiteral("attempt")).toObject();
+			m_account.insert(QStringLiteral("attemptPhase"),
+				attempt.value(QStringLiteral("phase")).toString());
+			const QString authorizeUrl = attempt.value(QStringLiteral("authorizeUrl")).toString();
+			m_account.insert(QStringLiteral("authorizeUrl"), authorizeUrl);
+			if (!authorizeUrl.isEmpty() && authorizeUrl != m_lastAuthorizeUrl)
+			{
+				m_lastAuthorizeUrl = authorizeUrl;
+				emit accountAuthorizeRequested(authorizeUrl);
+				m_accountLoginHint = true;
+				emit accountLoginHintChanged();
+			}
+			m_account.insert(QStringLiteral("attemptId"),
+				attempt.value(QStringLiteral("id")).toString());
+			if (!signedIn)
+			{
+				m_accountBusy = false;
+				m_account.insert(QStringLiteral("busy"), false);
+				m_account.insert(QStringLiteral("name"), QString());
+				m_account.insert(QStringLiteral("contact"), QString());
+				m_account.insert(QStringLiteral("balances"), QVariantList());
+				m_account.insert(QStringLiteral("balanceText"), QString());
+				emit accountChanged();
+				return;
+			}
+
+			const auto pending = std::make_shared<int>(2);
+			auto finishOne = [this, pending]() {
+				if (--(*pending) > 0)
+					return;
+				m_accountBusy = false;
+				m_account.insert(QStringLiteral("busy"), false);
+				emit accountChanged();
+			};
+			m_api->callMethod(QStringLiteral("account/getProfile"), accountClientArgs(),
+				[this, finishOne](const QJsonObject& profileResult) {
+					const QString status = profileResult.value(QStringLiteral("status")).toString();
+					const QJsonObject profile = profileResult.value(QStringLiteral("value")).toObject();
+					if (status == QLatin1String("ready"))
+					{
+						m_account.insert(QStringLiteral("name"),
+							profile.value(QStringLiteral("name")).toString());
+						m_account.insert(QStringLiteral("contact"),
+							profile.value(QStringLiteral("contact")).toString());
+						m_account.insert(QStringLiteral("avatarUrl"),
+							profile.value(QStringLiteral("avatarUrl")).toString());
+					}
+					finishOne();
+				},
+				[this, finishOne](const DshApiClient::RpcError& error) {
+					m_account.insert(QStringLiteral("error"),
+						QStringLiteral("profile: %1").arg(error.message));
+					finishOne();
+				});
+			m_api->callMethod(QStringLiteral("account/getBalance"), accountClientArgs(),
+				[this, finishOne](const QJsonObject& balanceResult) {
+					if (balanceResult.value(QStringLiteral("status")).toString()
+						== QLatin1String("ready"))
+					{
+						const QJsonArray wallets = balanceResult.value(QStringLiteral("value")).toArray();
+						const QJsonArray bonus = balanceResult.value(QStringLiteral("bonusWallets")).toArray();
+						QVariantList rows;
+						for (const QJsonValue& value : wallets)
+							rows.append(value.toObject().toVariantMap());
+						for (const QJsonValue& value : bonus)
+						{
+							QVariantMap row = value.toObject().toVariantMap();
+							row.insert(QStringLiteral("bonus"), true);
+							rows.append(row);
+						}
+						m_account.insert(QStringLiteral("balances"), rows);
+						m_account.insert(QStringLiteral("balanceText"), walletText(wallets));
+						m_account.insert(QStringLiteral("bonusText"), walletText(bonus));
+					}
+					finishOne();
+				},
+				[this, finishOne](const DshApiClient::RpcError& error) {
+					m_account.insert(QStringLiteral("error"),
+						QStringLiteral("balance: %1").arg(error.message));
+					finishOne();
+				});
+		},
+		[this](const DshApiClient::RpcError& error) {
+			m_accountBusy = false;
+			m_account.insert(QStringLiteral("busy"), false);
+			m_account.insert(QStringLiteral("error"), error.message);
+			emit accountChanged();
+		});
+}
+
+void SettingsController::startAccountSignIn()
+{
+	if (!m_api || m_accountBusy)
+		return;
+	m_accountBusy = true;
+	m_account.insert(QStringLiteral("busy"), true);
+	m_account.insert(QStringLiteral("error"), QString());
+	emit accountChanged();
+	QJsonObject args = accountClientArgs();
+	args.insert(QStringLiteral("callbackOrigin"), m_api->baseUrl().toString());
+	args.insert(QStringLiteral("loginSource"), QStringLiteral("desktop"));
+	m_api->callMethod(QStringLiteral("account/startSignIn"), args,
+		[this](const QJsonObject& value) {
+			m_accountBusy = false;
+			m_account.insert(QStringLiteral("busy"), false);
+			const QJsonObject attempt = value.value(QStringLiteral("attempt")).toObject();
+			m_account.insert(QStringLiteral("attemptPhase"),
+				attempt.value(QStringLiteral("phase")).toString());
+			const QString authorizeUrl = attempt.value(QStringLiteral("authorizeUrl")).toString();
+			m_account.insert(QStringLiteral("authorizeUrl"), authorizeUrl);
+			m_account.insert(QStringLiteral("attemptId"),
+				attempt.value(QStringLiteral("id")).toString());
+			if (!authorizeUrl.isEmpty() && authorizeUrl != m_lastAuthorizeUrl)
+			{
+				m_lastAuthorizeUrl = authorizeUrl;
+				emit accountAuthorizeRequested(authorizeUrl);
+				m_accountLoginHint = true;
+				emit accountLoginHintChanged();
+			}
+			emit accountChanged();
+			if (authorizeUrl.isEmpty())
+				QTimer::singleShot(600, this, [this]() { refreshAccount(); });
+		},
+		[this](const DshApiClient::RpcError& error) {
+			m_accountBusy = false;
+			m_account.insert(QStringLiteral("busy"), false);
+			m_account.insert(QStringLiteral("error"), error.message);
+			emit accountChanged();
+		});
+}
+
+void SettingsController::cancelAccountSignIn()
+{
+	if (!m_api)
+		return;
+	const QString attemptId = m_account.value(QStringLiteral("attemptId")).toString();
+	if (attemptId.isEmpty())
+		return;
+	QJsonObject args;
+	args.insert(QStringLiteral("attemptId"), attemptId);
+	m_api->callMethod(QStringLiteral("account/cancelSignIn"), args,
+		[this](const QJsonObject& value) {
+			m_account.insert(QStringLiteral("status"), value.value(QStringLiteral("status")).toString());
+			m_account.insert(QStringLiteral("attemptPhase"),
+				value.value(QStringLiteral("attempt")).toObject().value(QStringLiteral("phase")).toString());
+			emit accountChanged();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			m_account.insert(QStringLiteral("error"), error.message);
+			emit accountChanged();
+		});
+}
+
+void SettingsController::signOutAccount()
+{
+	if (!m_api || m_accountBusy)
+		return;
+	m_accountBusy = true;
+	m_account.insert(QStringLiteral("busy"), true);
+	m_account.insert(QStringLiteral("error"), QString());
+	emit accountChanged();
+	m_api->callMethod(QStringLiteral("account/signOut"), accountClientArgs(),
+		[this](const QJsonObject& value) {
+			m_accountBusy = false;
+			m_account.insert(QStringLiteral("busy"), false);
+			m_account.insert(QStringLiteral("signedIn"),
+				value.value(QStringLiteral("status")).toString() == QLatin1String("credential-stored"));
+			m_account.insert(QStringLiteral("status"), value.value(QStringLiteral("status")).toString());
+			if (m_accountLoginHint)
+			{
+				m_accountLoginHint = false;
+				emit accountLoginHintChanged();
+			}
+			m_account.insert(QStringLiteral("name"), QString());
+			m_account.insert(QStringLiteral("contact"), QString());
+			m_account.insert(QStringLiteral("balances"), QVariantList());
+			m_account.insert(QStringLiteral("balanceText"), QString());
+			emit accountChanged();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			m_accountBusy = false;
+			m_account.insert(QStringLiteral("busy"), false);
+			m_account.insert(QStringLiteral("error"), error.message);
+			emit accountChanged();
+		});
+}
+
+void SettingsController::openAccountUsage()
+{
+	const QString url = m_account.value(QStringLiteral("usageUrl")).toString();
+	if (!url.isEmpty())
+		QDesktopServices::openUrl(QUrl(url));
+}
+
+void SettingsController::openAccountTopUp()
+{
+	const QString url = m_account.value(QStringLiteral("topUpUrl")).toString();
+	if (!url.isEmpty())
+		QDesktopServices::openUrl(QUrl(url));
+}
+
+void SettingsController::openAccountAuthorize()
+{
+	const QString url = m_account.value(QStringLiteral("authorizeUrl")).toString();
+	if (!url.isEmpty())
+		QDesktopServices::openUrl(QUrl(url));
+}
+
+void SettingsController::setNotice(const QString& text)
+{
+	m_notice = text;
+	emit noticeChanged();
+	if (!text.isEmpty())
+		m_noticeTimer->start();
+}
+
+void SettingsController::openPage()
+{
+	if (m_open)
+		return;
+
+	m_open = true;
+	emit openChanged();
+	refresh();
+}
+
+void SettingsController::setPage(int page)
+{
+	const int bounded = qBound(0, page, 3);
+	if (m_page == bounded)
+		return;
+
+	m_page = bounded;
+	emit pageChanged();
+}
+
+void SettingsController::closePage()
+{
+	if (!m_open)
+		return;
+
+	m_open = false;
+	m_discovered.clear();
+	m_candidates.clear();
+	emit openChanged();
+	emit candidatesChanged();
+}
+
+void SettingsController::removeModel(const QString& provider, const QString& modelId)
+{
+	const ConfigurableProvider* entry = findProvider(provider);
+	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
+	if (!m_api || !entry || !ns) {
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
+		return;
+	}
+
+	setBusy(true);
+
+	ModelSelectionService::removeModel(m_api, *entry, *ns, modelId,
+		[this, modelId](const SettingsNamespace&) {
+			setBusy(false);
+			setNotice(qtTrId("model_deleted_fmt").arg(modelId));
+			refresh();
+		},
+		[this, modelId](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setNotice(qtTrId("model_delete_failed_fmt").arg(modelId, error.code, error.message));
+		});
+}
+
+void SettingsController::loadAgentPresets()
+{
+	if (!m_api)
+		return;
+
+	m_presetFeedback.clear();
+	AgentPresetService::fetch(m_api,
+		[this](const QVector<AgentPreset>& presets) {
+			QVariantList rows;
+			for (const AgentPreset& preset : presets) {
+				QVariantMap row;
+				row.insert(QStringLiteral("id"), preset.id);
+				row.insert(QStringLiteral("name"), preset.name);
+				rows.append(row);
+			}
+			m_agentPresets = rows;
+
+			if (rows.isEmpty()) {
+				m_defaultPresetName = qtTrId("settings_no_preset");
+			}
+			else {
+				const QString selectedId = AgentPresetService::resolveSelectedId(presets, QString());   // 选中项完全由服务端定（每行的 isDefault）；客户端不存本地副本
+				m_defaultPresetName.clear();
+				for (const AgentPreset& preset : presets) {
+					if (preset.id == selectedId) {
+						m_defaultPresetName = preset.name;
+						break;
+					}
+				}
+				if (m_defaultPresetName.isEmpty())
+					m_defaultPresetName = presets.first().name;
+			}
+			emit presetsChanged();
+		},
+		[this](const DshApiClient::RpcError&) {
+			m_agentPresets.clear();
+
+			// 当前 ULin Hub 的 minimal API profile 没有装 agent preset registry（/api/agentPresets/list 会 404）。
+			// 这不是网络故障，不要把底层 transport 文案原样怼到设置页按钮上；明确显示"未内置"。
+			m_defaultPresetName = qtTrId("settings_agent_preset_unavailable");
+			m_presetFeedback.clear();
+			emit presetsChanged();
+		});
+}
+
+void SettingsController::selectDefaultPreset(const QString& presetId)
+{
+	if (!m_api || presetId.isEmpty())
+		return;
+
+	const QString previousName = m_defaultPresetName;   // 乐观显示：写入失败再退回原文字
+	for (const QVariant& value : m_agentPresets) {
+		const QVariantMap row = value.toMap();
+		if (row.value(QStringLiteral("id")).toString() == presetId) {
+			m_defaultPresetName = row.value(QStringLiteral("name")).toString();
+			break;
+		}
+	}
+	m_presetFeedback.clear();
+	emit presetsChanged();
+
+	AgentPresetService::persistDefault(m_api, presetId,
+		[this](const QString& savedId) {
+			qInfo().noquote() << "[Settings] default agent preset ->" << savedId;   // 只在成功时留一行日志：界面是乐观更新，没有"已保存"文案
+			m_presetFeedback.clear();
+			emit presetsChanged();
+		},
+		[this, previousName](const DshApiClient::RpcError& error) {
+			m_defaultPresetName = previousName;
+			m_presetFeedback = qtTrId("common_load_failed_fmt").arg(error.code, error.message);
+			emit presetsChanged();
+		});
+}
+
+void SettingsController::saveServerUrl(const QString& url)
+{
+	SettingsStore::setServerUrl(url.trimmed());
+	m_serverUrl = SettingsStore::serverUrl();
+	emit serverUrlChanged();
+	emit serverRestartRequested();   // Settings::serverSettingsSaved -> ServerManager::restart
+}
+
+void SettingsController::loadAppearance()
+{
+	QVariantList rows;
+	QVariantMap follow;   // 第 0 项固定是"跟随系统"（数据为空串），保持一致
+	follow.insert(QStringLiteral("name"), qtTrId("settings_language_follow_system"));
+	follow.insert(QStringLiteral("code"), QString());
+	rows.append(follow);
+
+	for (const LanguageInfo& language : Translation::availableLanguages()) {
+		QVariantMap row;
+		row.insert(QStringLiteral("name"), language.name);
+		row.insert(QStringLiteral("code"), language.code);
+		rows.append(row);
+	}
+
+	m_languages = rows;
+	m_languageCode = Translation::savedLanguageCode();
+	m_appearanceFeedback.clear();
+	emit languageChanged();
+}
+
+void SettingsController::setLanguage(const QString& code)
+{
+	Translation::setSavedLanguageCode(code);
+	m_languageCode = code;
+
+	if (Translation::apply(code)) {
+		m_appearanceFeedback = qtTrId("settings_language_switched");
+	}
+	else {
+		m_appearanceFeedback = qtTrId("settings_language_pack_missing_fmt")   // 语言包缺失：退回原文并把原因说清楚（不是错误）
+			.arg(code.isEmpty() ? qtTrId("settings_language_system_name") : code);
+	}
+	emit languageChanged();
+}
+
+void SettingsController::resetStyles()
+{
+	ThemeManager::instance().resetStylePack();
+
+	// 风格包重置后让 QML 侧热重载 token：本类在 common（领域层），**不许**直接调 qmlbridge 的
+	// ThemeBridge，于是发信号、由 qmlbridge/QmlBridge 接住落地（等价于在这里直接调
+	// ThemeBridge::reload()；M8 起 ThemeManager 不再发信号，这条通路只能由本类主动发）。
+	emit stylesReset();
+	m_appearanceFeedback = qtTrId("settings_styles_reset_done");
+	emit languageChanged();
+}
+
+const ConfigurableProvider* SettingsController::findProvider(const QString& provider) const
+{
+	return m_view.findProvider(provider);
+}
+
+const SettingsNamespace* SettingsController::findNamespace(const ConfigurableProvider& provider) const
+{
+	return m_view.findNamespace(provider.settingsNs);
+}
+
+void SettingsController::setBusy(bool busy)
+{
+	if (m_busy == busy)
+		return;
+
+	m_busy = busy;
+	emit busyChanged();
+}
+
+void SettingsController::setStatus(const QString& text)
+{
+	if (m_status == text)
+		return;
+
+	m_status = text;
+	emit statusChanged();
+}
+
+void SettingsController::setFormFeedback(const QString& text)
+{
+	if (m_formFeedback == text)
+		return;
+
+	m_formFeedback = text;
+	emit formFeedbackChanged();
+}
+
+QString SettingsController::routeHint(const QString& provider) const
+{
+	const ConfigurableProvider* entry = findProvider(provider);   // 与现有实现 ModelListPanel::routeHint 逐句一致
+	if (!entry)
+		return qtTrId("model_no_configurable_provider");
+
+	QStringList parts;
+	const SettingsNamespace* ns = findNamespace(*entry);
+	if (!ns)
+		return qtTrId("model_namespace_missing_fmt").arg(entry->settingsNs);
+
+	const QJsonArray models = ModelSelectionService::configuredModels(*ns, entry->settingsPath);
+	const bool userDeclared = ModelSelectionService::userDeclaresModels(*ns, entry->settingsPath);
+
+	parts.append(qtTrId("model_write_progress_fmt").arg(entry->settingsNs,
+		ModelSelectionService::modelsPath(*entry).join(QLatin1Char('.')),
+		QString::number(models.size())));
+
+	if (routeIsPiAi(provider)) {
+		if (!userDeclared)   // pi-ai 的 models 是整体替换，会收窄公布范围
+			parts.append(qtTrId("model_write_warning_desc"));
+	}
+	else {
+		parts.append(qtTrId("model_write_deepseek_warning"));
+	}
+
+	if (!m_view.settingsWritable)
+		parts.append(qtTrId("model_write_readonly"));
+
+	return parts.join(QLatin1Char(' '));
+}
+
+bool SettingsController::routeIsPiAi(const QString& provider) const
+{
+	const ConfigurableProvider* entry = findProvider(provider);
+	return entry && entry->settingsNs.contains(QStringLiteral("pi-ai"));
+}
+
+void SettingsController::writeModel(const ConfigurableProvider& provider, const SettingsNamespace& ns, const AddModelRequest& request, bool replacing)
+{
+	setFormFeedback(qtTrId("model_writing"));
+	ModelSelectionService::addModel(m_api, provider, ns, request,
+		[this, request, replacing](const SettingsNamespace&) {
+			setBusy(false);
+			setFormFeedback(replacing
+				? qtTrId("model_updated_fmt").arg(request.id)
+				: qtTrId("model_added_fmt").arg(request.id));
+			emit modelAdded(request.provider, request.id);
+			refresh();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setFormFeedback(qtTrId("model_add_failed_fmt").arg(error.code, error.message));
+		});
+}
+
+void SettingsController::submitModelForm(const QString& provider, const QString& modelId, const QString& displayName, const QString& contextWindow, const QString& maxTokens, const QString& efforts, const QString& apiKey)
+{
+	if (provider.isEmpty()) {   // 校验顺序与文案沿用（ModelListPanel::submitForm）
+		setFormFeedback(qtTrId("model_select_provider_first"));
+		return;
+	}
+	if (modelId.trimmed().isEmpty()) {
+		setFormFeedback(qtTrId("model_id_required"));
+		return;
+	}
+
+	const ConfigurableProvider* entry = findProvider(provider);
+	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
+	if (!entry || !ns) {
+		setFormFeedback(qtTrId("model_namespace_missing_fmt").arg(provider));
+		return;
+	}
+
+	AddModelRequest request;
+	request.provider = entry->provider;
+	request.id = modelId.trimmed();
+	request.name = displayName.trimmed();
+
+	const auto parseOptional = [](const QString& text, bool* has, int* value) {   // 可选整数：空 = 不写；非法 = 拒绝
+		const QString trimmed = text.trimmed();
+		if (trimmed.isEmpty()) {
+			*has = false;
+			return true;
+		}
+		bool ok = false;
+		const int parsed = trimmed.toInt(&ok);
+		if (!ok || parsed <= 0)
+			return false;
+		*has = true;
+		*value = parsed;
+		return true;
+		};
+
+	if (!parseOptional(contextWindow, &request.hasContextWindow, &request.contextWindow)
+		|| !parseOptional(maxTokens, &request.hasMaxTokens, &request.maxTokens)) {
+		setFormFeedback(qtTrId("model_numeric_invalid"));
+		return;
+	}
+
+	const bool piAi = routeIsPiAi(provider);
+	if (piAi && !efforts.trimmed().isEmpty()) {
+		QStringList available;
+		for (const ReasoningLevel& level : fallbackReasoningLevels())
+			available << level.id;
+
+		const QStringList typed = efforts.split(QLatin1Char(','), Qt::SkipEmptyParts);
+		for (const QString& raw : typed) {
+			const QString id = raw.trimmed();
+			if (id.isEmpty())
+				continue;
+			if (!available.contains(id)) {
+				setFormFeedback(qtTrId("model_think_level_unknown_fmt").arg(id, available.join(QLatin1Char('/'))));
+				return;
+			}
+			request.reasoningEfforts.append(id);
+		}
+	}
+
+	// 凭据引用：profile 点名的优先，否则按约定派生并记入配置
+	const QString declared = ModelSelectionService::profileApiKeyEnv(*ns, entry->settingsPath);
+	const QString ref = declared.isEmpty()
+		? ModelSelectionService::deriveKeyRef(entry->provider)
+		: declared;
+
+	bool replacing = false;   // 同 ID 已存在 = 覆盖
+	const QJsonArray existing = ModelSelectionService::configuredModels(*ns, entry->settingsPath);
+	for (const QJsonValue& value : existing) {
+		if (value.toObject().value(QStringLiteral("id")).toString() == request.id) {
+			replacing = true;
+			break;
+		}
+	}
+
+	setBusy(true);
+	const QString typedKey = apiKey.trimmed();
+	if (typedKey.isEmpty()) {
+		writeModel(*entry, *ns, request, replacing);
+		return;
+	}
+
+	request.apiKeyRef = ref;
+	request.recordApiKeyEnv = declared.isEmpty() && !ref.isEmpty();
+	setFormFeedback(qtTrId("model_writing_credential"));
+	const ConfigurableProvider providerCopy = *entry;
+	const SettingsNamespace nsCopy = *ns;
+	ModelSelectionService::saveCredential(m_api, ref, typedKey,
+		[this, providerCopy, nsCopy, request, replacing]() {
+			writeModel(providerCopy, nsCopy, request, replacing);
+		},
+		[this, ref](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setFormFeedback(qtTrId("model_credential_write_failed_fmt").arg(ref, error.code, error.message));
+		});
+}
+
+void SettingsController::refresh()
+{
+	if (!m_api)
+		return;
+
+	setBusy(true);
+	setStatus(QString());
+
+	loadAgentPresets();   // 同一行为 Settings::refreshOnOpen：每次打开重同步服务端地址、预设、模型目录
+	loadAppearance();
+	m_serverUrl = SettingsStore::serverUrl();
+	if (m_serverUrl.isEmpty())
+		m_serverUrl = m_api->baseUrl().toString();
+	emit serverUrlChanged();
+
+	ModelSelectionService::fetchView(m_api,
+		[this](const ServerModelView& view) {
+			m_view = view;
+			setBusy(false);
+			rebuildProviders();
+
+			m_credentials.clear();  // 逐个 provider 查凭据状态：配没配、可不可写、来源（env / file）
+			for (const ConfigurableProvider& provider : m_view.providers) {
+				const SettingsNamespace* ns = findNamespace(provider);
+				if (!ns)
+					continue;
+
+				const QString ref = ModelSelectionService::resolveKeyRef(provider.provider, *ns, provider.settingsPath);
+				if (ref.isEmpty())
+					continue;
+
+				ModelSelectionService::describeCredential(m_api, ref,
+					[this](const CredentialStatus& status) {
+						m_credentials.append(status);
+						rebuildProviders();
+					},
+					[](const DshApiClient::RpcError& error) {
+						qWarning().noquote() << "[Settings] credentials/describe 失败:" << error.code << error.message;
+					});
+			}
+
+			if (m_view.providers.isEmpty())
+				setStatus(qtTrId("model_provider_none_reported"));
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setStatus(qtTrId("settings_read_failed_fmt").arg(error.code, error.message));
+		});
+}
+
+void SettingsController::rebuildProviders()
+{
+	QVariantList rows;
+	for (const ConfigurableProvider& provider : m_view.providers) {
+		const SettingsNamespace* ns = findNamespace(provider);
+
+		QVariantMap row;
+		row.insert(QStringLiteral("provider"), provider.provider);
+		row.insert(QStringLiteral("displayName"), provider.displayName);
+		row.insert(QStringLiteral("settingsNs"), provider.settingsNs);
+		row.insert(QStringLiteral("active"), provider.active);
+		row.insert(QStringLiteral("declared"), provider.declared);
+
+		QString label = provider.displayName;   // 下拉项文案：与现有实现 syncFormToRoute 同规则（displayName + 路由后缀 + 未启用后缀）
+		if (label != provider.provider)
+			label += qtTrId("model_provider_route_suffix_fmt").arg(provider.provider);
+		if (!provider.active)
+			label += qtTrId("model_disabled_suffix");
+		row.insert(QStringLiteral("label"), label);
+
+		QString ref;
+		bool declaredByProfile = false;
+		if (ns) {
+			declaredByProfile = !ModelSelectionService::profileApiKeyEnv(*ns, provider.settingsPath).isEmpty();
+			ref = ModelSelectionService::resolveKeyRef(provider.provider, *ns, provider.settingsPath);
+		}
+		row.insert(QStringLiteral("keyRef"), ref);
+		row.insert(QStringLiteral("keyDeclaredByProfile"), declaredByProfile);
+		row.insert(QStringLiteral("namespaceFound"), ns != nullptr);
+
+		bool known = false;   // 凭据状态：还没查到时按"未知"呈现（不能当成只读）
+		bool configured = false;
+		bool writable = false;
+		QString source;
+		for (const CredentialStatus& status : m_credentials) {
+			if (status.ref != ref || ref.isEmpty())
+				continue;
+			known = status.known;
+			configured = status.configured;
+			writable = status.writable;
+			source = status.source;
+			break;
+		}
+		row.insert(QStringLiteral("keyKnown"), known);
+		row.insert(QStringLiteral("keyConfigured"), configured);
+		row.insert(QStringLiteral("keyWritable"), writable);
+		row.insert(QStringLiteral("keySource"), source);
+
+		QVariantList models;  // 已声明的模型（settings 里的 models 数组，整份替换语义）
+		if (ns) {
+			const QJsonArray declared = ModelSelectionService::configuredModels(*ns, provider.settingsPath);
+			for (const QJsonValue& value : declared) {
+				ConfiguredModel model;
+				if (!ModelSelectionService::parseConfiguredModel(value, &model))
+					continue;
+				QVariantMap entry;
+				entry.insert(QStringLiteral("id"), model.id);
+				entry.insert(QStringLiteral("name"), model.name);
+				models.append(entry);
+			}
+		}
+		row.insert(QStringLiteral("models"), models);
+		rows.append(row);
+	}
+
+	m_providers = rows;
+
+	// 模型页的行：与现有实现 ModelListPanel 一样，用 buildModelInfos 把"目录公布的模型"与
+	// "settings 里声明的条目"join 成展示行（容量、写回地址只有 settings 侧知道）
+	QVariantList modelRows;
+	const QVector<ModelInfo> infos = ModelSelectionService::buildModelInfos(m_view);
+	for (const ModelInfo& info : infos) {
+		QVariantMap row;
+		row.insert(QStringLiteral("provider"), info.provider);
+		row.insert(QStringLiteral("providerName"), info.providerName);
+		row.insert(QStringLiteral("id"), info.id);
+		row.insert(QStringLiteral("name"), info.name);
+		row.insert(QStringLiteral("description"), info.description);
+		row.insert(QStringLiteral("declared"), info.declared);
+		row.insert(QStringLiteral("userDeclared"), info.userDeclared);
+		row.insert(QStringLiteral("hasContextWindow"), info.hasContextWindow);
+		row.insert(QStringLiteral("contextWindow"), info.contextWindow);
+		row.insert(QStringLiteral("hasMaxTokens"), info.hasMaxTokens);
+		row.insert(QStringLiteral("maxTokens"), info.maxTokens);
+		row.insert(QStringLiteral("hasReasoning"), info.hasReasoning);
+		row.insert(QStringLiteral("reasoningDisabled"), info.reasoningDisabled);
+		row.insert(QStringLiteral("settingsNs"), info.settingsNs);
+		row.insert(QStringLiteral("settingsWritable"), info.settingsWritable);
+
+		QStringList levels;
+		for (const ReasoningLevel& level : info.levels)
+			levels << level.name;
+		row.insert(QStringLiteral("levels"), levels);
+		modelRows.append(row);
+	}
+	m_models = modelRows;
+
+	QVariantList failures;  // 失败项（原版状态行会逐个列出：提供方名 + 原因）
+	for (const ModelCatalogFailure& failure : m_view.failures) {
+		QVariantMap row;
+		row.insert(QStringLiteral("id"), failure.id);
+		row.insert(QStringLiteral("name"), failure.name);
+		row.insert(QStringLiteral("message"), failure.message);
+		failures.append(row);
+	}
+	m_failures = failures;
+	m_groupCount = m_view.groups.size();
+
+	emit viewChanged();
+}
+
+void SettingsController::saveApiKey(const QString& provider, const QString& apiKey)
+{
+	if (!m_api || apiKey.trimmed().isEmpty()) {
+		setStatus(qtTrId("model_api_key_required"));
+		return;
+	}
+
+	const ConfigurableProvider* entry = findProvider(provider);
+	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
+	if (!entry || !ns) {
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
+		return;
+	}
+
+	const QString ref = ModelSelectionService::resolveKeyRef(entry->provider, *ns, entry->settingsPath);
+	setBusy(true);
+	ModelSelectionService::saveCredential(m_api, ref, apiKey.trimmed(),
+		[this, ref]() {
+			setBusy(false);
+			setStatus(qtTrId("model_credential_written_fmt").arg(ref));
+			refresh();  // 重新查状态：界面上的"已配置"要立刻反映出来
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setStatus(qtTrId("model_api_key_write_failed_fmt").arg(error.code, error.message));
+		});
+}
+
+void SettingsController::discover(const QString& provider, const QString& apiKey)
+{
+	const ConfigurableProvider* entry = findProvider(provider);
+	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
+	if (!m_api || !entry || !ns) {
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
+		return;
+	}
+
+	setBusy(true);
+	const QJsonObject request = ModelSelectionService::buildDiscoveryRequest(*entry, ns, apiKey);
+	ModelSelectionService::discoverModels(m_api, entry->settingsNs, request,
+		[this](const QVector<DiscoveredModel>& models) {
+			setBusy(false);
+			m_discovered = models;
+
+			QVariantList rows;
+			for (const DiscoveredModel& model : models) {
+				QVariantMap row;
+				row.insert(QStringLiteral("id"), model.id);
+				row.insert(QStringLiteral("name"), model.name.isEmpty() ? model.id : model.name);
+				row.insert(QStringLiteral("contextWindow"), model.hasContextWindow ? model.contextWindow : 0);
+				rows.append(row);
+			}
+			m_candidates = rows;
+			emit candidatesChanged();
+			setStatus(rows.isEmpty()
+				? qtTrId("model_fetch_none_found")
+				: qtTrId("model_fetch_found_fmt").arg(rows.size()));
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setStatus(qtTrId("model_fetch_failed_fmt").arg(error.code, error.message));
+		});
+}
+
+void SettingsController::addModel(const QString& provider, const QString& modelId, const QString& displayName)
+{
+	const ConfigurableProvider* entry = findProvider(provider);
+	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
+	if (!m_api || !entry || !ns) {
+		setStatus(qtTrId("settings_provider_namespace_missing_fmt").arg(provider));
+		return;
+	}
+	if (modelId.trimmed().isEmpty()) {
+		setStatus(qtTrId("model_id_required"));
+		return;
+	}
+
+	AddModelRequest request;
+	request.provider = entry->provider;
+	request.id = modelId.trimmed();
+	request.name = displayName.trimmed();
+	for (const DiscoveredModel& model : m_discovered) {   // 容量等字段留给"发现"回来的数值（addModel 会按 pi-ai / 非 pi-ai 两种形态写条目）
+		if (model.id != request.id)
+			continue;
+		request.hasContextWindow = model.hasContextWindow;
+		request.contextWindow = model.contextWindow;
+		request.hasMaxTokens = model.hasMaxTokens;
+		request.maxTokens = model.maxTokens;
+		break;
+	}
+
+	setBusy(true);
+	ModelSelectionService::addModel(m_api, *entry, *ns, request,
+		[this, provider, modelId](const SettingsNamespace&) {
+			setBusy(false);
+			setStatus(qtTrId("model_added_fmt").arg(modelId));
+			emit modelAdded(provider, modelId);   // 宿主据此刷新输入区的模型选择器
+			refresh();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setStatus(qtTrId("model_add_failed_fmt").arg(error.code, error.message));
+		});
+}

@@ -316,14 +316,20 @@ Item {
                     IconButton {   // 最小化：走 Shell → PanelBarWindow.minimizeWindow()（showMinimized）
                         id: minimizeButton
                         visible: root.sideDetached
-                        glyph: "−"
+                        iconSource: "qrc:/ULinHub/icons/ui/window-minimize.svg"
+                        iconColor: Theme.color.textSecondary
+                        iconSize: 12
                         onClicked: root.minimizeWindowRequested()
                     }
 
                     IconButton {   // 最大化/还原：走 Shell → PanelBarWindow.toggleMaximize()
                         id: maximizeButton
                         visible: root.sideDetached
-                        glyph: root.windowMaximized ? "❐" : "□"
+                        iconSource: root.windowMaximized
+                            ? "qrc:/ULinHub/icons/ui/window-restore.svg"
+                            : "qrc:/ULinHub/icons/ui/window-maximize.svg"
+                        iconColor: Theme.color.textSecondary
+                        iconSize: 12
                         onClicked: root.toggleMaximizeRequested()
                     }
 
@@ -331,7 +337,9 @@ Item {
                     // 走 Shell.onCloseRequested），这里只是从"单独一个"挪进 Row 里排队
                     IconButton {
                         id: closeButton
-                        glyph: "✕"
+                        iconSource: "qrc:/ULinHub/icons/ui/window-close.svg"
+                iconColor: Theme.color.textSecondary
+                iconSize: 12
                         tooltip: qsTrId("common_close")
                         onClicked: root.closeRequested()
                     }

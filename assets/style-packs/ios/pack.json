@@ -1,0 +1,12 @@
+{
+  "packVersion": "1.0.2",
+  "uiAbi": 3,
+  "readme": [
+    "iOS 玻璃 iOS Glass —— ULin Hub 风格包（不带壁纸，只改形状/描边/图案/颜色 + 一层自绘材质的雾面）。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/ui/（包内没有的文件保持内置），重启客户端。",
+    "覆盖件：Backdrop 画极光壁纸；TitleBar 是贴边的整条玻璃导航栏（开折射，条里的颜色来自它背后那片壁纸）；Card 是分组玻璃面；ActionButton 是 iOS 胶囊按钮；UserBubble 是 iMessage 蓝气泡；SessionRow 是侧栏胶囊选中；SessionSearchBox 是 iOS 搜索栏；SegmentedTabs 是分段控件；AppScrollBar 是细指示棒；PillButton 是 tinted chip；FieldBox 是表单框。",
+    "私有件：skin/window/Glass.qml（材质四层：折射/tint/厚度/边缘）、skin/window/wallpaper.js（壁纸色斑的唯一真源，Backdrop 与 Glass 共用，所以玻璃里透出来的颜色和背景是对齐的）、skin/window/grain.png（96×96 颗粒平铺图）。",
+    "注意：玻璃必须靠色板里的 alpha 才透得出来 —— theme-*.json 里 panelBg / cardBg / sessionBarBg / composerBg 都是 rgba(...)。",
+    "恢复默认：设置 → 外观 → 重置界面包，或删掉 <exe>/ui 后重启。"
+  ]
+}

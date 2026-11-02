@@ -94,13 +94,10 @@ Item {
     function reloadRows(first, last) {   // 重新取一段行（含越界钳制）。整屏重画时 first=0/last=rows-1
         if (!model)
             return
-        var parsed = model.rowSegments(first, last)   // 优先拿 C++ 的结构化数据（QVariantList），解析不再放 QML（分层：逻辑在 C++）
-        if (!parsed || parsed.length === 0) {
-            var json = model.rowsJson(first, last)   // 兜底：结构化返回为空就退回旧路 —— 保证"分层优化"永远不会把终端变成空白屏
-            if (!json || json.length === 0)
-                return
-            parsed = JSON.parse(json)
-        }
+        // 行数据只从 C++ 的结构化接口取；QML 不再解析 rowsJson 序列化文本。
+        var parsed = model.rowSegments(first, last)
+        if (!parsed || parsed.length === 0)
+            return
         var next = rows.slice()   // 浅拷贝：只换脏的那几项，别让所有行都重新绑定
         for (var i = 0; i < parsed.length; ++i) {
             var rowIndex = first + i

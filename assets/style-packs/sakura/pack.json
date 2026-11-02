@@ -1,0 +1,10 @@
+{
+  "packVersion": "1.0.0",
+  "uiAbi": 3,
+  "readme": [
+    "樱岚 Sakura —— ULin Hub 风格包（不带壁纸，只改形状/描边/图案/颜色）。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/ui/（包内没有的文件保持内置），重启客户端。",
+    "覆盖件：Backdrop 画晨雾粉渐变 + 飘落花瓣；Card 是大圆角奶白片；ActionButton 是玫瑰渐变胶囊；UserBubble 胶囊带小花点；SessionRow 胶囊行（选中显小花）；TitleBar 玫瑰标题。",
+    "恢复默认：设置 → 外观 → 重置界面包，或删掉 <exe>/ui 后重启。"
+  ]
+}

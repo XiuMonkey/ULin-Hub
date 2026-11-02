@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; padding: 0; background: #f5f6f7; }
+  body { font-family: "Microsoft YaHei UI", sans-serif; }
+  #status { padding: 18px; color: #61666b; font-size: 12px; }
+  #pages { padding: 10px; }
+  .page {
+    margin: 0 auto 12px auto;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    max-width: 920px;
+  }
+  .page canvas { display: block; width: 100%; height: auto; }
+  .pageno { text-align: center; color: #9aa0a6; font-size: 11px; padding: 4px 0 12px; }
+</style>
+</head>
+<body>
+<div id="status">等待文档…</div>
+<div id="pages"></div>
+<script src="pdf.min.js"></script>
+<script src="viewer.js"></script>
+</body>
+</html>

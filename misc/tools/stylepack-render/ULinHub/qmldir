@@ -1,0 +1,6 @@
+module ULinHub
+singleton Theme 1.0 Theme.qml
+singleton Style 1.0 Style.qml
+singleton WindowBridge 1.0 WindowBridge.qml
+singleton HostUi 1.0 HostUi.qml
+singleton Hub 1.0 Hub.qml

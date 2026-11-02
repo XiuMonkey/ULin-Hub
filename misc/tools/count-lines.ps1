@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Counts lines of source code in a project, ignoring dependencies and build outputs.
 
@@ -180,4 +180,8 @@ $byExtension | Format-Table -AutoSize
 # Largest files.
 Write-Host "Top 10 files by line count:" -ForegroundColor Cyan
 $fileStats | Sort-Object Lines -Descending | Select-Object -First 10 Lines, Relative | Format-Table -AutoSize
-Read-Host "�� Enter ���˳�..."
+# Keep the window open only when launched interactively (e.g. double-clicked).
+# Silently skipped when the host is non-interactive or stdin is redirected.
+if ($Host.Name -eq 'ConsoleHost' -and -not [Console]::IsInputRedirected) {
+    try { Read-Host 'Press Enter to exit' | Out-Null } catch { }
+}

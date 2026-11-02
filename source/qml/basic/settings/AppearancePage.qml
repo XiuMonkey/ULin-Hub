@@ -17,6 +17,16 @@ Item {
         anchors.top: parent.top
         spacing: 6
 
+        // 页面标题：这页原本一进来就是 12px 灰说明，从"设置"(15) 直接掉到 12，中间是空的。
+        Text {
+            text: qsTrId("settings_appearance_tab")
+            color: Theme.color.textPrimary
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.title
+            font.weight: Theme.font.weightBold
+            bottomPadding: 2
+        }
+
         Text {
             width: parent.width
             text: qsTrId("settings_appearance_desc")
@@ -33,6 +43,7 @@ Item {
             color: Theme.color.textSecondary
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.caption
+            topPadding: 4   // 与上面那段说明拉开：同号同色，不加间距会读成同一段
         }
 
         ComboBox {
@@ -173,6 +184,8 @@ Item {
         // background {{primaryButtonBg}} / color {{primaryButtonText}} / border none
         // border-radius 8px / padding 8px 14px；:hover→primaryButtonHover、:pressed→primaryButtonPressed、
         // :disabled→primaryButtonDisabledBg/Text；setCursor(Qt::PointingHandCursor)。
+        Item { height: 2 }   // Column 的 spacing 是全列统一的，单独给主按钮让一点位
+
         ActionButton {
             width: parent.width
             text: qsTrId("settings_reset_styles")

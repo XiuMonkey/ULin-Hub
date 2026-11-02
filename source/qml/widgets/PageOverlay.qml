@@ -116,6 +116,15 @@ Item {
 
         MouseArea {
             anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            preventStealing: true
+
+            // 遮罩要拦住滚轮，否则滚轮会继续送给下面的消息列表/页面。
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: (event) => { event.accepted = true }
+            }
         }
     }
 
