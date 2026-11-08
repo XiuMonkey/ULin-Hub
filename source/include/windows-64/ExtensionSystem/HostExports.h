@@ -2,7 +2,7 @@
 
 // 宿主 exe 的 C 导出入口：插件运行期用 QLibrary::resolve 取地址来"拉"宿主对象（宿主无
 // .def/dllexport ⇒ 直接链接 LNK2019；插件自编一份 CommonRegistry 会得到第二个单例）。
-// ABI：一律 extern "C" + 参数返回值只用 POD，动签名必须同步升 ULINHUB_HOST_ABI_VERSION；返回的
+// ABI：一律 extern "C" + 参数返回值只用 POD，动签名/虚接口顺序必须同步升 ULINHUB_HOST_ABI_VERSION；返回的
 // void* 是 QObject*，必须转成全内联接口再调（有 out-of-line 成员就撞回 LNK2019）。
 // 查询只在主线程可用（注册表未加锁、装的是 UI 对象），非主线程返回 NULL 并首次 qWarning；只读 ——
 // 刻意不导出 AddToRegistry，免得"谁负责析构"变成跨 DLL 所有权问题。
@@ -11,6 +11,7 @@
 #include "common/util/HostIndex.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QLibrary>
 #include <QObject>
 #include <QPointer>
@@ -18,7 +19,7 @@
 #include <QtGlobal>
 
 // 宿主 ULinHubHostAbiVersion 返回它；插件取到的值不一致就别再调后面的函数。
-#define ULINHUB_HOST_ABI_VERSION 1u
+#define ULINHUB_HOST_ABI_VERSION 3u
 
 // 导出符号名（QLibrary::resolve 走字符串，改 .cpp 里的定义时同步这里）
 #define ULINHUB_HOST_SYM_ABI_VERSION   "ULinHubHostAbiVersion"
@@ -30,6 +31,55 @@ using DshHostRegistryFindFn = void* (*)(const char* index);
 
 namespace DshHost
 {
+	// ---- 宿主本地数据契约 ----
+	// 不走 %LOCALAPPDATA% / %TEMP%：这两处在沙箱/安全软件下也可能不可写。
+	// 统一使用 <exe>/data 持久化、<exe>/temp 临时化；扩展只能通过这些入口拿路径。
+	namespace HostStorage
+	{
+		inline QString dataRoot()
+		{
+			return QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/data")).absolutePath();
+		}
+
+		inline QString tempRoot()
+		{
+			return QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/temp")).absolutePath();
+		}
+
+		inline QString clientDataDir()
+		{
+			const QString path = dataRoot() + QStringLiteral("/client");
+			QDir().mkpath(path);
+			return path;
+		}
+
+		inline QString extensionDataDir(const QString& extensionName)
+		{
+			const QString path = dataRoot() + QLatin1Char('/') + extensionName;
+			QDir().mkpath(path);
+			return path;
+		}
+
+		inline QString tempRunDir()
+		{
+			const QString run = qEnvironmentVariable("ULINHUB_TEMP_RUN").trimmed();
+			if (!run.isEmpty()) {
+				QDir().mkpath(run);
+				return QDir(run).absolutePath();
+			}
+			const QString fallback = tempRoot();
+			QDir().mkpath(fallback);
+			return fallback;
+		}
+
+		inline QString extensionTempDir(const QString& extensionName)
+		{
+			const QString path = tempRunDir() + QLatin1Char('/') + extensionName;
+			QDir().mkpath(path);
+			return path;
+		}
+	}
+
 	// 插件侧唯一取址入口：从宿主 exe 主模块取导出符号；用 applicationFilePath 免引 <windows.h>，
 	// 用 QLibrary::resolve 静态重载（成员版会被局部 QLibrary 析构卸载）。
 	inline QFunctionPointer resolveHostSymbol(const char* symbol)

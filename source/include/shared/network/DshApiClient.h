@@ -17,17 +17,20 @@
 #include <QRunnable>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QVariantList>
 #include <functional>
 
 // 接管的两半接口：本类实现 VirtualApiHost（插件调宿主），扩展实现 VirtualApiSink。
 // 插件侧只许经 VirtualApiHost 虚函数访问本类，别引用成员（宿主 exe 符号零导出，直接引用即 LNK2019）。
 #include "VirtualClass/VirtualApiTakeover.h"
+#include "VirtualClass/VirtualMasterAgent.h"
 #include "VirtualClass/VirtualCommon.h"
 
 class QNetworkAccessManager;
 class QNetworkReply;
 class QTimer;
 class QWebSocket;
+class AgentManager;
 
 // DSH API 客户端；用法：setBaseUrl → openStreams → callMethod / 监听 muxFrameReceived。
 // 接管态下不走 HTTP，出站请求改交扩展。
@@ -66,19 +69,6 @@ public:
 	void openStreams();
 	// 关闭流通道（WebSocket + 全部逻辑流）；接管态下只清本地账本、不回调扩展（析构期回调不安全）
 	void closeStreams();
-	// 跟随一个会话（mux 上开 session/follow，换会话自动换流）；接管态下改通知扩展。
-	// parentSessionId 非空 = 目标是一个**子代理会话**：address 必须用 subagent 形状
-	// （引擎对 origin == subagent 的 session 形状寻址一律回 session/agent-busy），mode 取
-	// subagentCatalog 里的 one-shot / continuable；解析在 ClientRuntime（它持有 SessionCatalog）。
-	void followSession(const QString& sessionId, const QString& parentSessionId = QString(),
-		const QString& mode = QString());
-	// 关闭 session/follow 流；接管态下通知扩展
-	void unfollowSession();
-	// 按当前 follow 的地址读 session/page（子代理会自动带上 subagent address）。
-	// 翻页/`surfaceOp:replace` 重拉都走这里：调用方不需要知道目标是不是子代理。
-	void pageSession(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0,
-		std::function<void(const QJsonObject& value)> onSuccess = {},
-		std::function<void(const RpcError& error)> onError = {});
 	// 终端附着流（terminal/attach）：一条终端 = 一条逻辑流，帧是 snapshot / output / state / ack。
 	// args 由 SessionCommands::terminalAttach(agentId, id) 给（别在这里拼 wire 名）。
 	// 同时只保留一条：重复调用先 cancel 旧的再开新的；mux 还没连上时只记下 args 并返回。
@@ -91,6 +81,19 @@ public:
 	bool isConnected() const;
 	// 后端是否处于接管态（原始上报/提问应答的分流、ULinHub 的旁路开关都看它）
 	bool isTakenover() const { return m_takenover; }
+
+	// ---- Master Agent 注册（AgentManager；旧 Takenover 直连路径保留）----
+	bool RegisterMasterAgent(const char* owner, QObject* agent) override;
+	void UnregisterMasterAgent(const char* owner) override;
+	bool ActivateMasterAgent(const char* backendId) override;
+	void DeactivateMasterAgent() override;
+
+	// 设置页读取：内置 dsh 不在这里，只列扩展注册的后端。
+	QVariantList registeredMasterAgents() const;
+	QString activeMasterAgentId() const;
+	QString selectedMasterAgentId() const;
+	void setSelectedMasterAgentId(const QString& backendId);
+	const char* ActiveMasterAgentId() const override;
 
 	// VirtualApiHost 接口（插件调用宿主，插件 → 宿主）：方法实现全内联在本头文件
 	// 幂等：拿不到扩展接收端时拒绝接管并记警告
@@ -331,9 +334,16 @@ public:
 	void respond(const QString& rpcId, const QJsonObject& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
 	void respondValue(const QString& rpcId, const QJsonValue& value, std::function<void(const QJsonObject& receipt)> onSuccess = {}, std::function<void(const RpcError& error)> onError = {});
 
+	// ---- 通用 mux 流（通讯层只负责开/关与分发，不解释 endpoint 语义） ----
+	// 返回流 id；接管态下只把 open 交给扩展，返回空 id（扩展负责后续帧）。
+	QString openGenericStream(const QString& endpoint, const QJsonObject& args = {});
+	void closeGenericStream(const QString& streamId);
+
 signals:
 	// 宿主内部信号：ULinHub 靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
 	void takeoverChanged(bool takenover);
+	void masterAgentsChanged();
+	void masterAgentActivated(const QString& backendId);
 	void connected();
 	// 兼容旧消费者：把 0.1.5 的新帧翻译成旧形状再发出
 	void muxFrameReceived(const QJsonObject& frame);
@@ -354,6 +364,10 @@ signals:
 	void sessionProjectionsBaselineReady(const QJsonObject& projectionsBySession);
 	// 现算现推，不读缓存
 	void sessionProjectionChanged(const QString& sessionId, const QString& key, const QJsonValue& value, int seq);
+	// 通用流的原始 item / end / error；endpoint 语义由订阅方解释。
+	void genericStreamItem(const QString& streamId, const QJsonValue& value);
+	void genericStreamEnded(const QString& streamId);
+	void genericStreamError(const QString& streamId, const QString& code, const QString& message);
 	void transportError(const QString& context, const QString& message);
 	void terminalFrame(const QString& streamId, const QJsonObject& frame);
 	// 流已开出（open 帧发出）；收到它就意味着"下一帧必须是 snapshot"
@@ -404,6 +418,9 @@ private:
 
 	// 接管态出站请求的回填时限：扩展不回填时不能让调用方永久挂起（未接管路径有 failAuthQueue 兜底）
 	static constexpr qint64 kTakeoverCallTimeoutMs = 120000;
+	// session/prompt 是唯一允许长时间运行的接管调用：Agent 可能在工具链里跑几十秒
+	// 到几分钟。120s 会把"还在执行"误报成后端失联（WorkBuddy 的 takeover-timeout）。
+	static constexpr qint64 kTakeoverPromptTimeoutMs = 600000;
 
 	// 取登记为接收端的扩展根对象（kApiSink）；每次现取，插件可能已被卸载或被顶掉
 	VirtualApiSink* apiSink() const;
@@ -437,17 +454,12 @@ private:
 	void sendStreamOpen(const QString& endpoint, const QString& streamId, const QJsonObject& args = {});
 	void sendStreamCancel(const QString& streamId);
 
-	// 四条逻辑流的 item 分发：$events、workspace/follow、session/follow、session/control
 	void handleEventsItem(const QJsonValue& value);
 	void handleWorkspaceItem(const QJsonValue& value);
-	void handleSessionItem(const QJsonValue& value);
 	void handleControlItem(const QJsonValue& value);
 	// 第五条：terminal/follow（一帧一个终端帧，原样上抛给 TerminalBridge）
 	void handleTerminalItem(const QJsonValue& value);
-	// 第六条：job/list（后台任务名册，帧是 JobListFrame）
-	void handleJobsItem(const QJsonValue& value);
 
-	void emitSessionEventFrame(const QString& sessionId, const QJsonObject& event);
 	void scheduleReconnect();
 	// 每次 open 都必须唯一；服务端遇重复 id 会 close(1008) 关掉整条 mux
 	QString nextStreamId(const QString& prefix);
@@ -479,23 +491,8 @@ private:
 	QString m_eventsStreamId;
 	QString m_workspaceStreamId;
 	QString m_controlStreamId;
-	QString m_sessionStreamId;
+	QHash<QString, QString> m_genericStreams;   // streamId -> endpoint
 	QString m_terminalStreamId;
-	// 后台任务名册流（job/list）。与 session/follow 同生命周期：换会话就换名册，mux 断开一起没。
-	QString m_jobsStreamId;
-	QString m_followedSessionId;
-	// 当前 follow 目标的 subagent address 两段（都为空 = 普通会话）。重连后要按同一形状重开，
-	// 否则子代理会退回 session 形状并被引擎拒成 agent-busy。
-	QString m_followedParentSessionId;
-	QString m_followedMode;
-	// "想跟随哪个会话"的**愿望账**（与上面三格"当前有没有活着的流"分开记）。
-	// closeStreams 会清掉上面三格（流确实没了），而重连后重开 follow 必须靠这本愿望账 ——
-	// 混成一本时，一次重连（内置引擎重启 / 网络抖动）之后 session/follow 就再也不开了：
-	// 界面收不到任何消息事件，用户看到的是"模型不说话"，而回合其实在服务端跑完了。
-	// 只在 followSession 里写、unfollowSession 里清，mux 断开/重连都不碰它。
-	QString m_resumeFollowId;
-	QString m_resumeFollowParent;
-	QString m_resumeFollowMode;
 	bool m_eventsReady = false;
 	bool m_streamConnected = false;
 	int m_streamSeq = 0;                    // 逻辑流 id 自增号
@@ -508,5 +505,7 @@ private:
 
 	bool m_destroyed = false;
 	// 本类作为 kMainWindow（VirtualMain）时，"已连接"是否已经发过 —— 见 HandleConnected
+	AgentManager* m_agentManager = nullptr;
+
 	bool m_injectConnectedEmitted = false;
 };

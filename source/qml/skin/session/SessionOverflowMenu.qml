@@ -130,7 +130,7 @@ Popup {
                         width: parent.width
                         text: modelData.label && String(modelData.label).length > 0
                             ? String(modelData.label)
-                            : qsTrId("ext_manager_title")
+                            : qsTrId("sessionBar_extension_entry")
                         color: Theme.color.textPrimary
                         font.family: "Microsoft YaHei UI"
                         font.pixelSize: Theme.font.body

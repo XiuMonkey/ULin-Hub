@@ -9,10 +9,11 @@
 
 #include "common/session/ChatController.h"
 #include "common/session/TraceModel.h"   // trace() 把 TraceModel* 当 QAbstractItemModel* 返回，需要完整类型
-#include "common/session/ToolsFilter.h"
+#include "common/Agent/ToolsFilter.h"
 #include "common/util/CodeHighlighter.h"
 #include "common/util/MarkdownSegmenter.h"
 #include "core/ClientRuntime.h"
+#include "core/ServerManager.h"
 #include "network/DshApiClient.h"
 #include "network/SessionCommands.h"
 #include "qmlbridge/TerminalBridge.h"
@@ -21,6 +22,7 @@
 #include "qmlbridge/ThemeBridge.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -37,6 +39,7 @@
 #include <QTextDocumentFragment>
 #include <QTextFrame>
 #include <QTextLayout>
+#include <algorithm>
 #include <QTextLine>
 #include <QTextTable>
 #include <QTimer>
@@ -61,6 +64,14 @@ QmlBridge& QmlBridge::instance()
 QmlBridge::QmlBridge(QObject* parent)
 	: QObject(parent)
 {
+	m_masterSwitchTimeout = new QTimer(this);
+	m_masterSwitchTimeout->setSingleShot(true);
+	connect(m_masterSwitchTimeout, &QTimer::timeout, this, [this]() {
+		if (!m_masterSwitching)
+			return;
+		emit operationFailed(QStringLiteral("切换 Agent 后端超时，请重试"));
+		finishMasterSwitch(false);
+	});
 }
 
 void QmlBridge::init()
@@ -88,6 +99,19 @@ void QmlBridge::init()
 
 	// 设置页（模型 / API key），侧栏 ⚙ 打开；必须在 api 之后（它要拿 api 发 RPC）
 	m_settings = new SettingsController(api, this);
+	// 扩展注册 Master Agent 后刷新设置页；如果本地选中的是已注册后端，自动激活它。
+	connect(api, &DshApiClient::masterAgentsChanged, this, [this, api]() {
+		if (m_settings)
+			m_settings->refreshMasterBackends();
+		const QString selected = api->selectedMasterAgentId();
+		if (!selected.isEmpty() && selected != QLatin1String("dsh")
+			&& api->activeMasterAgentId() != selected) {
+			if (api->ActivateMasterAgent(selected.toUtf8().constData())) {
+				if (ServerManager* server = m_runtime->server())
+					server->stopForTakeover();
+			}
+		}
+	});
 	// 插件市场：HTTP 与解析走 PluginMarketClient / PluginMarketModel
 	m_plugins = new PluginMarketController(api, this);
 	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
@@ -106,6 +130,39 @@ void QmlBridge::init()
 	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {
 		m_runtime->restartServer();
 		});
+	// Master 切换：切到扩展先停内置 DSH；切回 dsh 复位接管标记并重新拉起内置服务端。
+	connect(m_settings, &SettingsController::masterBackendChangeRequested, this,
+		[this](const QString& backendId) {
+			// 从设置页直接调 selectMasterBackend 的旧路径也要有遮罩；
+			// beginMasterSwitch() 已经先亮过遮罩时这里不重复清空。
+			if (!m_masterSwitching)
+				beginMasterSwitchVisual(backendId);
+			ServerManager* server = m_runtime->server();
+			if (!server) {
+				finishMasterSwitch(false);
+				return;
+			}
+			if (backendId == QLatin1String("dsh")) {
+				ServerManager::setTakenover(false);
+				m_runtime->restartServer();
+			}
+			else {
+				server->stopForTakeover();
+				// 扩展接管是同步完成；留一小段遮罩让切换动作有明确反馈。
+				QTimer::singleShot(850, this, [this]() {
+					if (m_masterSwitching)
+						finishMasterSwitch(true);
+				});
+			}
+		});
+	connect(m_settings, &SettingsController::masterBackendSwitchFailed, this,
+		[this](const QString&, const QString& reason) {
+			if (!m_masterSwitching)
+				return;
+			emit operationFailed(QStringLiteral("切换 Agent 后端失败：%1").arg(reason));
+			finishMasterSwitch(false);
+		});
+
 	// 风格包重置后热重载 QML 侧 token：SettingsController 在领域层，不许反向 include qmlbridge，
 	// 于是由它发信号、这里落地。
 	connect(m_settings, &SettingsController::stylesReset, this, []() {
@@ -118,7 +175,7 @@ void QmlBridge::init()
 		});
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----
-	m_chat = new ChatController(api, this);
+	m_chat = new ChatController(api, m_runtime->agentSession(), this);
 	// 新增/更新模型后目录会变：输入区的模型选择器必须跟着刷新，否则新模型要等换会话才出现。
 	connect(m_settings, &SettingsController::modelAdded, this, [this](const QString&, const QString&) {
 		m_chat->refreshModelCatalog();
@@ -147,7 +204,17 @@ void QmlBridge::wireRuntime()
 {
 	// 状态机（值是 core 里的，去重也在那边；这里只转发）
 	connect(m_runtime, &ClientRuntime::statusChanged, this, [this](const QString&) { emit statusTextChanged(); });
-	connect(m_runtime, &ClientRuntime::serverStateChanged, this, [this](const QString&) { emit serverStateChanged(); });
+	connect(m_runtime, &ClientRuntime::serverStateChanged, this, [this](const QString& state) {
+		emit serverStateChanged();
+		if (m_masterSwitching && m_masterSwitchTarget == QLatin1String("dsh")
+			&& state == QLatin1String("connected")) {
+			QTimer::singleShot(180, this, [this]() {
+				if (m_masterSwitching && m_masterSwitchTarget == QLatin1String("dsh")
+					&& m_runtime->serverState() == QLatin1String("connected"))
+					finishMasterSwitch(true);
+			});
+		}
+	});
 	connect(m_runtime, &ClientRuntime::initializingChanged, this, [this](bool) { emit initializingChanged(); });
 
 	// 目录变了 → 列表模型整份重建；列表空时给一句引导
@@ -176,6 +243,10 @@ void QmlBridge::wireRuntime()
 		const QString keep = m_sessions->selectedSessionId();
 		m_sessions->rebuild();
 
+		// 后端切换期间不要让目录刷新自动选中旧/新会话，否则遮罩后面消息区又会亮起来。
+		if (m_masterSwitching)
+			return;
+
 		// 启动/刷新后的目标会话：优先保留当前已选，其次保持侧栏选中，最后用
 		// SessionCatalog::autoSelectSessionId()（= updatedAt 最新的未归档会话，含运行中）。
 		QString target = m_currentSessionId;
@@ -192,6 +263,13 @@ void QmlBridge::wireRuntime()
 				selectSession(target);
 			else
 				m_sessions->setSelectedSession(target);
+		}
+
+		// 自动化任务页的「新建任务」：创建成功后切到新会话，别让用户停在旧对话里。
+		if (m_pendingScheduleSessionSelect) {
+			m_pendingScheduleSessionSelect = false;
+			if (!autoSelectSessionId.isEmpty())
+				selectSession(autoSelectSessionId);
 		}
 
 		if (m_sessions->rowCount() == 0)
@@ -228,6 +306,9 @@ void QmlBridge::wireRuntime()
 	//    要原样转发给 QML 弹 Toast。
 	connect(m_runtime, &ClientRuntime::operationFailed, this, &QmlBridge::operationFailed);
 	connect(m_runtime, &ClientRuntime::sessionCreateFailed, this, &QmlBridge::sessionCreateFailed);
+	connect(m_runtime, &ClientRuntime::sessionCreateFailed, this, [this](const QString&) {
+		m_pendingScheduleSessionSelect = false;
+	});
 
 	// 会话被整份清空：当前会话连同消息区一起作废。
 	// ⚠️ 必须把选中态也清掉：sessionsRefreshed 的自动选中只在 `keep.isEmpty()` 时生效，
@@ -402,6 +483,81 @@ void QmlBridge::refreshPeerRoot()
 	const SessionCatalog* catalog = m_sessions ? m_sessions->catalog() : nullptr;
 	const QString parentSessionId = catalog ? catalog->parentForSession(m_currentSessionId) : QString();
 	m_peerRootId = parentSessionId.isEmpty() ? m_currentSessionId : parentSessionId;
+}
+
+void QmlBridge::setMasterSwitching(bool switching)
+{
+	if (m_masterSwitching == switching)
+		return;
+	m_masterSwitching = switching;
+	emit masterSwitchingChanged();
+}
+
+void QmlBridge::clearConversationView()
+{
+	const bool hadSession = !m_currentSessionId.isEmpty();
+	m_currentSessionId.clear();
+	m_peerRootId.clear();
+	if (m_sessions)
+		m_sessions->setSelectedSession(QString());
+	if (m_chat)
+		m_chat->setSession(QString());
+	if (hadSession)
+		emit currentSessionChanged();
+	emit peerTabsChanged();
+}
+
+void QmlBridge::beginMasterSwitchVisual(const QString& backendId)
+{
+	m_masterSwitchTarget = backendId.trimmed();
+	setMasterSwitching(true);
+	clearConversationView();
+	m_masterSwitchTimeout->start(15000);
+	if (m_runtime)
+		m_runtime->setStatus(QStringLiteral("正在切换 Agent 后端…"));
+	emit statusTextChanged();
+}
+
+void QmlBridge::beginMasterSwitch(const QString& backendId)
+{
+	if (!m_settings)
+		return;
+	const QString id = backendId.trimmed();
+	if (id.isEmpty() || id == m_settings->masterBackend())
+		return;
+	bool known = false;
+	for (const QVariant& value : m_settings->masterBackends()) {
+		if (value.toMap().value(QStringLiteral("id")).toString() == id) {
+			known = true;
+			break;
+		}
+	}
+	if (!known)
+		return;
+	// 先让遮罩和清空在下一帧画出来，再执行可能卡住 UI 的后端激活。
+	beginMasterSwitchVisual(id);
+	QTimer::singleShot(0, this, [this, id]() {
+		if (m_masterSwitching && m_masterSwitchTarget == id)
+			m_settings->selectMasterBackend(id);
+	});
+}
+
+void QmlBridge::finishMasterSwitch(bool success)
+{
+	if (!m_masterSwitching)
+		return;
+	const QString target = m_masterSwitchTarget;
+	m_masterSwitchTarget.clear();
+	if (m_masterSwitchTimeout)
+		m_masterSwitchTimeout->stop();
+	setMasterSwitching(false);
+	if (success) {
+		const QString name = m_settings ? m_settings->masterBackendName() : target;
+		emit masterSwitchFinished(name.isEmpty() ? target : name);
+		if (m_runtime)
+			m_runtime->setStatus(QString());
+		emit statusTextChanged();
+	}
 }
 
 void QmlBridge::selectSession(const QString& sessionId)
@@ -784,6 +940,219 @@ void QmlBridge::closeToolsFilter()
 		return;
 	m_toolsFilterOpen = false;
 	emit toolsFilterOpenChanged();
+}
+
+namespace {
+// 自动化任务的规则摘要：只在界面上显示，不参与 RPC（服务端拿的是原始记录）。
+QString scheduleDurationText(qint64 seconds)
+{
+	if (seconds >= 3600) {
+		const double hours = seconds / 3600.0;
+		return QStringLiteral("%1 小时").arg(hours < 10.0 ? QString::number(hours, 'g', 2) : QString::number(qRound64(hours)));
+	}
+	if (seconds >= 60)
+		return QStringLiteral("%1 分钟").arg(qRound64(seconds / 60.0));
+	return QStringLiteral("%1 秒").arg(seconds);
+}
+
+QString scheduleWeekdaysText(const QJsonArray& days)
+{
+	static const char* const kNames[] = { "", "一", "二", "三", "四", "五", "六", "日" };
+	QStringList parts;
+	for (const QJsonValue& value : days) {
+		const int day = value.toInt();
+		if (day >= 1 && day <= 7)
+			parts << QStringLiteral("周") + QString::fromUtf8(kNames[day]);
+	}
+	return parts.join(QStringLiteral("、"));
+}
+
+QString scheduleRuleText(const QJsonObject& item)
+{
+	const QString kind = item.value(QStringLiteral("kind")).toString();
+	if (kind == QLatin1String("after"))
+		return scheduleDurationText(item.value(QStringLiteral("afterSeconds")).toInteger()) + QStringLiteral("后");
+	if (kind == QLatin1String("at"))
+		return QStringLiteral("指定时间");
+	if (kind == QLatin1String("every"))
+		return QStringLiteral("每 ") + scheduleDurationText(item.value(QStringLiteral("everySeconds")).toInteger());
+	if (kind == QLatin1String("daily")) {
+		const QString time = item.value(QStringLiteral("time")).toString().left(5);
+		return QStringLiteral("每天 %1").arg(time);
+	}
+	if (kind == QLatin1String("weekly")) {
+		const QString time = item.value(QStringLiteral("time")).toString().left(5);
+		const QString days = scheduleWeekdaysText(item.value(QStringLiteral("weekdays")).toArray());
+		return QStringLiteral("每%1 %2").arg(days, time);
+	}
+	if (kind == QLatin1String("cron"))
+		return QStringLiteral("cron：%1 (%2)").arg(item.value(QStringLiteral("expression")).toString(),
+			item.value(QStringLiteral("timeZone")).toString());
+	return kind;
+}
+
+QString scheduleRelativeText(const QDateTime& when)
+{
+	if (!when.isValid())
+		return QString();
+	const qint64 seconds = QDateTime::currentDateTime().secsTo(when);
+	if (seconds < 0)
+		return QStringLiteral("已过期");
+	if (seconds < 60)
+		return QStringLiteral("%1 秒后").arg(seconds);
+	if (seconds < 3600)
+		return QStringLiteral("%1 分钟后").arg(seconds / 60);
+	if (seconds < 86400)
+		return QStringLiteral("%1 小时后").arg(seconds / 3600);
+	return QStringLiteral("%1 天后").arg(seconds / 86400);
+}
+}   // namespace
+
+void QmlBridge::openSchedulePage()
+{
+	if (m_scheduleOpen)
+		return;
+	m_scheduleOpen = true;
+	emit scheduleOpenChanged();
+	refreshSchedules();
+}
+
+void QmlBridge::closeSchedulePage()
+{
+	if (!m_scheduleOpen)
+		return;
+	m_scheduleOpen = false;
+	emit scheduleOpenChanged();
+}
+
+void QmlBridge::refreshSchedules()
+{
+	DshApiClient* api = m_runtime ? m_runtime->apiClient() : nullptr;
+	if (!api) {
+		m_scheduleTasks.clear();
+		m_scheduleBusy = false;
+		m_scheduleStatus = qtTrId("schedule_server_not_ready");
+		emit scheduleChanged();
+		return;
+	}
+
+	m_scheduleBusy = true;
+	m_scheduleStatus = qtTrId("schedule_loading");
+	emit scheduleChanged();
+
+	api->callMethodValue(QStringLiteral("schedule/catalog"), {},
+		[this](const QJsonValue& value) {
+			const QJsonArray items = value.toArray();
+			QVariantList list;
+			list.reserve(items.size());
+			for (const QJsonValue& raw : items) {
+				const QJsonObject item = raw.toObject();
+				const QString sessionId = item.value(QStringLiteral("sessionId")).toString();
+
+				QString sessionTitle;
+				if (m_sessions) {
+					for (int row = 0; row < m_sessions->rowCount(); ++row) {
+						const QModelIndex index = m_sessions->index(row, 0);
+						if (m_sessions->data(index, SessionListModel::SessionIdRole).toString() == sessionId) {
+							sessionTitle = m_sessions->data(index, SessionListModel::TitleRole).toString();
+							break;
+						}
+					}
+				}
+
+				const QString status = item.value(QStringLiteral("status")).toString();
+				const bool active = status == QLatin1String("active");
+				const QDateTime utc = QDateTime::fromString(item.value(QStringLiteral("scheduledAt")).toString(), Qt::ISODate);
+				const QDateTime local = utc.toLocalTime();
+
+				QVariantMap row;
+				row.insert(QStringLiteral("id"), item.value(QStringLiteral("id")).toString());
+				row.insert(QStringLiteral("kind"), item.value(QStringLiteral("kind")).toString());
+				row.insert(QStringLiteral("title"), item.value(QStringLiteral("title")).toString());
+				row.insert(QStringLiteral("prompt"), item.value(QStringLiteral("prompt")).toString());
+				row.insert(QStringLiteral("sessionId"), sessionId);
+				row.insert(QStringLiteral("sessionTitle"), sessionTitle.isEmpty() ? qtTrId("schedule_untitled_session") : sessionTitle);
+				row.insert(QStringLiteral("status"), status);
+				row.insert(QStringLiteral("active"), active);
+				row.insert(QStringLiteral("statusText"), active ? qtTrId("schedule_status_active") : qtTrId("schedule_status_inactive"));
+				row.insert(QStringLiteral("ruleText"), scheduleRuleText(item));
+				row.insert(QStringLiteral("scheduledAt"), item.value(QStringLiteral("scheduledAt")).toString());
+				row.insert(QStringLiteral("nextText"), local.isValid() ? local.toString(QStringLiteral("M月d日 HH:mm")) : QString());
+				row.insert(QStringLiteral("nextRelative"), active ? scheduleRelativeText(local) : QStringLiteral("已结束"));
+				const QJsonObject last = item.value(QStringLiteral("lastDelivery")).toObject();
+				const QDateTime delivered = QDateTime::fromString(last.value(QStringLiteral("deliveredAt")).toString(), Qt::ISODate);
+				row.insert(QStringLiteral("lastDeliveryText"),
+					delivered.isValid() ? delivered.toLocalTime().toString(QStringLiteral("M月d日 HH:mm")) : QString());
+				list.append(row);
+			}
+
+			std::sort(list.begin(), list.end(), [](const QVariant& a, const QVariant& b) {
+				const QVariantMap left = a.toMap();
+				const QVariantMap right = b.toMap();
+				const bool leftActive = left.value(QStringLiteral("active")).toBool();
+				const bool rightActive = right.value(QStringLiteral("active")).toBool();
+				if (leftActive != rightActive)
+					return leftActive;
+				return left.value(QStringLiteral("scheduledAt")).toString()
+					< right.value(QStringLiteral("scheduledAt")).toString();
+			});
+
+			m_scheduleTasks = list;
+			m_scheduleBusy = false;
+			m_scheduleStatus = list.isEmpty() ? qtTrId("schedule_empty") : QString();
+			emit scheduleChanged();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			qWarning().noquote() << "[Schedule] schedule/catalog failed:" << error.code << error.message;
+			m_scheduleBusy = false;
+			m_scheduleStatus = qtTrId("schedule_load_failed");
+			emit scheduleChanged();
+		});
+}
+
+void QmlBridge::deleteSchedule(const QString& id, const QString& sessionId)
+{
+	if (id.isEmpty() || sessionId.isEmpty())
+		return;
+	DshApiClient* api = m_runtime ? m_runtime->apiClient() : nullptr;
+	if (!api)
+		return;
+
+	QJsonObject request;
+	request.insert(QStringLiteral("id"), id);
+	request.insert(QStringLiteral("sessionId"), sessionId);
+	QJsonObject args;
+	args.insert(QStringLiteral("request"), request);
+
+	m_scheduleBusy = true;
+	emit scheduleChanged();
+	api->callMethod(QStringLiteral("schedule/delete"), args,
+		[this](const QJsonObject&) {
+			m_scheduleBusy = false;
+			refreshSchedules();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			qWarning().noquote() << "[Schedule] schedule/delete failed:" << error.code << error.message;
+			m_scheduleBusy = false;
+			m_scheduleStatus = qtTrId("schedule_delete_failed");
+			emit scheduleChanged();
+		});
+}
+
+void QmlBridge::openScheduleSession(const QString& sessionId)
+{
+	if (sessionId.isEmpty())
+		return;
+	closeSchedulePage();
+	selectSession(sessionId);
+}
+
+void QmlBridge::createScheduleSession()
+{
+	// 服务端没有 schedule/create RPC：按 DSH Web 的做法开新会话，让 Agent 用 schedule_create 工具建任务。
+	closeSchedulePage();
+	m_pendingScheduleSessionSelect = true;
+	createSession(QString());
 }
 
 void QmlBridge::refreshSkills(const QString& requestedSessionId)

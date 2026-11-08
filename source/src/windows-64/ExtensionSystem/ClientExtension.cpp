@@ -1,5 +1,5 @@
 #include "ExtensionSystem/ClientExtension.h"
-#include "ExtensionSystem/DshHostPlugin.h"
+#include "VirtualClass/VirtualPlugin.h"
 #include "ExtensionSystem/ExtensionLoader.h"   // 身份字段解析（readIdentityFields）：与安装路径共用一份
 #include "common/util/HostIndex.h"
 #include "common/util/ConnectionManager.h"
@@ -76,7 +76,7 @@ namespace ClientExtension
 			if (g_loadedNames.contains(name)) {  // 已装载（同名二次装载，如重复安装）：不重复装载 dll，只重新 attach
 				QPluginLoader* loader = g_loaders.value(name);
 				QObject* root = loader ? loader->instance() : nullptr;
-				auto* plugin = root ? qobject_cast<DshHostPlugin*>(root) : nullptr;
+				auto* plugin = root ? qobject_cast<VirtualPlugin*>(root) : nullptr;
 				if (plugin) {
 					plugin->attachHost();
 					qInfo("[ClientExtension] re-attached: %s", qPrintable(name));
@@ -107,16 +107,16 @@ namespace ClientExtension
 
 			g_loaders.insert(name, loader);  // 两个成功分支都登记：装载失败的那个同样会让目录删不掉
 
-			auto* plugin = qobject_cast<DshHostPlugin*>(root);
+			auto* plugin = qobject_cast<VirtualPlugin*>(root);
 			if (!plugin) {
-				const QString reason = QStringLiteral("does not implement DshHostPlugin");
+				const QString reason = QStringLiteral("does not implement VirtualPlugin");
 				if (error)
 					*error = reason;
 				qWarning("[ClientExtension] %s: %s", qPrintable(fileName), qPrintable(reason));
 				return false;  // loader 留在 qApp 下，随进程一起走
 			}
 
-			// 可选能力：只登记、不装载判定，拒绝发生在 Takenover(true) 时；插件侧必须在根对象上写 Q_INTERFACES(DshHostPlugin VirtualApiSink)，否则 cast 永远是 nullptr
+			// 可选能力：只登记、不装载判定，拒绝发生在 Takenover(true) 时；插件侧必须在根对象上写 Q_INTERFACES(VirtualPlugin VirtualApiSink)，否则 cast 永远是 nullptr
 			if (qobject_cast<VirtualApiSink*>(root)) {
 				CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiSink, root);
 				qInfo("[ClientExtension] %s: 后端接管接收端（VirtualApiSink）已登记", qPrintable(name));

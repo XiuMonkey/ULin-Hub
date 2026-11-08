@@ -2,14 +2,14 @@
 
 // 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
-// 解析辅助函数直接复用既有的 network/DshEventParser（extractReply / extractThinking /
+// 解析辅助函数直接复用既有的 common/Agent/AgentEventParser（extractReply / extractThinking /
 // extractToolCall / extractToolResult / extractEventText / extractChunkType），所以语义不会漂。
 // 与现有实现的差异（有意）：
 //  * 不再有"控件树缓存 + 离屏分批建控件"：QML 的 ListView 自己复用 delegate；
 // * 流式改用 33ms 合并缓冲。
 // 还没做（M4b）：向上翻页（session/page + beforeSeq）、预取、锚点不跳、提问/审批面板。
 
-#include "common/session/ModelSelectionService.h"
+#include "common/Agent/ModelSelectionService.h"
 #include "common/session/MessageListModel.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
 //  实例化 QMetaType 校验，此时类型不完整就触发
@@ -27,6 +27,7 @@
 #include <functional>
 
 class DshApiClient;
+class AgentSessionClient;
 class QJsonArray;
 class QJsonObject;
 class QTimer;
@@ -65,7 +66,7 @@ class ChatController : public QObject
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
 
 public:
-	explicit ChatController(DshApiClient* api, QObject* parent = nullptr);
+	explicit ChatController(DshApiClient* api, AgentSessionClient* agentSession, QObject* parent = nullptr);
 
 	// 换会话：清空消息区并记住当前会话（其它会话的事件一律丢弃）
 	void setSession(const QString& sessionId);
@@ -201,6 +202,8 @@ private:
 	void rebuildFromRecords(const QJsonArray& records);
 	void applyHistoryEvent(const QJsonObject& event);
 	static QVector<MessageListModel::ImageRef> extractEventImages(const QJsonObject& event);
+	static QVector<MessageListModel::DeliverableRef> extractEventDeliverables(const QJsonObject& event);
+	void applyDeliverablesEvent(const QJsonObject& event);
 	void applyStreamEvent(const QJsonObject& event);
 	// 回合收尾：无可见输出时补兜底提示，然后广播 turnFinished
 	void finishTurn();
@@ -235,6 +238,7 @@ private:
 	QSet<QString> m_attachmentInFlight;
 
 	DshApiClient* m_api = nullptr;
+	AgentSessionClient* m_agentSession = nullptr;
 	MessageListModel* m_messages = nullptr;
 	TraceModel* m_trace = nullptr;
 	QTimer* m_flushTimer = nullptr;

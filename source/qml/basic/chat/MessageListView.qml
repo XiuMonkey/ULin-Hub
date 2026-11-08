@@ -569,6 +569,7 @@ ListView {
         required property string text
         required property var segments
         required property var images
+        required property var deliverables
         required property bool streaming
         required property int index
 
@@ -594,7 +595,9 @@ ListView {
             : Math.max(120, list.width - list.leftMargin - list.rightMargin)
         implicitHeight: (rowRoot.kind === "user")
             ? userBubble.implicitHeight
-            : ((rowRoot.kind === "system") ? systemNotice.contentHeight : agentBubble.implicitHeight)
+            : ((rowRoot.kind === "system")
+                ? systemNotice.contentHeight
+                : agentBubble.implicitHeight)
 
         UserBubble {
             id: userBubble
@@ -617,6 +620,7 @@ ListView {
             anchors.left: parent.left
             anchors.right: parent.right
             segments: rowRoot.segments
+            deliverables: rowRoot.deliverables
             // 行级标志优先；控制器仍在跑且这是最后一条 agent 时也视为流式。
             streaming: rowRoot.streaming
                 || (Hub.streaming && rowRoot.kind === "agent" && rowRoot.index === list.count - 1)

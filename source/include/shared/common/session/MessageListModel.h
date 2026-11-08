@@ -23,7 +23,8 @@ public:
 		TextRole,                      // 用户/系统消息的纯文本
 		ImagesRole,                    // 该行携带的图片附件 [{id, mediaType}]（仅用户行）
 		SegmentsRole,                  // 有序段（QVariantList）
-		StreamingRole
+		StreamingRole,
+		DeliverablesRole               // Agent 回合的交付文件 [{ path, name, suffix, description }]
 	};
 
 	enum Kind
@@ -45,6 +46,13 @@ public:
 		QString mediaType;
 		QString previewUrl;   // 发送瞬间用本地预览；历史消息为空，走 session/attachment
 	};
+
+	// `present` 工具产生的交付文件（DSH Web 的 deliverables/presented）。
+	struct DeliverableRef
+	{
+		QString path;
+		QString description;
+	};
 	int appendUser(const QString& text);
 	int appendUserWithImages(const QString& text, const QVector<ImageRef>& images);
 	// 连续重复的历史用户消息（引擎快照里可能同一个 prompt 出现两次）不重复插入
@@ -58,6 +66,7 @@ public:
 	// 工具结果贴到该行最后一个 toolCall 段上（一次调用的结果就在那张卡片里）；没有就新开 toolResult 段
 	void appendToolResult(int row, const QString& text);
 	void setStreaming(int row, bool streaming);
+	void appendDeliverables(int row, const QVector<DeliverableRef>& files);
 
 	// 最后一行是不是 Agent（历史回放时"工具事件接在上一气泡后面"要靠它）
 	int lastAgentRow() const;
@@ -95,6 +104,7 @@ private:
 		QString text;
 		QVector<Segment> segments;
 		QVector<ImageRef> images;   // 仅用户行
+		QVector<DeliverableRef> deliverables;   // 仅 Agent 行
 		QString toolResult;          // 最近的工具结果，附在 toolCall 段上显示
 		bool streaming = false;
 	};

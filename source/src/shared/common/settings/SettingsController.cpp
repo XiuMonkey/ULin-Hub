@@ -4,7 +4,7 @@
 
 #include "common/appearance/ThemeManager.h"
 #include "common/appearance/TranslationManager.h"
-#include "common/session/AgentPresetService.h"
+#include "common/Agent/AgentPresetService.h"
 #include "common/settings/SettingsStore.h"
 #include "network/DshApiClient.h"
 
@@ -46,6 +46,7 @@ SettingsController::SettingsController(DshApiClient* api, QObject* parent)
 	// 语言下拉当场绑定 Hub.settings.languages）、后 refresh() → loadAppearance() 填数据"，
 	// 所以在第一次打开设置页时绑定到的是空列表；配合 CONSTANT 属性就是"永远空白且不报错"。
 	loadAppearance();
+	loadMasterBackend();
 }
 
 namespace
@@ -487,6 +488,93 @@ void SettingsController::selectDefaultPreset(const QString& presetId)
 		});
 }
 
+QVariantList SettingsController::masterBackends() const
+{
+	QVariantList rows;
+	QVariantMap dsh;
+	dsh.insert(QStringLiteral("id"), QStringLiteral("dsh"));
+	dsh.insert(QStringLiteral("name"), QStringLiteral("DSH"));
+	dsh.insert(QStringLiteral("description"), QStringLiteral("内置 Agent 后端"));
+	rows.append(dsh);
+
+	if (m_api) {
+		for (const QVariant& value : m_api->registeredMasterAgents()) {
+			const QVariantMap row = value.toMap();
+			const QString id = row.value(QStringLiteral("id")).toString();
+			if (id.isEmpty() || id == QLatin1String("dsh"))
+				continue;
+			bool exists = false;
+			for (const QVariant& existing : rows) {
+				if (existing.toMap().value(QStringLiteral("id")).toString() == id) {
+					exists = true;
+					break;
+				}
+			}
+			if (!exists)
+				rows.append(row);
+		}
+	}
+	return rows;
+}
+
+QString SettingsController::masterBackendName() const
+{
+	for (const QVariant& value : masterBackends()) {
+		const QVariantMap row = value.toMap();
+		if (row.value(QStringLiteral("id")).toString() == m_masterBackend)
+			return row.value(QStringLiteral("name")).toString();
+	}
+	return m_masterBackend;
+}
+
+void SettingsController::loadMasterBackend()
+{
+	const QString saved = m_api ? m_api->selectedMasterAgentId() : QStringLiteral("dsh");
+	if (m_masterBackend == saved)
+		return;
+	m_masterBackend = saved;
+	emit masterBackendChanged();
+}
+
+void SettingsController::refreshMasterBackends()
+{
+	emit masterBackendChanged();
+}
+
+void SettingsController::selectMasterBackend(const QString& backendId)
+{
+	const QString id = backendId.trimmed();
+	if (id.isEmpty() || id == m_masterBackend)
+		return;
+	bool known = false;
+	for (const QVariant& value : masterBackends()) {
+		if (value.toMap().value(QStringLiteral("id")).toString() == id) {
+			known = true;
+			break;
+		}
+	}
+	if (!known) {
+		emit masterBackendSwitchFailed(id, QStringLiteral("后端未注册"));
+		return;
+	}
+	// 先落盘再激活：激活过程中扩展可能重新注册并触发 QmlBridge 的自动激活，
+	// 若仍读到旧值会把刚切走的后端又拉起来。
+	if (m_api) m_api->setSelectedMasterAgentId(id);
+	if (m_api) {
+		const bool ok = id == QLatin1String("dsh")
+			? (m_api->ActivateMasterAgent("dsh"), true)
+			: m_api->ActivateMasterAgent(id.toUtf8().constData());
+		if (!ok) {
+			if (m_api) m_api->setSelectedMasterAgentId(m_masterBackend);
+			emit masterBackendSwitchFailed(id, QStringLiteral("激活失败"));
+			return;
+		}
+	}
+	m_masterBackend = id;
+	emit masterBackendChanged();
+	emit masterBackendChangeRequested(id);
+}
+
 void SettingsController::saveServerUrl(const QString& url)
 {
 	SettingsStore::setServerUrl(url.trimmed());
@@ -745,6 +833,7 @@ void SettingsController::refresh()
 	setStatus(QString());
 
 	loadAgentPresets();   // 同一行为 Settings::refreshOnOpen：每次打开重同步服务端地址、预设、模型目录
+	loadMasterBackend();
 	loadAppearance();
 	m_serverUrl = SettingsStore::serverUrl();
 	if (m_serverUrl.isEmpty())

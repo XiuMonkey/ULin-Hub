@@ -120,8 +120,8 @@
     <ClCompile Include="src\shared\common\session\ChatController.cpp">
       <Filter>src\shared\common\session</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\session\ToolsFilter.cpp">
-      <Filter>src\shared\common\session</Filter>
+    <ClCompile Include="src\shared\common\Agent\ToolsFilter.cpp">
+      <Filter>src\shared\common\Agent</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\util\MarkdownSegmenter.cpp">
       <Filter>src\shared\common\util</Filter>
@@ -138,8 +138,8 @@
     <ClCompile Include="src\shared\network\DshApiClient.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\network\DshEventParser.cpp">
-      <Filter>src\core</Filter>
+    <ClCompile Include="src\shared\common\Agent\AgentEventParser.cpp">
+      <Filter>src\shared\common\Agent</Filter>
     </ClCompile>
     <ClCompile Include="src\windows-64\core\ServerManager.cpp">
       <Filter>src\core</Filter>
@@ -177,8 +177,11 @@
     <ClCompile Include="src\shared\common\settings\ClientSettings.cpp">
       <Filter>src\shared\common\settings</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\session\AgentPresetService.cpp">
-      <Filter>src\shared\common\session</Filter>
+    <ClCompile Include="src\shared\common\Agent\AgentPresetService.cpp">
+      <Filter>src\shared\common\Agent</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\Agent\AgentSessionClient.cpp">
+      <Filter>src\shared\common\Agent</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketClient.cpp">
       <Filter>src\shared\common\PluginMarket</Filter>
@@ -189,8 +192,8 @@
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketInstaller.cpp">
       <Filter>src\shared\common\PluginMarket</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\session\ModelSelectionService.cpp">
-      <Filter>src\shared\common\session</Filter>
+    <ClCompile Include="src\shared\common\Agent\ModelSelectionService.cpp">
+      <Filter>src\shared\common\Agent</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp">
       <Filter>src\shared\common\appearance</Filter>
@@ -272,8 +275,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\shared\network\DshEventParser.h">
-      <Filter>src\core</Filter>
+    <ClInclude Include="include\shared\common\Agent\AgentEventParser.h">
+      <Filter>include\shared\common\Agent</Filter>
     </ClInclude>
     <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionLoader.h">
       <Filter>src\core</Filter>
@@ -341,14 +344,17 @@
     <ClInclude Include="include\shared\common\settings\ClientSettings.h">
       <Filter>include\shared\common\settings</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\session\AgentPresetService.h">
-      <Filter>include\shared\common\session</Filter>
+    <ClInclude Include="include\shared\common\Agent\AgentPresetService.h">
+      <Filter>include\shared\common\Agent</Filter>
     </ClInclude>
+    <QtMoc Include="include\shared\common\Agent\AgentSessionClient.h">
+      <Filter>include\shared\common\Agent</Filter>
+    </QtMoc>
     <ClInclude Include="include\shared\common\PluginMarket\PluginMarketModel.h">
       <Filter>include\shared\common\PluginMarket</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\session\ModelSelectionService.h">
-      <Filter>include\shared\common\session</Filter>
+    <ClInclude Include="include\shared\common\Agent\ModelSelectionService.h">
+      <Filter>include\shared\common\Agent</Filter>
     </ClInclude>
     <ClInclude Include="include\windows-64\common\platform\win\NativeWindowFilter.h">
       <Filter>include\shared\common\platform\win</Filter>
@@ -440,10 +446,10 @@
       <Filter>include\shared\common\session</Filter>
     </QtMoc>
     <QtMoc Include="include\shared\common\session\ChatController.h">
-    <QtMoc Include="include\shared\common\session\ToolsFilter.h">
       <Filter>include\shared\common\session</Filter>
     </QtMoc>
-      <Filter>include\shared\common\session</Filter>
+    <QtMoc Include="include\shared\common\Agent\ToolsFilter.h">
+      <Filter>include\shared\common\Agent</Filter>
     </QtMoc>
     <QtMoc Include="include\shared\common\settings\SettingsController.h">
       <Filter>include\shared\common\settings</Filter>

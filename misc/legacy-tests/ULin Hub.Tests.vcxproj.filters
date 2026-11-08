@@ -83,7 +83,7 @@
     <ClCompile Include="..\source\src\ExtensionSystem\ExtensionToolHost.cpp">
       <Filter>Source Files\ExtensionSystem</Filter>
     </ClCompile>
-    <ClCompile Include="..\source\src\network\DshEventParser.cpp">
+    <ClCompile Include="..\source\src\common\Agent\AgentEventParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\source\src\common\util\CodeHighlighter.cpp">

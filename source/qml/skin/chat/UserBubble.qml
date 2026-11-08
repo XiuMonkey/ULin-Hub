@@ -11,6 +11,43 @@ Item {
     readonly property string copyText: text
     property var images: []   // [{ id, mediaType }]，源由 Hub.attachmentSource 取
 
+    // Non-image files are appended to the prompt as "附件：\n- name (path)".
+    // The bubble shows the user text only; files get dedicated cards.
+    readonly property var attachmentParse: splitAttachmentText(text)
+    readonly property string displayText: attachmentParse.text
+    readonly property var files: attachmentParse.files
+
+    function splitAttachmentText(raw) {
+        var source = String(raw || "")
+        var marker = source.lastIndexOf("附件：\n")
+        if (marker < 0)
+            return { text: source, files: [] }
+        if (marker > 0 && source.slice(Math.max(0, marker - 2), marker) !== "\n\n")
+            return { text: source, files: [] }
+        var body = source.slice(marker + 4)
+        var lines = body.split("\n")
+        var parsed = []
+        for (var i = 0; i < lines.length; ++i) {
+            var line = lines[i]
+            if (line.length === 0)
+                continue
+            var match = line.match(/^- (.+?) \((.*)\)$/)
+            if (!match)
+                return { text: source, files: [] }
+            var path = match[2]
+            var dot = path.lastIndexOf(".")
+            var suffix = dot >= 0 ? path.slice(dot + 1).toLowerCase() : ""
+            parsed.push({ name: match[1], path: path, suffix: suffix })
+        }
+        if (parsed.length === 0)
+            return { text: source, files: [] }
+        return { text: source.slice(0, marker).replace(/\s+$/, ""), files: parsed }
+    }
+
+    function fileSuffixLabel(suffix) {
+        return String(suffix || "").length > 0 ? String(suffix).toUpperCase() : "FILE"
+    }
+
     function copyAll() {
         if (root.copyText.length === 0)
             return
@@ -19,9 +56,85 @@ Item {
         clipboardHelper.deselect()
     }
 
-    implicitHeight: bubble.implicitHeight + (imagesRow.visible ? imagesRow.height + 8 : 0)
+    implicitHeight: (bubble.visible ? bubble.implicitHeight : 0)
+        + (filesRow.visible ? filesRow.height + 8 : 0)
+        + (imagesRow.visible ? imagesRow.height + 8 : 0)
 
     // 图片贴在气泡上方（右对齐）；单图按原比例限制 240px 长边，多图用 120px 方图裁切。
+    Column {
+        id: filesRow
+        anchors.right: parent.right
+        anchors.bottom: imagesRow.top
+        anchors.bottomMargin: 8
+        spacing: 6
+        visible: root.files.length > 0
+        height: visible ? implicitHeight : 0
+
+        Repeater {
+            model: root.files
+            Rectangle {
+                required property var modelData
+                width: 286
+                height: 58
+                radius: Theme.radius.panel
+                color: Theme.color.cardBg
+                border.width: 0.5
+                border.color: Theme.color.border
+                clip: true
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 12
+                    spacing: 10
+
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 38
+                        height: 38
+                        radius: 10
+                        color: Theme.color.tagBg
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.fileSuffixLabel(modelData.suffix)
+                            color: Theme.color.accent
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: 8
+                            font.weight: Theme.font.weightBold
+                            elide: Text.ElideRight
+                            width: parent.width - 6
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - 50)
+                        spacing: 3
+
+                        Text {
+                            width: parent.width
+                            text: modelData.name
+                            color: Theme.color.textPrimary
+                            elide: Text.ElideMiddle
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                            font.weight: Theme.font.weightMedium
+                        }
+                        Text {
+                            width: parent.width
+                            text: modelData.path
+                            color: Theme.color.textTertiary
+                            elide: Text.ElideMiddle
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Row {
         id: imagesRow
         anchors.right: parent.right
@@ -68,8 +181,9 @@ Item {
         id: bubble
         anchors.bottom: parent.bottom
         anchors.right: parent.right
-        width: content.width + 2 * Theme.spacing.cardPadding
-        implicitHeight: content.contentHeight + 2 * Theme.spacing.buttonPadY
+        visible: root.displayText.length > 0
+        width: visible ? content.width + 2 * Theme.spacing.cardPadding : 0
+        implicitHeight: visible ? content.contentHeight + 2 * Theme.spacing.buttonPadY : 0
         radius: Theme.radius.panel
         color: Theme.color.userBubbleBg
 
@@ -77,7 +191,7 @@ Item {
         Text {
             id: measure
             visible: false
-            text: root.text
+            text: root.displayText
             textFormat: Text.MarkdownText
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body   // 与 Agent 正文同档
@@ -88,7 +202,7 @@ Item {
             anchors.centerIn: parent
             width: Math.min(measure.implicitWidth, Math.max(40, root.width * 0.72 - 2 * Theme.spacing.cardPadding))   // 长消息不铺满整行
             height: contentHeight
-            text: root.text
+            text: root.displayText
             textFormat: TextEdit.MarkdownText
             wrapMode: TextEdit.Wrap
             readOnly: true

@@ -2,7 +2,7 @@
 //
 // 旧壳是 Widgets 的 `ToolsFilterPopup` + `ToolsFilterDirectoryEntry`（source/src/ui/TopBar.cpp，已随旧壳删除）。
 // QML 侧的分工（2026-10-10 定）：
-//   · **后台与形状** 全在 C++ 的 `common/session/ToolsFilter`（数据层 + 摊平的行模型）——本文件只画；
+//   · **后台与形状** 全在 C++ 的 `common/Agent/ToolsFilter`（数据层 + 摊平的行模型）——本文件只画；
 //   · 勾选/开关都直接打到模型上（模型内部即时生效并自动 POST 写回，不需要"保存"按钮）。
 //
 // 行模型（ToolsFilter::roleNames）：

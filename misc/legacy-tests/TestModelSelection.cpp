@@ -6,7 +6,7 @@
 
 #include "TestModelSelection.h"
 
-#include "common/session/ModelSelectionService.h"
+#include "common/Agent/ModelSelectionService.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>

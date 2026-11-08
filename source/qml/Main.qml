@@ -101,8 +101,8 @@ Window {
 
             Rectangle {
                 anchors.fill: parent
-                color: "#FFFFFF"
-                opacity: 0.74
+                color: Theme.color.windowBg
+                opacity: 0.82
             }
 
             Column {
@@ -115,9 +115,9 @@ Window {
                     width: 64
                     height: 64
                     radius: 18
-                    color: "#F7F8FA"
+                    color: Theme.color.panelBg
                     border.width: 1
-                    border.color: "#D8DBE0"
+                    border.color: Theme.color.border
 
                     Image {
                         anchors.centerIn: parent
@@ -134,7 +134,7 @@ Window {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "松开以添加文件"
-                    color: "#0F1115"
+                    color: Theme.color.textPrimary
                     font.family: "Microsoft YaHei UI"
                     font.pixelSize: Theme.font.lead
                     font.weight: Theme.font.weightBold
@@ -143,7 +143,7 @@ Window {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "图片会内联显示，其他文件以附件卡片加入"
-                    color: "#61666B"
+                    color: Theme.color.textSecondary
                     font.family: "Microsoft YaHei UI"
                     font.pixelSize: Theme.font.caption
                 }

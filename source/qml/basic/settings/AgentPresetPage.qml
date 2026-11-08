@@ -9,6 +9,7 @@ Item {
     id: page
 
     property bool popupOpen: false
+    property bool masterPopupOpen: false
 
     Column {
         anchors.left: parent.left
@@ -25,6 +26,133 @@ Item {
             font.pixelSize: Theme.font.title
             font.weight: Theme.font.weightBold
             bottomPadding: 2
+        }
+
+        // ---- Master：当前 Agent 后端 ----
+        Text {
+            text: "Master"
+            color: Theme.color.textSecondary
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.caption
+        }
+
+        Text {
+            text: "当前 Agent 后端"
+            color: Theme.color.textSecondary
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.caption
+        }
+
+        Item {
+            width: Math.max(280, parent.width)
+            implicitHeight: page.masterPopupOpen ? 34 + masterPopup.implicitHeight + 4 : 34
+            z: 150
+
+            Rectangle {
+                id: masterButton
+                width: parent.width
+                height: 34
+                radius: Theme.radius.control
+                color: masterMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                border.width: 1
+                border.color: Theme.color.inputBorder
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.right: masterArrow.left
+                    anchors.leftMargin: Theme.spacing.fieldPadX
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Hub.settings.masterBackendName
+                    elide: Text.ElideRight
+                    color: Theme.color.textPrimary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.body
+                }
+
+                Text {
+                    id: masterArrow
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacing.fieldPadX
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "▾"
+                    color: Theme.color.textCaption
+                    font.pixelSize: Theme.font.caption
+                }
+
+                MouseArea {
+                    id: masterMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.masterPopupOpen = !page.masterPopupOpen
+                }
+            }
+
+            Rectangle {
+                id: masterPopup
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: masterButton.bottom
+                anchors.topMargin: 4
+                visible: page.masterPopupOpen
+                implicitHeight: Math.min(220, masterList.implicitHeight + 12)
+                radius: Theme.radius.control
+                color: Theme.color.menuBg
+                border.width: 1
+                border.color: Theme.color.menuBorder
+                clip: true
+                z: 160
+
+                ListView {
+                    id: masterList
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    model: Hub.settings.masterBackends
+                    implicitHeight: contentHeight
+                    spacing: 0
+                    clip: true
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: masterList.width
+                        height: 38
+                        radius: Theme.radius.small
+                        color: masterItemMouse.containsMouse ? Theme.color.activeBg : "transparent"
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.leftMargin: Theme.spacing.labelGap
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: modelData.name
+                            elide: Text.ElideRight
+                            color: Theme.color.textPrimary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.body
+                        }
+
+                        MouseArea {
+                            id: masterItemMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                page.masterPopupOpen = false
+                                Hub.beginMasterSwitch(modelData.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Text {
+            width: parent.width
+            text: "切换后会改用对应的 Agent 后端；目前仅内置 DSH。"
+            wrapMode: Text.WordWrap
+            color: Theme.color.textSecondary
+            font.family: "Microsoft YaHei UI"
+            font.pixelSize: Theme.font.caption
         }
 
         Text {

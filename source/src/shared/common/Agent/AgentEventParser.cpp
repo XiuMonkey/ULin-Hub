@@ -1,6 +1,6 @@
 // DSH Mux 流 JSON 解析接口实现；不依赖任何 UI 类，可单独复用。
 
-#include "network/DshEventParser.h"
+#include "common/Agent/AgentEventParser.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>

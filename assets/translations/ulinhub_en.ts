@@ -829,6 +829,9 @@ Click “New chat” above to start</translation>
     <message id="sessionBar_more">
         <translation>More</translation>
     </message>
+    <message id="sessionBar_extension_entry">
+        <translation>Extension</translation>
+    </message>
     <message id="sessionBar_archived">
         <translation>Archived sessions</translation>
     </message>
@@ -1115,6 +1118,78 @@ Click “New chat” above to start</translation>
     </message>
     <message id="plugin_approve_builds_done">
         <translation>Build scripts allowed. Please retry the install.</translation>
+    </message>
+    <message id="schedule_title">
+        <translation>Automation</translation>
+    </message>
+    <message id="schedule_subtitle">
+        <translation>Managed by the DSH Schedule service. Due tasks post a follow-up into the original session and survive restarts.</translation>
+    </message>
+    <message id="schedule_refresh">
+        <translation>Refresh</translation>
+    </message>
+    <message id="schedule_empty">
+        <translation>No automation tasks yet</translation>
+    </message>
+    <message id="schedule_empty_title">
+        <translation>No automation tasks yet</translation>
+    </message>
+    <message id="schedule_empty_hint">
+        <translation>Ask the agent to create one, e.g. “Remind me to check the build at 9:00 every day.”</translation>
+    </message>
+    <message id="schedule_create">
+        <translation>New task</translation>
+    </message>
+    <message id="schedule_create_hint">
+        <translation>There is no direct create RPC: “New task” opens a new session; describe the rule to the agent.</translation>
+    </message>
+    <message id="schedule_next">
+        <translation>Next run</translation>
+    </message>
+    <message id="schedule_prompt">
+        <translation>Reminder</translation>
+    </message>
+    <message id="schedule_session">
+        <translation>Session</translation>
+    </message>
+    <message id="schedule_last_delivery">
+        <translation>Last delivery</translation>
+    </message>
+    <message id="schedule_open_session">
+        <translation>Open session</translation>
+    </message>
+    <message id="schedule_delete">
+        <translation>Delete</translation>
+    </message>
+    <message id="schedule_confirm_delete">
+        <translation>Confirm delete</translation>
+    </message>
+    <message id="schedule_status_active">
+        <translation>Active</translation>
+    </message>
+    <message id="schedule_status_inactive">
+        <translation>Ended</translation>
+    </message>
+    <message id="schedule_loading">
+        <translation>Loading automation tasks…</translation>
+    </message>
+    <message id="schedule_load_failed">
+        <translation>Failed to load automation tasks</translation>
+    </message>
+    <message id="schedule_delete_failed">
+        <translation>Failed to delete the task</translation>
+    </message>
+    <message id="schedule_server_not_ready">
+        <translation>Server is not ready</translation>
+    </message>
+    <message id="schedule_untitled_session">
+        <translation>Untitled session</translation>
+    </message>
+    <message id="schedule_menu_hint">
+        <translation>Tasks that run automatically on schedule</translation>
+    </message>
+    <message id="chat_streaming_hint">
+        <translation>Researching…</translation>
     </message>
 </context>
 </TS>

@@ -12,7 +12,8 @@
 
 namespace
 {
-	const char* const kDirName = "ClientSetting";
+	const char* const kDirName = "data/client";
+	const char* const kLegacyDirName = "ClientSetting";
 	const char* const kDirEnvVar = "ULINHUB_CLIENT_SETTING_DIR";
 
 	const char* const kAppearanceFile = "AppearanceSetting.json";
@@ -36,6 +37,17 @@ QString ClientSettings::dir()
 		+ QLatin1Char('/') + QLatin1String(kDirName);
 }
 
+namespace
+{
+	QString legacyDir()
+	{
+		if (!qEnvironmentVariableIsEmpty("ULINHUB_CLIENT_SETTING_DIR"))
+			return QString();
+		return QCoreApplication::applicationDirPath()
+			+ QLatin1Char('/') + QLatin1String(kLegacyDirName);
+	}
+}
+
 QString ClientSettings::filePath(const QString& fileName)
 {
 	return dir() + QLatin1Char('/') + fileName;
@@ -43,7 +55,12 @@ QString ClientSettings::filePath(const QString& fileName)
 
 QJsonObject ClientSettings::read(const QString& fileName)
 {
-	const QString path = filePath(fileName);
+	QString path = filePath(fileName);
+	if (!QFile::exists(path)) {
+		const QString legacy = legacyDir();
+		if (!legacy.isEmpty())
+			path = legacy + QLatin1Char('/') + fileName;
+	}
 
 	QFile file(path);
 	if (!file.exists())

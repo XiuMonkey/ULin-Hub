@@ -21,6 +21,7 @@
         <file>basic/settings/AppearancePage.qml</file>
         <file>basic/settings/ModelListPage.qml</file>
         <file>basic/settings/ServerPage.qml</file>
+        <file>basic/schedule/SchedulePage.qml</file>
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
         <file>basic/browser/WebBrowserPanel.qml</file>
@@ -49,6 +50,7 @@
         <file>metrics.json</file>
         <file>pack.json</file>
         <file>skin/chat/AgentBubble.qml</file>
+        <file>skin/chat/CrawlMark.qml</file>
         <file>skin/chat/CodeBlock.qml</file>
         <!-- 正文由 C++ QTextDocument + 单个 MarkdownBody 承担 -->
         <file>skin/chat/Markdown/MarkdownBody.qml</file>

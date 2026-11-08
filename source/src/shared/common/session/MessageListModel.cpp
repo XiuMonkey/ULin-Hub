@@ -4,6 +4,8 @@
 
 #include "common/util/MarkdownSegmenter.h"
 
+#include <QFileInfo>
+
 namespace
 {
 	QString kindName(int kind)
@@ -63,6 +65,37 @@ int MessageListModel::appendUserWithImages(const QString& text, const QVector<Im
 int MessageListModel::appendUser(const QString& text) { return appendRow(User, text); }
 int MessageListModel::appendSystem(const QString& text) { return appendRow(System, text); }
 int MessageListModel::appendAgent() { return appendRow(Agent, QString()); }
+
+void MessageListModel::appendDeliverables(int row, const QVector<DeliverableRef>& files)
+{
+	if (row < 0 || row >= m_rows.size() || files.isEmpty())
+		return;
+	Row& target = m_rows[row];
+	bool changed = false;
+	for (const DeliverableRef& file : files) {
+		if (file.path.trimmed().isEmpty())
+			continue;
+		bool found = false;
+		for (DeliverableRef& existing : target.deliverables) {
+			if (existing.path == file.path) {
+				if (!file.description.isEmpty() && existing.description != file.description) {
+					existing.description = file.description;
+					changed = true;
+				}
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			target.deliverables.append(file);
+			changed = true;
+		}
+	}
+	if (changed) {
+		const QModelIndex idx = index(row, 0);
+		emit dataChanged(idx, idx, { DeliverablesRole });
+	}
+}
 
 // 上面三个的公共动作：占行号 → beginInsertRows → 追加 → endInsertRows → 报数
 int MessageListModel::appendRow(int kind, const QString& text)
@@ -249,6 +282,19 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 		}
 		return images;
 	}
+	case DeliverablesRole: {
+		QVariantList files;
+		for (const DeliverableRef& file : row.deliverables) {
+			const QFileInfo info(file.path);
+			QVariantMap map;
+			map.insert(QStringLiteral("path"), file.path);
+			map.insert(QStringLiteral("name"), info.fileName().isEmpty() ? file.path : info.fileName());
+			map.insert(QStringLiteral("suffix"), info.suffix().toLower());
+			map.insert(QStringLiteral("description"), file.description);
+			files.append(map);
+		}
+		return files;
+	}
 	case StreamingRole:
 		return row.streaming;
 	default:
@@ -264,5 +310,6 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	names.insert(ImagesRole, "images");
 	names.insert(SegmentsRole, "segments");
 	names.insert(StreamingRole, "streaming");
+	names.insert(DeliverablesRole, "deliverables");
 	return names;
 }

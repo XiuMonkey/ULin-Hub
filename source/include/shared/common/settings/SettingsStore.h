@@ -19,4 +19,5 @@ namespace SettingsStore
 
 	// 写入服务地址；传入空串表示删除该键（回到内置服务）
 	void setServerUrl(const QString& url);
+
 }

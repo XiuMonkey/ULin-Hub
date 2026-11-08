@@ -664,11 +664,24 @@ Item {
     }
 
     // 初始化中的遮罩：只提示状态，不挡住操作。
+    // 启动初始化 / Master 后端切换共用同一套遮罩。
+    // 初始化阶段只提示；Master 切换期间必须挡住操作，避免旧后端已停还继续发消息。
     Rectangle {
         anchors.fill: parent
-        visible: Hub.initializing
+        visible: Hub.initializing || Hub.masterSwitching
         color: Theme.color.overlayBg
-        z: 10
+        z: 80
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: Hub.masterSwitching
+            acceptedButtons: Qt.AllButtons
+            preventStealing: true
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: (event) => { event.accepted = true }
+            }
+        }
 
         Column {
             anchors.centerIn: parent
@@ -678,17 +691,17 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 32
                 height: 32
-                color: Theme.color.textOnAccent
-                // ⚠️ 必须门控 running：父级不可见时动画仍会持续标脏场景，导致空闲重绘。
-                running: Hub.initializing
-                visible: Hub.initializing
+                color: Theme.isDark ? Theme.color.textPrimary : Theme.color.textOnAccent
+                // 必须门控 running：父级不可见时动画仍在跑会持续标脏场景。
+                running: Hub.initializing || Hub.masterSwitching
+                visible: Hub.initializing || Hub.masterSwitching
             }
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: Math.min(760, Math.max(320, shell.width * 0.68))
-                text: Hub.statusText
-                color: Theme.color.textOnAccent
+                text: Hub.masterSwitching ? "正在切换 Agent 后端…" : Hub.statusText
+                color: Theme.isDark ? Theme.color.textPrimary : Theme.color.textOnAccent
                 font.family: "Microsoft YaHei UI"
                 font.pixelSize: Theme.font.body
                 horizontalAlignment: Text.AlignHCenter
@@ -772,5 +785,13 @@ Item {
             if (item && item.closeRequested)
                 item.closeRequested.connect(Hub.closeToolsFilter)
         }
+    }
+
+    // 自动化任务：侧栏底排时钟按钮打开，数据面是 Hub.schedule*。
+    PageOverlay {
+        anchors.fill: parent
+        z: 34
+        shown: Hub.scheduleOpen
+        source: Style.url("basic/schedule/SchedulePage.qml")
     }
 }

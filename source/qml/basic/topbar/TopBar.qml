@@ -1,6 +1,6 @@
 // 顶栏：两行 —— 上面「当前会话标题 + 右侧两颗图标按钮」，下面一排「对话 / 轨迹」视图胶囊。
 // 面板本体在 basic/chat/ToolsFilterPanel.qml（由 Shell.qml 按 Hub.toolsFilterOpen 装载），
-// 数据与形状全在 C++ 的 common/session/ToolsFilter 里 —— 这里只负责"点一下"。
+// 数据与形状全在 C++ 的 common/Agent/ToolsFilter 里 —— 这里只负责"点一下"。
 
 import QtQuick
 import ULinHub 1.0

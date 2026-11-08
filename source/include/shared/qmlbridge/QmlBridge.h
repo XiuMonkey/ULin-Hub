@@ -39,7 +39,7 @@ class QTimer;
 class ThemeController;
 class ToolsFilter;
 
-// Q_PROPERTY 里用的是 ToolsFilter*，但这里只前置声明（完整定义在 common/session/ToolsFilter.h）。
+// Q_PROPERTY 里用的是 ToolsFilter*，但这里只前置声明（完整定义在 common/Agent/ToolsFilter.h）。
 // 指针元类型指向未定义类型时必须显式声明成 opaque pointer，否则 moc 生成的元对象编不过
 // （qmetatype.h 的 static_assert：「Pointer Meta Types must either point to fully-defined types
 // or be declared with Q_DECLARE_OPAQUE_POINTER(T *)」）。
@@ -82,6 +82,8 @@ class QmlBridge : public QObject
 	// 当前工作区根目录（文件浏览面板用；空 = 未分组/未知）
 	Q_PROPERTY(QString currentWorkspacePath READ currentWorkspacePath NOTIFY currentSessionChanged)
 	Q_PROPERTY(bool initializing READ initializing NOTIFY initializingChanged)
+	// Master 后端切换中：Shell 用和启动时同一套遮罩盖住消息区，切换完成再撤。
+	Q_PROPERTY(bool masterSwitching READ masterSwitching NOTIFY masterSwitchingChanged)
 	// 已选中会话、首帧历史还没到：加载期间 QML 不显示任何空状态占位。
 	Q_PROPERTY(bool sessionLoading READ sessionLoading NOTIFY sessionLoadingChanged)
 	Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
@@ -96,7 +98,7 @@ class QmlBridge : public QObject
 	Q_PROPERTY(bool modelCatalogMissing READ modelCatalogMissing NOTIFY modelCatalogChanged)
 	// 主题切换的过渡卡片（原版 #themeSwitchBody：360×200 + spinner + theme_switching）
 	Q_PROPERTY(bool themeSwitching READ themeSwitching NOTIFY themeSwitchingChanged)
-	// 工具过滤器：模型（common/session/ToolsFilter）+ 面板开关。QML 用 Hub.toolsFilter.* 取数据、
+	// 工具过滤器：模型（common/Agent/ToolsFilter）+ 面板开关。QML 用 Hub.toolsFilter.* 取数据、
 	// 用 Hub.toolsFilterOpen 决定面板是否装载；面板里的关闭走 closeToolsFilter。
 	Q_PROPERTY(ToolsFilter* toolsFilter READ toolsFilter CONSTANT)
 	Q_PROPERTY(bool toolsFilterOpen READ toolsFilterOpen NOTIFY toolsFilterOpenChanged)
@@ -118,6 +120,11 @@ class QmlBridge : public QObject
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
 	Q_PROPERTY(int jobCount READ jobCount NOTIFY jobsChanged)
 	Q_PROPERTY(bool jobRunning READ jobRunning NOTIFY jobsChanged)
+	// 自动化任务（DSH Schedule）：整壳页的数据面；删除走 schedule/delete，打开原会话走 selectSession。
+	Q_PROPERTY(QVariantList scheduleTasks READ scheduleTasks NOTIFY scheduleChanged)
+	Q_PROPERTY(bool scheduleBusy READ scheduleBusy NOTIFY scheduleChanged)
+	Q_PROPERTY(QString scheduleStatus READ scheduleStatus NOTIFY scheduleChanged)
+	Q_PROPERTY(bool scheduleOpen READ scheduleOpen NOTIFY scheduleOpenChanged)
 
 public:
 	static QmlBridge& instance();  // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
@@ -170,6 +177,8 @@ public:
 	QString currentWorkspaceId() const;
 	QString currentWorkspacePath() const;
 	Q_INVOKABLE void selectSession(const QString& sessionId);
+	// Master 切换入口：先亮遮罩/清空前台，再把真正的后端切换推迟到下一拍事件循环。
+	Q_INVOKABLE void beginMasterSwitch(const QString& backendId);
 	Q_INVOKABLE void refreshSessions();
 	// 轻量：只刷 running（子代理页签/列表的"运行中"）。顶栏在打开「子智能体」下拉前调它，
 	// 保证看到的是当下的状态，而不是启动时那份 session.list 快照。
@@ -201,6 +210,7 @@ public:
 	Q_INVOKABLE void cancelPrompt();
 
 	bool initializing() const;
+	bool masterSwitching() const { return m_masterSwitching; }
 	bool sessionLoading() const;
 	QString statusText() const;
 	QString serverState() const;
@@ -210,6 +220,10 @@ public:
 	ToolsFilter* toolsFilter() const { return m_toolsFilter; }
 	bool toolsFilterOpen() const { return m_toolsFilterOpen; }
 	QVariantList skills() const { return m_skills; }
+	QVariantList scheduleTasks() const { return m_scheduleTasks; }
+	bool scheduleBusy() const { return m_scheduleBusy; }
+	QString scheduleStatus() const { return m_scheduleStatus; }
+	bool scheduleOpen() const { return m_scheduleOpen; }
 	bool skillsBusy() const { return m_skillsBusy; }
 	QString skillsStatus() const { return m_skillsStatus; }
 	bool panelBarOpen() const { return m_panelBarOpen; }
@@ -224,6 +238,14 @@ public:
 	int jobCount() const;
 	bool jobRunning() const;
 	// 顶栏 ☰：开着就收起，否则打开并拉一次该会话的工具目录
+	// 自动化任务（自动化任务页）：catalog 列出全部任务，delete 删除，open 到原会话。
+	Q_INVOKABLE void openSchedulePage();
+	Q_INVOKABLE void closeSchedulePage();
+	Q_INVOKABLE void refreshSchedules();
+	Q_INVOKABLE void deleteSchedule(const QString& id, const QString& sessionId);
+	Q_INVOKABLE void openScheduleSession(const QString& sessionId);
+	// 「新建任务」：打开一个新会话，由 Agent 用 schedule_create 建任务（服务端没有直接创建 RPC）。
+	Q_INVOKABLE void createScheduleSession();
 	Q_INVOKABLE void openToolsFilter();
 	Q_INVOKABLE void closeToolsFilter();
 	Q_INVOKABLE void refreshSkills(const QString& sessionId = QString());
@@ -257,6 +279,8 @@ public:
 signals:
 	void currentSessionChanged();
 	void initializingChanged();
+	void masterSwitchingChanged();
+	void masterSwitchFinished(const QString& name);
 	void sessionLoadingChanged();
 	void statusTextChanged();
 	void serverStateChanged();
@@ -278,6 +302,8 @@ signals:
 	void peerTabsChanged();
 	// 后台任务名册变化（整表替换）
 	void jobsChanged();
+	void scheduleChanged();
+	void scheduleOpenChanged();
 	void interactionChanged();
 	void answerSelectionsChanged();
 	void olderChanged();
@@ -297,6 +323,10 @@ private:
 	// 接线：把 core 与业务层的信号接到本类/QML 面（init 里调用；只做 connect，不做业务）
 	void wireRuntime();
 	void wireChat();
+	void clearConversationView();
+	void setMasterSwitching(bool switching);
+	void finishMasterSwitch(bool success);
+	void beginMasterSwitchVisual(const QString& backendId);
 
 	// 当前会话 → 页签组根（父目录后到时把组从"子代理自己"纠正回真正的父会话）。
 	// 只改 m_peerRootId，不发信号（调用方照旧 emit peerTabsChanged，避免同一次刷新发两遍）。
@@ -325,6 +355,9 @@ private:
 	CommandController* m_commands = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	QString m_permissionPreset;   // 当前会话权限预设；空 = 还没读到投影
+	bool m_masterSwitching = false;
+	QString m_masterSwitchTarget;
+	QTimer* m_masterSwitchTimeout = nullptr;
 	// 页签组的"主会话"（纯界面状态）：当前会话是某会话的子代理时，它指向父会话；否则就是当前会话。
 	// 顶栏把父标题画成第一颗页签；**只有当前会话是子代理时**才画第二颗（当前子代理），
 	// 这样"父 ↔ 子"可来回切；父会话本身只显示一颗标题。
@@ -334,4 +367,10 @@ private:
 	bool m_skillsBusy = false;
 	QString m_skillsStatus;
 	bool m_panelBarOpen = false;  // 纯界面状态：右侧栏是否展开（不落盘，暂不跨会话记忆）
+	// 自动化任务页：目录快照 + 页面开合（纯界面状态）
+	QVariantList m_scheduleTasks;
+	bool m_scheduleBusy = false;
+	QString m_scheduleStatus;
+	bool m_scheduleOpen = false;
+	bool m_pendingScheduleSessionSelect = false;   // 「新建任务」创建成功后切到新会话
 };

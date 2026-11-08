@@ -147,7 +147,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\session\MessageListModel.cpp" />
     <ClCompile Include="src\shared\common\session\TraceModel.cpp" />
     <ClCompile Include="src\shared\common\session\ChatController.cpp" />
-    <ClCompile Include="src\shared\common\session\ToolsFilter.cpp" />
+    <ClCompile Include="src\shared\common\Agent\ToolsFilter.cpp" />
     <ClCompile Include="src\shared\common\util\MarkdownSegmenter.cpp" />
     <ClCompile Include="src\shared\common\settings\SettingsController.cpp" />
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketController.cpp" />
@@ -230,7 +230,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <QtMoc Include="include\windows-64\core\ServerManager.h" />
     <QtMoc Include="include\windows-64\core\ClientRuntime.h" />
     <ClCompile Include="src\shared\network\DshApiClient.cpp" />
-    <ClCompile Include="src\shared\network\DshEventParser.cpp" />
+    <ClCompile Include="src\shared\common\Agent\AgentEventParser.cpp" />
     <ClCompile Include="src\windows-64\core\ServerManager.cpp" />
     <ClCompile Include="src\windows-64\core\ClientRuntime.cpp" />
     <ClCompile Include="src\windows-64\core\main.cpp" />
@@ -242,11 +242,13 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\session\SessionService.cpp" />
     <ClCompile Include="src\shared\common\settings\SettingsStore.cpp" />
     <ClCompile Include="src\shared\common\settings\ClientSettings.cpp" />
-    <ClCompile Include="src\shared\common\session\AgentPresetService.cpp" />
+    <ClCompile Include="src\shared\common\Agent\AgentPresetService.cpp" />
+    <ClCompile Include="src\shared\common\Agent\AgentManager.cpp" />
+    <ClCompile Include="src\shared\common\Agent\AgentSessionClient.cpp" />
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketClient.cpp" />
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketModel.cpp" />
     <ClCompile Include="src\shared\common\PluginMarket\PluginMarketInstaller.cpp" />
-    <ClCompile Include="src\shared\common\session\ModelSelectionService.cpp" />
+    <ClCompile Include="src\shared\common\Agent\ModelSelectionService.cpp" />
     <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp" />
     <ClCompile Include="src\shared\network\SessionPrefetcher.cpp" />
     <ClCompile Include="src\shared\common\appearance\ThemeManager.cpp" />
@@ -280,7 +282,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="include\shared\common\util\ConnectionManager.h" />
-    <ClInclude Include="include\shared\network\DshEventParser.h" />
+    <ClInclude Include="include\shared\common\Agent\AgentEventParser.h" />
     <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionLoader.h" />
     <ClInclude Include="include\windows-64\ExtensionSystem\DllCaller.h" />
     <ClInclude Include="include\windows-64\ExtensionSystem\ComCaller.h" />
@@ -303,9 +305,11 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClInclude Include="include\shared\common\session\SessionService.h" />
     <ClInclude Include="include\shared\common\settings\SettingsStore.h" />
     <ClInclude Include="include\shared\common\settings\ClientSettings.h" />
-    <ClInclude Include="include\shared\common\session\AgentPresetService.h" />
+    <ClInclude Include="include\shared\common\Agent\AgentPresetService.h" />
+    <QtMoc Include="include\shared\common\Agent\AgentSessionClient.h" />
+    <QtMoc Include="include\shared\common\Agent\AgentManager.h" />
     <ClInclude Include="include\shared\common\PluginMarket\PluginMarketModel.h" />
-    <ClInclude Include="include\shared\common\session\ModelSelectionService.h" />
+    <ClInclude Include="include\shared\common\Agent\ModelSelectionService.h" />
     <QtMoc Include="include\shared\common\appearance\ThemeManager.h" />
     <QtMoc Include="include\shared\common\appearance\TranslationManager.h" />
     <!-- QML 壳的窗口桥与 token：QML 单例注册要 moc -->
@@ -318,7 +322,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <QtMoc Include="include\shared\common\session\MessageListModel.h" />
     <QtMoc Include="include\shared\common\session\TraceModel.h" />
     <QtMoc Include="include\shared\common\session\ChatController.h" />
-    <QtMoc Include="include\shared\common\session\ToolsFilter.h" />
+    <QtMoc Include="include\shared\common\Agent\ToolsFilter.h" />
     <QtMoc Include="include\shared\common\settings\SettingsController.h" />
     <QtMoc Include="include\shared\common\PluginMarket\PluginMarketController.h" />
     <QtMoc Include="include\shared\common\session\CommandController.h" />

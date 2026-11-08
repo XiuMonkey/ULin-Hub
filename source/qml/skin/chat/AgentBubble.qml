@@ -14,6 +14,15 @@ Item {
 
     property var segments: []
     property bool streaming: false
+    // 只在“研究”阶段（最后一块是 thinking/tool 组成的过程块）显示爬行提示；
+    // 一旦开始输出正文（最后一块是 reply），提示直接收起，不做动画。
+    readonly property bool showStreamingHint: {
+        if (!root.streaming)
+            return false
+        var bs = root.blocks
+        return bs.length > 0 && bs[bs.length - 1].kind === "process"
+    }
+    property var deliverables: []
 
     // 复制全文优先取 reply 段，没有 reply 时退回所有段；原生拖选无法跨多个 TextEdit。
     readonly property string copyText: {
@@ -43,7 +52,7 @@ Item {
     // 宿主没有该属性（独立使用或旧风格包）时视为 false。
     property bool widthAnimating: parent ? parent.widthAnimating === true : false
 
-    implicitHeight: bubble.implicitHeight
+    implicitHeight: bubble.implicitHeight + (root.showStreamingHint ? 29 : 0)
 
     // 展开态必须外提：Repeater 在 segments 变化时会重建全部 delegate，存在 Collapsible 内部会被
     // 下一个流式 chunk 冲掉。Collapsible 走受控模式；key 约定为成员 `type:toolName:index`、
@@ -326,7 +335,10 @@ Item {
                                     TextEdit {
                                         objectName: "bubbleText"
                                         width: parent.width
-                                        height: contentHeight
+                                        height: Math.ceil(contentHeight)
+                                        // TextEdit 不自动裁切：流式追加时 contentHeight 可能晚一帧，
+                                        // 不裁会把命令正文画到下一段"思考"/工具行上。
+                                        clip: true
                                         text: member.expanded
                                             ? (member.seg ? member.seg.text : "")
                                             : ""
@@ -383,6 +395,74 @@ Item {
                         }
                     }
                 }
+            }
+
+            DeliverablesView {
+                width: inner.width
+                items: root.deliverables
+            }
+        }
+    }
+
+    // 流式提示：气泡下方一条极淡的分隔线 + 爬行标记 + 文案；
+    // 只在最后一条 agent 消息的 streaming 期间显示，结束后高度收起。
+    Rectangle {
+        id: streamDivider
+        visible: root.showStreamingHint
+        anchors.top: bubble.bottom
+        anchors.left: bubble.left
+        width: bubble.width
+        height: 1
+        color: Theme.color.border
+        opacity: 0.7
+    }
+
+    Item {
+        id: streamingHint
+        visible: root.showStreamingHint
+        anchors.top: streamDivider.bottom
+        anchors.left: bubble.left
+        anchors.leftMargin: Theme.spacing.cardPadding
+        width: Math.max(0, bubble.width - 2 * Theme.spacing.cardPadding)
+        height: 24
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            CrawlMark {
+                width: 20
+                height: 16
+                running: streamingHint.visible
+            }
+
+            Text {
+                id: streamingText
+                text: qsTrId("chat_streaming_hint")
+                color: Theme.color.textPrimary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.caption
+            }
+        }
+
+        SequentialAnimation {
+            running: streamingHint.visible
+            loops: Animation.Infinite
+            NumberAnimation {
+                target: streamingText
+                property: "opacity"
+                from: 0.45
+                to: 0.9
+                duration: 900
+                easing.type: Easing.InOutSine
+            }
+            NumberAnimation {
+                target: streamingText
+                property: "opacity"
+                from: 0.9
+                to: 0.45
+                duration: 900
+                easing.type: Easing.InOutSine
             }
         }
     }

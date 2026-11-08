@@ -1,10 +1,11 @@
 // 见 ChatController.h：事件流 -> 消息模型。
 #include "common/session/ChatController.h"
 #include "common/session/MessageListModel.h"
+#include "common/Agent/AgentSessionClient.h"
 #include "common/session/TraceModel.h"
 
 #include "network/DshApiClient.h"
-#include "network/DshEventParser.h"
+#include "common/Agent/AgentEventParser.h"
 #include "network/SessionCommands.h"
 
 #include <QCoreApplication>
@@ -149,9 +150,10 @@ namespace
 	}
 }
 
-ChatController::ChatController(DshApiClient* api, QObject* parent)
+ChatController::ChatController(DshApiClient* api, AgentSessionClient* agentSession, QObject* parent)
 	: QObject(parent)
 	, m_api(api)
+	, m_agentSession(agentSession)
 	, m_messages(new MessageListModel(this))
 	, m_trace(new TraceModel(this))
 {
@@ -243,6 +245,30 @@ QVector<MessageListModel::ImageRef> imagesFromContent(const QJsonObject& event)
 QVector<MessageListModel::ImageRef> ChatController::extractEventImages(const QJsonObject& event)
 {
 	return imagesFromContent(event);
+}
+
+QVector<MessageListModel::DeliverableRef> ChatController::extractEventDeliverables(const QJsonObject& event)
+{
+	QVector<MessageListModel::DeliverableRef> files;
+	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
+	const QJsonArray array = data.value(QStringLiteral("files")).toArray();
+	for (const QJsonValue& value : array) {
+		const QJsonObject object = value.toObject();
+		MessageListModel::DeliverableRef file;
+		file.path = object.value(QStringLiteral("path")).toString().trimmed();
+		file.description = object.value(QStringLiteral("description")).toString().trimmed();
+		if (!file.path.isEmpty())
+			files.append(file);
+	}
+	return files;
+}
+
+void ChatController::applyDeliverablesEvent(const QJsonObject& event)
+{
+	const QVector<MessageListModel::DeliverableRef> files = extractEventDeliverables(event);
+	if (files.isEmpty() || !m_messages)
+		return;
+	m_messages->appendDeliverables(agentRowForTurn(), files);
 }
 
 namespace {
@@ -706,10 +732,10 @@ void ChatController::connectApi()
 	m_connected = true;
 
 	// follow 首帧快照（session/follow）与 mux 帧：本类的事件入口
-	connect(m_api, &DshApiClient::sessionSnapshotReady, this, &ChatController::onFollowSnapshot);
-	connect(m_api, &DshApiClient::muxFrameReceived, this, &ChatController::onMuxFrame);
-	// 后台任务名册（job/list 流，随 follow 会话开关；见 DshApiClient 第六条逻辑流）
-	connect(m_api, &DshApiClient::jobRosterReady, this, &ChatController::onJobRoster);
+	connect(m_agentSession, &AgentSessionClient::sessionSnapshotReady, this, &ChatController::onFollowSnapshot);
+	connect(m_agentSession, &AgentSessionClient::muxFrameReceived, this, &ChatController::onMuxFrame);
+	// 后台任务名册（job/list 流，随 follow 会话开关；见 AgentSessionClient）
+	connect(m_agentSession, &AgentSessionClient::jobRosterReady, this, &ChatController::onJobRoster);
 
 	// 快照里带一份全量投影（含 sessionStats / tokenUsage）——小灰字统计行的数据源；
 	// 只认当前会话（迟到的帧直接丢）。
@@ -776,7 +802,7 @@ void ChatController::loadOlder()
 	m_loadingOlder = true;
 	emit olderChanged();
 
-	m_api->pageSession(m_sessionId, m_cursor, 200, beforeSeq,
+	m_agentSession->pageSession(m_sessionId, m_cursor, 200, beforeSeq,
 		[this](const QJsonObject& page) {
 			m_loadingOlder = false;
 
@@ -914,6 +940,11 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 
 	// 斜杠命令的结果。命令**不进模型历史**：引擎只在会话日志里追加 command/run + command/done，
 	// 这里把它渲染成一条系统提示行。
+	if (type == QStringLiteral("deliverables/presented")) {
+		applyDeliverablesEvent(event);
+		return;
+	}
+
 	if (type == QStringLiteral("command/done")) {
 		const QJsonObject data = event.value(QStringLiteral("data")).toObject();
 		const QString text = data.value(QStringLiteral("text")).toString();
@@ -1253,6 +1284,11 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			m_turnHadOutput = true;
 			setStreaming(true);
 		}
+		return;
+	}
+
+	if (type == QStringLiteral("deliverables/presented")) {
+		applyDeliverablesEvent(event);
 		return;
 	}
 

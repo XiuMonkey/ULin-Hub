@@ -18,7 +18,7 @@ namespace ClientInfo
 	// 客户端版本：与发布包名（如 "ULin-Hub-Alpha-0.1.0b"）对得上。
 	// main.cpp 里会 QCoreApplication::setApplicationVersion(kVersion)，
 	// 之后日志、关于页、helpdesk 对版本都从 applicationVersion 统一取，不再各处手抄。
-	inline constexpr auto kVersion = "alpha-0.1.1c";
+	inline constexpr auto kVersion = "alpha-0.1.2a";
 
 	// QML 风格包（= 界面树）与宿主之间的**契约版本**。
 	// pack.json 的 uiAbi / 扩展 info.json5 的 ABIVersion 都对着它比。

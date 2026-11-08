@@ -829,6 +829,9 @@
     <message id="sessionBar_more">
         <translation>更多</translation>
     </message>
+    <message id="sessionBar_extension_entry">
+        <translation>扩展入口</translation>
+    </message>
     <message id="sessionBar_archived">
         <translation>已归档会话</translation>
     </message>
@@ -1115,6 +1118,78 @@
     </message>
     <message id="plugin_approve_builds_done">
         <translation>已允许构建脚本，请重试安装。</translation>
+    </message>
+    <message id="schedule_title">
+        <translation>自动化任务</translation>
+    </message>
+    <message id="schedule_subtitle">
+        <translation>由 DSH Schedule 托管：到点会在原会话里追加上下文消息，重启后仍然有效。</translation>
+    </message>
+    <message id="schedule_refresh">
+        <translation>刷新</translation>
+    </message>
+    <message id="schedule_empty">
+        <translation>还没有自动化任务</translation>
+    </message>
+    <message id="schedule_empty_title">
+        <translation>还没有自动化任务</translation>
+    </message>
+    <message id="schedule_empty_hint">
+        <translation>可以让 Agent 创建，例如「每天 9 点提醒我检查构建」。</translation>
+    </message>
+    <message id="schedule_create">
+        <translation>新建任务</translation>
+    </message>
+    <message id="schedule_create_hint">
+        <translation>服务端没有直接创建的接口：点「新建任务」会打开一个新会话，把规则告诉 Agent 即可。</translation>
+    </message>
+    <message id="schedule_next">
+        <translation>下次运行</translation>
+    </message>
+    <message id="schedule_prompt">
+        <translation>提醒内容</translation>
+    </message>
+    <message id="schedule_session">
+        <translation>原会话</translation>
+    </message>
+    <message id="schedule_last_delivery">
+        <translation>最近投递</translation>
+    </message>
+    <message id="schedule_open_session">
+        <translation>打开原会话</translation>
+    </message>
+    <message id="schedule_delete">
+        <translation>删除</translation>
+    </message>
+    <message id="schedule_confirm_delete">
+        <translation>确认删除</translation>
+    </message>
+    <message id="schedule_status_active">
+        <translation>启用中</translation>
+    </message>
+    <message id="schedule_status_inactive">
+        <translation>已结束</translation>
+    </message>
+    <message id="schedule_loading">
+        <translation>正在加载自动化任务…</translation>
+    </message>
+    <message id="schedule_load_failed">
+        <translation>自动化任务加载失败</translation>
+    </message>
+    <message id="schedule_delete_failed">
+        <translation>删除失败</translation>
+    </message>
+    <message id="schedule_server_not_ready">
+        <translation>服务端还没就绪</translation>
+    </message>
+    <message id="schedule_untitled_session">
+        <translation>未命名会话</translation>
+    </message>
+    <message id="schedule_menu_hint">
+        <translation>到点自动执行的任务</translation>
+    </message>
+    <message id="chat_streaming_hint">
+        <translation>正在研究…</translation>
     </message>
 </context>
 </TS>

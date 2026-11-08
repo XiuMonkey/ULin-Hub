@@ -2,7 +2,7 @@
 
 // 客户端扩展：装进本进程、在 GUI 线程直接操作宿主界面的 QPlugin DLL（落在 <exe>/clientExtensions/，登记在本模块自己的列表里）。
 // 与「工具扩展」（DllCaller 那条线）不是一套东西，只是都用 .ext 交付；分流在 ExtensionLoader::loadAndInstall 按身份文件（info.json5）的 Type 做。
-// 装载与 attach 必须在 GUI 线程：插件在 attachHost 里要查注册表、往宿主控件树挂控件（见 ExtensionSystem/DshHostPlugin.h）。
+// 装载与 attach 必须在 GUI 线程：插件在 attachHost 里要查注册表、往宿主控件树挂控件（见 VirtualClass/VirtualPlugin.h）。
 
 #include <QString>
 #include <QStringList>

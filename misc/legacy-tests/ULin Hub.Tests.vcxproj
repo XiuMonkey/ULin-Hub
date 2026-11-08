@@ -143,7 +143,7 @@
     <ClCompile Include="..\source\src\ExtensionSystem\ClientExtension.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\DshNamedPipeBridge.cpp" />
     <ClCompile Include="..\source\src\ExtensionSystem\ExtensionToolHost.cpp" />
-    <ClCompile Include="..\source\src\network\DshEventParser.cpp" />
+    <ClCompile Include="..\source\src\common\Agent\AgentEventParser.cpp" />
     <ClCompile Include="..\source\src\common\util\CodeHighlighter.cpp" />
     <ClCompile Include="..\source\src\common\util\MarkdownPreprocess.cpp" />
     <ClCompile Include="..\source\src\common\session\SessionCatalog.cpp" />

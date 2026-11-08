@@ -52,6 +52,11 @@ Item {
         function onOperationFailed(message) {
             sessionBar.notify(message)
         }
+
+        function onMasterSwitchFinished(name) {
+            if (name)
+                sessionBar.notify("已切换到 " + name)
+        }
     }
 
     signal openSettingsRequested()
@@ -374,6 +379,7 @@ Item {
         anchors.bottom: parent.bottom
         busy: Hub.initializing
         accountInitial: qsTrId("sessionBar_account_initial")
+        onScheduleRequested: Hub.openSchedulePage()
         onSettingsRequested: sessionBar.openSettingsRequested()
         onPluginsRequested: sessionBar.openPluginMarketRequested()
         onThemeRequested: Hub.toggleTheme()

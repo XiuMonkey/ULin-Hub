@@ -67,6 +67,23 @@ Item {
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body           // 原版 font-size: 13px
 
+            // Basic 风格的 ComboBox 内容项默认吃 QPalette；深色主题下会变成黑字。
+            // 内容项与 palette 都钉在主题 token 上。
+            palette.windowText: Theme.color.textPrimary
+            palette.text: Theme.color.textPrimary
+            palette.buttonText: Theme.color.textPrimary
+
+            contentItem: Text {
+                leftPadding: 10
+                rightPadding: 30
+                text: languageCombo.displayText
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+                color: Theme.color.textPrimary
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.body
+            }
+
             Component.onCompleted: syncFromSettings()   // 选中项跟随已保存的语言（空串 = 跟随系统）
             Connections {   // 页内同步，不登记（登记等于把 id 暴露成可被接管的目标）
                 target: Hub.settings
@@ -189,7 +206,9 @@ Item {
         ActionButton {
             width: parent.width
             text: qsTrId("settings_reset_styles")
-            variant: "primary"
+            // 设置页的重置不是全局主操作：用 elevated 中性面，避免 dark 主题下
+            // primary（近白面）在深色设置页里像一块游离的白色按钮。
+            variant: "elevated"
             onClicked: Hub.settings.resetStyles()
         }
     }

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ULin 品牌标记 · 爬行版（由 ulin-hub-mark.svg 派生，几何与原标记完全一致）。
+     把标记当成一只带前足的动物：右端那根 35.6° 斜切的三段甲片柱是它的前足，
+     其余部分是躯体，左端那根竖立的甲片柱是后柱。步态 = 前足抬足 → 前探 → 脚跟落地 →
+     踩平 → 滚到爪尖蹬地；同时后柱反相倾仰，躯体随之一伸一缩；
+     地面斜刻痕反向滚动表示身体在前进。
+     纯 SVG + SMIL，无脚本，放进 <img> 也会动。单色：改 svg 的 color 即可。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-18 -11 186 153" width="620" height="510"
+     role="img" aria-label="ULin 标记像有前后足的动物一样交替迈足向前爬行">
+  <title>ULin · 爬行</title>
+  <desc>ULin 标记以斜切甲片构成的前足抬起、前探、脚跟落地、踩平、爪尖蹬地；后柱反相倾仰配合，地面斜刻痕反向滚动，表现向前爬行。</desc>
+
+  <defs>
+    <clipPath id="groundClamp">
+      <rect x="-60" y="-60" width="340" height="181"/>
+    </clipPath>
+    <g id="tile" fill="none" stroke="currentColor" stroke-opacity=".16"
+       stroke-width=".95" stroke-linecap="butt">
+      <path d="M6 120.6 L9.6 125.4"/>
+      <path d="M17.4 121.5 L19.6 124.6"/>
+      <path d="M30 120.4 L34.4 126.7"/>
+      <path d="M41.2 121.7 L43.4 124.8"/>
+      <path d="M54 120.8 L57.2 125"/>
+      <rect x="24.2" y="128.4" width="1.7" height="1.7" fill="currentColor" stroke="none"/>
+      <rect x="47.8" y="127.4" width="1.3" height="1.3" fill="currentColor" stroke="none"/>
+    </g>
+  </defs>
+
+  <!-- 地面：细基准线 + 左移的斜刻痕（= 前进）。画在动物之前，爪尖压在上面。 -->
+  <g aria-hidden="true">
+    <line x1="-60" y1="117.35" x2="260" y2="117.35"
+          stroke="currentColor" stroke-opacity=".11" stroke-width=".8"/>
+    <g>
+      <animateTransform attributeName="transform" type="translate" calcMode="linear"
+        dur="2.05s" repeatCount="indefinite" values="0 0;-60 0"/>
+      <use href="#tile" x="-60"/>
+      <use href="#tile"/>
+      <use href="#tile" x="60"/>
+      <use href="#tile" x="120"/>
+      <use href="#tile" x="180"/>
+      <use href="#tile" x="240"/>
+    </g>
+  </g>
+
+  <!-- 动物本体。每个自由度一层 <g>，不用 additive="sum"（Chrome 里会失效）。 -->
+  <g clip-path="url(#groundClamp)">
+    <g>
+      <animateTransform attributeName="transform" type="translate" calcMode="linear"
+        dur="1.9s" repeatCount="indefinite" values="0 1.1;0 0.8;0 0.55;0 0.32;0 0.14;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0.06;0 0.16;0 0.25;0 0.29;0 0.57;0 0.76;0 1.1"/>
+      <g>
+        <animateTransform attributeName="transform" type="rotate" calcMode="linear"
+          dur="1.9s" repeatCount="indefinite" values="1.45 116 117;1.35 116 117;1.12 116 117;0.84 116 117;0.59 116 117;0.45 116 117;0.42 116 117;0.29 116 117;0.1 116 117;-0.13 116 117;-0.37 116 117;-0.59 116 117;-0.77 116 117;-0.88 116 117;-0.9 116 117;-0.88 116 117;-0.84 116 117;-0.79 116 117;-0.72 116 117;-0.66 116 117;-0.6 116 117;-0.55 116 117;-0.52 116 117;-0.5 116 117;-0.47 116 117;-0.37 116 117;-0.24 116 117;-0.08 116 117;0.05 116 117;0.13 116 117;0.16 116 117;0.24 116 117;0.37 116 117;0.53 116 117;0.69 116 117;0.8 116 117;0.85 116 117;0.94 116 117;1.15 116 117;1.36 116 117;1.45 116 117"/>
+        <g fill="currentColor">
+          <path d="M116 63.03 L136 48.73 L136 39 L116 39 L97 39 L78 39 L78 59 L78 97 L58 97 L58 39 L39 39 L39 97 L20 97 L20 91.23 L0 105.53 L0 117 L20 117 L39 117 L58 117 L78 117 L97 117 L97 97 L97 59 L116 59 L116 63.03 Z"/>
+        </g>
+        <!-- 后柱：左端那三根斜切甲片绕底端斜缝（踝）摆动 + 竖向抬落。
+             与前足反相：前足前探到底时后柱后仰、整段被拉长；前足拉回时后柱前倾、压紧。
+             三块甲片必须整组动 —— 各自错位会把 11 宽的等距白缝拉成碎块。 -->
+        <g fill="currentColor">
+          <animateTransform attributeName="transform" type="translate" calcMode="linear"
+            dur="1.9s" repeatCount="indefinite" values="0 -1.55;0 -1.59;0 -1.6;0 -1.56;0 -1.49;0 -1.38;0 -1.23;0 -1.06;0 -0.86;0 -0.64;0 -0.4;0 -0.15;0 0.1;0 0.35;0 0.59;0 0.81;0 1.02;0 1.2;0 1.35;0 1.47;0 1.55;0 1.59;0 1.6;0 1.56;0 1.49;0 1.38;0 1.23;0 1.06;0 0.86;0 0.64;0 0.4;0 0.15;0 -0.1;0 -0.35;0 -0.59;0 -0.81;0 -1.02;0 -1.2;0 -1.35;0 -1.47;0 -1.55"/>
+          <g>
+          <animateTransform attributeName="transform" type="rotate" calcMode="linear"
+            dur="1.9s" repeatCount="indefinite" values="-8.72 10 92.85;-8.96 10 92.85;-8.98 10 92.85;-8.78 10 92.85;-8.37 10 92.85;-7.75 10 92.85;-6.93 10 92.85;-5.95 10 92.85;-4.82 10 92.85;-3.57 10 92.85;-2.24 10 92.85;-0.85 10 92.85;0.57 10 92.85;1.96 10 92.85;3.31 10 92.85;4.58 10 92.85;5.74 10 92.85;6.75 10 92.85;7.6 10 92.85;8.26 10 92.85;8.72 10 92.85;8.96 10 92.85;8.98 10 92.85;8.78 10 92.85;8.37 10 92.85;7.75 10 92.85;6.93 10 92.85;5.95 10 92.85;4.82 10 92.85;3.57 10 92.85;2.24 10 92.85;0.85 10 92.85;-0.57 10 92.85;-1.96 10 92.85;-3.31 10 92.85;-4.58 10 92.85;-5.74 10 92.85;-6.75 10 92.85;-7.6 10 92.85;-8.26 10 92.85;-8.72 10 92.85"/>
+          <path d="M20 73.23 L0 87.53 L0 94.47 L20 80.17 Z"/>
+          <path d="M20 55.23 L0 69.53 L0 76.47 L20 62.17 Z"/>
+          <path d="M20 39 L0 39 L0 58.47 L20 44.17 Z"/>
+          </g>
+        </g>
+        <!-- 头顶方块：比躯体慢半拍，像有惯性的触角 / 眼点 -->
+        <g fill="currentColor">
+          <animateTransform attributeName="transform" type="translate" calcMode="linear"
+            dur="1.9s" repeatCount="indefinite" values="0 -1.43;0 -1.48;0 -1.5;0 -1.48;0 -1.43;0 -1.34;0 -1.21;0 -1.06;0 -0.88;0 -0.68;0 -0.46;0 -0.23;0 0;0 0.23;0 0.46;0 0.68;0 0.88;0 1.06;0 1.21;0 1.34;0 1.43;0 1.48;0 1.5;0 1.48;0 1.43;0 1.34;0 1.21;0 1.06;0 0.88;0 0.68;0 0.46;0 0.23;0 0;0 -0.23;0 -0.46;0 -0.68;0 -0.88;0 -1.06;0 -1.21;0 -1.34;0 -1.43"/>
+          <path d="M78 0 L97 0 L97 20 L78 20 Z"/>
+        </g>
+        <!-- 前足：三段甲片整根摆动，+ 摆动期整体抬升 -->
+        <g>
+          <animateTransform attributeName="transform" type="translate" calcMode="linear"
+            dur="1.9s" repeatCount="indefinite" values="0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 0;0 -0.82;0 -1.25;0 -1.69;0 -2.21;0 -2.4;0 -2.4;0 -2.4;0 -2.4;0 -2.4;0 -2.29;0 -1.89;0 -1.45;0 -1.2;0 -0.81;0 -0.23;0 0"/>
+          <g fill="currentColor">
+            <animateTransform attributeName="transform" type="rotate" calcMode="linear"
+              dur="1.9s" repeatCount="indefinite" values="-18 121 63;-16.5 121 63;-15 121 63;-13.5 121 63;-12 121 63;-10.5 121 63;-9 121 63;-7.5 121 63;-6 121 63;-4.5 121 63;-3 121 63;-1.5 121 63;0 121 63;1.5 121 63;3 121 63;4.5 121 63;6 121 63;7.5 121 63;9 121 63;10.5 121 63;12 121 63;13.5 121 63;15 121 63;16.5 121 63;18 121 63;12.16 121 63;6.95 121 63;0.67 121 63;-9.23 121 63;-13.18 121 63;-17.89 121 63;-24.17 121 63;-26.07 121 63;-26.88 121 63;-27.8 121 63;-27.65 121 63;-25.52 121 63;-24.45 121 63;-23.33 121 63;-22.45 121 63;-18 121 63"/>
+            <path d="M116 80.03 L136 65.73 L136 59.79 L116 74.09 Z"/>
+            <path d="M116 96.53 L136 82.23 L136 76.79 L116 91.09 Z"/>
+            <path d="M116 117 L136 117 L136 93.29 L116 107.59 Z"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- 落足扬尘 -->
+  <g aria-hidden="true">
+    <circle cx="130" cy="115.2" r="0.8" fill="currentColor"
+            fill-opacity=".5" opacity="0">
+      <animate attributeName="opacity" values="0;.5;0;0" keyTimes="0;.04;.40;1"
+               calcMode="linear" dur="1.9s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="0.8;2.3;2.3" keyTimes="0;.40;1"
+               calcMode="linear" dur="1.9s" begin="0s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate" values="0 0;-5.5 -3.6;-5.5 -3.6"
+               keyTimes="0;.5;1" calcMode="linear" dur="1.9s" begin="0s"
+               repeatCount="indefinite"/>
+    </circle>
+    <circle cx="138" cy="116.6" r="0.7" fill="currentColor"
+            fill-opacity=".5" opacity="0">
+      <animate attributeName="opacity" values="0;.5;0;0" keyTimes="0;.04;.40;1"
+               calcMode="linear" dur="1.9s" begin="0.07s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="0.7;1.9;1.9" keyTimes="0;.40;1"
+               calcMode="linear" dur="1.9s" begin="0.07s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate" values="0 0;-5.5 -3.6;-5.5 -3.6"
+               keyTimes="0;.5;1" calcMode="linear" dur="1.9s" begin="0.07s"
+               repeatCount="indefinite"/>
+    </circle>
+    <circle cx="146" cy="115" r="0.6" fill="currentColor"
+            fill-opacity=".5" opacity="0">
+      <animate attributeName="opacity" values="0;.5;0;0" keyTimes="0;.04;.40;1"
+               calcMode="linear" dur="1.9s" begin="0.13s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="0.6;1.5;1.5" keyTimes="0;.40;1"
+               calcMode="linear" dur="1.9s" begin="0.13s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate" values="0 0;-5.5 -3.6;-5.5 -3.6"
+               keyTimes="0;.5;1" calcMode="linear" dur="1.9s" begin="0.13s"
+               repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>

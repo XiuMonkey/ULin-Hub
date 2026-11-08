@@ -11,12 +11,17 @@ import "../../widgets"
 Item {
     id: root
 
+    // “助手”/“完全权限”这类中性 chip 的底色：比 5% hover 灰深一点，比 activeBg 浅一点。
+    readonly property color neutralChipBg: Theme.isDark ? "#333437" : "#F2F4F6"
+
     // 工作区 / 模式 / 模型这一行的上下文 chip
     component ContextChip: Rectangle {
         id: ctx
         property string iconName: ""
         property string label: ""
         property bool accent: false
+        // 中性高亮：浅灰底 + 灰字，用于“助手”这类需要强调但不抢 accent 的上下文 chip。
+        property bool neutral: false
         property bool clickable: false
         property int maxLabelWidth: 120
         signal clicked()
@@ -24,13 +29,17 @@ Item {
         implicitWidth: ctxRow.implicitWidth + 12
         implicitHeight: 22
         radius: 5
-        color: ctx.accent
-            ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.10)
-            : (ctx.clickable && ctxMouse.containsMouse ? Theme.color.hoverBg : "transparent")
+        color: ctx.neutral
+            ? root.neutralChipBg
+            : (ctx.accent
+                ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.10)
+                : (ctx.clickable && ctxMouse.containsMouse ? Theme.color.hoverBg : "transparent"))
         border.width: 1
-        border.color: ctx.accent
-            ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.22)
-            : Theme.color.border
+        border.color: ctx.neutral
+            ? Theme.color.border
+            : (ctx.accent
+                ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.22)
+                : Theme.color.border)
 
         Row {
             id: ctxRow
@@ -39,13 +48,15 @@ Item {
             LineIcon {
                 name: ctx.iconName
                 size: 11
-                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                color: ctx.neutral ? Theme.color.textSecondary
+                    : (ctx.accent ? Theme.color.accent : Theme.color.textTertiary)
                 visible: ctx.iconName.length > 0
             }
             Text {
                 text: ctx.label
                 width: Math.min(implicitWidth, ctx.maxLabelWidth)
-                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                color: ctx.neutral ? Theme.color.textSecondary
+                    : (ctx.accent ? Theme.color.accent : Theme.color.textTertiary)
                 font.family: "Microsoft YaHei UI"
                 font.pixelSize: Theme.font.small
                 elide: Text.ElideRight
@@ -53,7 +64,8 @@ Item {
             Text {
                 visible: ctx.clickable
                 text: "▾"
-                color: ctx.accent ? Theme.color.accent : Theme.color.textTertiary
+                color: ctx.neutral ? Theme.color.textTertiary
+                    : (ctx.accent ? Theme.color.accent : Theme.color.textTertiary)
                 font.pixelSize: 9
             }
         }
@@ -295,7 +307,7 @@ Item {
                     clickable: true
                     iconName: "bot"
                     label: "助手"
-                    accent: true
+                    neutral: true
                     onClicked: agentMenu.open()
                 }
                 ModelSelectorChip {
@@ -638,12 +650,10 @@ Item {
                     height: 26
                     radius: 6
                     color: root.permissionIsFull
-                        ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.10)
-                        : (permissionMouse.containsMouse ? Theme.color.iconButtonHoverBg : "transparent")
+                        ? root.neutralChipBg
+                        : (permissionMouse.containsMouse ? root.neutralChipBg : "transparent")
                     border.width: 1
-                    border.color: root.permissionIsFull
-                        ? Qt.rgba(Theme.color.accent.r, Theme.color.accent.g, Theme.color.accent.b, 0.24)
-                        : "transparent"
+                    border.color: root.permissionIsFull ? Theme.color.border : "transparent"
 
                     Row {
                         id: permissionRow
@@ -653,11 +663,11 @@ Item {
                         LineIcon {
                             name: "tools"
                             size: 13
-                            color: root.permissionIsFull ? Theme.color.accent : Theme.color.textTertiary
+                            color: root.permissionIsFull ? Theme.color.textSecondary : Theme.color.textTertiary
                         }
                         Text {
                             text: root.permissionLabel
-                            color: root.permissionIsFull ? Theme.color.accent : Theme.color.textTertiary
+                            color: root.permissionIsFull ? Theme.color.textSecondary : Theme.color.textTertiary
                             font.family: "Microsoft YaHei UI"
                             font.pixelSize: Theme.font.small
                         }
@@ -1019,14 +1029,16 @@ Item {
     // 权限菜单：会话级权限预设，完全权限需二次确认
     Popup {
         id: permissionMenu
-        parent: root
+        // 直接以入口按钮为 parent：Popup 的 x/y 就相对按钮，不再做跨层 mapToItem。
+        // 这样菜单始终贴着按钮上沿，并且水平居中在按钮正上方。
+        parent: permissionButton
         width: 292
         padding: 6
         modal: false
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        x: Math.max(8, Math.min(root.width - width - 8, permissionButton.mapToItem(root, 0, 0).x))
-        y: permissionButton.mapToItem(root, 0, 0).y - height - 8
+        x: Math.round((permissionButton.width - width) / 2)
+        y: -height - 8
 
         background: Rectangle {
             radius: 10

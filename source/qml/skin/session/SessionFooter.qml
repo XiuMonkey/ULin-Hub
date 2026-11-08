@@ -16,17 +16,16 @@ Item {
     property alias accountAnchor: avatar
     signal accountRequested()
 
+    signal scheduleRequested()
     signal settingsRequested()
     signal pluginsRequested()
     signal themeRequested()
     signal extensionsRequested()
     signal moreRequested()
 
-    // 底栏动作按钮总数上限（不含「更多」按钮）：内置 4 个 + 扩展入口。
-    // 超过 6 个时，第 7 个起收进「更多」上拉框；扩展入口的可用内联数量 = 6 - 内置数量。
-    property int totalInlineLimit: 6
-    property int fixedButtonCount: 4
-    readonly property int inlineExtLimit: Math.max(0, totalInlineLimit - fixedButtonCount)
+    // 底栏动作按钮总数上限（不含「更多」按钮）：官方入口 + 扩展入口一起计数。
+    // 官方入口带 officialAction 记号：它们占名额、但永远内联；真正溢出时只把扩展入口放进「更多」。
+    property int totalInlineLimit: 5
     property var overflowEntries: []
 
     function extMetaSource(item) {
@@ -63,16 +62,41 @@ Item {
     }
 
     function syncExtensionOverflow() {
-        if (!extDockRow)
+        if (!extDockRow || !actionRow)
             return
 
+        // 官方按钮参与计数，但绝不进溢出菜单；扩展入口按剩余名额内联。
+        var officialCount = 0
+        var rowChildren = actionRow.children
+        for (var r = 0; r < rowChildren.length; ++r) {
+            if (rowChildren[r] && rowChildren[r].officialAction === true)
+                ++officialCount
+        }
+        var inlineExtLimit = Math.max(0, totalInlineLimit - officialCount)
+
         var overflow = []
+        var fixedOverflow = []   // 固定放在「更多」里的内置入口（alwaysOverflow），排在扩展入口之后
         var children = extDockRow.children
+        var extensionIndex = 0
         for (var i = 0; i < children.length; ++i) {
             var child = children[i]
             if (!child)
                 continue
-            if (i < inlineExtLimit) {
+            if (child.alwaysOverflow === true) {   // 固定溢出：不进首屏，也不占扩展名额
+                child.visible = false
+                fixedOverflow.push({
+                    item: child,
+                    iconSource: extString(child, ["iconSource", "icon", "source"]),
+                    label: extString(child, ["tooltip", "label", "text", "title"]),
+                    description: extDescription(child)
+                })
+                continue
+            }
+            if (child.officialAction === true) {   // 官方入口：不参与扩展溢出
+                child.visible = true
+                continue
+            }
+            if (extensionIndex++ < inlineExtLimit) {
                 child.visible = true
                 continue
             }
@@ -85,8 +109,8 @@ Item {
             })
         }
 
-        // 被隐藏的入口也必须纳入可见计数：前六项始终显示。
-        overflowEntries = overflow
+        // 被隐藏的入口也必须纳入可见计数：扩展入口的前五项始终显示。
+        overflowEntries = overflow.concat(fixedOverflow)
     }
 
     // 扩展停靠位：宿主（SessionBar）在 Component.onCompleted 里登记为 "sessionBar.extDock"。
@@ -139,6 +163,12 @@ Item {
     }
 
     component FooterIconButton: IconButton {   // 底排图标按钮：尺寸与常态色一致，只有图标/提示/动作不同 —— 用内联组件收口，避免 5 份重复
+        // 官方入口记号：扩展溢出逻辑靠它识别，官方按钮永远不搬进「更多」。
+        property bool officialAction: true
+        // 固定溢出记号：像扩展入口一样注册，但永远只出现在「更多」里，不占首屏名额。
+        property bool alwaysOverflow: false
+        // 进「更多」时展示的副标题（扩展入口的 description 同款）。
+        property string description: ""
         boxSize: 27
         iconSize: 15
         iconColor: Theme.color.textTertiary
@@ -176,6 +206,16 @@ Item {
             id: extDockRow
             spacing: 0
             onChildrenChanged: root.syncExtensionOverflow()
+
+            // 自动化任务：像扩展入口一样注册，但带 alwaysOverflow 记号，固定只出现在「更多」里。
+            FooterIconButton {
+                iconSource: "qrc:/ULinHub/icons/ui/clock.svg"
+                tooltip: qsTrId("schedule_title")
+                description: qsTrId("schedule_menu_hint")
+                officialAction: false
+                alwaysOverflow: true
+                onClicked: root.scheduleRequested()
+            }
         }
 
         Item {   // 初始化转圈：塞进同尺寸的盒子，Row 里才不会把后面的按钮顶偏（不转时宽度收成 0）
@@ -194,6 +234,7 @@ Item {
         FooterIconButton {
             iconSource: "qrc:/ULinHub/icons/ui/more-horizontal.svg"
             tooltip: qsTrId("sessionBar_more")
+            officialAction: false   // 「更多」本身不参与名额计数
             onClicked: root.moreRequested()
         }
     }

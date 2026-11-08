@@ -22,6 +22,7 @@
 #include <functional>
 
 class DshApiClient;
+class AgentSessionClient;
 class ExtensionToolHost;
 class ServerManager;
 class QJsonArray;
@@ -37,6 +38,7 @@ public:
 	void start();
 
 	DshApiClient* apiClient() const { return m_api; }
+	AgentSessionClient* agentSession() const { return m_agentSession; }
 	ServerManager* server() const { return m_server; }
 	// 扩展工具宿主（命名管道 → DllCaller）：扩展管理页装/卸工具扩展时要它 reload/unload。
 	// 在内置服务端 start 之后创建；接管态下同样存在（桥与后端是不是 DSH 无关）。
@@ -114,6 +116,7 @@ private:
 
 	ServerManager* m_server = nullptr;
 	DshApiClient* m_api = nullptr;
+	AgentSessionClient* m_agentSession = nullptr;
 	ExtensionToolHost* m_toolHost = nullptr;
 	SessionCatalog m_catalog;   // 值成员（见 catalog() 的说明）
 

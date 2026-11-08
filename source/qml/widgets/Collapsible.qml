@@ -283,6 +283,7 @@ Column {
         // 下一条内容（过程组里的工具调用行等）从 bodyFlick.height 之后开始排。滚动区绝不冒出去。
         clip: true
         implicitHeight: root.expanded ? bodyFlick.height : 0
+        height: implicitHeight
 
         Flickable {
             id: bodyFlick
@@ -301,6 +302,7 @@ Column {
             // 滚到底时 contentY 的边界就是精确的 contentHeight - height，最后一行下面因此还留 4px，不会被裁掉。
             contentHeight: bodyHolder.implicitHeight + (needsScroll ? scrollTail : 0)
             boundsBehavior: Flickable.StopAtBounds
+            clip: true
             interactive: needsScroll   // 只在真的可滚时才让 Flickable 抢拖拽（否则会吃掉正文里的文字选择）
             visible: root.expanded
 

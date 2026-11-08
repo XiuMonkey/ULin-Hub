@@ -985,6 +985,36 @@ void ServerManager::ensureAgentPresets(const QString& profileDir)
 		changed = true;
 	}
 
+	// 自动化任务：老 profile 里没有 Schedule 服务与提醒工具，补齐（模板已带时是 no-op）。
+	{
+		const QString scheduleService = QStringLiteral("@deepseek-ai/dsh-schedule");
+		if (!content.contains(scheduleService)) {
+			const QString row = QStringLiteral("    - id: job-controller\n      name: '@deepseek-ai/dsh-api-job-controller'\n");
+			if (content.contains(row)) {
+				content.replace(row, row + QStringLiteral("\n    - id: schedule\n      name: '@deepseek-ai/dsh-schedule'\n"));
+				changed = true;
+			}
+		}
+
+		const QString timeContext = QStringLiteral("@deepseek-ai/dsh-time-context");
+		if (!content.contains(timeContext)) {
+			const QString row = QStringLiteral("          - id: agent-instructions\n            name: '@deepseek-ai/dsh-agent-instructions'\n            config:\n              maxBytes: 65536\n");
+			if (content.contains(row)) {
+				content.replace(row, row + QStringLiteral("\n          - id: time-context\n            name: '@deepseek-ai/dsh-time-context'\n"));
+				changed = true;
+			}
+		}
+
+		const QString scheduleTool = QStringLiteral("@deepseek-ai/dsh-tool-schedule");
+		if (!content.contains(scheduleTool)) {
+			const QString row = QStringLiteral("          - id: tool-jobs\n            name: '@deepseek-ai/dsh-tool-jobs'\n");
+			if (content.contains(row)) {
+				content.replace(row, row + QStringLiteral("\n          - id: tool-schedule\n            name: '@deepseek-ai/dsh-tool-schedule'\n"));
+				changed = true;
+			}
+		}
+	}
+
 	if (changed) {
 		QFile out(patchPath);
 		if (out.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {

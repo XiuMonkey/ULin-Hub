@@ -1,6 +1,6 @@
 #include "TestDshEventParser.h"
 
-#include "network/DshEventParser.h"
+#include "common/Agent/AgentEventParser.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>

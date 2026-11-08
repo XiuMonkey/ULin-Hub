@@ -1,7 +1,7 @@
 // HTTP 请求 + mux WebSocket：生成 rpcId、拆信封后回调成败
 
 #include "network/DshApiClient.h"
-#include "network/SessionCommands.h"
+#include "common/Agent/AgentManager.h"
 #include "common/util/ConnectionManager.h"
 #include "common/util/HostIndex.h"
 #include "common/util/CommonRegistry.h"
@@ -49,6 +49,10 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 	, m_nam(new QNetworkAccessManager(this))
 	, m_stream(new QWebSocket)
 {
+	m_agentManager = new AgentManager(this);
+	connect(m_agentManager, &AgentManager::registeredChanged, this, &DshApiClient::masterAgentsChanged);
+	connect(m_agentManager, &AgentManager::activeChanged, this,
+		[this](const QString& id) { if (!id.isEmpty()) emit masterAgentActivated(id); });
 	dshRegister("DshApiClient.001", m_stream, &QWebSocket::textMessageReceived, this, &DshApiClient::onStreamTextMessage);
 	dshRegister("DshApiClient.002", m_stream, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
 		emit transportError(QStringLiteral("stream"), m_stream->errorString());
@@ -66,21 +70,6 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 		m_controlStreamId = nextStreamId(QStringLiteral("control"));
 		sendStreamOpen(QStringLiteral("session/control"), m_controlStreamId);
 
-		// 重连后**必须重开 session/follow（+ job/list）**：openStreams() 里的 closeStreams() 已经把
-		// m_followed* 清空了（那是"当前有没有活着的流"的账），所以这里只能看 m_resumeFollow*。
-		// 两本账混成一本的后果：内置引擎重启（发布包首启会重启一次）或任何一次网络抖动之后，
-		// follow 再也不打开 ⇒ 客户端收不到任何消息事件 ⇒ 用户看到"模型不回复"，
-		// 而回合其实已经在服务端跑完了（session/*.jsonl 里有 assistant/message）。
-		if (!m_resumeFollowId.isEmpty()) {
-			const QString sessionId = m_resumeFollowId;
-			const QString parentSessionId = m_resumeFollowParent;   // 子代理要按 subagent address 重开；丢了这两段就会退回 session 形状（引擎回 agent-busy）
-			const QString mode = m_resumeFollowMode;
-			m_followedSessionId.clear();
-			m_followedParentSessionId.clear();
-			m_followedMode.clear();
-			m_sessionStreamId.clear();
-			followSession(sessionId, parentSessionId, mode);
-		}
 		});
 	dshRegister("DshApiClient.004", m_stream, &QWebSocket::disconnected, this, [this] {
 		const int code = static_cast<int>(m_stream->closeCode());
@@ -94,10 +83,6 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 			const QString ended = m_terminalStreamId;
 			m_terminalStreamId.clear();
 			emit terminalStreamEnded(ended);
-		}
-		if (!m_jobsStreamId.isEmpty()) {
-			m_jobsStreamId.clear();
-			emit jobRosterReady(QJsonArray());
 		}
 		if (wasConnected)  // 必须自愈：服务端遇重复 streamId 会 close(1008) 关掉整条 mux
 			scheduleReconnect();
@@ -321,15 +306,11 @@ void DshApiClient::closeStreams()
 	m_streamConnected = false;
 	m_eventsReady = false;
 	m_clientId.clear();
+	m_genericStreams.clear();
 	m_eventsStreamId.clear();
 	m_workspaceStreamId.clear();
 	m_controlStreamId.clear();
-	m_sessionStreamId.clear();
 	m_terminalStreamId.clear();
-	m_jobsStreamId.clear();
-	m_followedSessionId.clear();
-	m_followedParentSessionId.clear();
-	m_followedMode.clear();
 }
 
 // open 帧：type / streamId / endpoint / payload.args
@@ -363,113 +344,44 @@ void DshApiClient::sendStreamCancel(const QString& streamId)
 	m_stream->sendTextMessage(QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact)));
 }
 
-// 参数形状：request.address = {kind, sessionId} 或子代理的 {kind:"subagent", parentSessionId,
-// childSessionId, mode}（由 SessionCommands::sessionFollow 构造）。子代理**不能**用 session 形状：
-// 引擎 validateAddress 对 origin == subagent 的会话回 session/agent-busy，流的 open 会成功但
-// 一帧快照都不发 —— 正是"点开子代理页签消息区全空"的根因。
-void DshApiClient::followSession(const QString& sessionId, const QString& parentSessionId,
-	const QString& mode)
+QString DshApiClient::openGenericStream(const QString& endpoint, const QJsonObject& args)
 {
-	if (sessionId.isEmpty())
-		return;
-
-	// 同一目标重复调用不重开流；父会话 id / mode 一起比，避免"同一个 id 但地址形状变了"被误判为重复
-	if (sessionId == m_followedSessionId && parentSessionId == m_followedParentSessionId
-		&& mode == m_followedMode)
-		return;
-
-	unfollowSession();
-
-	const QJsonObject args = SessionCommands::sessionFollow(sessionId, parentSessionId, mode);
-	m_followedSessionId = sessionId;
-	m_followedParentSessionId = parentSessionId;
-	m_followedMode = mode;
-	m_resumeFollowId = sessionId;   // 愿望账：mux 断了也要记住"该跟谁"，重连时靠它重开（见 connected() 里那段）
-	m_resumeFollowParent = parentSessionId;
-	m_resumeFollowMode = mode;
-
-	qInfo().noquote() << "[DshApi] follow target =" << sessionId
-		<< (parentSessionId.isEmpty() ? QStringLiteral("(session)")
-			: QStringLiteral("(subagent of %1, mode=%2)").arg(parentSessionId,
-				mode.isEmpty() ? QStringLiteral("unknown") : mode));
-
-	if (m_takenover) {  // 接管态不开真流，只把"要看哪个会话"告诉扩展（载荷同 open 帧）
+	if (endpoint.isEmpty())
+		return QString();
+	if (m_takenover) {
 		QJsonObject frame;
-		frame.insert(QStringLiteral("endpoint"), QStringLiteral("session/follow"));
+		frame.insert(QStringLiteral("endpoint"), endpoint);
 		frame.insert(QStringLiteral("args"), args);
 		const QString rpcId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-		sendToSink(rpcId, QStringLiteral("$takeover/stream-open"), frame);  // fire-and-forget：不入 m_pending、不等回填
-		return;
+		sendToSink(rpcId, QStringLiteral("$takeover/stream-open"), frame);
+		return QString();
 	}
-
-	m_sessionStreamId = nextStreamId(QStringLiteral("session"));
-	sendStreamOpen(QStringLiteral("session/follow"), m_sessionStreamId, args);
-
-	// 后台任务名册（job/list）：跟 session/follow 同生命周期开/关。参数是引擎 Remote 的命名参数
-	// `request: JobListRequest`（payload.args = { request: { sessionId } }），帧是 JobListFrame。
-	// ⚠️ 这条流只在该会话被跟随期间才需要：名册是"该会话能看到的任务集合"（含无主任务），
-	// 换会话必须跟着换，否则顶栏计数会串会话。
-	QJsonObject jobsRequest;
-	jobsRequest.insert(QStringLiteral("sessionId"), sessionId);
-	QJsonObject jobsArgs;
-	jobsArgs.insert(QStringLiteral("request"), jobsRequest);
-	m_jobsStreamId = nextStreamId(QStringLiteral("jobs"));
-	sendStreamOpen(QStringLiteral("job/list"), m_jobsStreamId, jobsArgs);
+	const QString streamId = nextStreamId(QStringLiteral("stream"));
+	m_genericStreams.insert(streamId, endpoint);
+	sendStreamOpen(endpoint, streamId, args);
+	return streamId;
 }
 
-// 读当前 follow 目标的一页记录。普通会话与子代理共用：子代理那两段来自 followSession 记住的地址。
-// 调用方（ChatController 翻页 / handleSessionItem 的 replace 重拉）不需要再解析子代理关系。
-void DshApiClient::pageSession(const QString& sessionId, int throughSeq, int maxMessages,
-	int beforeSeq, std::function<void(const QJsonObject&)> onSuccess,
-	std::function<void(const RpcError&)> onError)
+void DshApiClient::closeGenericStream(const QString& streamId)
 {
-	const bool sameTarget = sessionId == m_followedSessionId;
-	const QString parentSessionId = sameTarget ? m_followedParentSessionId : QString();
-	const QString mode = sameTarget ? m_followedMode : QString();
-
-	callMethod(QStringLiteral("session/page"),
-		SessionCommands::sessionPage(sessionId, throughSeq, maxMessages, beforeSeq,
-			parentSessionId, mode),
-		std::move(onSuccess), std::move(onError));
-}
-
-void DshApiClient::unfollowSession()
-{
-	m_resumeFollowId.clear();   // 真正"不跟了"：愿望账也一起清掉 —— 否则重连会把刚取消的会话又拉回来（用户已经切走了）
-	m_resumeFollowParent.clear();
-	m_resumeFollowMode.clear();
-
-	if (m_takenover) {  // 接管态：通知扩展收掉 follow
-		if (!m_followedSessionId.isEmpty()) {
+	if (streamId.isEmpty())
+		return;
+	const bool known = m_genericStreams.contains(streamId);
+	m_genericStreams.remove(streamId);
+	if (m_takenover) {
+		if (known) {
 			QJsonObject frame;
-			frame.insert(QStringLiteral("endpoint"), QStringLiteral("session/follow"));
-			QJsonObject args;
-			frame.insert(QStringLiteral("args"), args);
+			frame.insert(QStringLiteral("endpoint"), QString());
+			frame.insert(QStringLiteral("args"), QJsonObject());
 			const QString rpcId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 			sendToSink(rpcId, QStringLiteral("$takeover/stream-cancel"), frame);
 		}
-		m_sessionStreamId.clear();
-		m_followedSessionId.clear();
-		m_followedParentSessionId.clear();
-		m_followedMode.clear();
 		return;
 	}
-
-	if (!m_sessionStreamId.isEmpty())
-		sendStreamCancel(m_sessionStreamId);
-	m_sessionStreamId.clear();
-
-	if (!m_jobsStreamId.isEmpty())   // 名册流跟着 follow 一起收：换会话时新的名册会由 followSession 重开
-		sendStreamCancel(m_jobsStreamId);
-	m_jobsStreamId.clear();
-
-	m_followedSessionId.clear();
-	m_followedParentSessionId.clear();
-	m_followedMode.clear();
+	sendStreamCancel(streamId);
 }
 
 // 终端附着流：args 由 SessionCommands::terminalAttach(agentId, id) 给。
-// 与 session/follow 的差别：这条流随"终端块"的开关走，不随会话切换自动跟着换，所以由调用方显式开关。
 void DshApiClient::openTerminalStream(const QJsonObject& attachArgs)
 {
 	if (m_takenover) {  // 接管态的流归扩展，宿主不开（终端也不在接管协议里）
@@ -748,8 +660,69 @@ void DshApiClient::handleParsedResponse(const QString& rpcId, const QJsonDocumen
 // 分工：插件 → 宿主走本类实现的 VirtualApiHost；宿主 → 插件走 VirtualApiSink::OnOutboundRequest，
 // 回填只能靠 rpcId（std::function 不是 metatype，传不出去）
 
-VirtualApiSink* DshApiClient::apiSink() const   // 现取不缓存：注册表的值是 QPointer，插件 unload 时会自动置空
+QString DshApiClient::activeMasterAgentId() const
 {
+	return m_agentManager ? m_agentManager->activeId() : QString();
+}
+
+QString DshApiClient::selectedMasterAgentId() const
+{
+	return m_agentManager ? m_agentManager->selectedId() : QStringLiteral("dsh");
+}
+
+void DshApiClient::setSelectedMasterAgentId(const QString& backendId)
+{
+	if (m_agentManager)
+		m_agentManager->setSelectedId(backendId);
+}
+
+const char* DshApiClient::ActiveMasterAgentId() const
+{
+	static thread_local QByteArray id;
+	id = activeMasterAgentId().toUtf8();
+	return id.constData();
+}
+
+bool DshApiClient::RegisterMasterAgent(const char* owner, QObject* agent)
+{
+	return m_agentManager && m_agentManager->registerAgent(QString::fromUtf8(owner ? owner : ""), agent);
+}
+
+void DshApiClient::UnregisterMasterAgent(const char* owner)
+{
+	if (m_agentManager)
+		m_agentManager->unregisterOwner(QString::fromUtf8(owner ? owner : ""));
+}
+
+QVariantList DshApiClient::registeredMasterAgents() const
+{
+	return m_agentManager ? m_agentManager->registeredAgents() : QVariantList();
+}
+
+bool DshApiClient::ActivateMasterAgent(const char* backendId)
+{
+	const QString id = QString::fromUtf8(backendId ? backendId : "").trimmed();
+	if (id.isEmpty() || id == QLatin1String("dsh")) {
+		DeactivateMasterAgent();
+		return true;
+	}
+	return m_agentManager && m_agentManager->activate(id);
+}
+
+void DshApiClient::DeactivateMasterAgent()
+{
+	if (m_agentManager)
+		m_agentManager->deactivate();
+	if (m_takenover)
+		Takenover(false);
+}
+
+VirtualApiSink* DshApiClient::apiSink() const
+{
+	if (m_agentManager) {
+		if (VirtualApiSink* active = m_agentManager->activeSink())
+			return active;
+	}
 	QObject* const root = CommonRegistry::instance().FindFromRegistry(QString::fromUtf8(DshHostIndex::kApiSink)).data();
 	if (!root)
 		return nullptr;
@@ -789,7 +762,9 @@ void DshApiClient::dispatchTakeoverCall(const QString& rpcId, const QString& met
 	pending.onSuccess = std::move(onSuccess);
 	pending.onError = std::move(onError);
 	pending.takeover = true;
-	pending.takeoverDeadlineMs = QDateTime::currentMSecsSinceEpoch() + kTakeoverCallTimeoutMs;
+	const qint64 timeoutMs = method == QLatin1String("session/prompt")
+		? kTakeoverPromptTimeoutMs : kTakeoverCallTimeoutMs;
+	pending.takeoverDeadlineMs = QDateTime::currentMSecsSinceEpoch() + timeoutMs;
 	m_pending.insert(rpcId, pending);
 
 	if (!sendToSink(rpcId, method, args)) {  // 没有接收端：当场用错误收尾
@@ -1011,76 +986,6 @@ void DshApiClient::handleControlItem(const QJsonValue& value)   // baseline 是�
 	}
 }
 
-void DshApiClient::handleSessionItem(const QJsonValue& value)   // 记录翻成旧的 session/event 帧，复用既有渲染路径
-{
-	const QJsonObject frame = value.toObject();
-	const QString type = frame.value(QStringLiteral("type")).toString();
-	const QString sessionId = m_followedSessionId;
-
-	if (type == QStringLiteral("snapshot")) {
-		const int cursor = frame.value(QStringLiteral("cursor")).toInt();
-		const QJsonArray records = SessionCommands::legacyRecords(
-			frame.value(QStringLiteral("records")).toArray());
-		const bool hasMore = frame.value(QStringLiteral("hasMore")).toBool();
-
-		qInfo().noquote() << "[DshApi] session snapshot sessionId=" << sessionId
-			<< "cursor=" << cursor << "records=" << records.size() << "hasMore=" << hasMore;
-
-		const QJsonObject projections = frame.value(QStringLiteral("projections")).toObject();  // 快照还带一份全量投影（projectionMode: all）
-		if (!projections.isEmpty()) {
-			emit sessionProjectionsReady(sessionId,
-				projections.value(QStringLiteral("asOfSeq")).toInt(),
-				projections.value(QStringLiteral("values")).toObject());
-		}
-
-		emit sessionSnapshotReady(sessionId, cursor, records, hasMore);  // 整包交给 HistoryLoader 批量播种，否则历史会被渲染两遍
-		return;
-	}
-
-	if (type == QStringLiteral("event")) {
-		const QJsonObject event = frame.value(QStringLiteral("event")).toObject();
-		if (event.isEmpty())
-			return;
-		const QJsonObject surfaceOp = event.value(QStringLiteral("surfaceOp")).toObject();
-		if (surfaceOp.value(QStringLiteral("op")).toString() == QStringLiteral("replace")) {
-			// replace 会改写旧 UI 已渲染的消息：从权威页重建，让旧文本与流式分片消失。
-			// 走 pageSession：子代理会自动带 subagent address（裸 session/page 会被引擎拒）。
-			const int cursor = event.value(QStringLiteral("seq")).toInt();
-			pageSession(sessionId, cursor, 200, 0,
-				[this, sessionId, cursor](const QJsonObject& page) {
-					const QJsonArray records = SessionCommands::legacyRecords(
-						page.value(QStringLiteral("records")).toArray());
-					emit sessionSnapshotReady(sessionId, cursor, records,
-						page.value(QStringLiteral("hasMore")).toBool());
-				},
-				[this](const RpcError& error) {
-					qWarning().noquote() << "[DshApi] replacement page refresh failed:"
-						<< error.code << error.message;
-				});
-			return;
-		}
-		emitSessionEventFrame(sessionId, event);
-		return;
-	}
-
-	if (type == QStringLiteral("assistant-stream")) {  // chunk 是 LLM 原始增量，翻成 assistant/chunk 后与历史回放共用渲染路径
-		const QJsonObject streamFrame = frame.value(QStringLiteral("frame")).toObject();
-		if (streamFrame.value(QStringLiteral("type")).toString() == QStringLiteral("chunk")) {
-			const QJsonObject chunk = streamFrame.value(QStringLiteral("chunk")).toObject();
-			if (!chunk.isEmpty()) {
-				QJsonObject event;
-				event.insert(QStringLiteral("type"), QStringLiteral("assistant/chunk"));
-				QJsonObject data;
-				data.insert(QStringLiteral("chunk"), chunk);
-				event.insert(QStringLiteral("data"), data);
-				emitSessionEventFrame(sessionId, event);
-			}
-		}
-	}
-}
-
-// terminal/follow 的帧就是终端帧本体（{type:"snapshot"|"output"|"state", …}），
-// 这里不做任何解释：解析/渲染都在页面里（xterm.js），C++ 侧只负责搬。
 void DshApiClient::handleTerminalItem(const QJsonValue& value)
 {
 	const QJsonObject frame = value.toObject();
@@ -1088,35 +993,6 @@ void DshApiClient::handleTerminalItem(const QJsonValue& value)
 		return;
 
 	emit terminalFrame(m_terminalStreamId, frame);
-}
-
-// 第六条逻辑流：job/list 的帧是 JobListFrame（{type:"rows", jobs:[...]}）。
-// 这里不解包 JobView —— 字段解释与排序都在 ChatController（common 层），网络层只搬原始数组。
-void DshApiClient::handleJobsItem(const QJsonValue& value)
-{
-	const QJsonObject frame = value.toObject();
-	if (frame.value(QStringLiteral("type")).toString() != QStringLiteral("rows"))
-		return;
-
-	emit jobRosterReady(frame.value(QStringLiteral("jobs")).toArray());
-}
-
-void DshApiClient::emitSessionEventFrame(const QString& sessionId, const QJsonObject& event){
-	QJsonArray record;
-	QJsonObject wrapped;
-	wrapped.insert(QStringLiteral("event"), event);
-	record.append(wrapped);
-	const QJsonArray normalized = SessionCommands::eventsFromRecords(record);
-	const QJsonObject visibleEvent = normalized.isEmpty() ? event : normalized.first().toObject();
-
-	QJsonObject payload;
-	payload.insert(QStringLiteral("type"), QStringLiteral("session/event"));
-	payload.insert(QStringLiteral("sessionId"), sessionId);
-	payload.insert(QStringLiteral("event"), visibleEvent);
-
-	QJsonObject legacyFrame;
-	legacyFrame.insert(QStringLiteral("payload"), payload);
-	emit muxFrameReceived(legacyFrame);
 }
 
 void DshApiClient::onStreamTextMessage(const QString& message)
@@ -1137,12 +1013,10 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 			handleWorkspaceItem(streamValue);
 		else if (streamId == m_controlStreamId)
 			handleControlItem(streamValue);
-		else if (streamId == m_sessionStreamId)
-			handleSessionItem(streamValue);
+		else if (m_genericStreams.contains(streamId))
+			emit genericStreamItem(streamId, streamValue);
 		else if (!m_terminalStreamId.isEmpty() && streamId == m_terminalStreamId)
 			handleTerminalItem(streamValue);
-		else if (!m_jobsStreamId.isEmpty() && streamId == m_jobsStreamId)
-			handleJobsItem(streamValue);
 	}
 	else if (streamType == QStringLiteral("end")) {
 		qInfo().noquote() << "[DshApi] stream ended:" << streamId;
@@ -1150,16 +1024,16 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 			m_terminalStreamId.clear();
 			emit terminalStreamEnded(streamId);
 		}
-		if (!m_jobsStreamId.isEmpty() && streamId == m_jobsStreamId) {
-			m_jobsStreamId.clear();
-			emit jobRosterReady(QJsonArray());
-		}
 	}
 	else if (streamType == QStringLiteral("error")) {
 		const QJsonObject streamError = frame.value(QStringLiteral("error")).toObject();
 		const QString code = streamError.value(QStringLiteral("code")).toString();
 		const QString detail = streamError.value(QStringLiteral("message")).toString();
 		qWarning().noquote() << "[DshApi] stream error" << streamId << code << detail;
+		if (m_genericStreams.contains(streamId)) {
+			emit genericStreamError(streamId, code, detail);
+			m_genericStreams.remove(streamId);
+		}
 
 		// 终端流的错误按流级上抛（terminal/unavailable、terminal/control-unavailable、gateway/* …），
 		// 别混进通用的 transportError：那些错误不该被当成"传输断了"去驱动重连。
@@ -1170,10 +1044,6 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 
 		// 名册流失败（典型：profile 里没挂 job-controller ⇒ gateway/service-unavailable）：
 		// 发一次空名册让顶栏退回空态，再走下面的通用 transportError 记到状态行。
-		if (!m_jobsStreamId.isEmpty() && streamId == m_jobsStreamId) {
-			m_jobsStreamId.clear();
-			emit jobRosterReady(QJsonArray());
-		}
 		emit transportError(QStringLiteral("stream"), QStringLiteral("%1: %2").arg(code, detail));
 	}
 	else {

@@ -19,7 +19,7 @@
 #include "common/shell/PanelBarDockModel.h"
 #include "qmlbridge/FileBrowserBridge.h"
 #include "qmlbridge/UrlInputBridge.h"
-#include "common/session/ToolsFilter.h"
+#include "common/Agent/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
 #include "qmlbridge/TerminalBridge.h"
 #include "qmlbridge/TerminalVtModel.h"
@@ -33,6 +33,7 @@
 #include <QQmlApplicationEngine>
 #include <QStyleHints>
 #include <QUrl>
+#include <QUuid>
 #include <QtQml/qqml.h>
 #include <QtWebEngineQuick/QtWebEngineQuick>
 #include <QtWidgets/QApplication>
@@ -72,6 +73,27 @@ int main(int argc, char* argv[])
 
 	// 版本号收口到 common/ClientInfo.h（与发布包名对得上）。此前整个客户端没有任何地方
 	// 登记过版本 —— 日志头、崩溃报告、helpdesk 对版本只能靠猜。
+	// 本地数据契约：<exe>/data 持久化，<exe>/temp/run-<uuid> 临时化。
+	// 这两处不再依赖 %LOCALAPPDATA% / %TEMP%，避免沙箱下不可写或数据分裂。
+	{
+		const QString dataRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/data");
+		QDir().mkpath(dataRoot + QStringLiteral("/client"));
+		const QString tempRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/temp");
+		QDir().mkpath(tempRoot);
+		const QString runDir = tempRoot + QStringLiteral("/run-")
+			+ QUuid::createUuid().toString(QUuid::WithoutBraces);
+		QDir().mkpath(runDir);
+		qputenv("ULINHUB_TEMP_RUN", QDir::toNativeSeparators(runDir).toUtf8());
+		// 只清理由宿主创建的旧 run-*；data/ 永远不碰。
+		const QFileInfoList stale = QDir(tempRoot).entryInfoList(
+			{ QStringLiteral("run-*") }, QDir::Dirs | QDir::NoDotAndDotDot);
+		const QString currentRun = QDir(runDir).absolutePath();
+		for (const QFileInfo& info : stale) {
+			if (info.absoluteFilePath() != currentRun)
+				QDir(info.absoluteFilePath()).removeRecursively();
+		}
+	}
+
 	QCoreApplication::setApplicationVersion(ClientInfo::kVersion);
 
 	// WebEngine 子进程定位：本工程把 Qt 运行库收进 <exe>/dependence/（SxS 私有程序集），

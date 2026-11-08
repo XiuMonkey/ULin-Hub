@@ -1,4 +1,4 @@
-#include "common/session/ModelSelectionService.h"
+#include "common/Agent/ModelSelectionService.h"
 
 #include "network/SessionCommands.h"
 #include <QDebug>

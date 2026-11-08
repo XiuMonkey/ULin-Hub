@@ -2,7 +2,7 @@
 
 // 分层：本文件在 common/settings/ —— **领域层**（设置页的数据面与视图状态机：
 // provider/凭据/模型写回、Agent 预设、服务端地址、外观项的装配与反馈文案都在这里），
-// 与它读写的 ClientSettings / SettingsStore 同层（解析与派生引用仍在 common/session/ModelSelectionService）。
+// 与它读写的 ClientSettings / SettingsStore 同层（解析与派生引用仍在 common/Agent/ModelSelectionService）。
 // 它不 import 任何 QML 概念，可以脱离 QML 引擎单测。QML 面（`Hub.settings` 属性、类型注册）在
 // qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
 // 设置页数据面（M6 前置）：把 ModelSelectionService 的既有能力接到 QML。
@@ -17,7 +17,7 @@
 // 逻辑一行没重写：解析、派生引用、读-改-写 models 数组全在既有 ModelSelectionService 里。
 // 本类只负责"持有视图状态 + 暴露给 QML + 把回调翻成信号"。
 
-#include "common/session/ModelSelectionService.h"
+#include "common/Agent/ModelSelectionService.h"
 
 #include <QObject>
 #include <QString>
@@ -50,6 +50,10 @@ class SettingsController : public QObject
 		Q_PROPERTY(QVariantList agentPresets READ agentPresets NOTIFY presetsChanged)
 		Q_PROPERTY(QString defaultPresetName READ defaultPresetName NOTIFY presetsChanged)
 		Q_PROPERTY(QString presetFeedback READ presetFeedback NOTIFY presetsChanged)
+		// Agent Master：当前 Agent 后端（内置 DSH；后续后端加入这里）
+		Q_PROPERTY(QString masterBackend READ masterBackend NOTIFY masterBackendChanged)
+		Q_PROPERTY(QString masterBackendName READ masterBackendName NOTIFY masterBackendChanged)
+		Q_PROPERTY(QVariantList masterBackends READ masterBackends NOTIFY masterBackendChanged)
 		// 服务端地址
 		Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
 		// 外观
@@ -81,6 +85,9 @@ public:
 	QVariantList agentPresets() const { return m_agentPresets; }
 	QString defaultPresetName() const { return m_defaultPresetName; }
 	QString presetFeedback() const { return m_presetFeedback; }
+	QString masterBackend() const { return m_masterBackend; }
+	QString masterBackendName() const;
+	QVariantList masterBackends() const;
 	QString serverUrl() const { return m_serverUrl; }
 	QVariantList languages() const { return m_languages; }
 	QString languageCode() const { return m_languageCode; }
@@ -111,6 +118,8 @@ public:
 	Q_INVOKABLE void removeModel(const QString& provider, const QString& modelId);
 	// Agent 预设：设为默认（settings/update）
 	Q_INVOKABLE void selectDefaultPreset(const QString& presetId);
+	Q_INVOKABLE void selectMasterBackend(const QString& backendId);
+	Q_INVOKABLE void refreshMasterBackends();
 	// 服务端地址：写入本地 SettingsStore 后请宿主重启内置服务端
 	Q_INVOKABLE void saveServerUrl(const QString& url);
 	// 外观：切语言（立即生效，无需重启）与重置风格包
@@ -136,6 +145,10 @@ signals:
 	void candidatesChanged();
 	void pageChanged();
 	void presetsChanged();
+	void masterBackendChanged();
+	// 后端切换请求：当前只有 DSH，占位给后续后端实现（服务/扩展在这里接管）。
+	void masterBackendChangeRequested(const QString& backendId);
+	void masterBackendSwitchFailed(const QString& backendId, const QString& reason);
 	void serverUrlChanged();
 	void languageChanged();
 	void formFeedbackChanged();
@@ -163,6 +176,7 @@ private:
 	void rebuildProviders();
 	void writeModel(const ConfigurableProvider& provider, const SettingsNamespace& ns, const AddModelRequest& request, bool replacing);
 	void loadAgentPresets();
+	void loadMasterBackend();
 	void loadAppearance();
 
 	DshApiClient* m_api = nullptr;
@@ -182,6 +196,7 @@ private:
 	QString m_formFeedback;
 	QString m_defaultPresetName;
 	QString m_presetFeedback;
+	QString m_masterBackend = QStringLiteral("dsh");
 	QString m_serverUrl;
 	QString m_languageCode;
 	QString m_appearanceFeedback;

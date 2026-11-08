@@ -10,6 +10,7 @@
 #include "common/util/HostIndex.h"
 #include "core/ServerManager.h"
 #include "network/DshApiClient.h"
+#include "common/Agent/AgentSessionClient.h"
 #include "ExtensionSystem/ExtensionToolHost.h"
 
 #include <QCoreApplication>
@@ -58,6 +59,7 @@ void ClientRuntime::start()
 {
 	m_server = new ServerManager(this);
 	m_api = new DshApiClient(this);
+	m_agentSession = new AgentSessionClient(m_api, this);
 
 	// findObject(kApiClient) 取出站客户端；此前这个 index 从没登记过 ⇒ 扩展只拿到 null 并静默退化成"没接管"。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiClient, m_api);
@@ -134,7 +136,8 @@ void ClientRuntime::start()
 			if (m_catalog.applyProjectionChange(sessionId, key, value))
 				emit peerCatalogChanged();
 		});
-	connect(m_api, &DshApiClient::sessionProjectionsReady, this,
+	// follow snapshot projections now come from AgentSessionClient
+	connect(m_agentSession, &AgentSessionClient::sessionProjectionsReady, this,
 		[this](const QString& sessionId, int, const QJsonObject& values) {
 			if (m_catalog.applyFollowProjections(sessionId, values))
 				emit peerCatalogChanged();
@@ -615,5 +618,5 @@ void ClientRuntime::followSession(const QString& sessionId)
 	// parentForSession 优先取 subagentCatalog 反推，mode 取同一条目录项；普通会话两段都为空。
 	const QString parentSessionId = m_catalog.parentForSession(sessionId);
 	const QString mode = parentSessionId.isEmpty() ? QString() : m_catalog.subagentModeFor(sessionId);
-	m_api->followSession(sessionId, parentSessionId, mode);
+	m_agentSession->followSession(sessionId, parentSessionId, mode);
 }
