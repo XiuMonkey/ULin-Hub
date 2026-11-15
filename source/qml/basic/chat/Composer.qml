@@ -270,8 +270,9 @@ Item {
             // 皮肤可用 composerBg 单独覆盖输入卡底色，未定义时回退 panelBg。
             color: Theme.color.composerBg || Theme.color.panelBg
             // 聚焦只加深灰色描边，不用 accent 蓝，也不加发光或阴影。
-            readonly property color restingBorder: Theme.isDark ? "#2E3034" : "#E3E5E9"
-            readonly property color activeBorder: Theme.isDark ? "#4A4D53" : "#C6CAD0"
+            // 浅色下输入卡边框只做很轻的分隔，别比卡片阴影还抢眼。
+            readonly property color restingBorder: Theme.isDark ? "#2E3034" : "#ECEEF1"
+            readonly property color activeBorder: Theme.isDark ? "#4A4D53" : "#DDE1E6"
             border.color: (editor.activeFocus || dropArea.containsDrag) ? activeBorder : restingBorder
             border.width: 1
         }
@@ -315,6 +316,7 @@ Item {
                     onSelectModelRequested: (provider, model) => Hub.selectModel(provider, model)
                     onSelectLevelRequested: (levelId) => Hub.selectLevel(levelId)
                 }
+                UlinCoreModelChip { }
             }
 
             // 待发图片（缩略图 + 移除）
@@ -322,7 +324,7 @@ Item {
                 id: pendingRow
                 width: parent.width
                 visible: Hub.pendingAttachments.length > 0
-                height: visible ? 68 : 0
+                height: visible ? 64 : 0
                 clip: true
 
                 Row {
@@ -341,9 +343,10 @@ Item {
                         readonly property bool isImage: modelData.kind === "image"
                             || (modelData.kind === undefined
                                 && modelData.preview !== undefined && modelData.preview.length > 0)
+                        readonly property bool isBrowser: modelData.kind === "browser"
 
-                        // 与 DSH FileCard 同构：240×64、极细描边、输入区同色底。
-                        width: isImage ? 64 : 240
+                        // 与 DSH FileCard 同构：240×64、极细描边、输入区同色底；浏览器卡片宽一点放下位置。
+                        width: isBrowser ? 300 : (isImage ? 64 : 240)
                         height: 64
                         radius: Theme.radius.panel
                         color: isImage ? (Theme.isDark ? "#232427" : "#F2F3F5")
@@ -405,7 +408,7 @@ Item {
                             anchors.topMargin: 8
                             anchors.bottomMargin: 8
                             spacing: 10
-                            visible: !attachmentTile.isImage
+                            visible: !attachmentTile.isImage && !attachmentTile.isBrowser
 
                             Image {
                                 anchors.verticalCenter: parent.verticalCenter
@@ -451,6 +454,70 @@ Item {
                             }
                         }
 
+                        // 浏览器上下文卡片：标题 + 元素位置 + 「读取浏览器内容」短提示。
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 24
+                            anchors.topMargin: 8
+                            anchors.bottomMargin: 8
+                            spacing: 8
+                            visible: attachmentTile.isBrowser
+
+                            Rectangle {
+                                width: 30
+                                height: 30
+                                radius: Theme.radius.small
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.isDark ? "#2A2C30" : "#EEF1F5"
+
+                                LineIcon {
+                                    anchors.centerIn: parent
+                                    name: "browser"
+                                    size: 17
+                                    color: Theme.color.accent
+                                }
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(0, parent.width - 38)
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: (modelData.title !== undefined && modelData.title.length > 0)
+                                        ? modelData.title
+                                        : (modelData.url !== undefined ? modelData.url : "")
+                                    elide: Text.ElideRight
+                                    color: Theme.color.textPrimary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.body
+                                    font.weight: Theme.font.weightMedium
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: (modelData.selector !== undefined && modelData.selector.length > 0)
+                                        ? modelData.selector
+                                        : (modelData.url !== undefined ? modelData.url : "")
+                                    elide: Text.ElideMiddle
+                                    color: Theme.color.textTertiary
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.caption
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: modelData.prompt !== undefined ? modelData.prompt : "读取浏览器内容"
+                                    elide: Text.ElideRight
+                                    color: Theme.color.accent
+                                    font.family: "Microsoft YaHei UI"
+                                    font.pixelSize: Theme.font.small
+                                }
+                            }
+                        }
+
                         Rectangle {
                             width: 18
                             height: 18
@@ -458,12 +525,21 @@ Item {
                             anchors.top: parent.top
                             anchors.right: parent.right
                             anchors.margins: 3
-                            color: Theme.color.overlayBg
+                            // 默认完全透明：只画一颗深灰叉；悬浮时铺一层浅灰半透明底，无边框。
+                            color: removeHover.hovered
+                                ? (Theme.isDark ? Qt.rgba(0.80, 0.82, 0.85, 0.20)
+                                                : Qt.rgba(0.55, 0.57, 0.60, 0.25))
+                                : "transparent"
+                            border.width: 0
+
+                            HoverHandler {
+                                id: removeHover
+                            }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "\u2715"
-                                color: Theme.color.textPrimary
+                                color: Theme.color.textSecondary
                                 font.pixelSize: 9
                             }
 
@@ -528,6 +604,10 @@ Item {
                 TextEdit {
                     id: editor
                     objectName: "composerEditor"
+                    // 固定顶对齐：Flickable 的 view 比单行 editor 高时，别让文字在
+                    // 附件缩略图和输入行之间被居中/下沉，造成一块空档。
+                    anchors.top: parent.top
+                    anchors.left: parent.left
                     // 超高时为滚动条让出宽度
                     width: editorView.width - (editorView.needsScroll
                                                ? Theme.size.scrollbarThickness : 0)
@@ -640,10 +720,46 @@ Item {
                     }
                 }
 
+                // 截图：框选整个屏幕，截完作为图片附件进输入区。
+                Rectangle {
+                    id: screenshotButton
+                    anchors.left: contextButton.right
+                    anchors.leftMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 26
+                    height: 26
+                    radius: Theme.radius.small
+                    color: screenshotMouse.containsMouse ? Theme.color.iconButtonHoverBg : "transparent"
+
+                    LineIcon {
+                        anchors.centerIn: parent
+                        name: "camera"
+                        size: 17
+                        // 相机的线条密度比 + 高，hover 跟着 textPrimary 会整块发黑；
+                        // 只做一档轻微加深，保持和同级工具按钮同一观感。
+                        color: screenshotMouse.containsMouse ? Theme.color.textSecondary : Theme.color.textTertiary
+                    }
+
+                    MouseArea {
+                        id: screenshotMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: (mouse) => {
+                            if (mouse.button === Qt.RightButton) {
+                                shotOptionsMenu.open()
+                                return
+                            }
+                            screenshotWindow.beginShot()
+                        }
+                    }
+                }
+
                 // 权限预设直接显示在按钮上，点开切换
                 Rectangle {
                     id: permissionButton
-                    anchors.left: contextButton.right
+                    anchors.left: screenshotButton.right
                     anchors.leftMargin: 4
                     anchors.verticalCenter: parent.verticalCenter
                     width: permissionRow.implicitWidth + 14
@@ -732,8 +848,24 @@ Item {
         modal: false
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        x: Math.max(8, Math.min(root.width - width - 8, workspaceChip.mapToItem(root, 0, 0).x))
-        y: workspaceChip.mapToItem(root, 0, workspaceChip.height).y + 6
+        // 下方空间不足时改为从 chip 上方向上展开；否则底部菜单会被窗口裁掉。
+        function updateMenuPosition() {
+            const chipPos = workspaceChip.mapToItem(root, 0, 0)
+            const win = root.Window.window
+            const winH = win ? win.height : root.height
+            const rootScene = root.mapToItem(null, 0, 0)
+            const chipTopScene = rootScene.y + chipPos.y
+            const chipBottomScene = chipTopScene + workspaceChip.height
+            const menuH = height > 0 ? height : contentItem.implicitHeight + 2 * padding
+            const spaceBelow = winH - chipBottomScene - 8
+            const spaceAbove = chipTopScene - 8
+            const below = chipPos.y + workspaceChip.height + 6
+            x = Math.max(8, Math.min(root.width - width - 8, chipPos.x))
+            // 上下都按窗口（不是 Composer 自身）计算；Composer 本身只有输入卡那么高。
+            y = (spaceBelow >= menuH || spaceAbove < menuH) ? below : chipPos.y - menuH - 6
+        }
+        onOpened: updateMenuPosition()
+        onHeightChanged: if (visible) updateMenuPosition()
 
         readonly property var items: Hub.sessions ? Hub.sessions.workspaceItems() : []
 
@@ -901,8 +1033,24 @@ Item {
         modal: false
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        x: Math.max(8, Math.min(root.width - width - 8, agentChip.mapToItem(root, 0, 0).x))
-        y: agentChip.mapToItem(root, 0, agentChip.height).y + 6
+        // 下方空间不足时改为从 chip 上方向上展开；否则子代理列表会被窗口裁掉。
+        function updateMenuPosition() {
+            const chipPos = agentChip.mapToItem(root, 0, 0)
+            const win = root.Window.window
+            const winH = win ? win.height : root.height
+            const rootScene = root.mapToItem(null, 0, 0)
+            const chipTopScene = rootScene.y + chipPos.y
+            const chipBottomScene = chipTopScene + agentChip.height
+            const menuH = height > 0 ? height : contentItem.implicitHeight + 2 * padding
+            const spaceBelow = winH - chipBottomScene - 8
+            const spaceAbove = chipTopScene - 8
+            const below = chipPos.y + agentChip.height + 6
+            x = Math.max(8, Math.min(root.width - width - 8, chipPos.x))
+            // 以窗口可用高度判断上拉/下拉。
+            y = (spaceBelow >= menuH || spaceAbove < menuH) ? below : chipPos.y - menuH - 6
+        }
+        onOpened: updateMenuPosition()
+        onHeightChanged: if (visible) updateMenuPosition()
 
         readonly property var peers: Hub.peerTabs || []
 
@@ -1020,6 +1168,487 @@ Item {
                     onClicked: {
                         Hub.openToolsFilter()
                         agentMenu.close()
+                    }
+                }
+            }
+        }
+    }
+
+    // 截图：全屏置顶窗口。仿微信/QQ 截图：选区外变暗、选区内保持原色，
+    // 拖完不立刻截，先出现工具栏，可继续移动/改大小，点“完成”才抓屏。
+    Window {
+        id: screenshotWindow
+        flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+        visibility: Window.Hidden
+        color: "transparent"
+
+        property bool selectionReady: false
+        property bool hideWindowOnShot: true   // 右键菜单可切换：截桌面时是否隐藏 ULin Hub
+        property bool drawing: false
+        property rect resizeStart: Qt.rect(0, 0, 0, 0)
+        property point resizePress: Qt.point(0, 0)
+        property string resizeMode: ""
+        property int minShotSize: 8
+        property bool appHiddenForShot: false
+        property var hiddenAppWindow: null
+        property int appRestoreVisibility: Window.Windowed
+
+        function restoreAppWindow() {
+            if (!appHiddenForShot || !hiddenAppWindow)
+                return
+            const w = hiddenAppWindow
+            const vis = appRestoreVisibility
+            appHiddenForShot = false
+            hiddenAppWindow = null
+            w.show()
+            w.visibility = vis
+            w.requestActivate()
+        }
+
+        function beginShot() {
+            resetSelection()
+            // 窗口上次关闭时可能缓存了旧内容；先透明显示，等第一帧新 QML
+            // 绘制完成后再显形，避免复用上一次选区纹理造成“闪旧框”。
+            opacity = 0
+            const w = root.Window.window
+            if (!w)
+                return
+            screen = w.screen
+            if (hideWindowOnShot) {
+                // 先让主窗口真正隐藏，再显示全屏选区层；反过来会在桌面/窗口
+                // 还没重绘时截到冻结的旧画面。
+                appHiddenForShot = true
+                hiddenAppWindow = w
+                appRestoreVisibility = w.visibility
+                w.hide()
+                shotShowTimer.restart()
+            } else {
+                showFullScreen()
+                shotRevealTimer.restart()
+            }
+        }
+
+        function cancelShot() {
+            hide()
+            restoreAppWindow()
+        }
+
+        function resetSelection() {
+            selectionReady = false
+            drawing = false
+            shotSelection.x = 0
+            shotSelection.y = 0
+            shotSelection.width = 0
+            shotSelection.height = 0
+        }
+
+        function commitSelection() {
+            if (shotSelection.width < minShotSize || shotSelection.height < minShotSize)
+                return
+            const r = Qt.rect(shotSelection.x, shotSelection.y,
+                shotSelection.width, shotSelection.height)
+            const willRestore = appHiddenForShot
+            const appWindow = hiddenAppWindow
+            const restoreVisibility = appRestoreVisibility
+            hide()
+            shotTimer.captureRect = r
+            shotTimer.hideApp = willRestore
+            shotTimer.appWindow = appWindow
+            shotTimer.restoreVisibility = restoreVisibility
+            shotTimer.restart()
+        }
+
+        onVisibleChanged: {
+            // 显示前由按钮先 reset；这里只在关闭后清理，避免显示第一帧闪旧选区。
+            if (!visible) {
+                opacity = 0
+                resetSelection()
+            }
+        }
+
+        Item {
+            id: shotUi
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: screenshotWindow.cancelShot()
+
+            // 未开始框选：整屏压暗。
+            Rectangle {
+                anchors.fill: parent
+                color: "#66000000"
+                visible: !screenshotWindow.selectionReady && !screenshotWindow.drawing
+            }
+
+            // 选区外四块压暗，选区内保持原色（真正的“变亮”）。
+            Rectangle { x: 0; y: 0; width: parent.width
+                height: Math.max(0, shotSelection.y)
+                color: "#66000000"; visible: screenshotWindow.selectionReady || screenshotWindow.drawing }
+            Rectangle { x: 0; y: shotSelection.y + shotSelection.height
+                width: parent.width; height: Math.max(0, parent.height - shotSelection.y - shotSelection.height)
+                color: "#66000000"; visible: screenshotWindow.selectionReady || screenshotWindow.drawing }
+            Rectangle { x: 0; y: shotSelection.y
+                width: Math.max(0, shotSelection.x); height: shotSelection.height
+                color: "#66000000"; visible: screenshotWindow.selectionReady || screenshotWindow.drawing }
+            Rectangle { x: shotSelection.x + shotSelection.width; y: shotSelection.y
+                width: Math.max(0, parent.width - shotSelection.x - shotSelection.width); height: shotSelection.height
+                color: "#66000000"; visible: screenshotWindow.selectionReady || screenshotWindow.drawing }
+
+            Rectangle {
+                id: shotSelection
+                visible: screenshotWindow.selectionReady || screenshotWindow.drawing
+                color: "transparent"
+                border.width: 1.5
+                border.color: Theme.color.accent
+                radius: 2
+                z: 2
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: screenshotWindow.selectionReady
+                    cursorShape: Qt.SizeAllCursor
+                    property point press: Qt.point(0, 0)
+                    property rect start: Qt.rect(0, 0, 0, 0)
+                    onPressed: (mouse) => {
+                        press = Qt.point(mouse.x, mouse.y)
+                        start = Qt.rect(shotSelection.x, shotSelection.y,
+                            shotSelection.width, shotSelection.height)
+                    }
+                    onPositionChanged: (mouse) => {
+                        if (!pressed)
+                            return
+                        const dx = mouse.x - press.x
+                        const dy = mouse.y - press.y
+                        shotSelection.x = Math.max(0, Math.min(shotUi.width - start.width, start.x + dx))
+                        shotSelection.y = Math.max(0, Math.min(shotUi.height - start.height, start.y + dy))
+                    }
+                }
+            }
+
+            // 四角拖拽改大小。
+            Repeater {
+                model: ["tl", "tr", "bl", "br"]
+                delegate: Rectangle {
+                    required property string modelData
+                    width: 10
+                    height: 10
+                    radius: 5
+                    color: Theme.color.accent
+                    visible: screenshotWindow.selectionReady
+                    z: 3
+                    x: (modelData === "tl" || modelData === "bl")
+                        ? shotSelection.x - 5 : shotSelection.x + shotSelection.width - 5
+                    y: (modelData === "tl" || modelData === "tr")
+                        ? shotSelection.y - 5 : shotSelection.y + shotSelection.height - 5
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        cursorShape: modelData === "tl" || modelData === "br"
+                            ? Qt.SizeFDiagCursor : Qt.SizeBDiagCursor
+                        onPressed: (mouse) => {
+                            screenshotWindow.resizeMode = modelData
+                            screenshotWindow.resizeStart = Qt.rect(shotSelection.x, shotSelection.y,
+                                shotSelection.width, shotSelection.height)
+                            screenshotWindow.resizePress = Qt.point(mouse.x, mouse.y)
+                        }
+                        onPositionChanged: (mouse) => {
+                            if (!pressed)
+                                return
+                            const dx = mouse.x - screenshotWindow.resizePress.x
+                            const dy = mouse.y - screenshotWindow.resizePress.y
+                            const r = screenshotWindow.resizeStart
+                            let x = r.x, y = r.y, w = r.width, h = r.height
+                            if (screenshotWindow.resizeMode === "tl") {
+                                x = r.x + dx; y = r.y + dy; w = r.width - dx; h = r.height - dy
+                            } else if (screenshotWindow.resizeMode === "tr") {
+                                y = r.y + dy; w = r.width + dx; h = r.height - dy
+                            } else if (screenshotWindow.resizeMode === "bl") {
+                                x = r.x + dx; w = r.width - dx; h = r.height + dy
+                            } else {
+                                w = r.width + dx; h = r.height + dy
+                            }
+                            if (w < screenshotWindow.minShotSize || h < screenshotWindow.minShotSize)
+                                return
+                            shotSelection.x = Math.max(0, Math.min(shotUi.width - w, x))
+                            shotSelection.y = Math.max(0, Math.min(shotUi.height - h, y))
+                            shotSelection.width = w
+                            shotSelection.height = h
+                        }
+                    }
+                }
+            }
+
+            // 初始框选区域。
+            MouseArea {
+                id: shotDrawArea
+                z: 1
+                anchors.fill: parent
+                enabled: !screenshotWindow.selectionReady
+                cursorShape: Qt.CrossCursor
+                property point startPoint
+                onPressed: (mouse) => {
+                    screenshotWindow.drawing = true
+                    startPoint = Qt.point(mouse.x, mouse.y)
+                    shotSelection.x = mouse.x
+                    shotSelection.y = mouse.y
+                    shotSelection.width = 0
+                    shotSelection.height = 0
+                }
+                onPositionChanged: (mouse) => {
+                    if (!pressed)
+                        return
+                    shotSelection.x = Math.min(startPoint.x, mouse.x)
+                    shotSelection.y = Math.min(startPoint.y, mouse.y)
+                    shotSelection.width = Math.abs(mouse.x - startPoint.x)
+                    shotSelection.height = Math.abs(mouse.y - startPoint.y)
+                }
+                onReleased: {
+                    screenshotWindow.drawing = false
+                    if (shotSelection.width < screenshotWindow.minShotSize
+                            || shotSelection.height < screenshotWindow.minShotSize) {
+                        screenshotWindow.resetSelection()
+                    } else {
+                        screenshotWindow.selectionReady = true
+                    }
+                }
+            }
+
+            // 已有选区时点空白处 = 取消当前选区，重新框。
+            MouseArea {
+                z: 1
+                anchors.fill: parent
+                enabled: screenshotWindow.selectionReady
+                onPressed: screenshotWindow.resetSelection()
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 18
+                text: screenshotWindow.selectionReady
+                    ? "拖动选区移动 · 拖四角调整 · 点完成截图"
+                    : "拖动选择截图区域 · Esc 取消"
+                color: "white"
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.caption
+                z: 20
+            }
+
+            // QQ/微信式操作栏：选区右下（空间不够就移到上方）。
+            Rectangle {
+                id: shotToolbar
+                visible: screenshotWindow.selectionReady
+                z: 30
+                width: 148
+                height: 38
+                radius: 8
+                color: Theme.color.menuBg
+                border.width: 0.5
+                border.color: Theme.color.menuBorder
+                x: Math.max(8, Math.min(shotUi.width - width - 8,
+                    shotSelection.x + shotSelection.width - width))
+                y: shotSelection.y + shotSelection.height + 10 + height > shotUi.height - 8
+                    ? Math.max(8, shotSelection.y - height - 10)
+                    : shotSelection.y + shotSelection.height + 10
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    Rectangle {
+                        width: 64
+                        height: 28
+                        radius: 6
+                        color: cancelMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                        Text {
+                            anchors.centerIn: parent
+                            text: "取消"
+                            color: Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                        }
+                        MouseArea {
+                            id: cancelMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: screenshotWindow.cancelShot()
+                        }
+                    }
+
+                    Rectangle {
+                        width: 64
+                        height: 28
+                        radius: 6
+                        color: confirmMouse.containsMouse ? Theme.color.accent : Theme.color.activeBg
+                        Text {
+                            anchors.centerIn: parent
+                            text: "完成"
+                            color: confirmMouse.containsMouse ? "white" : Theme.color.textPrimary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                            font.weight: Theme.font.weightBold
+                        }
+                        MouseArea {
+                            id: confirmMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: screenshotWindow.commitSelection()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: shotRevealTimer
+        interval: 60
+        repeat: false
+        onTriggered: screenshotWindow.opacity = 1
+    }
+
+    Timer {
+        id: shotShowTimer
+        interval: 120
+        repeat: false
+        onTriggered: {
+            screenshotWindow.showFullScreen()
+            shotRevealTimer.restart()
+        }
+    }
+
+    Timer {
+        id: shotTimer
+        interval: 140
+        repeat: false
+        property rect captureRect: Qt.rect(0, 0, 0, 0)
+        property bool hideApp: false
+        property var appWindow: null
+        property int restoreVisibility: Window.Windowed
+        onTriggered: {
+            if (captureRect.width >= 2 && captureRect.height >= 2)
+                Hub.captureScreenArea(captureRect.x, captureRect.y,
+                    captureRect.width, captureRect.height)
+            if (hideApp && appWindow) {
+                appWindow.show()
+                appWindow.visibility = restoreVisibility
+                appWindow.requestActivate()
+                screenshotWindow.appHiddenForShot = false
+                screenshotWindow.hiddenAppWindow = null
+            }
+        }
+    }
+
+    // 右键截图按钮：选择截图时隐藏还是保留 ULin Hub 窗口。
+    Popup {
+        id: shotOptionsMenu
+        parent: screenshotButton
+        width: 226
+        padding: 6
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        x: -width + screenshotButton.width
+        y: -height - 8
+
+        background: Rectangle {
+            radius: 10
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: shotOptionsMenu.width - 12
+            spacing: 2
+
+            Text {
+                width: parent.width
+                height: 24
+                verticalAlignment: Text.AlignVCenter
+                leftPadding: 6
+                text: "截图选项"
+                color: Theme.color.textCaption
+                font.family: "Microsoft YaHei UI"
+                font.pixelSize: Theme.font.small
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 32
+                radius: 5
+                color: hideOptionMouse.containsMouse ? Theme.color.hoverBg
+                    : (screenshotWindow.hideWindowOnShot ? Theme.color.activeBg : "transparent")
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 7
+                    Text {
+                        width: 12
+                        text: screenshotWindow.hideWindowOnShot ? "✓" : ""
+                        color: Theme.color.accent
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                    }
+                    Text {
+                        text: "隐藏 ULin Hub 后截图"
+                        color: Theme.color.textSecondary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                    }
+                }
+
+                MouseArea {
+                    id: hideOptionMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        screenshotWindow.hideWindowOnShot = true
+                        shotOptionsMenu.close()
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 32
+                radius: 5
+                color: showOptionMouse.containsMouse ? Theme.color.hoverBg
+                    : (!screenshotWindow.hideWindowOnShot ? Theme.color.activeBg : "transparent")
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 7
+                    Text {
+                        width: 12
+                        text: !screenshotWindow.hideWindowOnShot ? "✓" : ""
+                        color: Theme.color.accent
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                    }
+                    Text {
+                        text: "显示窗口截图"
+                        color: Theme.color.textSecondary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: Theme.font.caption
+                    }
+                }
+
+                MouseArea {
+                    id: showOptionMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        screenshotWindow.hideWindowOnShot = false
+                        shotOptionsMenu.close()
                     }
                 }
             }

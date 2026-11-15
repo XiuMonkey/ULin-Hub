@@ -9,7 +9,7 @@
 #include "qmlbridge/TerminalBridge.h"
 
 #include "common/terminal/TerminalVt.h"
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 #include "network/SessionCommands.h"
 #include "qmlbridge/TerminalVtModel.h"
 

@@ -5,7 +5,7 @@
 
 #include "common/session/SessionCatalog.h"
 // 回调签名用到 DshApiClient::RpcError（嵌套类型），因此需要完整定义
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 
 #include <QString>
 #include <functional>
@@ -34,4 +34,7 @@ public:
 	// 清空 DSH home 下的会话数据：sessions 目录 + storages/workspace.json。
 	// 默认工作区不在这里补建，由 ClientRuntime::resolveSessionWorkspace 在缺分组时补。
 	static void clearAllSessionData(const QString& dshHome);
+
+	// 删除单个会话在 DSH home 下的数据目录（服务端不支持 session/delete 时的兜底）。
+	static void deleteSessionData(const QString& dshHome, const QString& sessionId);
 };

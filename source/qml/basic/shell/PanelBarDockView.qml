@@ -552,8 +552,11 @@ Item {
                     // 视图时 Loader 不重建，靠活绑定把新地址推下去。
                     // 用户自己开的浏览器块 URL 是空串 ⇒ openExternal 直接返回，行为与从前一致。
                     onLoaded: {
-                        if (item && typeof item.openExternal === "function")
-                            item.startUrl = Qt.binding(function () { return PanelBarDock.activeViewUrl })
+                        if (item) {
+                            item.blockId = Qt.binding(function () { return PanelBarDock.activeBlockId })
+                            if (typeof item.openExternal === "function")
+                                item.startUrl = Qt.binding(function () { return PanelBarDock.activeViewUrl })
+                        }
                     }
                 }
             }

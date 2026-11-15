@@ -132,6 +132,10 @@ public:
 	QString firstWorkspaceId() const;
 	// 需要显示在侧边栏的会话（未归档、非子代理）
 	QVector<SessionRecord> visibleSessions() const;
+	// 已归档会话（非子代理）；按最近活动时间倒序，供“已归档会话”面板查看
+	QVector<SessionRecord> archivedSessions() const;
+	// 服务端确认彻底删除后，把记录从目录里移除（含归档集合）
+	void removeSession(const QString& sessionId);
 
 	// 自动选中：第一个"非运行中、非子代理"的会话，无则返回空串
 	QString autoSelectSessionId() const;

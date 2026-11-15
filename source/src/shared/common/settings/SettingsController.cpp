@@ -4,13 +4,15 @@
 
 #include "common/appearance/ThemeManager.h"
 #include "common/appearance/TranslationManager.h"
-#include "common/Agent/AgentPresetService.h"
+#include "common/agent/AgentPresetService.h"
+#include "common/agent/ulincore/UlinCoreSettings.h"
 #include "common/settings/SettingsStore.h"
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 
 #include <QJsonArray>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QQmlEngine>
 #include <memory>
 #include <QDesktopServices>
 #include <QLocale>
@@ -371,7 +373,7 @@ void SettingsController::openPage()
 
 void SettingsController::setPage(int page)
 {
-	const int bounded = qBound(0, page, 3);
+	const int bounded = qBound(0, page, 6);
 	if (m_page == bounded)
 		return;
 
@@ -488,6 +490,15 @@ void SettingsController::selectDefaultPreset(const QString& presetId)
 		});
 }
 
+QObject* SettingsController::ulincore() const
+{
+	auto& settings = UlinCore::UlinCoreSettings::instance();
+	settings.setDataDir(QCoreApplication::applicationDirPath() + QStringLiteral("/data/ulincore"));
+	// 单例由 C++ 持有：QML 不能接管所有权，否则引擎销毁时会 delete 静态对象。
+	QQmlEngine::setObjectOwnership(&settings, QQmlEngine::CppOwnership);
+	return &settings;
+}
+
 QVariantList SettingsController::masterBackends() const
 {
 	QVariantList rows;
@@ -571,6 +582,7 @@ void SettingsController::selectMasterBackend(const QString& backendId)
 		}
 	}
 	m_masterBackend = id;
+	setPage(0);   // 切后端后回到第一页：ulincore 模式下就是 ULin Core 设置页
 	emit masterBackendChanged();
 	emit masterBackendChangeRequested(id);
 }
@@ -848,6 +860,11 @@ void SettingsController::refresh()
 
 			m_credentials.clear();  // 逐个 provider 查凭据状态：配没配、可不可写、来源（env / file）
 			for (const ConfigurableProvider& provider : m_view.providers) {
+				// deepseek-account 走账号登录，不需要 API Key（服务端 hasProviderApiKey 也跳过它）；
+				// 别去 describe 一个不存在的凭据引用，否则设置页会显示「缺 key」。
+				if (provider.provider == QLatin1String("deepseek-account"))
+					continue;
+
 				const SettingsNamespace* ns = findNamespace(provider);
 				if (!ns)
 					continue;
@@ -901,22 +918,34 @@ void SettingsController::rebuildProviders()
 			declaredByProfile = !ModelSelectionService::profileApiKeyEnv(*ns, provider.settingsPath).isEmpty();
 			ref = ModelSelectionService::resolveKeyRef(provider.provider, *ns, provider.settingsPath);
 		}
+		// deepseek-account 走账号登录，不需要 API Key（与服务端 hasProviderApiKey 的跳过一致）。
+		const bool noApiKey = provider.provider == QLatin1String("deepseek-account");
 		row.insert(QStringLiteral("keyRef"), ref);
 		row.insert(QStringLiteral("keyDeclaredByProfile"), declaredByProfile);
 		row.insert(QStringLiteral("namespaceFound"), ns != nullptr);
+		row.insert(QStringLiteral("noApiKey"), noApiKey);
 
 		bool known = false;   // 凭据状态：还没查到时按"未知"呈现（不能当成只读）
 		bool configured = false;
 		bool writable = false;
 		QString source;
-		for (const CredentialStatus& status : m_credentials) {
-			if (status.ref != ref || ref.isEmpty())
-				continue;
-			known = status.known;
-			configured = status.configured;
-			writable = status.writable;
-			source = status.source;
-			break;
+		if (noApiKey) {
+			// 账号登录视作已就绪：没有 key 可填，也不该提示「缺 key」。
+			known = true;
+			configured = true;
+			writable = false;
+			source = QStringLiteral("account");
+		}
+		else {
+			for (const CredentialStatus& status : m_credentials) {
+				if (status.ref != ref || ref.isEmpty())
+					continue;
+				known = status.known;
+				configured = status.configured;
+				writable = status.writable;
+				source = status.source;
+				break;
+			}
 		}
 		row.insert(QStringLiteral("keyKnown"), known);
 		row.insert(QStringLiteral("keyConfigured"), configured);

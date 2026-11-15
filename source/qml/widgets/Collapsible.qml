@@ -197,6 +197,10 @@ Column {
             color: root.labelColor
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
+            // 折叠行只有 24px：默认 NoWrap 虽禁自动折行，但命令/工具名里的显式 \n 照样断行，
+            // 会把这一行撑高、顶到后面的成员行上（同 EntryChip.qml:228-233 的坑）。
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            maximumLineCount: 1
             elide: Text.ElideRight
             Behavior on color {
                 ColorAnimation { duration: 100; easing.type: Easing.OutCubic }
@@ -245,8 +249,10 @@ Column {
             color: root.labelColor   // 官方 .summary 不设 color ⇒ 继承行的 label-tertiary（悬停变 secondary），与标题同步
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
-            elide: Text.ElideRight
+            // 与 titleText 同理：显式 wrapMode + maximumLineCount 才能让 elide 真正收成一行
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
             maximumLineCount: 1
+            elide: Text.ElideRight
 
             // 官方在流式尾巴上给摘要套 TextShimmer（高亮扫光）。**本版不做任何动画**：
             // 而且还拖累 MessageListView 的贴底（每次 opacity 变化都触发一次重绘）。

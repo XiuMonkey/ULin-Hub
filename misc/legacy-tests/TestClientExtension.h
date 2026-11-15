@@ -17,7 +17,7 @@
 //   · 下次启动   → loadAll() 开头的清扫把带标记（或"没判据却还有 dll"）的目录删掉。
 //
 // 测试全程只碰自己的临时目录（ULINHUB_CLIENT_EXTENSION_DIR 被指过去），
-// 绝不碰真的 <exe>/clientExtensions。
+// 绝不碰真的 <exe>/extensions。
 // ------------------------------------------------------------------
 
 class TestClientExtension : public QObject

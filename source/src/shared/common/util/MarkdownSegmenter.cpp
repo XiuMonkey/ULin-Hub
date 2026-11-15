@@ -110,8 +110,8 @@ namespace
 
 	void applyBlockLayout(QTextBlock block, int blockIndex, int blockCount)
 	{
-		QTextBlockFormat blockFormat = block.blockFormat();
-		QTextCursor cursor(block);
+		const QTextBlockFormat original = block.blockFormat();
+		QTextBlockFormat blockFormat = original;
 		const int heading = blockFormat.headingLevel();
 		const bool listItem = block.textList() != nullptr;
 		const bool listFirst = listItem
@@ -142,11 +142,18 @@ namespace
 			}
 		}
 
-		cursor.setBlockFormat(blockFormat);
+		// 流式每 33ms 都会 restyle 全部块；而 setBlockFormat/setFormat 会打脏布局、
+		// 触发整篇重新排版。稳定态下格式其实早就对了，只在真的变了才写。
+		if (blockFormat != original) {
+			QTextCursor cursor(block);
+			cursor.setBlockFormat(blockFormat);
+		}
 		if (listItem) {
-			QTextListFormat listFormat = block.textList()->format();
+			const QTextListFormat current = block.textList()->format();
+			QTextListFormat listFormat = current;
 			listFormat.setIndent(1);
-			block.textList()->setFormat(listFormat);
+			if (listFormat != current)
+				block.textList()->setFormat(listFormat);
 		}
 	}
 
@@ -322,6 +329,16 @@ namespace MarkdownSegmenter
 		QVariantList parts;
 		if (markdown.isEmpty())
 			return parts;
+
+		// 没有代码围栏时根本不需要按行拆分：流式长正文每个 chunk 都会走 split，
+		// 直接返回单个 prose 单元，避免每 33ms 重建整篇 QStringList。
+		if (!markdown.contains(QStringLiteral("```"))) {
+			QVariantMap part;
+			part.insert(QStringLiteral("kind"), QStringLiteral("prose"));
+			part.insert(QStringLiteral("text"), markdown);
+			parts.append(part);
+			return parts;
+		}
 
 		const QStringList lines = markdown.split(QLatin1Char('\n'));
 		QStringList proseBuffer;

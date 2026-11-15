@@ -280,7 +280,7 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 
 	if (ClientExtension::isClientExtensionType(loaded.type)) {
 		// 客户端扩展：不碰 serverProfilePath（不写 extensions.json、不改 cordis.patch.yml、不重启服务端），
-		// 只把 dll + regulation 落到 <exe>/clientExtensions/<Name>/。这里**不装载 DLL** —— 本函数跑在
+		// 只把 dll + regulation 落到 <exe>/extensions/<Name>/。这里**不装载 DLL** —— 本函数跑在
 		// ExtensionInstallTask 的后台线程上，装载必须由 GUI 线程做（调用方拿到 isClientExtension 后自己
 		// 调 ClientExtension::loadOne）。
 		const QString name = loaded.declaredName.isEmpty()

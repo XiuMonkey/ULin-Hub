@@ -517,6 +517,9 @@
     <message id="model_credential_unconfigured_suffix">
         <translation>；服务端尚未配置</translation>
     </message>
+    <message id="model_credential_account_auth">
+        <translation>账号登录，无需 API Key</translation>
+    </message>
     <message id="model_credential_readonly_hint">
         <translation>该凭据为只读，留空即可</translation>
     </message>
@@ -629,7 +632,7 @@
         <translation>设置</translation>
     </message>
     <message id="settings_agent_preset_tab">
-        <translation>Agent预设</translation>
+        <translation>Agent</translation>
     </message>
     <message id="settings_server_tab">
         <translation>Server设置</translation>
@@ -638,10 +641,10 @@
         <translation>外观设置</translation>
     </message>
     <message id="settings_default_agent_preset">
-        <translation>默认 Agent 预设</translation>
+        <translation>默认 Agent</translation>
     </message>
     <message id="settings_agent_preset_hint">
-        <translation>新会话将使用该预设；修改后对当前会话也会立即生效。</translation>
+        <translation>新会话将使用该 Agent；修改后对当前会话也会立即生效。</translation>
     </message>
     <message id="settings_server_address">
         <translation>服务端地址</translation>
@@ -683,10 +686,10 @@
         <translation>加载失败：%1 %2</translation>
     </message>
     <message id="settings_no_preset">
-        <translation>（无可用预设）</translation>
+        <translation>（无可用 Agent）</translation>
     </message>
     <message id="settings_agent_preset_unavailable">
-        <translation>当前引擎未内置 Agent 预设</translation>
+        <translation>当前引擎未内置 Agent</translation>
     </message>
     <message id="sessionBar_new_workspace">
         <translation>新建工作区</translation>
@@ -1190,6 +1193,45 @@
     </message>
     <message id="chat_streaming_hint">
         <translation>正在研究…</translation>
+    </message>
+    <message id="settings_ulincore_tab">
+        <translation>ULin Core</translation>
+    </message>
+    <message id="ulincore_settings_hint">
+        <translation>自研内核的模型接口与本地设置；保存后下一轮生效。</translation>
+    </message>
+    <message id="ulincore_base_url">
+        <translation>接口地址</translation>
+    </message>
+    <message id="ulincore_api_key">
+        <translation>API Key</translation>
+    </message>
+    <message id="ulincore_model">
+        <translation>模型名</translation>
+    </message>
+    <message id="ulincore_temperature">
+        <translation>温度</translation>
+    </message>
+    <message id="ulincore_max_tokens">
+        <translation>最大 Token</translation>
+    </message>
+    <message id="ulincore_system_prompt">
+        <translation>系统提示词</translation>
+    </message>
+    <message id="ulincore_workspace">
+        <translation>工作目录</translation>
+    </message>
+    <message id="ulincore_tool_threads">
+        <translation>工具线程数</translation>
+    </message>
+    <message id="ulincore_save">
+        <translation>保存</translation>
+    </message>
+    <message id="ulincore_restore">
+        <translation>恢复默认</translation>
+    </message>
+    <message id="ulincore_save_hint">
+        <translation>保存后下一轮生效；Key 为空时使用 Echo 模型。</translation>
     </message>
 </context>
 </TS>

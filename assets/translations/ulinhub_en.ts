@@ -517,6 +517,9 @@
     <message id="model_credential_unconfigured_suffix">
         <translation>; not configured on the server yet</translation>
     </message>
+    <message id="model_credential_account_auth">
+        <translation>Signed in via account — no API key needed</translation>
+    </message>
     <message id="model_credential_readonly_hint">
         <translation>This credential is read-only, just leave it empty</translation>
     </message>
@@ -629,7 +632,7 @@
         <translation>Settings</translation>
     </message>
     <message id="settings_agent_preset_tab">
-        <translation>Agent preset</translation>
+        <translation>Agent</translation>
     </message>
     <message id="settings_server_tab">
         <translation>Server</translation>
@@ -638,10 +641,10 @@
         <translation>Appearance</translation>
     </message>
     <message id="settings_default_agent_preset">
-        <translation>Default agent preset</translation>
+        <translation>Default agent</translation>
     </message>
     <message id="settings_agent_preset_hint">
-        <translation>New sessions use this preset; changes also take effect immediately in the current session.</translation>
+        <translation>New sessions use this agent; changes also take effect immediately in the current session.</translation>
     </message>
     <message id="settings_server_address">
         <translation>Server address</translation>
@@ -683,10 +686,10 @@
         <translation>Load failed: %1 %2</translation>
     </message>
     <message id="settings_no_preset">
-        <translation>(no preset available)</translation>
+        <translation>(no agent available)</translation>
     </message>
     <message id="settings_agent_preset_unavailable">
-        <translation>Agent presets are not available in this engine build</translation>
+        <translation>No agent is available in this engine build</translation>
     </message>
     <message id="sessionBar_new_workspace">
         <translation>New workspace</translation>
@@ -1190,6 +1193,45 @@ Click “New chat” above to start</translation>
     </message>
     <message id="chat_streaming_hint">
         <translation>Researching…</translation>
+    </message>
+    <message id="settings_ulincore_tab">
+        <translation>ULin Core</translation>
+    </message>
+    <message id="ulincore_settings_hint">
+        <translation>Model endpoint and local settings for the in-house kernel; applies to the next turn.</translation>
+    </message>
+    <message id="ulincore_base_url">
+        <translation>Base URL</translation>
+    </message>
+    <message id="ulincore_api_key">
+        <translation>API Key</translation>
+    </message>
+    <message id="ulincore_model">
+        <translation>Model</translation>
+    </message>
+    <message id="ulincore_temperature">
+        <translation>Temperature</translation>
+    </message>
+    <message id="ulincore_max_tokens">
+        <translation>Max tokens</translation>
+    </message>
+    <message id="ulincore_system_prompt">
+        <translation>System prompt</translation>
+    </message>
+    <message id="ulincore_workspace">
+        <translation>Workspace root</translation>
+    </message>
+    <message id="ulincore_tool_threads">
+        <translation>Tool threads</translation>
+    </message>
+    <message id="ulincore_save">
+        <translation>Save</translation>
+    </message>
+    <message id="ulincore_restore">
+        <translation>Restore defaults</translation>
+    </message>
+    <message id="ulincore_save_hint">
+        <translation>Applies to the next turn; Echo is used when the key is empty.</translation>
     </message>
 </context>
 </TS>

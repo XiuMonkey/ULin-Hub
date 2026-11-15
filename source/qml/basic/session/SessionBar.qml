@@ -1,4 +1,4 @@
-// 侧栏（Quiet Rail 版）：200×69 Logo + 唯一主按钮「新对话」+ 搜索 + 置顶/工作区/会话列表 + 底部工具条。
+// 侧栏（Quiet Rail 版）：200×69 Logo + 唯一主按钮「新建工作区」+ 搜索 + 置顶/工作区/会话列表 + 底部工具条。
 // 视觉与结构照 build/temp/sidebar-redesign/index.html（concept a）+ styles.css 落地；
 // 外层圆角卡片（radius 12、窗口留白、Card 阴影）仍由 Shell.qml 的 sessionBarCard 提供，这里只排卡片内部。
 // 数据仍是 Hub.sessions（摊平的工作区/会话行模型，见 common/session/SessionListModel.h）：
@@ -69,6 +69,12 @@ Item {
 
     function startNewSession() {
         Hub.createSession("")   // 与现有实现「新建会话」同一条路：没有工作区参数 = 当前/默认工作区
+    }
+
+    property var archivedModel: []
+    function openArchivedSessions() {
+        archivedModel = Hub.archivedSessions()
+        archivedPopup.open()
     }
 
     // 工作区识别色：从 id/title 稳定散列出一个受控色相（蓝/绿/橙/紫），
@@ -186,7 +192,7 @@ Item {
             anchors.right: newChatKeycap.left
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
-            text: qsTrId("sessionBar_new_chat")
+            text: qsTr("新建工作区")
             color: Theme.color.primaryButtonText
             font.family: "Microsoft YaHei UI"
             font.pixelSize: Theme.font.body
@@ -211,13 +217,13 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: sessionBar.startNewSession()
+            onClicked: Hub.createWorkspace()
         }
     }
 
-    Shortcut {   // Ctrl N = 新对话（与按钮同一条路）
+    Shortcut {   // Ctrl N = 新建工作区（与主按钮同一条路）
         sequence: "Ctrl+N"
-        onActivated: sessionBar.startNewSession()
+        onActivated: Hub.createWorkspace()
     }
 
     SessionSearchBox {
@@ -432,6 +438,264 @@ Item {
         }
     }
 
+    Popup {
+        id: archivedPopup
+        parent: sessionBar
+        width: Math.min(320, sessionBar.width + 360)   // 放在侧栏右侧，不占列表本身
+        height: Math.min(430, sessionBar.height - 40)
+        padding: 0
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        // 锚在侧栏右侧、靠近底部“已归档会话”入口的位置。
+        x: sessionBar.width + 8
+        y: Math.max(8, Math.min(sessionBar.height - height - 8,
+            sessionBar.height - footer.height - height - 24))
+
+        property string confirmDeleteId: ""
+
+        Connections {
+            target: Hub
+            function onArchivedSessionsChanged() {
+                sessionBar.archivedModel = Hub.archivedSessions()
+            }
+        }
+
+        background: Rectangle {
+            radius: 10
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: archivedPopup.width
+            spacing: 0
+
+            Item {
+                width: parent.width
+                height: 46
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "已归档会话"
+                    color: Theme.color.textPrimary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.body
+                    font.weight: Theme.font.weightBold
+                }
+
+                Item {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 30
+                    height: 30
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "×"
+                        color: closeArchivedMouse.containsMouse
+                            ? Theme.color.textPrimary : Theme.color.textTertiary
+                        font.family: "Microsoft YaHei UI"
+                        font.pixelSize: 18
+                    }
+
+                    MouseArea {
+                        id: closeArchivedMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: archivedPopup.close()
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.color.border
+            }
+
+            ListView {
+                id: archivedList
+                width: parent.width
+                height: archivedPopup.height - 48
+                clip: true
+                model: sessionBar.archivedModel
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: AppScrollBar { }
+
+                delegate: Item {
+                    required property var modelData
+                    width: archivedList.width
+                    height: archivedPopup.confirmDeleteId === modelData.sessionId ? 92 : 64
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
+                        anchors.topMargin: 3
+                        anchors.bottomMargin: 3
+                        radius: 7
+                        color: archivedRowMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                    }
+
+                    Column {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        anchors.right: parent.right
+                        anchors.rightMargin: 14
+                        anchors.top: parent.top
+                        anchors.topMargin: 9
+                        spacing: 3
+
+                        Text {
+                            width: parent.width
+                            text: modelData.title && String(modelData.title).length > 0
+                                ? String(modelData.title) : "未命名会话"
+                            color: Theme.color.textPrimary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.caption
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: modelData.updatedAt > 0
+                                ? sessionBar.relativeTimeText(modelData.updatedAt) : "已归档"
+                            color: Theme.color.textCaption
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                        }
+                    }
+
+                    MouseArea {
+                        id: archivedRowMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {}   // 行本身不打开会话；只能通过右侧按钮操作
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.top: parent.top
+                        anchors.topMargin: 10
+                        spacing: 10
+                        visible: archivedPopup.confirmDeleteId !== modelData.sessionId
+
+                        Text {
+                            text: "还原"
+                            color: restoreMouse.containsMouse ? Theme.color.accent : Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+
+                            MouseArea {
+                                id: restoreMouse
+                                anchors.fill: parent
+                                anchors.margins: -5
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    Hub.unarchiveArchivedSession(modelData.sessionId)
+                                    archivedPopup.close()
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "彻底删除"
+                            color: deleteMouse.containsMouse ? Theme.color.danger : Theme.color.textTertiary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+
+                            MouseArea {
+                                id: deleteMouse
+                                anchors.fill: parent
+                                anchors.margins: -5
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: archivedPopup.confirmDeleteId = modelData.sessionId
+                            }
+                        }
+                    }
+
+                    Item {
+                        visible: archivedPopup.confirmDeleteId === modelData.sessionId
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.topMargin: 54
+                        height: 34
+
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "彻底删除后无法恢复，确定？"
+                            color: Theme.color.textSecondary
+                            font.family: "Microsoft YaHei UI"
+                            font.pixelSize: Theme.font.small
+                        }
+
+                        Row {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 10
+
+                            Text {
+                                text: "取消"
+                                color: cancelDeleteMouse.containsMouse
+                                    ? Theme.color.textPrimary : Theme.color.textSecondary
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.small
+                                MouseArea {
+                                    id: cancelDeleteMouse
+                                    anchors.fill: parent
+                                    anchors.margins: -5
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: archivedPopup.confirmDeleteId = ""
+                                }
+                            }
+
+                            Text {
+                                text: "删除"
+                                color: Theme.color.danger
+                                font.family: "Microsoft YaHei UI"
+                                font.pixelSize: Theme.font.small
+                                font.weight: Theme.font.weightBold
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -5
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        Hub.deleteArchivedSession(modelData.sessionId)
+                                        archivedPopup.confirmDeleteId = ""
+                                        archivedPopup.close()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: archivedList.count === 0
+                    text: "没有已归档会话"
+                    color: Theme.color.textCaption
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+            }
+        }
+    }
+
     SessionOverflowMenu {   // 溢出菜单：危险动作（清空会话）与低频动作（新建工作区）收在这里，不再常驻首屏
         id: overflowMenu
         parent: sessionBar
@@ -439,6 +703,7 @@ Item {
         y: Math.round(sessionBar.height - footer.height - height - 4)
         onClearSessionsRequested: sessionBar.clearSessionsRequested()
         onNewWorkspaceRequested: Hub.createWorkspace()
+        onArchivedSessionsRequested: sessionBar.openArchivedSessions()
     }
 
     property string pendingId: ""

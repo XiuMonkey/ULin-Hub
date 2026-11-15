@@ -1,6 +1,11 @@
 // Agent 消息气泡：整条消息套圆角气泡，内部按官方的三层折叠铺开。
-// 连续的 thinking/toolCall/toolResult 段归入一个过程组，reply 段是组与组的分界；
-// 整轮行只控制过程组显隐，正文始终可见。气泡不画描边，只用极淡的外晕。
+// 层级（官方原版）：
+//   「已完成」            ← 整轮行：本轮除最终输出外的一切都收在里面
+//     「已完成分析」      ← 过程组：连续的 thinking/toolCall/toolResult（思考与工具同组）
+//     「中间输出文字」    ← 非最终 reply：也在完成行里，隔开前后两个过程组
+//     「执行了命令」      ← 只含工具、没有思考的组
+//   「最终输出」          ← 最后一段 reply，始终可见
+// 所以：reply 段是过程组的分界；最后一段 reply 是唯一留在完成行外面的正文。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -13,6 +18,18 @@ Item {
     id: root
 
     property var segments: []
+    // 最后一段 reply 是最终输出；流式期间它的正文走 replyTail，提交后回落到 segments。
+    readonly property int finalReplyIndex: {
+        var index = -1
+        var segs = root.segments || []
+        for (var i = 0; i < segs.length; ++i) {
+            if (segs[i].type === "reply")
+                index = i
+        }
+        return index
+    }
+    // 仅最终 reply 的流式尾文本；thinking/tool 不走这里。
+    property string replyTail: ""
     property bool streaming: false
     // 只在“研究”阶段（最后一块是 thinking/tool 组成的过程块）显示爬行提示；
     // 一旦开始输出正文（最后一块是 reply），提示直接收起，不做动画。
@@ -24,13 +41,16 @@ Item {
     }
     property var deliverables: []
 
-    // 复制全文优先取 reply 段，没有 reply 时退回所有段；原生拖选无法跨多个 TextEdit。
-    readonly property string copyText: {
+    // 复制全文优先取 reply 段，没有 reply 时退回所有段。
+    // 按需拼一次，不做成绑定：流式期间 replyTail 每 33ms 变一次，绑定会把整段文本反复重建。
+    function collectCopyText() {
         var replies = []
         var all = []
         var segs = root.segments || []
         for (var i = 0; i < segs.length; ++i) {
-            var text = segs[i] && segs[i].text ? String(segs[i].text) : ""
+            var text = (i === root.finalReplyIndex && root.replyTail.length > 0)
+                ? root.replyTail
+                : (segs[i] && segs[i].text ? String(segs[i].text) : "")
             if (text.length === 0)
                 continue
             all.push(text)
@@ -41,11 +61,52 @@ Item {
     }
 
     function copyAll() {
-        if (root.copyText.length === 0)
+        var text = root.collectCopyText()
+        if (text.length === 0)
             return
+        clipboardHelper.text = text
         clipboardHelper.selectAll()
         clipboardHelper.copy()
         clipboardHelper.deselect()
+    }
+
+    // 右键菜单「复制」：把拖选中的文字写进剪贴板（与 Ctrl+C 同一份内容）。
+    // 选区在右键按下 / 弹窗抢焦点后可能被清掉，所以 press 阶段先抓成字符串；
+    // 一条消息拆成多个 TextEdit（prose / 代码块 / 过程段），这里取第一个有选区的，
+    // 原生拖选不能跨控件的代价照旧接受。
+    property string capturedSelection: ""
+
+    function findSelectedText(item) {
+        if (!item)
+            return ""
+        if (item.selectedText !== undefined && item.selectedText.length > 0)
+            return item.selectedText
+        var kids = item.children || []
+        for (var i = 0; i < kids.length; ++i) {
+            var t = root.findSelectedText(kids[i])
+            if (t.length > 0)
+                return t
+        }
+        // Flickable 等容器把子项挂在 contentItem 上，不在 children 里
+        var ci = item.contentItem
+        if (ci && ci !== item) {
+            var ciKids = ci.children || []
+            for (var j = 0; j < ciKids.length; ++j) {
+                var t2 = root.findSelectedText(ciKids[j])
+                if (t2.length > 0)
+                    return t2
+            }
+        }
+        return ""
+    }
+
+    function copySelection() {
+        if (root.capturedSelection.length === 0)
+            return
+        selectionHelper.text = root.capturedSelection
+        selectionHelper.selectAll()
+        selectionHelper.copy()
+        selectionHelper.deselect()
     }
 
     // 宽度正被外层动画驱动时按停阴影，避免源面尺寸变化反复重做离屏纹理；
@@ -100,17 +161,22 @@ Item {
         root.expandedKeys = next
     }
 
-    // 把 segments 切成正文块 / 过程块
+    // 把 segments 切成正文块 / 过程块，顺序严格保持 segments 的原始顺序
     readonly property var blocks: {
         var out = []
         var segs = root.segments || []
+        var lastReply = root.finalReplyIndex
         var i = 0
         while (i < segs.length) {
             if (segs[i].type === "reply") {
-                out.push({ kind: "reply", part: segs[i], start: i, count: 1, members: [] })
+                // 按真实 segment 顺序排列；最终 reply 不压到底部，否则“正文 → 思考/工具”
+                // 会被重排成“思考/工具 → 正文”，与流式输出顺序不一致。
+                out.push({ kind: "reply", part: segs[i], start: i, count: 1, members: [],
+                           final: i === lastReply })
                 i += 1
                 continue
             }
+            // 过程组 = 一段连续的非正文段（思考与工具同组，reply 是组与组的分界）。
             var start = i
             var members = []
             while (i < segs.length && segs[i].type !== "reply") {
@@ -141,14 +207,18 @@ Item {
             root.expandKey("turn")
     }
 
-    // 组内是否出现过工具调用 ⇒ 决定组标题/图标（"执行了命令" / "已完成分析"）
+    // 组内出现过思考 ⇒ 「已完成分析」（思考与工具同组，标题按分析算）；
+    // 只有工具的组才叫「执行了命令」。
     function groupActivity(start, count) {
+        var hasTool = false
         for (var i = start; i < start + count; ++i) {
             var type = root.segments[i] ? root.segments[i].type : ""
+            if (type === "thinking")
+                return "think"
             if (type === "toolCall" || type === "toolResult")
-                return "tool"
+                hasTool = true
         }
-        return "think"
+        return hasTool ? "tool" : "think"
     }
 
     // 折叠摘要取正文第一行；流式中改取最近一个已完成段落的首行，并去掉 Markdown 强调符号。
@@ -268,6 +338,11 @@ Item {
                     width: inner.width
                     spacing: Theme.spacing.labelGap
 
+                    // 中间输出（非最终 reply）收进「已完成」：只有最后一段输出常显，
+                    // 其余跟随整轮行展开/折叠；过程组有自己的显隐绑定，不受这里影响。
+                    // 最终正文无条件常显；只有中间 reply 收束在「已完成」里，不单独露到过程组外。
+                    visible: blockData.kind !== "reply" || blockData.final
+
                     // 过程组：一组连续的思考/工具，收起只剩一行“图标 + 动作短语”。
                     Collapsible {
                         id: group
@@ -320,11 +395,15 @@ Item {
 
                                     iconKind: isThinking ? "think" : "tool"
                                     running: isTail
-                                    // 没有工具到动作名的映射表，直接用工具名占同一格
-                                    title: isThinking
+                                    // 没有工具到动作名的映射表，直接用工具名占同一格。
+                                    // ACP 的 tool title 有时是一整条命令（账本里确实存在
+                                    // name="`pwd && ls ...`" 这种），折叠行只有一行高，
+                                    // 不截断就会横向溢出盖住相邻行；正文有内滚，不受影响。
+                                    readonly property string rawTitle: isThinking
                                         ? qsTrId("chat_thinking_title")
                                         : (seg.type === "toolCall" ? seg.toolName
                                                                    : qsTrId("chat_tool_result_label"))
+                                    title: rawTitle.length > 64 ? rawTitle.slice(0, 64) + "…" : rawTitle
                                     summary: isThinking
                                         ? root.thinkingSummary(seg.text, isTail)
                                         : root.toolArgsSummary(seg.text)
@@ -360,7 +439,10 @@ Item {
                     }
 
                     // 正文段：正文 / 代码块按出现顺序；用数字模型避免每个 chunk 重建。
-                    readonly property var replyParts: (blockData.kind === "reply" && blockData.part.parts)
+                    readonly property bool replyTailActive: !!blockData.final
+                        && root.replyTail.length > 0
+                    readonly property var replyParts: (blockData.kind === "reply"
+                        && !replyTailActive && blockData.part.parts)
                         ? blockData.part.parts
                         : []
 
@@ -394,12 +476,21 @@ Item {
                             }
                         }
                     }
+                    // 最终 reply 的流式尾：只更新这一块，稳定 segments/Repeater 不重建。
+                    MarkdownBody {
+                        visible: block.replyTailActive
+                        width: block.width
+                        text: block.replyTailActive ? root.replyTail : ""
+                    }
                 }
             }
 
             DeliverablesView {
                 width: inner.width
                 items: root.deliverables
+                // 产物只在整轮输出结束后出现：present 是在回合中间调用的，事件会先到；
+                // 流式期间先压住，避免卡片抢在正文/流式尾巴前面。
+                visible: !root.streaming && root.deliverables.length > 0
             }
         }
     }
@@ -468,12 +559,22 @@ Item {
     }
 
     // QML 没有独立 Clipboard 类型，借只读 TextEdit 复制全文。
+    // text 只在 copyAll() 时写入，保持为空避免流式期间绑定重建全文。
     TextEdit {
         id: clipboardHelper
         visible: false
         readOnly: true
         textFormat: TextEdit.PlainText
-        text: root.copyText
+        width: 1
+        height: 1
+    }
+
+    // 复制选区用：TextEdit.copy() 只认自己的选区，借一个无绑定的隐藏 TextEdit 写字符串。
+    TextEdit {
+        id: selectionHelper
+        visible: false
+        readOnly: true
+        textFormat: TextEdit.PlainText
         width: 1
         height: 1
     }
@@ -497,6 +598,35 @@ Item {
         contentItem: Column {
             width: copyMenu.width - 12
             spacing: 2
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
+                visible: root.capturedSelection.length > 0
+                color: selCopyMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTrId("common_copy")
+                    color: Theme.color.textSecondary
+                    font.family: "Microsoft YaHei UI"
+                    font.pixelSize: Theme.font.caption
+                }
+
+                MouseArea {
+                    id: selCopyMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.copySelection()
+                        copyMenu.close()
+                    }
+                }
+            }
 
             Rectangle {
                 width: parent.width
@@ -530,8 +660,15 @@ Item {
 
     TapHandler {
         acceptedButtons: Qt.RightButton
+        // 右键按下时选区还在，先抓一份；Popup 打开会抢焦点，之后不再依赖原选区。
+        onPressedChanged: {
+            if (pressed)
+                root.capturedSelection = root.findSelectedText(root)
+        }
         onTapped: (eventPoint) => {
             var p = eventPoint.position
+            if (root.capturedSelection.length === 0)
+                root.capturedSelection = root.findSelectedText(root)
             copyMenu.x = Math.max(8, Math.min(root.width - copyMenu.width - 8, p.x))
             copyMenu.y = Math.max(8, Math.min(root.height - copyMenu.height - 8, p.y))
             copyMenu.open()

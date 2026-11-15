@@ -9,12 +9,13 @@
 
 #include "common/session/ChatController.h"
 #include "common/session/TraceModel.h"   // trace() 把 TraceModel* 当 QAbstractItemModel* 返回，需要完整类型
-#include "common/Agent/ToolsFilter.h"
+#include "common/agent/ToolsFilter.h"
 #include "common/util/CodeHighlighter.h"
+#include "common/util/Debugger.h"
 #include "common/util/MarkdownSegmenter.h"
 #include "core/ClientRuntime.h"
 #include "core/ServerManager.h"
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 #include "network/SessionCommands.h"
 #include "qmlbridge/TerminalBridge.h"
 #include "qmlbridge/FileBrowserBridge.h"
@@ -23,15 +24,24 @@
 
 #include <QAbstractTextDocumentLayout>
 #include <QDateTime>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QImage>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QQuickTextDocument>
+#include <QQuickWindow>
 #include <QTextBlock>
 #include <QTextBlockFormat>
 #include <QTextCursor>
@@ -39,6 +49,7 @@
 #include <QTextDocumentFragment>
 #include <QTextFrame>
 #include <QTextLayout>
+#include <QUuid>
 #include <algorithm>
 #include <QTextLine>
 #include <QTextTable>
@@ -53,6 +64,23 @@ namespace
 {
 	// 界面上的"未分组"分组（见 SessionListModel::ungroupedWorkspaceKey）
 	const char kUngroupedKey[] = "#ungrouped";
+
+	// 流式正文的纯文本快路径判据：只有不含任何 Markdown 控制字符的内容才能直接 insertText；
+	// 否则必须回落到 fragment 重排，避免链接/强调/代码/表格/HTML/实体等被当普通字面量插进文档。
+	bool isPlainStreamingText(const QString& text)
+	{
+		for (const QChar ch : text) {
+			if (ch == QLatin1Char('\n') || ch == QLatin1Char('\r')
+				|| ch == QLatin1Char('#') || ch == QLatin1Char('*') || ch == QLatin1Char('_')
+				|| ch == QLatin1Char('`') || ch == QLatin1Char('[') || ch == QLatin1Char(']')
+				|| ch == QLatin1Char('(') || ch == QLatin1Char(')') || ch == QLatin1Char('>')
+				|| ch == QLatin1Char('|') || ch == QLatin1Char('~') || ch == QLatin1Char('$')
+				|| ch == QLatin1Char('\\') || ch == QLatin1Char('<') || ch == QLatin1Char('&')) {
+				return false;
+			}
+		}
+		return true;
+	}
 }
 
 QmlBridge& QmlBridge::instance()
@@ -197,6 +225,7 @@ void QmlBridge::init()
 
 	wireRuntime();
 	wireChat();
+
 }
 
 // 接线：core 的信号 → 本类的属性信号 / 业务层对象。**这里不写业务**。
@@ -219,6 +248,7 @@ void QmlBridge::wireRuntime()
 
 	// 目录变了 → 列表模型整份重建；列表空时给一句引导
 	connect(m_runtime, &ClientRuntime::catalogChanged, this, [this]() {
+		emit archivedSessionsChanged();
 		if (m_sessions)
 			m_sessions->rebuild();
 		// 工作区标题/归属可能随目录刷新变化：让顶栏与输入框的 currentWorkspaceTitle 重新求值。
@@ -389,6 +419,37 @@ void QmlBridge::wireChat()
 // 会话 / 工作区：转调 core（换算是 core 的事，界面 key 只在这里出现）
 // ------------------------------------------------------------------
 
+QVariantList QmlBridge::archivedSessions() const
+{
+	QVariantList list;
+	if (!m_sessions)
+		return list;
+	const SessionCatalog* catalog = m_sessions->catalog();
+	if (!catalog)
+		return list;
+	for (const SessionRecord& record : catalog->archivedSessions()) {
+		QVariantMap row;
+		row.insert(QStringLiteral("sessionId"), record.sessionId);
+		row.insert(QStringLiteral("title"), record.title);
+		row.insert(QStringLiteral("updatedAt"), record.updatedAtMs);
+		row.insert(QStringLiteral("workspaceId"), record.workspaceId);
+		list.append(row);
+	}
+	return list;
+}
+
+void QmlBridge::unarchiveArchivedSession(const QString& sessionId)
+{
+	if (m_runtime)
+		m_runtime->unarchiveSession(sessionId);
+}
+
+void QmlBridge::deleteArchivedSession(const QString& sessionId)
+{
+	if (m_runtime)
+		m_runtime->deleteSessionPermanently(sessionId);
+}
+
 void QmlBridge::refreshSessions()
 {
 	m_runtime->refreshSessions();
@@ -502,6 +563,8 @@ void QmlBridge::clearConversationView()
 		m_sessions->setSelectedSession(QString());
 	if (m_chat)
 		m_chat->setSession(QString());
+	if (m_runtime)
+		m_runtime->followSession(QString());   // 同时清掉 AgentSessionClient 的 follow 愿望账
 	if (hadSession)
 		emit currentSessionChanged();
 	emit peerTabsChanged();
@@ -577,6 +640,16 @@ void QmlBridge::selectSession(const QString& sessionId)
 	// 消息区换会话（清空 + 记住当前会话），再把跟随流切过去：首帧快照会由 ChatController 接收。
 	// 子代理的地址形状（parent + mode）由 ClientRuntime 从 catalog 解析，follow/page 都走 subagent address。
 	m_chat->setSession(sessionId);
+	// 会话记录的模型选择（session/list 行投影 modelSelection，扩展按账本回带）：
+	// 先应用到 chip 的 override 再重拉目录，chip 才按会话回显；没有记录就清掉
+	// 上一个会话的残留 override，chip 回到目录默认（ModelSelectionService 注释里
+	// "会话级的当前选择在 session/list 行投影里"说的就是这条通道）。
+	QString selProvider, selModel, selEffort;
+	if (m_sessions && m_sessions->catalog()
+		&& m_sessions->catalog()->modelSelectionFor(sessionId, &selProvider, &selModel, &selEffort))
+		m_chat->applySessionModelSelection(selProvider, selModel, selEffort);
+	else
+		m_chat->applySessionModelSelection(QString(), QString(), QString());
 	m_chat->refreshModelCatalog();  // 输入区的模型/思考 chip 按会话重拉
 	m_runtime->followSession(sessionId);   // 同时会换掉 job/list 名册流
 	// 顺手把运行态刷一次：换到子代理/切回父会话都是"看谁在跑"的时刻，
@@ -801,6 +874,74 @@ void QmlBridge::addAttachments(const QVariantList& urls)
 {
 	if (m_chat)
 		m_chat->addImageFiles(urls);
+}
+
+void QmlBridge::captureScreenArea(int x, int y, int width, int height)
+{
+	if (width < 2 || height < 2 || !m_chat)
+		return;
+
+	QScreen* screen = QGuiApplication::screenAt(QPoint(x, y));
+	if (screen == nullptr)
+		screen = QGuiApplication::primaryScreen();
+	if (screen == nullptr)
+		return;
+
+	const QRect geometry = screen->geometry();
+	const QImage shot = screen->grabWindow(0,
+		x - geometry.x(), y - geometry.y(), width, height).toImage();
+	if (shot.isNull())
+		return;
+
+	const QString dirPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+		+ QStringLiteral("/ULinHub/screenshots");
+	QDir().mkpath(dirPath);
+	const QString path = dirPath + QStringLiteral("/shot-")
+		+ QUuid::createUuid().toString(QUuid::WithoutBraces) + QStringLiteral(".png");
+	if (!shot.save(path, "PNG")) {
+		qWarning().noquote() << "[Screenshot] save failed:" << path;
+		return;
+	}
+
+	m_chat->addImageFiles({ QUrl::fromLocalFile(path) });
+}
+
+void QmlBridge::askBrowserContext(const QVariantMap& context)
+{
+	if (!m_runtime || !m_chat)
+		return;
+	DshApiClient* api = m_runtime->apiClient();
+	if (!api)
+		return;
+	QNetworkAccessManager* nam = api->networkAccessManager();
+	if (!nam)
+		return;
+
+	const QString ref = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	QVariantMap payload = context;
+	payload.insert(QStringLiteral("sessionId"), m_currentSessionId);
+	payload.insert(QStringLiteral("ref"), ref);
+
+	QUrl url = api->baseUrl();
+	url.setPath(QStringLiteral("/api/ulin-kit/browser-context"));
+	QNetworkRequest request(url);
+	request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+	const QByteArray body = QJsonDocument(QJsonObject::fromVariantMap(payload)).toJson(QJsonDocument::Compact);
+
+	QNetworkReply* reply = nam->post(request, body);
+	connect(reply, &QNetworkReply::finished, this, [this, reply, ref, context]() {
+		if (reply->error() != QNetworkReply::NoError) {
+			qWarning().noquote() << "[Browser] 推送浏览器上下文失败:"
+				<< reply->errorString() << reply->readAll();
+		}
+		reply->deleteLater();
+
+		QVariantMap card = context;
+		card.insert(QStringLiteral("ref"), ref);
+		card.insert(QStringLiteral("prompt"), QStringLiteral("读取浏览器内容"));
+		if (m_chat)
+			m_chat->addBrowserContext(card);
+	});
 }
 
 void QmlBridge::removeAttachment(int index)
@@ -1303,8 +1444,10 @@ void QmlBridge::markdownUpdate(QObject* quickDocument, const QString& markdown)
 	if (markdown == state.text)
 		return;
 
+	const bool extendsPrevious = !state.text.isEmpty() && markdown.startsWith(state.text);
+
 	// 流式正常情况下新文本是旧文本的前缀扩展；如果不是（重放/换消息），整篇重建。
-	if (!state.text.isEmpty() && !markdown.startsWith(state.text)) {
+	if (!state.text.isEmpty() && !extendsPrevious) {
 		document->clear();
 		state.stableOffset = 0;
 		state.stablePos = 0;
@@ -1329,6 +1472,26 @@ void QmlBridge::markdownUpdate(QObject* quickDocument, const QString& markdown)
 		document->clear();
 		state.stableOffset = 0;
 		state.stablePos = 0;
+	}
+
+	// 纯文本尾部快路径：稳定边界没变、文本只是前缀增长，而且上一版正好停在同一段落中间
+	// （不是刚出现空行），新增内容与当前尾段都不含 Markdown 控制字符。直接 insertText，
+	// 避免每秒几十次 renderFragment + 整段 tail 重新排版（大段回复时单次可达 80–100ms）。
+	// 上一版以空行结尾时必须走 fragment：那段空行下面还没起新块，直接 append 会把新段落
+	// 拼进上一段（"标题\n\n" 后第一段正文会粘在标题块里）。
+	const bool continuesParagraph = state.text.size() > state.stableOffset
+		&& state.text.at(state.text.size() - 1) != QLatin1Char('\n')
+		&& state.text.at(state.text.size() - 1) != QLatin1Char('\r');
+	if (extendsPrevious && continuesParagraph && stableOffset == state.stableOffset) {
+		const QString delta = markdown.mid(state.text.size());
+		const QString tail = markdown.mid(stableOffset);
+		if (!delta.isEmpty() && isPlainStreamingText(delta) && isPlainStreamingText(tail)) {
+			QTextCursor endCursor(document);
+			endCursor.movePosition(QTextCursor::End);
+			endCursor.insertText(delta);
+			state.text = markdown;
+			return;
+		}
 	}
 
 	// 先移除上一次渲染的尾段，保留已提交的稳定内容。
@@ -1367,6 +1530,18 @@ void QmlBridge::markdownUpdate(QObject* quickDocument, const QString& markdown)
 	state.text = markdown;
 }
 
+bool QmlBridge::uiProbeEnabled() const
+{
+	return Debugger::uiProbeEnabled();
+}
+
+void QmlBridge::uiProbe(const QString& tag, const QString& detail)
+{
+	if (!Debugger::uiProbeEnabled())
+		return;
+	Debugger::log(QStringLiteral("UIProbe"), tag + QLatin1Char(' ') + detail);
+}
+
 void QmlBridge::markdownDetach(QObject* quickDocument)
 {
 	m_markdownDocuments.remove(quickDocument);
@@ -1383,6 +1558,23 @@ QVariantList QmlBridge::markdownInlineCodeRects(QObject* quickDocument)
 		return rects;
 	QAbstractTextDocumentLayout* layout = document->documentLayout();
 	if (layout == nullptr)
+		return rects;
+
+	// 没有 inline-code（等宽片段）时不要 documentSize()：那会强制整篇文本重新布局，
+	// 而 MarkdownBody 每个流式 tick 都会来取一次 —— 纯正文输出时这里是最贵的一段。
+	// 先只扫片段格式（不碰布局）判断有没有 inline code；没有就直接空手返回。
+	bool hasInlineCode = false;
+	for (QTextBlock block = document->begin(); block.isValid(); block = block.next()) {
+		for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it) {
+			if (it.fragment().isValid() && it.fragment().charFormat().fontFixedPitch()) {
+				hasInlineCode = true;
+				break;
+			}
+		}
+		if (hasInlineCode)
+			break;
+	}
+	if (!hasInlineCode)
 		return rects;
 
 	layout->documentSize();   // 强制布局，block/line 坐标才是当前宽度下的真实值
@@ -1539,9 +1731,4 @@ void QmlBridge::openModelSettings()
 	qInfo().noquote() << "[Shell] openModelSettings ->" << url.toString(QUrl::RemoveQuery)
 		<< "(token present:" << !token.isEmpty() << ")";
 	QDesktopServices::openUrl(url);
-}
-
-void QmlBridge::probe(const QString& tag, const QString& detail)
-{
-	qInfo().noquote() << "[Probe]" << tag << detail;  // 诊断专用：调用方是 QML（消息区滚动条行为），输出进 info.log
 }

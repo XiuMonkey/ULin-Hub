@@ -2,7 +2,7 @@
 
 #include "common/session/CommandController.h"
 
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 #include "network/SessionCommands.h"
 
 #include <QDebug>

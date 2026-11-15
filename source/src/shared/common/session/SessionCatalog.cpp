@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QDir>
 
+#include <algorithm>
+
 namespace   // 会话/工作区列表的解析与派生逻辑。所有函数都不触碰控件，因此可以脱离 UI 单独做单元测试
 {
 	const char* const kWorkspaceIdKey = "workspaceId";
@@ -415,6 +417,30 @@ QVector<SessionRecord> SessionCatalog::visibleSessions() const
 			visible.append(record);
 	}
 	return visible;
+}
+
+QVector<SessionRecord> SessionCatalog::archivedSessions() const
+{
+	QVector<SessionRecord> result;
+	for (const SessionRecord& record : m_sessions) {
+		if (record.archived && !record.subagent)
+			result.append(record);
+	}
+	std::sort(result.begin(), result.end(), [](const SessionRecord& a, const SessionRecord& b) {
+		return a.updatedAtMs > b.updatedAtMs;
+	});
+	return result;
+}
+
+void SessionCatalog::removeSession(const QString& sessionId)
+{
+	m_archivedSessionIds.remove(sessionId);
+	m_sessions.erase(std::remove_if(m_sessions.begin(), m_sessions.end(),
+		[&sessionId](const SessionRecord& record) { return record.sessionId == sessionId; }),
+		m_sessions.end());
+	m_childSessions.erase(std::remove_if(m_childSessions.begin(), m_childSessions.end(),
+		[&sessionId](const SessionRecord& record) { return record.sessionId == sessionId; }),
+		m_childSessions.end());
 }
 
 QString SessionCatalog::autoSelectSessionId() const

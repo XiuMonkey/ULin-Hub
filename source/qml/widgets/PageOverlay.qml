@@ -165,6 +165,9 @@ Item {
                 Loader {
                     id: content
                     anchors.fill: parent
+                    // 打开设置/扩展等重页面时不要在 GUI 线程同步构建整棵 QML 树：
+                    // 否则遮罩动画第一帧就被几十毫秒的控件创建卡住。
+                    asynchronous: true
                     active: root.shown || root.t > 0.001
                     source: root.source
 

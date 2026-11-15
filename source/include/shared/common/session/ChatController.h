@@ -2,14 +2,14 @@
 
 // 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
-// 解析辅助函数直接复用既有的 common/Agent/AgentEventParser（extractReply / extractThinking /
+// 解析辅助函数直接复用既有的 common/agent/AgentEventParser（extractReply / extractThinking /
 // extractToolCall / extractToolResult / extractEventText / extractChunkType），所以语义不会漂。
 // 与现有实现的差异（有意）：
 //  * 不再有"控件树缓存 + 离屏分批建控件"：QML 的 ListView 自己复用 delegate；
 // * 流式改用 33ms 合并缓冲。
 // 还没做（M4b）：向上翻页（session/page + beforeSeq）、预取、锚点不跳、提问/审批面板。
 
-#include "common/Agent/ModelSelectionService.h"
+#include "common/agent/ModelSelectionService.h"
 #include "common/session/MessageListModel.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
 //  实例化 QMetaType 校验，此时类型不完整就触发
@@ -22,6 +22,7 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QVariantMap>
 #include <QVector>
 
 #include <functional>
@@ -140,6 +141,9 @@ public:
 	// 图片走内联 base64；普通文件先落成待发卡片，正文里带本地路径。
 	Q_INVOKABLE void addFiles(const QVariantList& urls);
 	Q_INVOKABLE void addImageFiles(const QVariantList& urls);   // 兼容旧调用，等价 addFiles
+	// 浏览器上下文卡片（侧栏浏览器右键「询问 Agent」产生）：
+	// {kind:"browser", ref, url, title, selector, prompt} —— 发送时拼成一段「用工具读取」的提示。
+	void addBrowserContext(const QVariantMap& card);
 	Q_INVOKABLE void removePendingAttachment(int index);
 	Q_INVOKABLE void clearPendingAttachments();
 	// attachmentId -> file:// 源（异步取字节并落临时文件；首次返回空）
@@ -203,7 +207,7 @@ private:
 	void applyHistoryEvent(const QJsonObject& event);
 	static QVector<MessageListModel::ImageRef> extractEventImages(const QJsonObject& event);
 	static QVector<MessageListModel::DeliverableRef> extractEventDeliverables(const QJsonObject& event);
-	void applyDeliverablesEvent(const QJsonObject& event);
+	void applyDeliverablesEvent(const QJsonObject& event, bool deferUntilTurnEnd = false);
 	void applyStreamEvent(const QJsonObject& event);
 	// 回合收尾：无可见输出时补兜底提示，然后广播 turnFinished
 	void finishTurn();
@@ -313,5 +317,8 @@ private:
 	// 本轮（自最近一次 beginTurn 起）是否已有可见输出：无输出且回合收尾时补一条兜底提示，
 	// 避免用户对着自己的消息发呆（无模型 / 模型空回复 / 事件解析不出）—— 同一套判定
 	bool m_turnHadOutput = false;
+	// 产物卡片等 turn/end 再挂到消息上，避免输出中途提前出现在正文下方。
+	QVector<MessageListModel::DeliverableRef> m_pendingDeliverables;
+	int m_pendingDeliverablesRow = -1;
 	bool m_lastTurnHadOutput = true;
 };

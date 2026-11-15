@@ -2,6 +2,8 @@
 
 // 会话消息列表的 QML 模型：一行 = 一条消息（用户 / Agent / 系统提示）。
 // Agent 消息内部是**有序段**（thinking / reply / toolCall / toolResult），交错顺序不会丢；reply 段按代码围栏切成单元。
+// 流式期间最终 reply 不逐个 chunk 改 segments，而是写进 Row::replyTail（ReplyTailRole）；回合收尾时再落回
+// 稳定 reply 段（SegmentsRole + ReplyTailRole 一起发）。这样过程组的段/委托在正文增长时完全不重建。
 // 更新策略：段是追加式的，每次只发 dataChanged(单行)，**绝不** beginResetModel —— 整表重置会丢滚动位置与 delegate。
 
 #include <QAbstractListModel>
@@ -23,6 +25,7 @@ public:
 		TextRole,                      // 用户/系统消息的纯文本
 		ImagesRole,                    // 该行携带的图片附件 [{id, mediaType}]（仅用户行）
 		SegmentsRole,                  // 有序段（QVariantList）
+		ReplyTailRole,                 // 仅流式期间最终 reply 的完整尾文本；稳定段不变
 		StreamingRole,
 		DeliverablesRole               // Agent 回合的交付文件 [{ path, name, suffix, description }]
 	};
@@ -38,6 +41,11 @@ public:
 
 	// 会话切换：整表清空（换了会话，必须重置）
 	void clear();
+
+	// 批量重建：只在 begin/end 之间发一次 reset，避免历史重建时逐条 insert/dataChanged
+	// 把 QML 的 ListView 拖死（加载更多一页 1500+ 条时尤其明显）。
+	void beginBatchRebuild();
+	void endBatchRebuild();
 
 	// 图片附件引用（用户消息）
 	struct ImageRef
@@ -105,7 +113,7 @@ private:
 		QVector<Segment> segments;
 		QVector<ImageRef> images;   // 仅用户行
 		QVector<DeliverableRef> deliverables;   // 仅 Agent 行
-		QString toolResult;          // 最近的工具结果，附在 toolCall 段上显示
+		QString replyTail;           // 仅流式期间：当前最终 reply 的完整尾文本；收尾时落回稳定段
 		bool streaming = false;
 	};
 
@@ -115,6 +123,11 @@ private:
 	// 段的 QML 视图（含 reply 的代码围栏切分结果）按需重建，避免每次 data 都重算
 	QVariantList segmentsFor(const Row& row) const;
 	void touchRow(int row);
+	// 流式 reply 的增量尾：只有最终 reply 走这里；必要时补一个空 reply 段占位，保持真实段顺序。
+	void appendReplyTail(int row, const QString& text);
+	// 把尾文本落回最近的稳定 reply 段（没有就补一段），并清空 replyTail；返回是否真的提交了尾文本。
+	bool commitReplyTail(int row, bool notify = true);
 
 	QVector<Row> m_rows;
+	bool m_batchRebuild = false;
 };

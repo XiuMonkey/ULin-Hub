@@ -12,6 +12,9 @@ import "../../widgets"
 Item {
     id: page
 
+    // Master 后端切到自研内核时，第一页（原“模型列表”）自动换成 ULin Core 设置。
+    readonly property bool ulincoreMode: Hub.settings.masterBackend === "ulincore"
+
     implicitWidth: 632
     implicitHeight: 432
 
@@ -91,12 +94,23 @@ Item {
                     spacing: 2
 
                     Repeater {
-                        model: [   // 图标名 = assets/resources/icons/ui/<name>.svg（model / bot / server / theme）
-                            { label: qsTrId("model_list_title"), icon: "model" },
-                            { label: qsTrId("settings_agent_preset_tab"), icon: "bot" },
-                            { label: qsTrId("settings_server_tab"), icon: "server" },
-                            { label: qsTrId("settings_appearance_tab"), icon: "theme" }
-                        ]
+                        // ulincore 模式下换一套导航：提供商 / 模型 / 运行时 / 数据 / Agent / 外观 / 服务
+                        model: page.ulincoreMode
+                            ? [
+                                { label: "提供商", icon: "server" },
+                                { label: "模型", icon: "model" },
+                                { label: "运行时", icon: "theme" },
+                                { label: "数据", icon: "server" },
+                                { label: "Agent", icon: "bot" },
+                                { label: "外观", icon: "theme" },
+                                { label: "服务", icon: "server" }
+                              ]
+                            : [
+                                { label: qsTrId("model_list_title"), icon: "model" },
+                                { label: qsTrId("settings_agent_preset_tab"), icon: "bot" },
+                                { label: qsTrId("settings_server_tab"), icon: "server" },
+                                { label: qsTrId("settings_appearance_tab"), icon: "theme" }
+                              ]
 
                         delegate: Item {
                             id: navItem
@@ -158,7 +172,7 @@ Item {
                 }
             }
 
-            Item {   // 右内容区：四页叠放，按 page 显隐（原版也是四块一起建、切换只改可见性）
+            Item {   // 右内容区：通用 4 页；ulincore 模式下换成 7 页（含 Agent / 外观 / 服务）
                 id: content
                 width: layout.width - navColumn.width - layout.spacing
                 height: layout.height
@@ -166,27 +180,56 @@ Item {
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 0
-                    source: Style.url("basic/settings/ModelListPage.qml")
+                    source: page.ulincoreMode
+                        ? Style.url("basic/settings/UlinCoreProvidersPage.qml")
+                        : Style.url("basic/settings/ModelListPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 1
-                    source: Style.url("basic/settings/AgentPresetPage.qml")
+                    source: page.ulincoreMode
+                        ? Style.url("basic/settings/UlinCoreModelsPage.qml")
+                        : Style.url("basic/settings/AgentPresetPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 2
-                    source: Style.url("basic/settings/ServerPage.qml")
+                    source: page.ulincoreMode
+                        ? Style.url("basic/settings/UlinCoreRuntimePage.qml")
+                        : Style.url("basic/settings/ServerPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 3
+                    source: page.ulincoreMode
+                        ? Style.url("basic/settings/UlinCoreDataPage.qml")
+                        : Style.url("basic/settings/AppearancePage.qml")
+                }
+
+                // ulincore 专属的后三页：原客户端的 Agent / 外观 / 服务设置保留
+                Loader {
+                    anchors.fill: parent
+                    active: page.ulincoreMode && Hub.settings.page === 4
+                    visible: page.ulincoreMode && Hub.settings.page === 4
+                    source: Style.url("basic/settings/AgentPresetPage.qml")
+                }
+
+                Loader {
+                    anchors.fill: parent
+                    active: page.ulincoreMode && Hub.settings.page === 5
+                    visible: page.ulincoreMode && Hub.settings.page === 5
                     source: Style.url("basic/settings/AppearancePage.qml")
                 }
 
+                Loader {
+                    anchors.fill: parent
+                    active: page.ulincoreMode && Hub.settings.page === 6
+                    visible: page.ulincoreMode && Hub.settings.page === 6
+                    source: Style.url("basic/settings/ServerPage.qml")
+                }
 
             }
         }

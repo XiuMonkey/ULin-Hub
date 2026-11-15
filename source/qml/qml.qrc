@@ -2,7 +2,7 @@
     <!-- QML 壳的资源 = 内置风格包（见 docs/ui-qml-migration-plan.md §2.4）。
          目录：basic/（结构，引用 Hub.settings 等）、skin/（纯视觉，原 appearance/）、
          widgets/（通用控件）；包根只留入口 Main.qml 与清单 pack.json / metrics.json。
-         ⚠️ 这里列的文件会在首启被释放到 <exe>/ui/（ThemeManager::ensureStylePack）；
+         ⚠️ 这里列的文件会在首启被释放到 <exe>/resources/ui/（ThemeManager::ensureStylePack）；
             释放规则是"增量同步"：用户改过的文件不动，内置更新过的会覆盖。 -->
     <!-- 面板坞：PanelGrip（三个点抓手）/ DockDropHint（拖回时的落点提示）-->
     <qresource prefix="/qml">
@@ -14,6 +14,7 @@
         <!-- 轨迹：会话区的另一个视图（顶栏胶囊切换），数据面是 common/session/TraceModel -->
         <file>basic/trace/TraceView.qml</file>
         <file>basic/chat/ModelSelectorChip.qml</file>
+        <file>basic/chat/UlinCoreModelChip.qml</file>
         <file>basic/extensions/ExtensionManagerPage.qml</file>
         <file>basic/plugins/PluginMarketPage.qml</file>
         <file>basic/account/AccountPage.qml</file>
@@ -21,6 +22,13 @@
         <file>basic/settings/AppearancePage.qml</file>
         <file>basic/settings/ModelListPage.qml</file>
         <file>basic/settings/ServerPage.qml</file>
+        <file>basic/settings/UlinCoreField.qml</file>
+        <file>basic/settings/UlinCoreComboBox.qml</file>
+        <file>basic/settings/UlinCoreCheckBox.qml</file>
+        <file>basic/settings/UlinCoreProvidersPage.qml</file>
+        <file>basic/settings/UlinCoreModelsPage.qml</file>
+        <file>basic/settings/UlinCoreRuntimePage.qml</file>
+        <file>basic/settings/UlinCoreDataPage.qml</file>
         <file>basic/schedule/SchedulePage.qml</file>
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
@@ -52,6 +60,8 @@
         <file>skin/chat/AgentBubble.qml</file>
         <file>skin/chat/CrawlMark.qml</file>
         <file>skin/chat/CodeBlock.qml</file>
+        <!-- 交付文件行（DSH deliverables/presented）：AgentBubble 内联引用，缺它整条气泡都建不出来 -->
+        <file>skin/chat/DeliverablesView.qml</file>
         <!-- 正文由 C++ QTextDocument + 单个 MarkdownBody 承担 -->
         <file>skin/chat/Markdown/MarkdownBody.qml</file>
         <file>skin/chat/MenuRow.qml</file>

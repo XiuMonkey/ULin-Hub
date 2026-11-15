@@ -35,6 +35,7 @@
         <file>icons/ui/send.svg</file>
         <file>icons/ui/bot.svg</file>
         <file>icons/ui/browser.svg</file>
+        <file>icons/ui/camera.svg</file>
         <file>icons/ui/changes.svg</file>
         <file>icons/ui/chat.svg</file>
         <file>icons/ui/close.svg</file>
@@ -71,14 +72,14 @@
              只是保证开箱即有中英可用；其它语言从外部目录补充即可。 -->
         <file alias="translations/ulinhub_zh_CN.qm">translations/ulinhub_zh_CN.qm</file>
         <file alias="translations/ulinhub_en.qm">translations/ulinhub_en.qm</file>
-        <!-- 内置插件：工具过滤器（按会话隐藏模型可见的工具，见
-             resources/tools-filter-plugin/）。编译进 exe 是为了让内置插件不依赖
+        <!-- 内置插件 ulin-kit（当前承载工具过滤器：按会话隐藏模型可见的工具，见
+             resources/ulin-kit/）。编译进 exe 是为了让内置插件不依赖
              发布目录里的散装文件；首次启动服务端时由
              ServerManager::ensureBuiltinPlugins() 调用 ExtensionLoader 安装到
-             <DSH_HOME>/profiles/web/node_modules/ 下。 -->
-        <file alias="tools-filter-plugin/package.json">tools-filter-plugin/package.json</file>
-        <file alias="tools-filter-plugin/index.js">tools-filter-plugin/index.js</file>
-        <file alias="tools-filter-plugin/example.ToolsFilterConfig.json">tools-filter-plugin/example.ToolsFilterConfig.json</file>
+             <DSH_HOME>/profiles/web/node_modules/ 下。后续能力继续往这个包里加。 -->
+        <file alias="ulin-kit/package.json">ulin-kit/package.json</file>
+        <file alias="ulin-kit/index.js">ulin-kit/index.js</file>
+        <file alias="ulin-kit/example.ToolsFilterConfig.json">ulin-kit/example.ToolsFilterConfig.json</file>
         <!-- 右栏「终端」块的页面与它的渲染引擎（Qt WebEngine 里跑 xterm.js）。
              这一份是**入库资产**，不从 :/qml 释放到 <exe>/ui（那是可被风格包覆盖的界面子树，
              660KB 的 xterm 不该跟着走）。三个 js/css 的来源、版本与抽取方式见

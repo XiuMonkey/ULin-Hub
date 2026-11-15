@@ -248,6 +248,7 @@ Item {
         if (Math.abs(shell.panelBarInset - shell.panelBarContentInset) >= shell.panelBarReflowStep)
             shell.panelBarContentInset = shell.panelBarInset
     }
+
     onPanelBarInsetChanged: {
         syncPanelBarContentInset()
         if (!shell.panelBarAnimating)   // 补间结束，补齐不足一档的余量
@@ -414,6 +415,10 @@ Item {
                         return
                     if (typeof item.widthAnimating !== "undefined")
                         item.widthAnimating = Qt.binding(function () { return shell.contentWidthDriven })
+                    // 拖右栏边框时禁止滚动锁底/夹取：0.1.1c 的 contentY Binding
+                    // 会让 maxContentY→builtBottom→contentY 递归，主线程卡死。
+                    if (typeof item.widthResizing !== "undefined")
+                        item.widthResizing = Qt.binding(function () { return shell.resizing })
                 }
             }
 
@@ -670,6 +675,13 @@ Item {
         anchors.fill: parent
         visible: Hub.initializing || Hub.masterSwitching
         color: Theme.color.overlayBg
+        // 盖住整个窗口时也要跟窗口外框同圆角；最大化/全屏时才是直角。
+        readonly property bool edgeToEdge: Window.window
+            ? (Window.window.visibility === Window.Maximized
+               || Window.window.visibility === Window.FullScreen)
+            : false
+        radius: edgeToEdge ? 0 : Theme.radius.window
+        clip: true
         z: 80
 
         MouseArea {

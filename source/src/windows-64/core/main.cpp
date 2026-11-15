@@ -12,14 +12,14 @@
 #include "ExtensionSystem/ClientExtension.h"
 #include "common/appearance/TranslationManager.h"
 #include "common/platform/win/NativeWindowFilter.h"
-#include "common/PluginMarket/PluginMarketController.h"
+#include "common/pluginmarket/PluginMarketController.h"
 #include "common/appearance/StyleResolver.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
 #include "common/shell/PanelBarDockModel.h"
 #include "qmlbridge/FileBrowserBridge.h"
 #include "qmlbridge/UrlInputBridge.h"
-#include "common/Agent/ToolsFilter.h"
+#include "common/agent/ToolsFilter.h"
 #include "qmlbridge/QmlBridge.h"
 #include "qmlbridge/TerminalBridge.h"
 #include "qmlbridge/TerminalVtModel.h"
@@ -31,6 +31,7 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QQmlApplicationEngine>
+#include <QQuickWindow>
 #include <QStyleHints>
 #include <QUrl>
 #include <QUuid>
@@ -78,6 +79,7 @@ int main(int argc, char* argv[])
 	{
 		const QString dataRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/data");
 		QDir().mkpath(dataRoot + QStringLiteral("/client"));
+		QDir().mkpath(dataRoot + QStringLiteral("/ulincore"));
 		const QString tempRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/temp");
 		QDir().mkpath(tempRoot);
 		const QString runDir = tempRoot + QStringLiteral("/run-")
@@ -136,8 +138,8 @@ int main(int argc, char* argv[])
 		? app.styleHints()->colorScheme() == Qt::ColorScheme::Dark
 		: savedThemeMode == AppearanceSetting::ThemeMode::Dark;
 
-	// 界面副本目录：<exe>/ui（新的界面目录；旧的 <exe>/styles 已退役）
-	const QString stylesDir = QCoreApplication::applicationDirPath() + QStringLiteral("/ui");
+	// 界面副本目录：<exe>/resources/ui（与 translations 一起收进 resources；旧的 <exe>/ui 已迁移）
+	const QString stylesDir = QCoreApplication::applicationDirPath() + QStringLiteral("/resources/ui");
 	ThemeManager::instance().init(stylesDir, dark ? ThemeManager::Mode::Dark : ThemeManager::Mode::Light);
 	TimingLogger::mark(QStringLiteral("theme styles init"));
 

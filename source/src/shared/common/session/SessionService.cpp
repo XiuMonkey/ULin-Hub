@@ -1,10 +1,11 @@
 #include "common/session/SessionService.h"
 
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 #include "network/SessionCommands.h"
 #include "common/util/Logger.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QHash>
 #include <QJsonObject>
@@ -45,7 +46,7 @@ void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog,
 			const QJsonArray items = value.value(QStringLiteral("items")).toArray();
 			state->sessions = items;
 			state->sessionsOk = true;
-			state->workspacesOk = false;   // workspacesOk 保持 false，让 catalog 保留 workspace/follow 给的基线分组
+			state->workspacesOk = false;   // workspacesOk 淇濇寔 false锛岃 catalog 淇濈暀 workspace/follow 缁欑殑鍩虹嚎鍒嗙粍
 			applySnapshot();
 		},
 		[state, applySnapshot](const DshApiClient::RpcError& error) {
@@ -116,8 +117,27 @@ void SessionService::refreshRunningStates(DshApiClient* api, SessionCatalog* cat
 				onChanged(changed);
 		},
 		[](const DshApiClient::RpcError&) {
-			// 轻量刷新失败不打扰用户：顶栏那颗点保持旧值，等下一次触发
+			// 杞婚噺鍒锋柊澶辫触涓嶆墦鎵扮敤鎴凤細椤舵爮閭ｉ鐐逛繚鎸佹棫鍊硷紝绛変笅涓€娆¤Е鍙?
 		});
+}
+
+void SessionService::deleteSessionData(const QString& dshHome, const QString& sessionId)
+{
+	if (dshHome.isEmpty() || sessionId.isEmpty())
+		return;
+
+	// 浼氳瘽鐩綍閫氬父褰㈠ dshHome/sessions/<encoded-cwd>/session-<id>锛涙寜鐩綍鍚嶇簿纭尮閰嶏紝
+	// 涓嶈鍒犲悓鍓嶇紑鐨勫叾浠栦細璇濄€?
+	const QString root = dshHome + QStringLiteral("/sessions");
+	QDirIterator it(root, QDir::Dirs | QDir::NoDotAndDotDot,
+		QDirIterator::Subdirectories);
+	while (it.hasNext()) {
+		const QString path = it.next();
+		if (QFileInfo(path).fileName() == sessionId) {
+			QDir(path).removeRecursively();
+			return;
+		}
+	}
 }
 
 void SessionService::clearAllSessionData(const QString& dshHome)
@@ -131,8 +151,8 @@ void SessionService::clearAllSessionData(const QString& dshHome)
 		sessionsDir.mkpath(QStringLiteral("."));
 	}
 
-	// 本次运行内的分组不受影响 —— 注册表活在服务端进程内存里，且每次变更都会重新写盘
-	// （dsh-storage-json 的 putRecord → publish），所以"连当前运行的工作区一起清"要走 workspace/delete。
-	// 默认工作区不在这里补，由 ClientRuntime::resolveSessionWorkspace() 在缺分组时补建。
+	// 鏈杩愯鍐呯殑鍒嗙粍涓嶅彈褰卞搷 鈥斺€?娉ㄥ唽琛ㄦ椿鍦ㄦ湇鍔＄杩涚▼鍐呭瓨閲岋紝涓旀瘡娆″彉鏇撮兘浼氶噸鏂板啓鐩?
+	// 锛坉sh-storage-json 鐨?putRecord 鈫?publish锛夛紝鎵€浠?杩炲綋鍓嶈繍琛岀殑宸ヤ綔鍖轰竴璧锋竻"瑕佽蛋 workspace/delete銆?
+	// 榛樿宸ヤ綔鍖轰笉鍦ㄨ繖閲岃ˉ锛岀敱 ClientRuntime::resolveSessionWorkspace() 鍦ㄧ己鍒嗙粍鏃惰ˉ寤恒€?
 	QFile::remove(dshHome + QStringLiteral("/storages/workspace.json"));
 }

@@ -14,7 +14,7 @@ public:
 	// 当前是否为深色模式。
 	virtual bool ExternalIsDarkMode() = 0;
 
-	// 重新读取 <exe>/ui 下的 theme-<mode>.json + metrics.json，只重载调色板。
+	// 重新读取 <exe>/resources/ui 下的 theme-<mode>.json + metrics.json，只重载调色板。
 	virtual bool ExternalReloadStyles() = 0;
 
 	// 切换浅色/深色，不重建窗口；允许传 nullptr。

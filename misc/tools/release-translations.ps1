@@ -1,4 +1,4 @@
-﻿# ------------------------------------------------------------------
+# ------------------------------------------------------------------
 # release-translations.ps1
 # ------------------------------------------------------------------
 # 语言包发布。源码里只有 key（qtTrId("...")），文案只存在于 translations\*.ts，
@@ -17,7 +17,7 @@
 #      谁也不会发现，界面直接露代号。踩过一次。
 #   2) 校验：正式 .ts 与源码的 id 集合必须一致；源码里有、.ts 里没有的 key
 #      会以代号显示给用户，所以脚本直接报错停下。
-#   3) lrelease：把 .ts 编成 .qm 发布到 x64\<Config>\translations；内置语言包
+#   3) lrelease：把 .ts 编成 .qm 发布到 x64\<Config>\resources\translations；内置语言包
 #      另存一份到 assets\resources\translations\（进 qrc，作为开箱保底）。
 #
 # 改文案 / 加 key 的正确做法：
@@ -44,7 +44,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $tsDir = Join-Path $root "assets\translations"
 $resDir = Join-Path $root "assets\resources\translations"
-$outDir = Join-Path $root "x64\$Config\translations"
+$outDir = Join-Path $root "x64\$Config\resources\translations"
 
 # 与 TranslationManager.cpp 的 kBuiltinPacks / assets\resources\ulinhub.qrc 保持一致：
 # 这几个包除了发布到程序目录，还会内置进 qrc 作为开箱保底。
@@ -156,12 +156,13 @@ if ($CheckOnly) {
 # 2) 编译：全部 .ts -> .qm；内置包另存到 resources\translations（进 qrc）
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 New-Item -ItemType Directory -Path $resDir -Force | Out-Null
+New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 Write-Host "`n=== lrelease ==="
 foreach ($ts in $tsFiles) {
 	$qm = Join-Path $outDir ($ts.BaseName + ".qm")
 	& $lrelease $ts.FullName -qm $qm | Out-Null
 	if ($LASTEXITCODE -ne 0) { throw "lrelease 失败：$($ts.Name)" }
-	Write-Host ("  {0} -> x64\{1}\translations\{2}" -f $ts.Name, $Config, (Split-Path $qm -Leaf))
+	Write-Host ("  {0} -> x64\{1}\resources\translations\{2}" -f $ts.Name, $Config, (Split-Path $qm -Leaf))
 
 	if ($builtinPacks -contains $ts.BaseName) {
 		Copy-Item $qm (Join-Path $resDir ($ts.BaseName + ".qm")) -Force

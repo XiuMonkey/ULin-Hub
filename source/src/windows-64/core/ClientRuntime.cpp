@@ -9,8 +9,9 @@
 #include "common/util/CommonRegistry.h"
 #include "common/util/HostIndex.h"
 #include "core/ServerManager.h"
-#include "network/DshApiClient.h"
-#include "common/Agent/AgentSessionClient.h"
+#include "common/agent/dsh/DshApiClient.h"
+#include "common/agent/AgentSessionClient.h"
+#include "common/agent/ulincore/UlinCoreMasterAgent.h"
 #include "ExtensionSystem/ExtensionToolHost.h"
 
 #include <QCoreApplication>
@@ -60,6 +61,14 @@ void ClientRuntime::start()
 	m_server = new ServerManager(this);
 	m_api = new DshApiClient(this);
 	m_agentSession = new AgentSessionClient(m_api, this);
+
+	// 自研内核作为 Master Agent 后端注册：设置页的 Agent 列表能看到 "ULin Core"，
+	// 选中后由它接管 session/prompt（和 CodexBackend / WorkBuddy 走同一张注册表）。
+	m_ulinCoreAgent = new UlinCore::UlinCoreMasterAgent(m_api, m_api, this);
+	m_ulinCoreAgent->setDataDir(QCoreApplication::applicationDirPath()
+		+ QStringLiteral("/data/ulincore"));
+	if (!m_api->RegisterMasterAgent("ulincore", m_ulinCoreAgent))
+		qWarning().noquote() << "[UlinCore] failed to register master agent";
 
 	// findObject(kApiClient) 取出站客户端；此前这个 index 从没登记过 ⇒ 扩展只拿到 null 并静默退化成"没接管"。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiClient, m_api);
@@ -467,6 +476,49 @@ void ClientRuntime::archiveSession(const QString& sessionId)
 		});
 }
 
+void ClientRuntime::unarchiveSession(const QString& sessionId)
+{
+	if (sessionId.isEmpty() || !m_api)
+		return;
+
+	m_api->callMethod(QStringLiteral("workspace/unarchiveSession"),
+		SessionCommands::sessionUnarchive(sessionId),
+		[this](const QJsonObject& value) {
+			m_catalog.setArchivedSessionIds(SessionCatalog::parseArchivedSessionIds(value));
+			emit catalogChanged();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			const QString text = QStringLiteral("还原会话失败：%1 %2").arg(error.code, error.message);
+			if (setStatus(text))
+				emit operationFailed(text);
+		});
+}
+
+void ClientRuntime::deleteSessionPermanently(const QString& sessionId)
+{
+	if (sessionId.isEmpty() || !m_api)
+		return;
+
+	// 服务端的 session/delete 真正删除会话存储；成功后目录也得同步移除，
+	// 否则下一次 session/list 之前侧栏还挂着一条已经没了的会话。
+	m_api->callMethod(QStringLiteral("session/delete"),
+		SessionCommands::sessionDelete(sessionId),
+		[this, sessionId](const QJsonObject&) {
+			m_catalog.removeSession(sessionId);
+			emit catalogChanged();
+		},
+		[this, sessionId](const DshApiClient::RpcError& error) {
+			// 当前 DSH 运行时没有暴露 session/delete 能力：退回本地删除会话数据，
+			// 并把它从目录里移除。服务端下次刷新已没有这份文件，不会再回来。
+			if (m_server)
+				SessionService::deleteSessionData(m_server->dshHome(), sessionId);
+			m_catalog.removeSession(sessionId);
+			emit catalogChanged();
+			qWarning().noquote() << "[Shell] session/delete 不受支持，已本地删除:" << sessionId
+				<< error.code << error.message;
+		});
+}
+
 void ClientRuntime::deleteWorkspace(const QString& workspaceId)
 {
 	if (workspaceId.isEmpty() || !m_api)
@@ -611,8 +663,14 @@ void ClientRuntime::createWorkspace(const QString& path)
 
 void ClientRuntime::followSession(const QString& sessionId)
 {
-	if (!m_api || sessionId.isEmpty())
+	if (!m_api)
 		return;
+	if (sessionId.isEmpty()) {
+		// 清空视图时也要清掉 follow 愿望账：否则切回 dsh 后点回原会话，
+		// AgentSessionClient 会因为“同 id”直接 return，首帧快照永远不会再来。
+		m_agentSession->unfollowSession();
+		return;
+	}
 
 	// 子代理会话的 follow 必须用 subagent address（parent + catalog 里的 mode）。关系全在 catalog：
 	// parentForSession 优先取 subagentCatalog 反推，mode 取同一条目录项；普通会话两段都为空。

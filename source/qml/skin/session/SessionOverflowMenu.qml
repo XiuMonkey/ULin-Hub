@@ -22,6 +22,7 @@ Popup {
 
     signal clearSessionsRequested()
     signal newWorkspaceRequested()
+    signal archivedSessionsRequested()
 
     enter: Transition {
         NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.motion.fast }
@@ -33,6 +34,8 @@ Popup {
     function activate(kind) {   // "已归档会话"是置灰占位项（enabled=false，点击不触发）⇒ 这里只有 workspace / clear 两条活路
         if (kind === "workspace")
             root.newWorkspaceRequested()
+        else if (kind === "archived")
+            root.archivedSessionsRequested()
         else if (kind === "clear")
             root.clearSessionsRequested()
         else
@@ -177,7 +180,7 @@ Popup {
         Repeater {
             model: [
                 { kind: "workspace", label: qsTrId("sessionBar_new_workspace"), danger: false, enabled: true },
-                { kind: "archived", label: qsTrId("sessionBar_archived"), danger: false, enabled: false },
+                { kind: "archived", label: qsTrId("sessionBar_archived"), danger: false, enabled: true },
                 { kind: "separator", label: "", danger: false, enabled: false },
                 { kind: "clear", label: qsTrId("sessionBar_clear_sessions"), danger: true, enabled: true }
             ]

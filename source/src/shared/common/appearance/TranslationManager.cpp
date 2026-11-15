@@ -160,7 +160,7 @@ namespace Translation
 
 	QString translationsDir()
 	{
-		return QCoreApplication::applicationDirPath() + QStringLiteral("/translations");
+		return QCoreApplication::applicationDirPath() + QStringLiteral("/resources/translations");
 	}
 
 	QString translationFileBase(const QString& languageCode)

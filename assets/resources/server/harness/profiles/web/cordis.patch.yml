@@ -90,8 +90,8 @@
       name: '@deepseek-ai/dsh-session-stats'
 
 - insert:
-    - id: tools-filter-plugin
-      name: 'tools-filter-plugin'
+    - id: ulin-kit
+      name: 'ulin-kit'
 
 # Agent preset standard: one `@deepseek-ai/dsh-agent-preset` declaration inserted
 # after the web patch. Edits saved from the Web editor override this row's

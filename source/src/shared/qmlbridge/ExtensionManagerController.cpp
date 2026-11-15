@@ -129,7 +129,7 @@ void ExtensionManagerController::populate()
 		rows.append(row);
 	}
 
-	// ② 客户端扩展：来自 <exe>/clientExtensions/；未装载的补一段说明
+	// ② 客户端扩展：来自 <exe>/extensions/；未装载的补一段说明
 	const QStringList clientNames = ClientExtension::installedNames();
 	const QStringList clientLoaded = ClientExtension::loadedNames();
 	for (const QString& name : clientNames) {

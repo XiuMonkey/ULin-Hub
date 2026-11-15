@@ -2,7 +2,7 @@
 
 // 分层：本文件在 common/settings/ —— **领域层**（设置页的数据面与视图状态机：
 // provider/凭据/模型写回、Agent 预设、服务端地址、外观项的装配与反馈文案都在这里），
-// 与它读写的 ClientSettings / SettingsStore 同层（解析与派生引用仍在 common/Agent/ModelSelectionService）。
+// 与它读写的 ClientSettings / SettingsStore 同层（解析与派生引用仍在 common/agent/ModelSelectionService）。
 // 它不 import 任何 QML 概念，可以脱离 QML 引擎单测。QML 面（`Hub.settings` 属性、类型注册）在
 // qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
 // 设置页数据面（M6 前置）：把 ModelSelectionService 的既有能力接到 QML。
@@ -17,7 +17,7 @@
 // 逻辑一行没重写：解析、派生引用、读-改-写 models 数组全在既有 ModelSelectionService 里。
 // 本类只负责"持有视图状态 + 暴露给 QML + 把回调翻成信号"。
 
-#include "common/Agent/ModelSelectionService.h"
+#include "common/agent/ModelSelectionService.h"
 
 #include <QObject>
 #include <QString>
@@ -26,6 +26,8 @@
 
 class DshApiClient;
 class QTimer;
+
+namespace UlinCore { class UlinCoreSettings; }
 
 class SettingsController : public QObject
 {
@@ -44,7 +46,8 @@ class SettingsController : public QObject
 		// 表单反馈行
 		Q_PROPERTY(QString formFeedback READ formFeedback NOTIFY formFeedbackChanged)
 		Q_PROPERTY(QVariantList candidates READ candidates NOTIFY candidatesChanged)
-		// 导航页下标：0=模型 1=Agent 预设 2=服务端 3=外观
+		// 导航页下标：通用 0=模型 1=Agent 预设 2=服务端 3=外观；
+		// ulincore 0=提供商 1=模型 2=运行时 3=数据 4=Agent 5=外观 6=服务
 		Q_PROPERTY(int page READ page NOTIFY pageChanged)
 		// Agent 预设
 		Q_PROPERTY(QVariantList agentPresets READ agentPresets NOTIFY presetsChanged)
@@ -54,6 +57,8 @@ class SettingsController : public QObject
 		Q_PROPERTY(QString masterBackend READ masterBackend NOTIFY masterBackendChanged)
 		Q_PROPERTY(QString masterBackendName READ masterBackendName NOTIFY masterBackendChanged)
 		Q_PROPERTY(QVariantList masterBackends READ masterBackends NOTIFY masterBackendChanged)
+		// 自研内核设置页（data/ulincore/settings.json）：模型、Key、系统提示词、工具线程等
+		Q_PROPERTY(QObject* ulincore READ ulincore CONSTANT)
 		// 服务端地址
 		Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
 		// 外观
@@ -88,6 +93,7 @@ public:
 	QString masterBackend() const { return m_masterBackend; }
 	QString masterBackendName() const;
 	QVariantList masterBackends() const;
+	QObject* ulincore() const;
 	QString serverUrl() const { return m_serverUrl; }
 	QVariantList languages() const { return m_languages; }
 	QString languageCode() const { return m_languageCode; }

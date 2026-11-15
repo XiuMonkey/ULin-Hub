@@ -91,6 +91,55 @@ namespace {
 	QString g_logsDir;
 	QMutex g_logMutex;
 
+	// 单文件 8 MiB 封顶，保留 5 个历史分片（info.1.log … info.5.log，越新编号越小）。
+	// 此前每个「模块×级别」是一个永不轮转的 Append 文件，extension/info.log 累积到 121 MB，
+	// 打开/grep 都很慢；轮转后当前文件始终很小，最老的分片自动淘汰。
+	constexpr qint64 kMaxLogFileBytes = 8 * 1024 * 1024;
+	constexpr int kMaxLogBackups = 5;
+
+	QString backupPath(const QString& path, int index)
+	{
+		const QString base = path.left(path.size() - 4);   // 去掉 ".log"
+		return base + QStringLiteral(".") + QString::number(index) + QStringLiteral(".log");
+	}
+
+	bool needsRotate(const ModuleTarget* target, LogType level)
+	{
+		const QFile* file = target->files[level];
+		return file && file->isOpen() && file->size() >= kMaxLogFileBytes;
+	}
+
+	void rotateLogFile(ModuleTarget* target, LogType level)
+	{
+		QFile* file = target->files[level];
+		if (!file)
+			return;
+		const QString path = file->fileName();
+
+		QFile::remove(backupPath(path, kMaxLogBackups));
+		for (int i = kMaxLogBackups - 1; i >= 1; --i) {
+			const QString from = backupPath(path, i);
+			if (QFile::exists(from))
+				QFile::rename(from, backupPath(path, i + 1));
+		}
+
+		if (target->streams[level])
+			target->streams[level]->flush();
+		delete target->streams[level];
+		target->streams[level] = nullptr;
+		file->close();
+
+		// 外部程序占用导致改名失败时，退回原文件继续追加：宁可文件偏大也不丢日志。
+		if (!QFile::rename(path, backupPath(path, 1))) {
+			file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			target->streams[level] = new QTextStream(file);
+			return;
+		}
+
+		if (file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+			target->streams[level] = new QTextStream(file);
+	}
+
 	void openModuleTarget(ModuleTarget* target, const char* folder)
 	{
 		target->folder = folder;
@@ -107,6 +156,9 @@ namespace {
 
 			target->files[i] = file;
 			target->streams[i] = new QTextStream(file);
+			// 启动时就把上次遗留的超大文件归档，当前文件从头开始，不用等写到阈值才切。
+			if (needsRotate(target, static_cast<LogType>(i)))
+				rotateLogFile(target, static_cast<LogType>(i));
 		}
 	}
 
@@ -147,6 +199,8 @@ namespace {
 
 	void writeEntry(ModuleTarget* target, LogType level, const QMessageLogContext& context, const QString& message)
 	{
+		if (needsRotate(target, level))
+			rotateLogFile(target, level);
 		QTextStream* stream = target->streams[level];
 		if (!stream)
 			return;

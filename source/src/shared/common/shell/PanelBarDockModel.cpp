@@ -185,6 +185,26 @@ QString PanelBarDockModel::openUrl(const QString& url, const QString& title)
 	return appendBlock(QStringLiteral("browser"), url, title);
 }
 
+void PanelBarDockModel::setBlockUrl(const QString& blockId, const QString& url)
+{
+	for (int i = 0; i < m_blocks.size(); ++i) {
+		if (m_blocks.at(i).id != blockId)
+			continue;
+		if (m_blocks.at(i).url == url)
+			return;
+		m_blocks[i].url = url;
+		if (i == m_activeIndex)
+			emit activeViewChanged();
+		return;
+	}
+	for (Block& block : m_detachedBlocks) {
+		if (block.id == blockId) {
+			block.url = url;
+			return;
+		}
+	}
+}
+
 bool PanelBarDockModel::closeBlock(const QString& blockId)
 {
 	for (int index = 0; index < m_blocks.size(); ++index) {

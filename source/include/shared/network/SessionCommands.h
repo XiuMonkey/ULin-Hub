@@ -312,6 +312,26 @@ namespace SessionCommands
 		return args;
 	}
 
+	// workspace/unarchiveSession（还原归档）-> args { request: { sessionId } }
+	inline QJsonObject sessionUnarchive(const QString& sessionId)
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("sessionId"), sessionId);
+
+		QJsonObject args;
+		args.insert(QStringLiteral("request"), request);
+		return args;
+	}
+
+	// session/delete（彻底删除）-> args { request: { sessionId } }；
+	// 与 archive 不同：真正从服务端会话存储里删除。
+	inline QJsonObject sessionDelete(const QString& sessionId)
+	{
+		QJsonObject request;
+		request.insert(QStringLiteral("sessionId"), sessionId);
+		return request;
+	}
+
 	// agentPresets/select -> args { agentId, agentPreset }（不是 `request` 包装，agentId 就是 sessionId）；
 	// 只在会话空白期可用，跑过任一轮即永久锁定（服务端回 agent-preset/locked）；Hub 暂无调用点，保留作协议收录。
 	inline QJsonObject agentPresetSelect(const QString& sessionId, const QString& presetId)

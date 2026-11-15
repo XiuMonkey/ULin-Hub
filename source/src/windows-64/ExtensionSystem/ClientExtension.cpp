@@ -142,7 +142,7 @@ namespace ClientExtension
 		if (!override.isEmpty())
 			return override;
 
-		return QCoreApplication::applicationDirPath() + QStringLiteral("/clientExtensions");
+		return QCoreApplication::applicationDirPath() + QStringLiteral("/extensions");
 	}
 
 	QStringList loadedNames()

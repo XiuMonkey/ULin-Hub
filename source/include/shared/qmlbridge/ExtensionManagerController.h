@@ -9,7 +9,7 @@
 // 扩展管理（原版 src/ui/ExtensionManagerPopup.cpp 的 QML 版）
 // 一个窗口把两条后端线接到一起：
 //  · 工具扩展 —— <DSH_HOME>/profiles/web（extensions.json + node_modules + cordis.patch.yml）
-//  · 客户端扩展 —— <exe>/clientExtensions/<Name>/（main.dll + info.json5 + ui/），进程内 QPluginLoader
+//  · 客户端扩展 —— <exe>/extensions/<Name>/（main.dll + info.json5 + ui/），进程内 QPluginLoader
 // 逻辑一行不重写：解压安装是 ExtensionLoader（worker 线程）、进度由 ExtensionInstallTask 轮询、
 // 清单读写与目录清理在 ExtensionRegistry / ClientExtension。这里只做三件事：
 //  * 列表：两种来源合成 QML 好用的 QVariantList（行里带 kind / name / label / kindLabel / loaded）

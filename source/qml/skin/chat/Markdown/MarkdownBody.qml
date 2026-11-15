@@ -20,14 +20,27 @@ Item {
     property var inlineCodeRects: []
     property bool decorationsRefreshPending: false
 
+    // 用组件内的 Timer 而不是 Qt.callLater：后者排在事件循环里，Repeater 重建委托时
+    // 组件可能已销毁，回调再访问 root 就会报 "refreshDecorations is not a function"。
+    // Timer 是子对象，随组件一起销毁，不会在销毁后触发。
+    // interval 不是 0：取表格线/行内代码矩形要 documentSize() 强制整篇布局，而流式正文
+    // 每 33ms 变一次 —— 放到 ~100ms 一拍（10Hz），肉眼无感，`documentSize` 少掉三分之二。
+    // decorationsRefreshPending 保证上层每 tick 调 start() 也不会把这一拍一直往后推。
+    Timer {
+        id: decorationsTimer
+        interval: 100
+        repeat: false
+        onTriggered: {
+            root.decorationsRefreshPending = false
+            root.refreshDecorations()
+        }
+    }
+
     function scheduleRefreshDecorations() {
         if (decorationsRefreshPending)
             return
         decorationsRefreshPending = true
-        Qt.callLater(function () {
-            root.decorationsRefreshPending = false
-            root.refreshDecorations()
-        })
+        decorationsTimer.start()
     }
 
     readonly property var colorTokens: ({   // 主题 token 一次性交给 C++；主题切换时重挂文档并重渲染
@@ -50,8 +63,16 @@ Item {
     function refreshDecorations() {
         if (body.textDocument === null)
             return
-        root.tableLines = Hub.markdownTableLines(body.textDocument)
-        root.inlineCodeRects = Hub.markdownInlineCodeRects(body.textDocument)
+        // 纯正文流式占多数：没有 | 就不要为表格扫整篇 block，没有 ` 就不要扫 inline-code。
+        // 并且空数组不重复赋值，避免 Repeater/绑定在无装饰时也被标脏。
+        const table = root.text.indexOf("|") >= 0
+            ? Hub.markdownTableLines(body.textDocument) : []
+        if (table.length > 0 || root.tableLines.length > 0)
+            root.tableLines = table
+        const inline = root.text.indexOf("`") >= 0
+            ? Hub.markdownInlineCodeRects(body.textDocument) : []
+        if (inline.length > 0 || root.inlineCodeRects.length > 0)
+            root.inlineCodeRects = inline
     }
 
     function reattach() {
@@ -105,15 +126,16 @@ Item {
     // QTextDocument 只能给 inline-code 画直角纯色底；圆角/内边距用这层矩形补。
     // 声明在 TextEdit 之前，确保底块在文字下方，不盖住选中高亮。
     Repeater {
-        model: 256
+        // 不能固定 256：每个 MarkdownBody 都会常驻几百个 Rectangle，流式多段时
+        // 场景图/布局明显变重。按实际 inline-code 数量创建，没有时就是 0 个。
+        model: root.inlineCodeRects.length
         delegate: Rectangle {
             required property int index
-            readonly property var rect: index < root.inlineCodeRects.length ? root.inlineCodeRects[index] : null
-            visible: rect !== null
-            x: rect ? rect.x : 0
-            y: rect ? rect.y : 0
-            width: rect ? rect.w : 0
-            height: rect ? rect.h : 0
+            readonly property var rect: root.inlineCodeRects[index]
+            x: rect.x
+            y: rect.y
+            width: rect.w
+            height: rect.h
             radius: 4
             color: Theme.color.inlineCodeBg || Theme.color.inputBg
             border.width: 1
@@ -150,14 +172,14 @@ Item {
     // 固定池：Repeater(model: tableLines) 在数组一换时会销毁重建全部 delegate，
     // 表格线会整批闪；固定池只更新已有 Rectangle 的 x/y/w/visible。
     Repeater {
-        model: 128
+        // 同上：表格线按实际数量创建，不再固定 128 个空 Rectangle。
+        model: root.tableLines.length
         delegate: Rectangle {
             required property int index
-            readonly property var line: index < root.tableLines.length ? root.tableLines[index] : null
-            visible: line !== null
-            x: line ? line.x : 0
-            y: line ? line.y : 0
-            width: line ? line.w : 0
+            readonly property var line: root.tableLines[index]
+            x: line.x
+            y: line.y
+            width: line.w
             height: 1
             z: 2
             color: Qt.rgba(Theme.color.textPrimary.r, Theme.color.textPrimary.g,

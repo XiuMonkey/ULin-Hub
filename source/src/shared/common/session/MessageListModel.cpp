@@ -26,6 +26,20 @@ MessageListModel::MessageListModel(QObject* parent)
 {
 }
 
+void MessageListModel::beginBatchRebuild()
+{
+	beginResetModel();
+	m_rows.clear();
+	m_batchRebuild = true;
+}
+
+void MessageListModel::endBatchRebuild()
+{
+	m_batchRebuild = false;
+	endResetModel();
+	emit countChanged();
+}
+
 void MessageListModel::clear()
 {
 	beginResetModel();
@@ -91,7 +105,7 @@ void MessageListModel::appendDeliverables(int row, const QVector<DeliverableRef>
 			changed = true;
 		}
 	}
-	if (changed) {
+	if (changed && !m_batchRebuild) {
 		const QModelIndex idx = index(row, 0);
 		emit dataChanged(idx, idx, { DeliverablesRole });
 	}
@@ -101,13 +115,19 @@ void MessageListModel::appendDeliverables(int row, const QVector<DeliverableRef>
 int MessageListModel::appendRow(int kind, const QString& text)
 {
 	const int row = m_rows.size();
-	beginInsertRows(QModelIndex(), row, row);
+	if (m_batchRebuild) {
+		Row entry;
+		entry.kind = kind;
+		entry.text = text;
+		m_rows.append(entry);
+		return row;
+	}
 
+	beginInsertRows(QModelIndex(), row, row);
 	Row entry;
 	entry.kind = kind;
 	entry.text = text;
 	m_rows.append(entry);
-
 	endInsertRows();
 	emit countChanged();
 	return row;
@@ -119,6 +139,17 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 		return;
 
 	Row& entry = m_rows[row];
+
+	// 只有"最终 reply"走增量尾：流式期间只发 ReplyTailRole，稳定段与过程组一个都不重建。
+	// 占位段放在末尾是因为它确实是当前最新的段；AgentBubble 始终按 segments 原序渲染，不做重排。
+	if (entry.streaming && type == QLatin1String("reply")) {
+		appendReplyTail(row, text);
+		return;
+	}
+
+	// 任何非 reply 内容到来都说明当前正文段落已经结束：先把尾文本落回稳定段（同时清掉 QML 的流式尾），
+	// 再走下面的既有追加逻辑。
+	commitReplyTail(row, true);
 
 	// 引擎的 assistant/message 有时是**整段快照**而不是增量（同一 turn 的工具前后会重复发）。
 	// 若本次文本与同类上一段相同/是其前缀，跳过；若是它的累积版本，直接替换，避免正文重复两遍。
@@ -158,11 +189,77 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	touchRow(row);
 }
 
+void MessageListModel::appendReplyTail(int row, const QString& text)
+{
+	Row& entry = m_rows[row];
+
+	// 尾文本必须挂在最后一段 reply 上；最后一段是思考/工具时先补一个空 reply 占位，
+	// 这样段顺序仍是真实输出顺序，AgentBubble 不需要做任何重排。
+	const bool created = entry.segments.isEmpty()
+		|| entry.segments.last().type != QLatin1String("reply");
+	if (created) {
+		Segment placeholder;
+		placeholder.type = QLatin1String("reply");
+		placeholder.partsReady = true;   // 空文本，避免 segmentsFor 在这里切分
+		entry.segments.append(placeholder);
+	}
+
+	Segment& reply = entry.segments.last();
+	const QString base = entry.replyTail.isEmpty() ? reply.text : entry.replyTail;
+	if (base == text || base.startsWith(text))
+		return;   // 同一快照重复到达 / 迟到的更短快照
+
+	entry.replyTail = text.startsWith(base) ? text : (base + text);
+	const QModelIndex idx = index(row, 0);
+	if (created)
+		emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole });
+	else
+		emit dataChanged(idx, idx, { ReplyTailRole });
+}
+
+bool MessageListModel::commitReplyTail(int row, bool notify)
+{
+	if (row < 0 || row >= m_rows.size())
+		return false;
+	Row& entry = m_rows[row];
+	if (entry.replyTail.isEmpty())
+		return false;
+
+	int replyIndex = -1;
+	for (int i = entry.segments.size() - 1; i >= 0; --i) {
+		if (entry.segments.at(i).type == QLatin1String("reply")) {
+			replyIndex = i;
+			break;
+		}
+	}
+
+	if (replyIndex < 0) {
+		// 防御：正常路径下 appendReplyTail 已经建好占位段。
+		Segment reply;
+		reply.type = QLatin1String("reply");
+		reply.text = entry.replyTail;
+		reply.partsReady = false;
+		entry.segments.append(reply);
+	} else {
+		Segment& reply = entry.segments[replyIndex];
+		reply.text = entry.replyTail;
+		reply.partsReady = false;
+	}
+	entry.replyTail.clear();
+
+	if (notify) {
+		const QModelIndex idx = index(row, 0);
+		emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole });
+	}
+	return true;
+}
+
 void MessageListModel::appendToolResult(int row, const QString& text)
 {
 	if (row < 0 || row >= m_rows.size() || text.isEmpty())
 		return;
 
+	commitReplyTail(row, true);
 	Row& entry = m_rows[row];
 
 	for (int i = entry.segments.size() - 1; i >= 0; --i) {
@@ -183,12 +280,35 @@ void MessageListModel::appendToolResult(int row, const QString& text)
 
 void MessageListModel::setStreaming(int row, bool streaming)
 {
-	if (row < 0 || row >= m_rows.size() || m_rows.at(row).streaming == streaming)
+	if (row < 0 || row >= m_rows.size())
 		return;
 
-	m_rows[row].streaming = streaming;
+	Row& entry = m_rows[row];
+	bool tailCommitted = false;
+	if (!streaming)
+		tailCommitted = commitReplyTail(row, false);
+
+	if (entry.streaming == streaming) {
+		// 正常不会走到这里；若收到"已经是 false、但还残留尾文本"的异常收尾，也要把稳定段推给 QML。
+		if (tailCommitted && !m_batchRebuild) {
+			const QModelIndex idx = index(row, 0);
+			emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole });
+		}
+		return;
+	}
+
+	entry.streaming = streaming;
+	if (m_batchRebuild)
+		return;
 	const QModelIndex idx = index(row, 0);
-	emit dataChanged(idx, idx, { StreamingRole });
+	if (streaming) {
+		emit dataChanged(idx, idx, { StreamingRole });
+		return;
+	}
+
+	// 收尾：commitReplyTail 已把尾文本写进稳定 reply 段，必须同时通知 SegmentsRole，
+	// 否则 QML 只清掉 tail、不重新取 segments，最终正文会消失。
+	emit dataChanged(idx, idx, { StreamingRole, ReplyTailRole, SegmentsRole });
 }
 
 int MessageListModel::lastAgentRow() const
@@ -225,6 +345,8 @@ QVariantList MessageListModel::segmentsFor(const Row& row) const
 
 void MessageListModel::touchRow(int row)
 {
+	if (m_batchRebuild)
+		return;
 	const QModelIndex idx = index(row, 0);
 	emit dataChanged(idx, idx, { SegmentsRole, TextRole });
 }
@@ -271,6 +393,8 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 		return row.text;
 	case SegmentsRole:
 		return segmentsFor(row);
+	case ReplyTailRole:
+		return row.replyTail;
 	case ImagesRole: {
 		QVariantList images;
 		for (const ImageRef& image : row.images) {
@@ -309,6 +433,7 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	names.insert(TextRole, "text");
 	names.insert(ImagesRole, "images");
 	names.insert(SegmentsRole, "segments");
+	names.insert(ReplyTailRole, "replyTail");
 	names.insert(StreamingRole, "streaming");
 	names.insert(DeliverablesRole, "deliverables");
 	return names;

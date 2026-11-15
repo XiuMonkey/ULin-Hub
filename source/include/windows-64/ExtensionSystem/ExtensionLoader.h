@@ -1,7 +1,7 @@
 #pragma once
 
 // .ext 包（zip）的解析与安装，按描述文件里的 Type 分流。
-// ClientExtension[Debug] → 客户端扩展：装进 <exe>/clientExtensions/<Name>/，GUI 线程 QPluginLoader 装载；
+// ClientExtension[Debug] → 客户端扩展：装进 <exe>/extensions/<Name>/，GUI 线程 QPluginLoader 装载；
 // 其余 → 工具扩展：服务端扩展目录，Worker 线程按 JSON 协议调用。
 //
 // ── 描述文件：一个还是两个，取决于扩展类型 ──────────────────────────────

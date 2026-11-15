@@ -27,6 +27,8 @@ class ExtensionToolHost;
 class ServerManager;
 class QJsonArray;
 
+namespace UlinCore { class UlinCoreMasterAgent; }
+
 class ClientRuntime : public QObject
 {
 	Q_OBJECT
@@ -58,6 +60,10 @@ public:
 	// ULinHub::onClearConversationClicked 同路（Sidebar::clearAllSessions → deleteAllThen → callSessionCreate）。
 	void clearAllSessions();
 	void archiveSession(const QString& sessionId);
+	// 还原已归档会话（workspace/unarchiveSession）
+	void unarchiveSession(const QString& sessionId);
+	// 彻底删除已归档会话（session/delete）
+	void deleteSessionPermanently(const QString& sessionId);
 	void deleteWorkspace(const QString& workspaceId);
 	void createWorkspace(const QString& path);   // 目录选择在外面（QFileDialog 是控件层的事）
 	void followSession(const QString& sessionId);
@@ -117,6 +123,7 @@ private:
 	ServerManager* m_server = nullptr;
 	DshApiClient* m_api = nullptr;
 	AgentSessionClient* m_agentSession = nullptr;
+	UlinCore::UlinCoreMasterAgent* m_ulinCoreAgent = nullptr;
 	ExtensionToolHost* m_toolHost = nullptr;
 	SessionCatalog m_catalog;   // 值成员（见 catalog() 的说明）
 

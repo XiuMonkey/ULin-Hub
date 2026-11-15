@@ -16,6 +16,9 @@ ListView {
 
     // 宽度正被外层动画驱动时，不逐帧贴底，并暂停气泡阴影；由 Shell 的 messageLoader 注入。
     property bool widthAnimating: false
+    // Shell 在拖右栏边框时注入 true；拖动期间不锁底、不夹取，避免
+    // contentY ↔ maxContentY/builtBottom 的递归绑定把主线程卡死。
+    property bool widthResizing: false
 
     // 首屏/换会话先隐藏，首次贴底完成后显示；用 opacity 而非 visible，避免 ListView 停止布局。
     property bool awaitingFirstPin: false
@@ -28,7 +31,10 @@ ListView {
     boundsBehavior: Flickable.StopAtBounds
     readonly property int fullBuildRowLimit: 40   // 一页内全建，超出才虚拟化
     cacheBuffer: count <= fullBuildRowLimit ? 100000 : Math.round(Math.max(600, height) * 2)   // 只设它不会真正全建，还要 pinStep() 配合
-    ScrollBar.vertical: AppScrollBar { }   // 不要开 reuseItems：高度差异大时 indexAt() 会失效
+    ScrollBar.vertical: AppScrollBar {
+        // 用户主动拖滚动条时先退出贴底，否则 maxContentY 会把把手夹回去。
+        onPressedChanged: if (pressed) list.followBottom = false
+    }   // 不要开 reuseItems：高度差异大时 indexAt() 会失效
 
     property bool bottomSettling: false   // 结束帧解冻期间持续锁底
     Timer {
@@ -71,7 +77,7 @@ ListView {
         // 连滚以上一次的目标为起点
         var base = wheelTargetY >= 0 ? wheelTargetY : contentY
         // ⚠️ 本 ListView 不自动夹取 contentY，必须自己收口
-        var next = Math.max(minContentY, Math.min(maxContentY, base - dy))
+        var next = Math.max(minContentY, Math.min(scrollMaxContentY, base - dy))
 
         wheelAnim.stop()        // 打断上一段（onStopped 同步把 wheelTargetY 归 -1）
         wheelTargetY = next     // 再写新目标，供下一次连滚累积
@@ -140,7 +146,11 @@ ListView {
     readonly property bool lastRowBuilt: count > 0 && lastBuiltIndex === count - 1
 
     // originY 在上方仍有未实例化行时会被 ListView 挪动，下界必须取 min()，不能让它变成正数。
-    readonly property real minContentY: Math.min(-topMargin, originY - topMargin)
+    // 不用 originY 参与下界：向下滚动后 originY 变负，会把下界放到很远，
+    // 滚轮就能一直滚进列表上方的空白。这里只留 header（44px）+ topMargin 的有限回弹。
+    readonly property real minContentY: (Hub.olderAvailable || Hub.loadingOlder)
+        ? -(topMargin + 44)
+        : -topMargin
     readonly property real maxContentY: {
         // ListView 的算法含估值，只当上限兜底
         var flickMax = contentHeight - height + originY + bottomMargin
@@ -150,6 +160,11 @@ ListView {
         // 优先用已建区域底，绝不滚进未建区域
         return Math.max(minContentY, Math.min(flickMax, b + bottomMargin - height))
     }
+
+    // 用户主动滚动/拖滚动条时的真实上界；maxContentY 为了贴底安全只用已建区域，
+    // 历史加载后部分行未实例化时会偏小，不能拿来限制滚动条。
+    readonly property real scrollMaxContentY: Math.max(maxContentY,
+        contentHeight - height + originY + bottomMargin)
 
     // 上翻前记录内容高，重建后补 contentY，避免当前阅读位置被新插入的历史顶走。
     property real olderAnchorHeight: 0
@@ -288,10 +303,11 @@ ListView {
     // 滚动条拖动、ListView 保持首个可见项等操作可能把 contentY 设到合法区间外，这里统一拉回；
     // 贴底过程中的临时越界由 pinStep 自行收敛。
     onContentYChanged: {
-        if (pinning || clampingY || bottomAnchorAdjusting || height <= 0)
+        if (pinning || clampingY || bottomAnchorAdjusting || height <= 0
+                || widthResizing)
             return
         var lo = minContentY
-        var hi = maxContentY
+        var hi = followBottom ? maxContentY : scrollMaxContentY
         if (contentY > hi + 0.5) {
             clampingY = true
             contentY = hi
@@ -329,7 +345,7 @@ ListView {
                 readingSettleTimer.restart()
         }
         // 贴底且宽度正在变化时，先用新 contentHeight 同步写一次底部，避免多一帧旧位置。
-        if ((widthAnimating || bottomSettling) && followBottom && lastRowBuilt) {
+        if (!widthResizing && (widthAnimating || bottomSettling) && followBottom && lastRowBuilt) {
             const bottomTarget = Math.max(minContentY,
                 contentHeight - height + originY + bottomMargin)
             if (Math.abs(contentY - bottomTarget) > 0.5) {
@@ -454,7 +470,8 @@ ListView {
     Binding {
         target: list
         property: "contentY"
-        when: (list.widthAnimating || list.bottomSettling) && list.followBottom
+        when: !list.widthResizing
+            && (list.widthAnimating || list.bottomSettling) && list.followBottom
         value: Math.max(list.minContentY, list.maxContentY)
         restoreMode: Binding.RestoreNone
     }
@@ -568,6 +585,7 @@ ListView {
         required property string kind
         required property string text
         required property var segments
+        required property var replyTail
         required property var images
         required property var deliverables
         required property bool streaming
@@ -595,9 +613,7 @@ ListView {
             : Math.max(120, list.width - list.leftMargin - list.rightMargin)
         implicitHeight: (rowRoot.kind === "user")
             ? userBubble.implicitHeight
-            : ((rowRoot.kind === "system")
-                ? systemNotice.contentHeight
-                : agentBubble.implicitHeight)
+            : ((rowRoot.kind === "system") ? systemNotice.contentHeight : agentBubble.implicitHeight)
 
         UserBubble {
             id: userBubble
@@ -620,6 +636,7 @@ ListView {
             anchors.left: parent.left
             anchors.right: parent.right
             segments: rowRoot.segments
+            replyTail: rowRoot.replyTail
             deliverables: rowRoot.deliverables
             // 行级标志优先；控制器仍在跑且这是最后一条 agent 时也视为流式。
             streaming: rowRoot.streaming

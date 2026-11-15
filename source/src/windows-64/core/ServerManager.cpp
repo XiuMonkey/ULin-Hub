@@ -1031,8 +1031,12 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 		return;
 
 	// 内置插件清单：qrc 目录名 == node_modules 目录名 == patch 行的 id/name
-	static const QStringList kBuiltinPlugins{ QStringLiteral("tools-filter-plugin") };
-	static const QStringList kLegacyBuiltinPlugins{ QStringLiteral("ToolsFilterPlugin") };
+	static const QStringList kBuiltinPlugins{ QStringLiteral("ulin-kit") };
+	// 旧名字：ToolsFilterPlugin 是更早的目录名，tools-filter-plugin 是 v1 的名字。
+	// 启动时清掉旧目录和旧 patch 行，避免同一个插件被加载两次。
+	static const QStringList kLegacyBuiltinPlugins{
+		QStringLiteral("ToolsFilterPlugin"),
+		QStringLiteral("tools-filter-plugin") };
 
 	const QString nodeModulesPath = profileDir + QStringLiteral("/node_modules");
 	// 旧目录/旧 patch 行迁移到新名字，避免同一个插件被加载两次。

@@ -70,7 +70,7 @@ void TestClientExtension::unlockMainDll()
 
 void TestClientExtension::initTestCase()
 {
-	// 指到临时目录：测试绝不能碰真正的 <exe>/clientExtensions
+	// 指到临时目录：测试绝不能碰真正的 <exe>/extensions
 	m_root = QDir(QDir::tempPath()).filePath(
 		QStringLiteral("ulinhub-clientext-test-%1").arg(QCoreApplication::applicationPid()));
 	QDir(m_root).removeRecursively();

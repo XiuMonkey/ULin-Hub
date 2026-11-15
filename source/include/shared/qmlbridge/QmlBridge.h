@@ -21,7 +21,7 @@
 // 分层依赖方向（自上而下，不许反向）：
 //  qmlbridge → core / common/session / common/appearance → common/util / network
 
-#include "common/PluginMarket/PluginMarketController.h"
+#include "common/pluginmarket/PluginMarketController.h"
 #include "common/session/CommandController.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
@@ -39,7 +39,7 @@ class QTimer;
 class ThemeController;
 class ToolsFilter;
 
-// Q_PROPERTY 里用的是 ToolsFilter*，但这里只前置声明（完整定义在 common/Agent/ToolsFilter.h）。
+// Q_PROPERTY 里用的是 ToolsFilter*，但这里只前置声明（完整定义在 common/agent/ToolsFilter.h）。
 // 指针元类型指向未定义类型时必须显式声明成 opaque pointer，否则 moc 生成的元对象编不过
 // （qmetatype.h 的 static_assert：「Pointer Meta Types must either point to fully-defined types
 // or be declared with Q_DECLARE_OPAQUE_POINTER(T *)」）。
@@ -98,7 +98,7 @@ class QmlBridge : public QObject
 	Q_PROPERTY(bool modelCatalogMissing READ modelCatalogMissing NOTIFY modelCatalogChanged)
 	// 主题切换的过渡卡片（原版 #themeSwitchBody：360×200 + spinner + theme_switching）
 	Q_PROPERTY(bool themeSwitching READ themeSwitching NOTIFY themeSwitchingChanged)
-	// 工具过滤器：模型（common/Agent/ToolsFilter）+ 面板开关。QML 用 Hub.toolsFilter.* 取数据、
+	// 工具过滤器：模型（common/agent/ToolsFilter）+ 面板开关。QML 用 Hub.toolsFilter.* 取数据、
 	// 用 Hub.toolsFilterOpen 决定面板是否装载；面板里的关闭走 closeToolsFilter。
 	Q_PROPERTY(ToolsFilter* toolsFilter READ toolsFilter CONSTANT)
 	Q_PROPERTY(bool toolsFilterOpen READ toolsFilterOpen NOTIFY toolsFilterOpenChanged)
@@ -180,6 +180,10 @@ public:
 	// Master 切换入口：先亮遮罩/清空前台，再把真正的后端切换推迟到下一拍事件循环。
 	Q_INVOKABLE void beginMasterSwitch(const QString& backendId);
 	Q_INVOKABLE void refreshSessions();
+	// 已归档会话列表（id/title/updatedAt/workspaceId），供侧栏“已归档会话”面板。
+	Q_INVOKABLE QVariantList archivedSessions() const;
+	Q_INVOKABLE void unarchiveArchivedSession(const QString& sessionId);
+	Q_INVOKABLE void deleteArchivedSession(const QString& sessionId);
 	// 轻量：只刷 running（子代理页签/列表的"运行中"）。顶栏在打开「子智能体」下拉前调它，
 	// 保证看到的是当下的状态，而不是启动时那份 session.list 快照。
 	Q_INVOKABLE void refreshSessionStates();
@@ -201,8 +205,13 @@ public:
 	int attachmentRevision() const { return m_attachmentRevision; }
 
 	Q_INVOKABLE void addAttachments(const QVariantList& urls);
+	// 截图：抓取当前窗口指定逻辑矩形，存成 PNG 并作为图片附件加入输入区。
+	Q_INVOKABLE void captureScreenArea(int x, int y, int width, int height);
 	// 原生文件对话框（避免依赖 QtQuick.Dialogs 部署）
 	Q_INVOKABLE void chooseImageFiles();
+	// 侧栏浏览器右键「询问 Agent」：把 {url,title,selector,selectedText,text,html,pageText}
+	// 推给 ulin-kit 插件（POST /api/ulin-kit/browser-context），并在输入框生成一张卡片。
+	Q_INVOKABLE void askBrowserContext(const QVariantMap& context);
 	Q_INVOKABLE void removeAttachment(int index);
 	Q_INVOKABLE QString attachmentSource(const QString& attachmentId);
 
@@ -273,8 +282,9 @@ public:
 	// CodeBlock 在主题切换后重新取一次高亮 HTML：消息模型里的 html 是装载时烘死的旧色，
 	// 这里按当前主题现算（CodeHighlighter 内部有语言+代码+亮暗的缓存）。
 	Q_INVOKABLE QString highlightCode(const QString& language, const QString& code) const;
-	// QML 侧诊断出口：console.log 不落盘，诊断信息统一从这里走项目 Logger（qInfo → logs/general/info.log）
-	Q_INVOKABLE void probe(const QString& tag, const QString& detail);
+	// UI 侧诊断探针：ULINHUB_UI_PROBE=1 时把帧级滚动/贴底状态写进 logs/general/info.log。
+	Q_INVOKABLE bool uiProbeEnabled() const;
+	Q_INVOKABLE void uiProbe(const QString& tag, const QString& detail);
 
 signals:
 	void currentSessionChanged();
@@ -310,6 +320,7 @@ signals:
 void pendingAttachmentsChanged();
 void attachmentRevisionChanged();
 	void olderPrepended();
+	void archivedSessionsChanged();
 	void sessionCreateFailed(const QString& message);  // 新建会话失败（QML 用 Toast 显示：statusText 只在初始化遮罩里可见）
 	// 操作失败/被拒（删工作区、建工作区...）：以前这里是一条空连接，所有错误都被丢掉了 ——
 	// 用户看到的就是"点了没反应"。现在转发到 QML，由侧栏弹 Toast。

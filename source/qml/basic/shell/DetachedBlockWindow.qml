@@ -160,8 +160,8 @@ Window {
             onLoaded: {
                 if (!item || !win.info)
                     return
-                if (win.info.viewBlockScoped)
-                    item.blockId = win.blockId
+                // 所有视图都注入 blockId：网页块用它把当前 URL 写回 PanelBarDock。
+                item.blockId = win.blockId
                 if (typeof item.openExternal === "function")
                     item.startUrl = win.info.url
             }

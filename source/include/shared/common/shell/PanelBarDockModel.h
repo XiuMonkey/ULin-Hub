@@ -115,6 +115,8 @@ public:
 	// 离开主界面），只多记一个初始地址并**返回它的稳定 id**（"blk-N"；url 为空则拒绝，返回空串）。
 	// 调用方拿 id 就能用 closeBlock 关它 —— 谁开的谁记 id，模型不记"是谁开的"。
 	Q_INVOKABLE QString openUrl(const QString& url, const QString& title);
+	// 保存网页块当前地址（脱离/回附、切块后重新实例化时恢复原页面）。
+	Q_INVOKABLE void setBlockUrl(const QString& blockId, const QString& url);
 	// 按稳定 id 关一块（不存在/已关 = 什么都不做，返回 false）。与 close(index) 同一条收敛逻辑。
 	Q_INVOKABLE bool closeBlock(const QString& blockId);
 	// 当前所有块的稳定 id（按打开顺序）。给"我这块还开着吗"这类判断用。

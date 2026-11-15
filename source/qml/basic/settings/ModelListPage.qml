@@ -89,6 +89,8 @@ Item {
     }
 
     function credentialText(row) {   // 凭据引用行：基础句 + 状态后缀（原版 refreshCredentialRowText）
+        if (row && row.noApiKey === true)   // 账号登录路由：没有 key 可填，别按"未配置"呈现
+            return qsTrId("model_credential_account_auth")
         if (!row || !row.keyRef || row.keyRef.length === 0)
             return ""
 
@@ -303,6 +305,7 @@ Item {
                                             Row {
                                                 width: parent.width
                                                 visible: rowHost.providerRow !== null
+                                                    && rowHost.providerRow.noApiKey !== true
                                                     && rowHost.providerRow.keyKnown
                                                     && !rowHost.providerRow.keyConfigured
                                                 topPadding: 1
@@ -460,6 +463,8 @@ Item {
                                     Row {
                                         width: keyPanel.width - keyPanel.leftPadding - keyPanel.rightPadding
                                         spacing: 8
+                                        // 账号登录路由没有 key 可填：整行隐藏，只留下面的状态说明。
+                                        visible: !(rowHost.providerRow !== null && rowHost.providerRow.noApiKey === true)
 
                                         Text {
                                             width: page.detailLabelWidth
@@ -892,6 +897,8 @@ Item {
                         Row {   // 8 API Key（原版是字面量标签，无 id）
                             width: parent.width
                             spacing: 8
+                            // 账号登录路由没有 key 可填：表单里也隐藏这一行。
+                            visible: !(page.currentProvider !== null && page.currentProvider.noApiKey === true)
 
                             Text {
                                 width: page.labelWidth

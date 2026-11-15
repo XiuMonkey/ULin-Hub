@@ -23,14 +23,40 @@ Item {
 
     // 气泡搬到顶层后**不再**跟着宿主一起隐藏（宿主的 visible 不会传导到 contentItem），
     // 这里自己沿 parent 链查一遍。在绑定里逐个读 .visible 会自动建立依赖。
-    readonly property bool anchorShown: {
+    // visible 不要直接绑定 parent 链上的 visible：QML 会把“气泡 reparent 到 contentItem”
+    // 与锚点可见性识别成循环，启动/开设置页时刷出大量 Binding loop。
+    // 改为显式 bool，提示实际可见期间用 200ms 轮询刷新（工具栏 tooltip 不是流式热点）。
+    property bool tipVisible: false
+
+    function refreshTipVisible() {
         let it = root.anchorItem
-        while (it) {
-            if (!it.visible)
-                return false
+        let shown = true
+        while (it && it !== root.topLayer) {
+            if (!it.visible) {
+                shown = false
+                break
+            }
             it = it.parent
         }
-        return true
+        const next = root.visible && root.anchorItem !== null && shown
+            && root.text.length > 0
+        if (root.tipVisible !== next)
+            root.tipVisible = next
+    }
+
+    Component.onCompleted: refreshTipVisible()
+    onVisibleChanged: refreshTipVisible()
+    onTextChanged: refreshTipVisible()
+    onAnchorItemChanged: {
+        refreshTipVisible()
+        root.place()
+    }
+
+    Timer {
+        interval: 200
+        repeat: true
+        running: root.visible && root.text.length > 0
+        onTriggered: root.refreshTipVisible()
     }
 
     implicitWidth: bubble.implicitWidth
@@ -67,8 +93,7 @@ Item {
         // 顶层：contentItem 的最后一批子项 ⇒ 盖住顶栏/会话区。Popup 的 Overlay 比它更晚创建，
         // 所以菜单仍然压在提示之上（这正是想要的顺序）。
         parent: root.topLayer ? root.topLayer : root.anchorItem
-        visible: root.visible && root.anchorItem !== null && root.anchorShown
-            && root.text.length > 0
+        visible: root.tipVisible
 
         implicitWidth: label.implicitWidth + 2 * Theme.spacing.fieldPadX
         implicitHeight: label.implicitHeight + Theme.spacing.labelGap
@@ -114,14 +139,15 @@ Item {
         function onHeightChanged() { root.place() }
     }
 
-    Connections {   // 窗口尺寸变化：夹边界与上下翻转都要重算
-        target: Window.window
+    Connections {   // 窗口尺寸变化：contentItem 跟着窗口变，夹边界与上下翻转都要重算。
+        // 不能写 target: Window.window —— attached property 只能在 Item 上求值，
+        // Connections 不是 Item，Qt 会逐次报 "Window.window only supports types derived from Item"。
+        target: root.topLayer
         enabled: bubble.visible
         function onWidthChanged() { root.place() }
         function onHeightChanged() { root.place() }
     }
 
-    onAnchorItemChanged: root.place()   // 锚点被显式改掉时也要重算
 
     // 换 parent 会连同 QObject 父子关系一起改（气泡从此归 contentItem 所有），
     // 所以宿主被销毁时必须自己收尸 —— 否则 ListView 委托里的提示会一层层堆在窗口根上。

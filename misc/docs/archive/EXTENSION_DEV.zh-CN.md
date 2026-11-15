@@ -383,7 +383,7 @@ AttachedPlugin/
 ## 11. 客户端扩展（`Type = ClientExtension`）：DLL + QML 两个扩展系统
 
 前面 1~10 节讲的都是**工具扩展**（装进服务端 profile、给 Agent 加工具）。本节讲另一条线：
-**客户端扩展** —— 装进宿主进程 `<exe>/clientExtensions/<Name>/`，可以带原生 DLL、也可以带 QML。
+**客户端扩展** —— 装进宿主进程 `<exe>/extensions/<Name>/`，可以带原生 DLL、也可以带 QML。
 
 > ⚠️ **本节分"现状"与"目标形态"**。QML 那一半（扩展 QML 的装载与注入：
 > `HostUi` / `VirtualUiHost`）**已于 2026-10-01 实现**（§11.3 就是实现后的形态）。11.1 表里"扩展能拿到的宿主对象"那句仍是旧的：现在可挂对象是 `shell` / `titleBar` / `topBar` / `sessionBar` / `sessionBar.extDock` / `composer`。
@@ -392,10 +392,10 @@ AttachedPlugin/
 
 | 能力 | 实现 | 说明 |
 |---|---|---|
-| 安装 | `ExtensionLoader::loadAndInstall` | 解压到临时目录 → 按 `info.json5` 的 `Type` 分流 → 客户端扩展**整包落地**到 `<exe>/clientExtensions/<Name>/`（dll 之外的 **QML 与资源也一并拷过去**；描述文件统一落成 `info.json5`） |
+| 安装 | `ExtensionLoader::loadAndInstall` | 解压到临时目录 → 按 `info.json5` 的 `Type` 分流 → 客户端扩展**整包落地**到 `<exe>/extensions/<Name>/`（dll 之外的 **QML 与资源也一并拷过去**；描述文件统一落成 `info.json5`） |
 | DLL 装载 | `ClientExtension::loadAll()` / `loadOne()` | 启动时（`engine.load()` 之后）扫目录：没有身份文件（`info.json5`；老扩展 `regulation.json5`，规则见 `ExtensionLoader::infoPath`）的跳过；`main.dll` 优先，否则取目录里第一个 `*.dll`；`QPluginLoader` → `qobject_cast<DshHostPlugin*>` → `setHostIdentity(目录名)` → `attachHost()`。全程 **GUI 线程** |
 | 卸载 | `ClientExtension::remove()` | 先删判据（`info.json5` / 老名 `regulation.json5`，两个都试）⇒ 不再算已安装；dll 被占用则留残留，下次启动 `sweepPendingRemovals()` 清 |
-| 管理界面 | `Hub.extensions`（`ExtensionManagerController` + `basic/extensions/ExtensionManagerPage.qml`） | 两种来源：工具扩展（`profiles/web/extensions.json`）、客户端扩展（`<exe>/clientExtensions`） |
+| 管理界面 | `Hub.extensions`（`ExtensionManagerController` + `basic/extensions/ExtensionManagerPage.qml`） | 两种来源：工具扩展（`profiles/web/extensions.json`）、客户端扩展（`<exe>/extensions`） |
 | 扩展能拿到的宿主对象 | `DshHost::findObject` | `themeManager` / `translationNotifier` / `connectionManager` / `apiSink` 四个（旧控件壳时代的 `sidebar` / `topbar` / `mainWindow` 随 M8 删除，取到 **null**）。**界面注入点另走一套名字**（`VirtualUiHost::HostItem(...)`，非 `findObject`）：`shell` / `titleBar` / `topBar` / `sessionBar` / `sessionBar.extDock` / `composer`，2026-10-01 起已恢复登记，见 §11.3 的表 |
 
 ### 11.2 目标形态：包结构
@@ -414,7 +414,7 @@ AttachedPlugin/
 ```json5
 // info.json5（客户端扩展）—— 客户端扩展没有 regulation.json5：它没有要注册的 DLL 工具
 {
-  "Name": "plugin-transpiler",    // 安装目录名 = <exe>/clientExtensions/<Name>/
+  "Name": "plugin-transpiler",    // 安装目录名 = <exe>/extensions/<Name>/
   "Type": "ClientExtension",     // 或 ClientExtensionDebug
   // ---- 扩展身份三件套（2026-10-16 新增；宿主**目前只登记，不消费**）----
   "ID": "plugin-transpiler",     // 标识符，约定**小写 + 连字符**（与 Name 的安装目录名不是一回事）

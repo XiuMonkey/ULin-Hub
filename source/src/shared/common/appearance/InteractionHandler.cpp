@@ -1,6 +1,6 @@
 #include "common/appearance/InteractionHandler.h"
 
-#include "network/DshApiClient.h"
+#include "common/agent/dsh/DshApiClient.h"
 
 #include <QAbstractButton>
 #include <QButtonGroup>

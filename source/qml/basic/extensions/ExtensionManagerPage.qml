@@ -3,7 +3,7 @@
 // 工具栏：安装扩展（ext_install）/ 移除选中（ext_remove_selected，无选中时禁用）/ 刷新（common_refresh）
 // / 重启服务端（plugin_restart_server，工具扩展增删后生效用）
 // 列表（panelBg + 1px border + radius 12，行 hover/selected 背景与旧 QSS 同款）：
-// 两种来源 —— 工具扩展（profiles/web/extensions.json）、客户端扩展（<exe>/clientExtensions）。
+// 两种来源 —— 工具扩展（profiles/web/extensions.json）、客户端扩展（<exe>/extensions）。
 // 未装载的客户端扩展按原版在行尾标「·未装载」。
 // 移除要确认：AppPopup + ext_remove_confirm_title / ext_remove_confirm_fmt（确认按钮用 common_delete）
 // 底部状态行：ext_empty_hint / ext_installed_count_fmt / ext_installing / ext_install_*_fmt …
