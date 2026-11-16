@@ -553,7 +553,11 @@ Item {
                     // 用户自己开的浏览器块 URL 是空串 ⇒ openExternal 直接返回，行为与从前一致。
                     onLoaded: {
                         if (item) {
-                            item.blockId = Qt.binding(function () { return PanelBarDock.activeBlockId })
+                            // 浏览器/文件预览这类纯 URL 面板没有 blockId；只有终端那类
+                            // block-scoped 视图才需要。无条件赋值会报
+                            // "Cannot assign to non-existent property blockId"。
+                            if (item.blockId !== undefined)
+                                item.blockId = Qt.binding(function () { return PanelBarDock.activeBlockId })
                             if (typeof item.openExternal === "function")
                                 item.startUrl = Qt.binding(function () { return PanelBarDock.activeViewUrl })
                         }

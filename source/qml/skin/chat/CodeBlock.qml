@@ -143,8 +143,18 @@ Item {
                 size: scroller.visibleArea.widthRatio
                 position: scroller.visibleArea.xPosition
 
-                // 拖动滚动条 -> 移动代码；代码被别的方式滚动时用下面的 Binding 回写位置
-                onPositionChanged: scroller.contentX = position * (scroller.contentWidth - scroller.width)
+                // 拖动滚动条 -> 移动代码；代码被别的方式滚动时用下面的 Binding 回写位置。
+                // ⚠️ ScrollBar.position 的范围是 0..1-size（不是 0..1），不能乘
+                // (contentWidth - width)，否则到最右端只滚到 (1-size) 的位置，松手后
+                // 下面那条 Binding 又把 position 拉回去 —— 看起来就是滚动条回弹。
+                // position 与 visibleArea.xPosition 同域，乘 contentWidth 才是正确映射。
+                onPositionChanged: {
+                    const maxX = Math.max(0, scroller.contentWidth - scroller.width)
+                    if (maxX <= 0)
+                        return
+                    scroller.contentX = Math.max(0, Math.min(maxX,
+                        hbar.position * scroller.contentWidth))
+                }
             }
 
             Binding {   // 代码区自己滚动（滚轮/拖动）时把位置同步回滚动条；拖动期间不回写，避免打架

@@ -272,7 +272,9 @@ Item {
             // 聚焦只加深灰色描边，不用 accent 蓝，也不加发光或阴影。
             // 浅色下输入卡边框只做很轻的分隔，别比卡片阴影还抢眼。
             readonly property color restingBorder: Theme.color.composerBorder || Theme.color.border || (Theme.isDark ? "#2E3034" : "#ECEEF1")
-            readonly property color activeBorder: Theme.color.accent
+            readonly property color activeBorder: Theme.color.composerBorderActive
+                || Theme.color.composerBorder
+                || (Theme.isDark ? "#4A4D53" : "#DDE1E6")
             border.color: (editor.activeFocus || dropArea.containsDrag) ? activeBorder : restingBorder
             border.width: 1
         }

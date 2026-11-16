@@ -50,6 +50,7 @@
   "shadowFloat": "rgba(16,32,64,0.160)",
   "textOnAccent": "#FFFFFF",
   "composerBorder": "rgba(0,102,204,0.32)",
+  "composerBorderActive": "#0066CC",
   "textTertiary": "#7C818B",
   "textCaption": "#9AA1AB",
   "chipHoverBg": "rgba(16,32,64,0.045)",
