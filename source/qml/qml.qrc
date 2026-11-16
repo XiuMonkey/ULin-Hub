@@ -7,7 +7,6 @@
     <!-- 面板坞：PanelGrip（三个点抓手）/ DockDropHint（拖回时的落点提示）-->
     <qresource prefix="/qml">
         <file>basic/chat/Composer.qml</file>
-        <file>basic/chat/InteractionPanel.qml</file>
         <file>basic/chat/ToolsFilterPanel.qml</file>
         <file>basic/chat/SkillsManagerPage.qml</file>
         <file>basic/chat/MessageListView.qml</file>
@@ -22,9 +21,6 @@
         <file>basic/settings/AppearancePage.qml</file>
         <file>basic/settings/ModelListPage.qml</file>
         <file>basic/settings/ServerPage.qml</file>
-        <file>basic/settings/UlinCoreField.qml</file>
-        <file>basic/settings/UlinCoreComboBox.qml</file>
-        <file>basic/settings/UlinCoreCheckBox.qml</file>
         <file>basic/settings/UlinCoreProvidersPage.qml</file>
         <file>basic/settings/UlinCoreModelsPage.qml</file>
         <file>basic/settings/UlinCoreRuntimePage.qml</file>
@@ -58,6 +54,8 @@
         <file>metrics.json</file>
         <file>pack.json</file>
         <file>skin/chat/AgentBubble.qml</file>
+        <!-- 提问 / 审批面板：纯视觉件（被 Shell 经 Style.url 装载，风格包可整件遮蔽） -->
+        <file>skin/chat/InteractionPanel.qml</file>
         <file>skin/chat/CrawlMark.qml</file>
         <file>skin/chat/CodeBlock.qml</file>
         <!-- 交付文件行（DSH deliverables/presented）：AgentBubble 内联引用，缺它整条气泡都建不出来 -->
@@ -69,6 +67,13 @@
         <file>skin/chat/UserBubble.qml</file>
         <file>skin/settings/FieldBox.qml</file>
         <file>skin/shell/ThemeSwitchOverlay.qml</file>
+        <!-- 壳层外观面（侧栏 / 顶栏 / 会话区 / 输入停放区）：壳层不再自绘这些面 -->
+        <file>skin/shell/SidebarSurface.qml</file>
+        <file>skin/shell/TopBarSurface.qml</file>
+        <file>skin/shell/ConversationSurface.qml</file>
+        <file>skin/shell/ComposerDock.qml</file>
+        <!-- 右栏外框面（PanelBar 的外观层） -->
+        <file>skin/panel/PanelSurface.qml</file>
         <file>skin/session/SessionFooter.qml</file>
         <file>skin/session/SessionOverflowMenu.qml</file>
         <file>skin/session/SessionRow.qml</file>
@@ -77,13 +82,19 @@
         <file>skin/session/WorkspaceHeader.qml</file>
         <file>skin/window/Backdrop.qml</file>
         <file>skin/window/TitleBar.qml</file>
+        <file>skin/window/WindowSurface.qml</file>
         <file>widgets/ActionButton.qml</file>
+        <file>widgets/CheckMark.qml</file>
         <file>widgets/AppPopup.qml</file>
         <file>widgets/AppScrollBar.qml</file>
         <file>widgets/AppToolTip.qml</file>
         <file>widgets/BusySpinner.qml</file>
         <file>widgets/Card.qml</file>
         <file>widgets/Collapsible.qml</file>
+        <!-- ULin Core 设置页共用的表单控件（输入框 / 下拉 / 勾选） -->
+        <file>widgets/UlinCoreField.qml</file>
+        <file>widgets/UlinCoreComboBox.qml</file>
+        <file>widgets/UlinCoreCheckBox.qml</file>
         <file>widgets/IconButton.qml</file>
         <!-- 单色 SVG 图标载体（侧栏新图标全部走它；qrc 资源在 assets/resources/ulinhub.qrc） -->
         <file>widgets/LineIcon.qml</file>

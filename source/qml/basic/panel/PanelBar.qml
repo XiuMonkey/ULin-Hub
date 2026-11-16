@@ -80,11 +80,14 @@ Item {
     signal panelBarAttachRequested()
     signal panelBarPreviewChanged(bool over)   // 拖动中的落点预览开关（拖动期间主窗口收不到 hover，只能由正在拖的抓手推过去）
 
-    Card {
+    // 外框面（B 层可替换单元）：几何归本件，外观走 Style.url
+    Item {
         anchors.fill: parent
-        radius: Theme.radius.panel
-        padding: 0
-        shadowEnabled: true
+
+        Loader {
+            anchors.fill: parent
+            source: Style.url("skin/panel/PanelSurface.qml")
+        }
 
         Column {
             anchors.fill: parent

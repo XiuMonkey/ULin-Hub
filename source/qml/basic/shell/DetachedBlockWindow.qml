@@ -44,7 +44,7 @@ Window {
         id: frame
         anchors.fill: parent
         radius: win.maximized ? 0 : 12
-        color: Theme.color.panelBg
+        color: Theme.color.dockBg || Theme.color.panelBg
         border.width: win.maximized ? 0 : 1
         border.color: win.frameBorder
         clip: true
@@ -61,7 +61,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 radius: win.maximized ? 0 : 11
-                color: Theme.color.panelBg
+                color: Theme.color.dockBg || Theme.color.panelBg
             }
 
             Row {

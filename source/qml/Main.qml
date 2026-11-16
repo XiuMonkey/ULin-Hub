@@ -39,16 +39,29 @@ Window {
         WindowBridge.attachWindow(root)
     }
 
-    Rectangle {   // 窗口可见面：圆角与 1px 描边就是窗口的真实外轮廓（圆角之外是透明，交给系统投影）
+    Item {   // 窗口可见面（容器）：几何归壳层，外观归 skin/window/WindowSurface
         id: surface
         anchors.fill: parent
         anchors.margins: WindowBridge.contentInset   // 最大化时系统多给一圈不可见缩放边框，内容按它内缩，可见内容才落进工作区
 
         readonly property bool edgeToEdge: WindowBridge.maximized || WindowBridge.fullScreen
+        readonly property real cornerRadius: edgeToEdge ? 0 : Theme.radius.window
 
-        radius: edgeToEdge ? 0 : Theme.radius.window
-        color: Theme.color.windowBg
-        clip: true
+        // 整窗按圆角裁剪：窗口底色本身是透明的（Window color: "transparent"），
+        // 圆角之外直接透出桌面。底板的 radius 只解决"底板自己圆"，内容若画出直角仍会露方角，
+        // 所以这里用 alpha mask 把整张内容收进圆角（最大化时不启用，避免多一层全窗 FBO）。
+        layer.enabled: surface.cornerRadius > 0
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: windowMask
+            autoPaddingEnabled: false
+        }
+
+        // 窗口底板：圆角 / 底色 / 裁剪（B 层可替换单元）
+        Loader {
+            anchors.fill: parent
+            source: Style.url("skin/window/WindowSurface.qml")
+        }
 
         // 背景层（B 层可替换单元，第 37 个）：磁盘风格包优先、qrc 兜底。
         // 所以天然画在卡片之下，不需要 z。
@@ -160,5 +173,15 @@ Window {
                     Hub.addAttachments(drop.urls)
             }
         }
+    }
+
+    // 圆角遮罩源：alpha=1 的圆角矩形，只作为 surface.layer 的 maskSource（不绘制）
+    Rectangle {
+        id: windowMask
+        anchors.fill: surface
+        radius: surface.cornerRadius
+        color: "white"
+        visible: false
+        layer.enabled: true
     }
 }

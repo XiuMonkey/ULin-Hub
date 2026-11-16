@@ -351,12 +351,11 @@ Item {
                         border.width: 1
                         border.color: row.toolVisible ? Theme.color.accent : Theme.color.inputBorder
 
-                        Text {
+                        CheckMark {
                             anchors.centerIn: parent
                             visible: row.toolVisible
-                            text: "✓"
+                            size: 10
                             color: Theme.color.textOnAccent
-                            font.pixelSize: Theme.font.small
                         }
                     }
 

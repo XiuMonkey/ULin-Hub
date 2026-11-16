@@ -199,7 +199,7 @@ Item {
                     width: ListView.view.width
                     implicitHeight: Math.max(64, cardBody.implicitHeight + 24)
                     radius: Theme.radius.card
-                    color: cardMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                    color: cardMouse.containsMouse ? Theme.color.hoverBg : Theme.color.pageBg || Theme.color.panelBg
                     border.width: 1
                     border.color: cardMouse.containsMouse ? Theme.color.inputBorder : Theme.color.menuBorder
 
@@ -326,7 +326,7 @@ Item {
                     width: ListView.view.width
                     implicitHeight: 56
                     radius: Theme.radius.card
-                    color: installedHover.hovered ? Theme.color.hoverBg : Theme.color.panelBg
+                    color: installedHover.hovered ? Theme.color.hoverBg : Theme.color.pageBg || Theme.color.panelBg
                     border.width: 1
                     border.color: installedHover.hovered ? Theme.color.inputBorder : Theme.color.menuBorder
 

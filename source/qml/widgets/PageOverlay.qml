@@ -15,6 +15,14 @@ Item {
     property bool shown: false   // 由壳层绑到 Hub.xxx.open：true = 展开；false = 原路收回，收完（t 回 0）才卸载页面
     property url source   // 页面文件（Style.url("basic/...")）
     property real cardRadius: Theme.radius.popup
+    // 功能性页面（设置/扩展）不需要从点击处长出来的展开/收回动画。
+    property bool animate: true
+    // 仅本次打开不播展开动画（用于切换 Agent 后自动打开新设置）；
+    // 关闭仍走正常收回动画，用户点齿轮正常打开也仍有动画。
+    property bool openInstant: false
+    property bool pendingOpenInstant: false
+    // 切换 Agent 时旧设置直接收掉，不播收回动画；普通关闭仍动画。
+    property bool closeInstant: false
 
     // 与转圈叠加时是相乘关系 ⇒ 一起把整窗重绘推到 ~50ms/帧）。稳定后再开，肉眼无差别。
     // 注意：不能直接改上面的默认值，否则**静止**状态也没阴影了 ⇒ 用 overlayAnimating 门控。
@@ -77,6 +85,11 @@ Item {
     }
 
     function beginExpand() {
+        if (!animate || pendingOpenInstant) {
+            t = 1;
+            pendingOpenInstant = false;
+            return;
+        }
         if (targetW <= 0 || targetH <= 0)
             return;   // 页面还没装载：等 onLoaded 再起（起点已在 onShownChanged 定好）
         t = 0;
@@ -90,11 +103,18 @@ Item {
     function beginRetract() {
         if (!visible)
             return;
+        if (!animate || closeInstant || Hub.settings.switchingBackend) {
+            t = 0;
+            closeInstant = false;
+            return;
+        }
         expandAnim.stop();
         retractAnim.start();
     }
 
     onShownChanged: {
+        if (shown && openInstant)
+            pendingOpenInstant = true
         if (shown) {
             startRect = resolveStartRect();   // 刚点完，指针位置最新鲜：先把起点定下来，再等装载完起动画
             dragOffsetX = 0;   // 每次打开都回到居中位置（抓手拖动留下的偏移不跨次残留）

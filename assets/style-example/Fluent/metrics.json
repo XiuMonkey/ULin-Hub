@@ -1,0 +1,56 @@
+{
+  "_readme": "Fluent 的几何档位（2026-11 定稿）：窗口 12px、表面 10px、控件 6px —— 比 Win11 原生 8/8/4 圆一档；描边细、无重阴影（tonal elevation）；动效取 WinUI ControlFast/Normal/Slow = 150/250/350ms。只列与内置不同的键（其余键自动回退内置默认值）。",
+  "radius": {
+    "window": 12,
+    "panel": 10,
+    "card": 10,
+    "inner": 8,
+    "control": 6,
+    "input": 6,
+    "small": 6,
+    "check": 4,
+    "dot": 9,
+    "tiny": 4,
+    "chip": 6,
+    "pill": 6,
+    "popup": 10,
+    "menu": 8,
+    "float": 10,
+    "composer": 10
+  },
+  "spacing": {
+    "cardPadding": 16,
+    "sectionGap": 12,
+    "buttonPadX": 12,
+    "fieldPadY": 6,
+    "fieldPadWideY": 8
+  },
+  "size": {
+    "titleBarHeight": 40,
+    "windowButtonWidth": 46,
+    "windowButtonHeight": 32,
+    "windowButtonTopMargin": 4,
+    "windowButtonRightMargin": 0,
+    "logoHeight": 18,
+    "scrollbarThickness": 10,
+    "scrollbarHandleWidth": 6,
+    "scrollbarHandleMin": 24,
+    "panelBarWidth": 300
+  },
+  "shadow": {
+    "cardBlur": 10,
+    "cardDy": 2,
+    "cardRadius": 10,
+    "inputBlur": 10,
+    "inputDy": 2,
+    "inputRadius": 10,
+    "floatBlur": 24,
+    "floatDy": 8,
+    "floatRadius": 10
+  },
+  "motion": {
+    "fast": 150,
+    "normal": 250,
+    "slow": 350
+  }
+}

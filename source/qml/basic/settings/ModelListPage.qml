@@ -239,7 +239,7 @@ Item {
                             width: parent.width
                             implicitHeight: entryColumn.implicitHeight
                             radius: Theme.radius.card
-                            color: Theme.color.panelBg
+                            color: Theme.color.pageBg || Theme.color.panelBg
                             border.width: 1
 
                             // 原描边是 border(4% 黑)，和白底几乎同色 —— 卡片边界只能靠 4px 间距"猜"。
@@ -852,7 +852,7 @@ Item {
                                 palette.windowText: Theme.color.textPrimary   // 标签色/高亮色也钉在 token 上：不再受全局 QPalette 影响（深色主题下尤其重要）
                                 palette.text: Theme.color.textPrimary
                                 palette.highlight: Theme.color.textSecondary
-                                palette.highlightedText: Theme.color.panelBg
+                                palette.highlightedText: Theme.color.pageBg || Theme.color.panelBg
 
                                 indicator: Rectangle {
                                     implicitWidth: Theme.size.checkbox
@@ -881,14 +881,11 @@ Item {
                                             : Theme.color.inputBorder
                                     }
 
-                                    Text {
+                                    CheckMark {
                                         anchors.centerIn: parent
-                                        visible: imageInputBox.checkState === Qt.Checked   // 勾：反相中性色（浅色下"近黑面 + 白勾"，深色下"近白面 + 深灰勾"）
-                                        text: "✓"
-                                        color: Theme.color.panelBg
-                                        font.family: "Microsoft YaHei UI"
-                                        font.pixelSize: Theme.font.small
-                                        font.weight: Theme.font.weightBold
+                                        visible: imageInputBox.checkState === Qt.Checked
+                                        size: 11
+                                        color: Theme.color.pageBg || Theme.color.panelBg
                                     }
                                 }
                             }

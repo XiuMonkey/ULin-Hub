@@ -291,6 +291,11 @@ signals:
 	void initializingChanged();
 	void masterSwitchingChanged();
 	void masterSwitchFinished(const QString& name);
+	// 后端切换完成后请求重新打开当前 Agent 的设置入口；
+	// QML 侧转成 sessionBar.openSettingsRequested，扩展接管时由新扩展接手。
+	void agentSettingsRequested();
+	// 切换刚开始、设置页即将 closePage 之前发出；QML 侧据此关闭动画。
+	void agentSwitchStarting();
 	void sessionLoadingChanged();
 	void statusTextChanged();
 	void serverStateChanged();

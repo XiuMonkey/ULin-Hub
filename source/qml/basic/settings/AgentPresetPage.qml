@@ -53,7 +53,7 @@ Item {
                 width: parent.width
                 height: 34
                 radius: Theme.radius.control
-                color: masterMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                color: masterMouse.containsMouse ? Theme.color.hoverBg : Theme.color.pageBg || Theme.color.panelBg
                 border.width: 1
                 border.color: Theme.color.inputBorder
 
@@ -176,7 +176,7 @@ Item {
                 width: parent.width
                 height: 34
                 radius: Theme.radius.control
-                color: presetMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                color: presetMouse.containsMouse ? Theme.color.hoverBg : Theme.color.pageBg || Theme.color.panelBg
                 border.width: 1
 
                 // 这是"下拉触发按钮"：交互控件走官方 DSH 的 `--dsw-alias-border-l2`(inputBorder, 10% 黑)，

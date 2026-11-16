@@ -55,6 +55,8 @@ class SettingsController : public QObject
 		Q_PROPERTY(QString presetFeedback READ presetFeedback NOTIFY presetsChanged)
 		// Agent Master：当前 Agent 后端（内置 DSH；后续后端加入这里）
 		Q_PROPERTY(QString masterBackend READ masterBackend NOTIFY masterBackendChanged)
+	// true 仅覆盖 selectMasterBackend() 里 closePage() 的瞬间；QML 设置页据此跳过收回动画。
+	Q_PROPERTY(bool switchingBackend READ switchingBackend NOTIFY switchingBackendChanged)
 		Q_PROPERTY(QString masterBackendName READ masterBackendName NOTIFY masterBackendChanged)
 		Q_PROPERTY(QVariantList masterBackends READ masterBackends NOTIFY masterBackendChanged)
 		// 自研内核设置页（data/ulincore/settings.json）：模型、Key、系统提示词、工具线程等
@@ -91,6 +93,7 @@ public:
 	QString defaultPresetName() const { return m_defaultPresetName; }
 	QString presetFeedback() const { return m_presetFeedback; }
 	QString masterBackend() const { return m_masterBackend; }
+	bool switchingBackend() const { return m_switchingBackend; }
 	QString masterBackendName() const;
 	QVariantList masterBackends() const;
 	QObject* ulincore() const;
@@ -153,6 +156,10 @@ signals:
 	void presetsChanged();
 	void masterBackendChanged();
 	// 后端切换请求：当前只有 DSH，占位给后续后端实现（服务/扩展在这里接管）。
+	// 在 closePage() 之前发：让外层先把“本次是切换 Agent”标出来，
+	// 这样设置页关闭时可以跳过收回动画。
+	void masterSwitchStarting(const QString& backendId);
+	void switchingBackendChanged();
 	void masterBackendChangeRequested(const QString& backendId);
 	void masterBackendSwitchFailed(const QString& backendId, const QString& reason);
 	void serverUrlChanged();
@@ -203,6 +210,7 @@ private:
 	QString m_defaultPresetName;
 	QString m_presetFeedback;
 	QString m_masterBackend = QStringLiteral("dsh");
+	bool m_switchingBackend = false;
 	QString m_serverUrl;
 	QString m_languageCode;
 	QString m_appearanceFeedback;

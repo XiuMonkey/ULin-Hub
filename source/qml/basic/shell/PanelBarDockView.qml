@@ -333,7 +333,7 @@ Item {
                 width: 0
                 height: 34
                 radius: Theme.radius.small
-                color: Theme.color.panelBg
+                color: Theme.color.dockBg || Theme.color.panelBg
                 border.width: 1
                 border.color: Theme.color.inputBorder
                 opacity: 0.97
@@ -433,7 +433,7 @@ Item {
                             width: launcherColumn.width
                             height: 52
                             radius: Theme.radius.control
-                            color: launcherMouse.containsMouse ? Theme.color.hoverBg : Theme.color.panelBg
+                            color: launcherMouse.containsMouse ? Theme.color.hoverBg : Theme.color.dockBg || Theme.color.panelBg
                             border.width: 1
                             border.color: launcherMouse.containsMouse
                                 ? Theme.color.inputBorder : Theme.color.menuBorder
@@ -607,7 +607,7 @@ Item {
         Rectangle {
             anchors.fill: parent
             radius: Theme.radius.small
-            color: Theme.color.panelBg
+            color: Theme.color.dockBg || Theme.color.panelBg
             border.width: 1
             border.color: Theme.color.inputBorder
             opacity: 0.97

@@ -582,6 +582,14 @@ void SettingsController::selectMasterBackend(const QString& backendId)
 		}
 	}
 	m_masterBackend = id;
+	// 切后端时关掉已打开的宿主设置弹窗：codex / workbuddy 在激活时接管设置入口，
+	// 重新点开才会挂上新后端的面板；否则旧弹窗会一直停在那里，看着像"没切换"。
+	m_switchingBackend = true;
+	emit switchingBackendChanged();
+	emit masterSwitchStarting(id);
+	closePage();
+	m_switchingBackend = false;
+	emit switchingBackendChanged();
 	setPage(0);   // 切后端后回到第一页：ulincore 模式下就是 ULin Core 设置页
 	emit masterBackendChanged();
 	emit masterBackendChangeRequested(id);

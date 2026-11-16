@@ -298,8 +298,8 @@ Item {
             sessionBarContentInset = sessionBarTargetInset
     }
 
-    // 左侧侧栏卡片
-    Card {
+    // 左侧侧栏（几何归壳层；外观面经 Style.url 装载，包可整件替换）
+    Item {
         id: sessionBarCard
         // T = 1 贴左留白；T = 0 时右缘正好落在窗口左缘。
         x: Theme.spacing.windowMargin
@@ -311,20 +311,47 @@ Item {
         anchors.topMargin: Theme.spacing.contentSideInset
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacing.contentSideInset
-        radius: Theme.radius.panel
-        padding: 0
-        shadowEnabled: true
         // 删除按钮/确认卡是侧栏内的浮层；侧栏本身默认 z=0，会被右侧输入卡盖住。
         // 出现待删除项时把整张侧栏抬到内容区之上，确认卡才能跨出侧栏边界显示。
         z: (sessionBarView.pendingId.length > 0 || sessionBarView.confirmOpen) ? 50 : 0
-        color: Theme.color.sessionBarBg || Theme.color.cardBg   // 与内容面区分一档
-        bordered: false   // 原版侧栏没有描边
+
+        Loader {
+            anchors.fill: parent
+            source: Style.url("skin/shell/SidebarSurface.qml")
+        }
 
         SessionBar {
             id: sessionBarView
             anchors.fill: parent
             onNotify: shell.notify(text)
             onCollapseRequested: shell.setSessionBarCollapsed(true)
+        }
+    }
+
+    property bool agentSettingsInstant: false
+    property bool agentSwitchClosing: false
+    Timer {
+        id: agentSwitchCloseTimer
+        interval: 2500
+        onTriggered: shell.agentSwitchClosing = false
+    }
+    Connections {
+        target: Hub
+        function onAgentSwitchStarting() {
+            shell.agentSwitchClosing = true
+            agentSwitchCloseTimer.restart()
+        }
+        function onMasterSwitchingChanged() {
+            if (Hub.masterSwitching) {
+                shell.agentSwitchClosing = true
+                agentSwitchCloseTimer.restart()
+            }
+        }
+        function onAgentSettingsRequested() {
+            // 切换 Agent 后自动打开设置：这一次不播展开动画；关闭仍走收回动画。
+            shell.agentSettingsInstant = true
+            sessionBarView.openSettingsRequested()
+            Qt.callLater(function () { shell.agentSettingsInstant = false })
         }
     }
 
@@ -348,7 +375,8 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.spacing.contentSideInset
 
-        Card {
+        // 顶栏（几何归壳层；外观面经 Style.url 装载）
+        Item {
             id: topBarCard
             anchors.left: parent.left
             anchors.right: parent.right
@@ -356,9 +384,15 @@ Item {
             anchors.rightMargin: Theme.spacing.columnClearance
             anchors.top: parent.top
             implicitHeight: topBar.implicitHeight
-            radius: Theme.radius.panel
-            padding: 0
-            shadowEnabled: !shell.contentWidthDriven   // 宽度动画期间按停阴影
+
+            Loader {
+                anchors.fill: parent
+                source: Style.url("skin/shell/TopBarSurface.qml")
+                onLoaded: {
+                    if (item && typeof item.shadow !== "undefined")
+                        item.shadow = Qt.binding(function () { return !shell.contentWidthDriven })
+                }
+            }
 
             TopBar {
                 id: topBar
@@ -387,7 +421,7 @@ Item {
             }
         }
 
-        // 会话区：圆角只给消息气泡，这里用普通 Item。
+        // 会话区（几何归壳层；承载面经 Style.url 装载，默认裸容器 → 消息直接坐在背景上）
         Item {
             id: conversationCard
             anchors.left: parent.left
@@ -395,6 +429,20 @@ Item {
             anchors.top: topBarCard.bottom
             anchors.topMargin: Theme.shadow.topBarGap
             anchors.bottom: parent.bottom
+
+            Loader {
+                anchors.fill: parent
+                source: Style.url("skin/shell/ConversationSurface.qml")
+            }
+
+            // 输入区停放面（默认透明）：几何跟输入卡同步，画在输入卡下面
+            Loader {
+                x: composerLoader.x
+                width: composerLoader.width
+                height: composerLoader.height
+                anchors.bottom: parent.bottom
+                source: Style.url("skin/shell/ComposerDock.qml")
+            }
 
             // 选中会话时显示消息列表与输入区
             Loader {
@@ -431,7 +479,7 @@ Item {
                 anchors.bottomMargin: 0
                 height: item ? item.implicitHeight : 0
                 active: Hub.questionActive || Hub.approvalActive
-                source: Style.url("basic/chat/InteractionPanel.qml")
+                source: Style.url("skin/chat/InteractionPanel.qml")
             }
 
             Loader {
@@ -762,6 +810,9 @@ Item {
         anchors.fill: parent
         z: 30
         shown: Hub.settings.open
+        openInstant: shell.agentSettingsInstant
+        closeInstant: Hub.masterSwitching || shell.agentSwitchClosing
+                     || Hub.settings.switchingBackend
         source: Style.url("basic/settings/SettingsPage.qml")
     }
 

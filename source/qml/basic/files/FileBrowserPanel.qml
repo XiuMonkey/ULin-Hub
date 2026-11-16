@@ -201,7 +201,7 @@ Item {
             anchors.top: parent.top
             height: 34
             radius: 5
-            color: Theme.color.panelBg
+            color: Theme.color.dockBg || Theme.color.panelBg
             border.width: 1
             border.color: Theme.color.border
 
@@ -417,7 +417,7 @@ Item {
             anchors.top: parent.top
             height: 32
             radius: 5
-            color: Theme.color.panelBg
+            color: Theme.color.dockBg || Theme.color.panelBg
             border.width: 1
             border.color: Theme.color.border
 
@@ -454,7 +454,7 @@ Item {
             anchors.top: pdfTabBar.bottom
             anchors.bottom: parent.bottom
             anchors.topMargin: 6
-            backgroundColor: Theme.color.panelBg
+            backgroundColor: Theme.color.dockBg || Theme.color.panelBg
             url: FileBrowser.officeViewerUrl + "viewer.html"
 
             onLoadingChanged: (request) => {
@@ -487,7 +487,7 @@ Item {
             anchors.top: parent.top
             height: 32
             radius: 5
-            color: Theme.color.panelBg
+            color: Theme.color.dockBg || Theme.color.panelBg
             border.width: 1
             border.color: Theme.color.border
 

@@ -72,5 +72,10 @@
   "syntaxConstant": "#71C1F0",
   "syntaxFunction": "#B79DFF",
   "syntaxVariable": "#F0A868",
-  "syntaxPunct": "#B6C6DC"
+  "syntaxPunct": "#B6C6DC",
+  "contentBg": "rgba(30,40,56,0.62)",
+  "controlBg": "rgba(30,40,56,0.62)",
+  "pageBg": "rgba(34,45,64,0.66)",
+  "dockBg": "rgba(30,40,56,0.62)",
+  "topBarBg": "rgba(34,45,64,0.66)"
 }

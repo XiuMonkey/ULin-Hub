@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-view="chat">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ULin Hub · Fluent (Win11) 样张 v4</title>
+<style>
+  :root {
+    --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+    --font-mono: "Cascadia Code", Consolas, monospace;
+    --r-window: 12px;
+    --r-surface: 10px;
+    --r-control: 6px;
+    --caption: 40px;
+    --nav-w: 232px;
+  }
+
+  /* 浅色：柔和光斑（比 v2 更浅）+ 实面卡片 */
+  [data-theme="light"] {
+    --bg-a: #fafcff;
+    --bg-b: #ebf1fb;
+    --tint: rgba(84, 128, 240, 0.100);
+    --tint-2: rgba(150, 120, 255, 0.070);
+
+    --card: #ffffff;
+    --card-2: #f6f8fc;
+    --card-hover: #fbfcff;
+    --fill: rgba(16, 32, 64, 0.040);
+    --fill-2: rgba(16, 32, 64, 0.065);
+    --stroke: rgba(16, 32, 64, 0.075);
+    --stroke-2: rgba(16, 32, 64, 0.13);
+    --hair: rgba(16, 32, 64, 0.055);
+
+    --text: #16181d;
+    --text-2: #4f545d;
+    --text-3: #7c818b;
+
+    --accent: #0066cc;
+    --accent-hover: #1a78d6;
+    --accent-soft: rgba(0, 102, 204, 0.10);
+    --on-accent: #ffffff;
+    --danger: #c42b1c;
+    --danger-soft: rgba(196, 43, 28, 0.09);
+    --success: #0f7b0f;
+    --bubble: #e8f2fd;
+    --shadow: 0 10px 28px rgba(16, 32, 64, 0.16);
+    --noise: 0.022;
+  }
+
+  /* 深色：同结构，光斑更淡 */
+  [data-theme="dark"] {
+    --bg-a: #1f2026;
+    --bg-b: #16171b;
+    --tint: rgba(96, 205, 255, 0.080);
+    --tint-2: rgba(140, 130, 255, 0.060);
+
+    --card: #2b2c32;
+    --card-2: #26272c;
+    --card-hover: #303137;
+    --fill: rgba(255, 255, 255, 0.065);
+    --fill-2: rgba(255, 255, 255, 0.095);
+    --stroke: rgba(255, 255, 255, 0.072);
+    --stroke-2: rgba(255, 255, 255, 0.14);
+    --hair: rgba(255, 255, 255, 0.065);
+
+    --text: #ffffff;
+    --text-2: #c7c7c7;
+    --text-3: #9a9a9a;
+
+    --accent: #60cdff;
+    --accent-hover: #7edcff;
+    --accent-soft: rgba(96, 205, 255, 0.12);
+    --on-accent: #000000;
+    --danger: #ff99a4;
+    --danger-soft: rgba(255, 153, 164, 0.10);
+    --success: #6ccb5f;
+    --bubble: rgba(96, 205, 255, 0.13);
+    --shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+    --noise: 0.040;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-ui);
+    background: #1a1a1c;
+    display: grid; place-items: center; padding: 24px;
+  }
+  [data-theme="light"] body { background: #c8d1dc; }
+
+  /* ============ 窗口：柔和光斑（浅）+ 圆角 ============ */
+  .window {
+    width: min(1340px, 100%);
+    height: min(860px, calc(100vh - 48px));
+    border-radius: var(--r-window);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--stroke);
+    box-shadow: var(--shadow);
+    position: relative;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--bg-a), var(--bg-b));
+  }
+  .window::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    opacity: var(--noise);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+  .rim {
+    position: absolute; top: 0; left: 0; right: 0; height: 1px; z-index: 6;
+    background: rgba(255, 255, 255, 0.6); pointer-events: none;
+  }
+  [data-theme="dark"] .rim { background: rgba(255, 255, 255, 0.09); }
+
+  /* ============ 标题栏 ============ */
+  .caption { height: var(--caption); flex: none; display: flex; align-items: center; padding-left: 16px; position: relative; z-index: 5; }
+  .app-ic {
+    width: 16px; height: 16px; border-radius: 4px; flex: none;
+    background: linear-gradient(140deg, #3d7df0, #7b5cff);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  .app-title { font-size: 12px; color: var(--text-2); margin-left: 9px; }
+  .spacer { flex: 1; }
+  .cap-btns { display: flex; }
+  .cap-btn {
+    width: 46px; height: 32px; display: grid; place-items: center;
+    border: 0; background: transparent; color: var(--text-2); cursor: default;
+  }
+  .cap-btn:hover { background: var(--fill); color: var(--text); }
+  .cap-btn.close:hover { background: var(--danger); color: #fff; }
+  [data-theme="dark"] .cap-btn.close:hover { color: #000; }
+
+  .body { flex: 1; display: flex; min-height: 0; position: relative; z-index: 2; }
+
+  /* ============ NavigationView ============ */
+  .nav {
+    width: var(--nav-w); flex: none;
+    display: flex; flex-direction: column;
+    padding: 8px 8px 8px 10px; gap: 2px;
+  }
+  .nav-item {
+    height: 36px; border-radius: var(--r-control);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 10px; position: relative;
+    font-size: 13.5px; color: var(--text-2); cursor: default;
+  }
+  .nav-item:hover { background: var(--fill); color: var(--text); }
+  .nav-item.on { background: var(--fill); color: var(--text); font-weight: 600; }
+  .nav-item.on::before {
+    content: ""; position: absolute; left: 0; top: 50%;
+    width: 3px; height: 16px; margin-top: -8px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .nav-sep { height: 1px; margin: 8px 10px; background: var(--hair); }
+  .nav .grow { flex: 1; }
+  .nav-user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; border-radius: var(--r-control);
+  }
+  .nav-user:hover { background: var(--fill); }
+  .nav-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    background: var(--accent); color: var(--on-accent);
+    display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  }
+  .nav-user .u-name { font-size: 12.5px; }
+  .nav-user .u-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+  /* ============ 主区域 ============ */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .content { flex: 1; overflow: auto; min-height: 0; }
+  .content::-webkit-scrollbar { width: 12px; }
+  .content::-webkit-scrollbar-thumb {
+    background: var(--fill-2); border-radius: 6px;
+    border: 3px solid transparent; background-clip: padding-box;
+  }
+
+  /* ============ 会话 ============ */
+  .chat { padding: 16px clamp(20px, 6%, 76px) 8px; }
+  .chat-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  .msg-user { display: flex; justify-content: flex-end; }
+  .msg-user .b {
+    max-width: 72%;
+    background: var(--bubble);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-surface);
+    padding: 10px 14px;
+    font-size: 13.5px; line-height: 22px;
+  }
+
+  .agent { display: flex; flex-direction: column; gap: 10px; }
+  .turn {
+    display: inline-flex; align-items: center; gap: 7px;
+    align-self: flex-start;
+    font-size: 12px; color: var(--text-3);
+    padding: 3px 6px; border-radius: var(--r-control);
+    cursor: default;
+  }
+  .turn:hover { background: var(--fill); color: var(--text-2); }
+
+  /* 过程组：实面卡片 + 发丝分隔（Frost 是玻璃片、这里是实面） */
+  .group-card {
+    box-shadow: 0 1px 2px rgba(16, 32, 64, 0.05);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-surface);
+    background: var(--card);
+    overflow: hidden;
+  }
+  .group-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; font-size: 12.5px; color: var(--text-2);
+    cursor: default;
+  }
+  .group-head:hover { background: var(--fill); }
+  .group-head .gi {
+    width: 18px; height: 18px; border-radius: 5px;
+    border: 1px solid var(--stroke);
+    display: grid; place-items: center;
+    font-size: 9px; color: var(--text-3);
+  }
+  .group-head .gt { flex: 1; }
+  .group-head .chev { font-size: 10px; color: var(--text-3); }
+  .steps { border-top: 1px solid var(--hair); }
+  .step {
+    display: flex; gap: 14px; padding: 9px 14px;
+    font-size: 12.5px; line-height: 20px; color: var(--text-2);
+  }
+  .step + .step { border-top: 1px solid var(--hair); }
+  .step .k { width: 56px; flex: none; color: var(--text-3); }
+  .step .v { flex: 1; min-width: 0; }
+  .step code {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--fill); border-radius: 4px; padding: 1px 5px;
+  }
+
+  .prose { font-size: 13.5px; line-height: 23px; }
+  .prose h4 { font-size: 13.5px; font-weight: 600; margin: 12px 0 6px; }
+  .prose h4:first-child { margin-top: 0; }
+  .prose p + p { margin-top: 10px; }
+  .prose ul { margin: 8px 0 8px 20px; }
+  .prose li { margin: 4px 0; }
+  .prose code.inline {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--fill); border-radius: 4px; padding: 1px 5px;
+  }
+
+  .deliverable {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 6px 10px;
+    border: 1px solid var(--stroke); border-radius: var(--r-control);
+    background: var(--card);
+    font-size: 12px; color: var(--text-2);
+  }
+  .deliverable .d { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+  /* ============ 输入区 ============ */
+  .composer-wrap { padding: 8px clamp(20px, 6%, 76px) 14px; }
+  .composer-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+
+  .approval {
+    box-shadow: 0 1px 2px rgba(16, 32, 64, 0.05);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-surface);
+    background: var(--card);
+    padding: 12px 14px;
+  }
+  .approval-top { display: flex; align-items: center; gap: 10px; }
+  .warn {
+    width: 22px; height: 22px; border-radius: 7px; flex: none;
+    background: var(--danger-soft); color: var(--danger);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  .approval-title { font-size: 13.5px; font-weight: 600; flex: 1; }
+  .btn {
+    height: 30px; padding: 0 14px;
+    border-radius: var(--r-control);
+    border: 1px solid var(--stroke);
+    background: var(--card);
+    color: var(--text); font: 12.5px var(--font-ui);
+    cursor: default;
+  }
+  .btn:hover { background: var(--fill); }
+  .btn.primary {
+    background: var(--accent); color: var(--on-accent);
+    border-color: transparent; font-weight: 600;
+  }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
+  .btn.ghost:hover { background: var(--fill); color: var(--text); }
+  .approval-detail {
+    margin-top: 10px; border-top: 1px solid var(--hair); padding-top: 10px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .cmdline { font-family: var(--font-mono); font-size: 12px; color: var(--text); word-break: break-all; }
+  .why { font-size: 11.5px; color: var(--text-2); }
+
+  /* 输入卡：实面 + 聚焦环 */
+  .composer {
+    box-shadow: 0 1px 2px rgba(16, 32, 64, 0.05);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-surface);
+    background: var(--card);
+    transition: box-shadow .12s ease, border-color .12s ease;
+  }
+  .composer.focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke)); }
+  .composer-top { display: flex; align-items: center; gap: 8px; padding: 8px 12px 0; }
+  .chip {
+    height: 24px; padding: 0 8px;
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: var(--r-control);
+    border: 1px solid var(--stroke);
+    font-size: 11.5px; color: var(--text-2);
+    background: var(--card-2);
+    cursor: default;
+  }
+  .chip:hover { background: var(--card-hover); color: var(--text); }
+  .chip.accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+  .composer textarea {
+    display: block; width: 100%; min-height: 46px;
+    border: 0; outline: none; resize: none;
+    background: transparent; color: var(--text);
+    font: 13.5px/22px var(--font-ui);
+    padding: 9px 12px 4px;
+  }
+  .composer textarea::placeholder { color: var(--text-3); }
+  .composer-bottom {
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 8px 8px 10px;
+    border-top: 1px solid var(--hair);
+  }
+  .ic-btn {
+    width: 30px; height: 30px; border-radius: var(--r-control);
+    border: 0; background: transparent; color: var(--text-2);
+    display: grid; place-items: center; cursor: default;
+  }
+  .ic-btn:hover { background: var(--fill); color: var(--text); }
+  .send {
+    margin-left: auto; height: 30px; padding: 0 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 0; border-radius: var(--r-control);
+    background: var(--accent); color: var(--on-accent);
+    font: 12.5px var(--font-ui); font-weight: 600; cursor: default;
+  }
+  .send:hover { background: var(--accent-hover); }
+
+  /* ============ 设置页 ============ */
+  .settings { padding: 18px clamp(24px, 6%, 76px) 28px; display: none; }
+  [data-view="settings"] .chatpage { display: none !important; }
+  [data-view="settings"] .settings { display: block; }
+  .settings-inner { max-width: 760px; margin: 0 auto; }
+
+  .crumb { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+  .page-title { font: 600 20px/28px var(--font-display); margin-bottom: 16px; }
+
+  .card {
+    box-shadow: 0 1px 2px rgba(16, 32, 64, 0.05);
+    border: 1px solid var(--stroke);
+    border-radius: var(--r-surface);
+    background: var(--card);
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .row {
+    display: flex; align-items: center; gap: 14px;
+    min-height: 60px; padding: 12px 16px;
+    position: relative; cursor: default;
+  }
+  .row + .row::before {
+    content: ""; position: absolute; left: 16px; right: 16px; top: 0;
+    height: 1px; background: var(--hair);
+  }
+  .row:hover { background: var(--fill); }
+  .row .ic {
+    width: 30px; height: 30px; border-radius: 7px; flex: none;
+    display: grid; place-items: center;
+    background: var(--fill); color: var(--text-2);
+  }
+  .row .ic.blue { background: color-mix(in srgb, #0078d4 12%, transparent); color: #0078d4; }
+  .row .ic.violet { background: color-mix(in srgb, #8b6cef 12%, transparent); color: #7a5af5; }
+  .row .ic.green { background: color-mix(in srgb, #107c10 12%, transparent); color: #107c10; }
+  [data-theme="dark"] .row .ic.blue { color: #60cdff; }
+  [data-theme="dark"] .row .ic.violet { color: #b8a6ff; }
+  [data-theme="dark"] .row .ic.green { color: #6ccb5f; }
+  .row .txt { flex: 1; min-width: 0; }
+  .row .t1 { font-size: 13.5px; }
+  .row .t2 { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .row .ctl { flex: none; display: flex; align-items: center; gap: 8px; }
+  .row .chev { color: var(--text-3); font-size: 13px; }
+  .row .val { font-size: 12px; color: var(--text-2); }
+
+  .switch {
+    width: 40px; height: 20px; border-radius: 10px; flex: none;
+    border: 1px solid var(--stroke-2); background: transparent; position: relative;
+  }
+  .switch.on { background: var(--accent); border-color: transparent; }
+  .switch::after {
+    content: ""; position: absolute; top: 50%; left: 3px;
+    width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
+    background: var(--text-2);
+  }
+  .switch.on::after { left: 23px; background: var(--on-accent); }
+
+  .themewrap { display: flex; gap: 12px; padding: 14px 16px 16px; }
+  .theme-card {
+    flex: 1; border-radius: 8px; padding: 3px;
+    border: 1px solid var(--stroke); background: var(--card-2);
+  }
+  .theme-card.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .theme-thumb {
+    height: 74px; border-radius: 5px; border: 1px solid var(--stroke);
+    position: relative; overflow: hidden;
+  }
+  .theme-thumb.light { background: linear-gradient(180deg, #fbfbfc, #eceef2); }
+  .theme-thumb.dark { background: linear-gradient(180deg, #2a2a2b, #1d1d1e); }
+  .theme-thumb.auto { background: linear-gradient(120deg, #f6f7f9 50%, #202021 50%); }
+  .theme-thumb::before {
+    content: ""; position: absolute; left: 8px; top: 9px; width: 32%;
+    height: 7px; border-radius: 2px; background: rgba(0, 0, 0, 0.18);
+  }
+  .theme-thumb.dark::before, .theme-thumb.auto::before { background: rgba(255, 255, 255, 0.28); }
+  .theme-thumb::after {
+    content: ""; position: absolute; left: 8px; right: 30%; top: 24px; height: 32px;
+    border-radius: 4px; background: #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+  .theme-thumb.dark::after { background: #333; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07); }
+  .theme-card .cap { text-align: center; font-size: 12px; color: var(--text-2); padding: 6px 0 4px; }
+
+  /* 右下角切换 */
+  .fab { position: fixed; right: 22px; bottom: 22px; z-index: 20; display: flex; gap: 8px; }
+  .fab button {
+    height: 32px; padding: 0 14px; border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(28, 28, 30, 0.74);
+    color: #ececec; font: 12px var(--font-ui);
+    backdrop-filter: blur(14px); cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="rim"></div>
+
+  <header class="caption">
+    <span class="app-ic"></span>
+    <span class="app-title">ULin Hub</span>
+    <span class="spacer"></span>
+    <div class="cap-btns">
+      <button class="cap-btn" aria-label="最小化"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5h6" stroke="currentColor"/></svg></button>
+      <button class="cap-btn" aria-label="最大化"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="2.5" y="2.5" width="5" height="5" fill="none" stroke="currentColor"/></svg></button>
+      <button class="cap-btn close" aria-label="关闭"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor"/></svg></button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="nav">
+      <div class="nav-item on">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.5 3.5h11v7.2H7.6L4 13.5v-2.8H2.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        会话
+      </div>
+      <div class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2.2" y="2.4" width="4.6" height="4.6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9.2" y="2.4" width="4.6" height="4.6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2.2" y="9.4" width="4.6" height="4.6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9.2" y="9.4" width="4.6" height="4.6" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+        扩展
+      </div>
+      <div class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 12.5c1.8-3 3.1-4.4 5-4.4s3.2 1.4 5 4.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="4.6" r="2.2" stroke="currentColor" stroke-width="1.2"/></svg>
+        技能
+      </div>
+      <div class="nav-sep"></div>
+      <div class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        设置
+      </div>
+      <div class="grow"></div>
+      <div class="nav-user">
+        <span class="nav-avatar">P</span>
+        <div>
+          <div class="u-name">Playe</div>
+          <div class="u-sub">WorkBuddy · 已登录</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- 会话页 -->
+      <div class="chatpage" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+        <div class="content">
+          <div class="chat">
+            <div class="chat-inner">
+
+              <div class="msg-user"><div class="b">把刚才的发布整理成摘要：改了什么、风险点、回滚方式</div></div>
+
+              <div class="agent">
+                <div class="turn"><span style="font-size:9px;">▾</span> 已完成</div>
+
+                <div class="group-card">
+                  <div class="group-head">
+                    <span class="gi">⌃</span>
+                    <span class="gt">已完成分析</span>
+                    <span class="chev">▾</span>
+                  </div>
+                  <div class="steps">
+                    <div class="step"><span class="k">思考</span><span class="v">先确认发布涉及的模块和变更范围，再对照版本记录。</span></div>
+                    <div class="step"><span class="k">运行命令</span><span class="v"><code>git log --oneline -8</code></span></div>
+                    <div class="step"><span class="k">思考</span><span class="v">风险点应落在旧账本兼容与权限模式。</span></div>
+                  </div>
+                </div>
+
+                <div class="prose">
+                  <h4>本次发布摘要</h4>
+                  <p>三块改动，按影响面从大到小：</p>
+                  <ul>
+                    <li><strong>附件链路</strong>：图片随 prompt 内联发送，历史回放走 <code class="inline">session/attachment</code>。</li>
+                    <li><strong>审批面板</strong>：危险命令转发宿主审批，<code class="inline">optionId</code> 按真实选项表回填。</li>
+                    <li><strong>分页</strong>：窗口预算从「消息数」改为「轮数」。</li>
+                  </ul>
+                  <p>回滚方式：设置 → 外观 → 重置界面包。</p>
+                </div>
+
+                <div class="deliverable"><span class="d"></span> release-notes.md · 已生成</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="composer-inner">
+            <div class="approval">
+              <div class="approval-top">
+                <span class="warn">!</span>
+                <span class="approval-title">工具调用请求审批</span>
+                <button class="btn ghost">拒绝</button>
+                <button class="btn primary">允许一次</button>
+              </div>
+              <div class="approval-detail">
+                <span class="cmdline">rm -rf D:\Program Files\ULinHub\temp\build-cache</span>
+                <span class="why">清理构建缓存，释放约 1.2 GB 空间</span>
+              </div>
+            </div>
+
+            <div class="composer focus">
+              <div class="composer-top">
+                <span class="chip accent">
+                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 5.2v3.2l2 1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                  审批：允许一次
+                </span>
+                <span class="chip">DeepSeek-V4.1-Flash · High ▾</span>
+              </div>
+              <textarea placeholder="描述任务，或输入 / 选择命令…"></textarea>
+              <div class="composer-bottom">
+                <button class="ic-btn" aria-label="附件">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M9.5 4.5l-4.6 4.6a2.1 2.1 0 003 3l4.9-4.9a3.3 3.3 0 00-4.7-4.7L3.4 7.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                </button>
+                <button class="ic-btn" aria-label="命令">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 5.5l3 2.5-3 2.5M7.5 11h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="ic-btn" aria-label="提及">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M10 8v1.6a1.8 1.8 0 003.6 0V8a5.6 5.6 0 10-2.2 4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                </button>
+                <button class="send">
+                  发送
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 12.5V4M4.5 7L8 3.5 11.5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置页 -->
+      <div class="settings">
+        <div class="settings-inner">
+          <div class="crumb">设置 › 个性化</div>
+          <h1 class="page-title">个性化</h1>
+
+          <div class="card">
+            <div class="themewrap">
+              <div class="theme-card on"><div class="theme-thumb light"></div><div class="cap">浅色</div></div>
+              <div class="theme-card"><div class="theme-thumb dark"></div><div class="cap">深色</div></div>
+              <div class="theme-card"><div class="theme-thumb auto"></div><div class="cap">跟随系统</div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row">
+              <div class="ic blue">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.2" y="2.2" width="11.6" height="11.6" rx="2.4" stroke="currentColor" stroke-width="1.2"/><path d="M2.2 6h11.6" stroke="currentColor" stroke-width="1.2"/></svg>
+              </div>
+              <div class="txt">
+                <div class="t1">界面包</div>
+                <div class="t2">Fluent · Win11 云母</div>
+              </div>
+              <div class="ctl"><span class="val">1.2.0</span><span class="chev">›</span></div>
+            </div>
+            <div class="row">
+              <div class="ic violet">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 12.5c2.4-.8 3.2-3.4 5-5s4.2-2.6 5-5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="3" cy="12.5" r="1.1" fill="currentColor"/></svg>
+              </div>
+              <div class="txt">
+                <div class="t1">动画效果</div>
+                <div class="t2">展开、收回与页面切换的过渡</div>
+              </div>
+              <div class="ctl"><span class="switch on"></span></div>
+            </div>
+            <div class="row">
+              <div class="ic green">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2.4" y="2.4" width="11.2" height="11.2" rx="3" stroke="currentColor" stroke-width="1.2"/></svg>
+              </div>
+              <div class="txt">
+                <div class="t1">窗口圆角</div>
+                <div class="t2">窗口 12px · 卡片 10px · 控件 6px</div>
+              </div>
+              <div class="ctl"><span class="switch on"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="fab">
+  <button id="viewBtn">切到设置</button>
+  <button id="themeBtn">切换深色</button>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const nb = document.getElementById('viewBtn');
+  nb.addEventListener('click', () => {
+    root.dataset.view = root.dataset.view === 'chat' ? 'settings' : 'chat';
+    nb.textContent = root.dataset.view === 'chat' ? '切到设置' : '切到会话';
+  });
+  const tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', () => {
+    const dark = root.dataset.theme === 'dark';
+    root.dataset.theme = dark ? 'light' : 'dark';
+    tb.textContent = dark ? '切换深色' : '切换浅色';
+  });
+</script>
+</body>
+</html>

@@ -46,7 +46,7 @@ Item {
         anchors.right: parent.right
         implicitHeight: column.implicitHeight + 24
         radius: Theme.radius.panel
-        color: Theme.color.panelBg
+        color: Theme.color.contentBg || Theme.color.panelBg
         border.width: 1
         border.color: Theme.color.border
 
@@ -143,12 +143,11 @@ Item {
                                     border.width: 1
                                     border.color: optionRow.checked ? Theme.color.accent : Theme.color.inputBorder
 
-                                    Text {
+                                    CheckMark {
                                         anchors.centerIn: parent
                                         visible: optionRow.checked
-                                        text: "✓"
+                                        size: 11
                                         color: Theme.color.textOnAccent
-                                        font.pixelSize: Theme.font.small
                                     }
                                 }
 
@@ -203,7 +202,7 @@ Item {
                             background: Rectangle {
                                 implicitHeight: 30
                                 radius: Theme.radius.input
-                                color: Theme.color.panelBg
+                                color: Theme.color.contentBg || Theme.color.panelBg
                                 border.width: 1
 
                                 // 输入类控件：静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`；

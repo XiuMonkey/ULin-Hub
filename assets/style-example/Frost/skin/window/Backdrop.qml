@@ -1,6 +1,10 @@
 // 霜玻 · 窗口背景层
 // 契约与内置件一致：根 Item、锚满父级、不接鼠标、描边自己画、最大化时去圆角。
 // 造型：冷色底 + 三团柔和光斑（Canvas 径向渐变）+ 一层细颗粒，作为玻璃面板后面的"环境光"。
+//
+// ⚠️ 两条硬约束（2026-11 补）：
+//  1. 画布按圆角路径裁剪：Item.clip 只裁矩形，会把窗口四角盖方。
+//  2. 主题切换（Theme.changed）要 requestPaint，否则切深色背景不重绘。
 import QtQuick
 import ULinHub 1.0
 
@@ -15,6 +19,16 @@ Item {
             + Math.round(c.b * 255) + "," + a + ")"
     }
 
+    function roundRectPath(ctx, x, y, w, h, r) {
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.arcTo(x + w, y, x + w, y + h, r)
+        ctx.arcTo(x + w, y + h, x, y + h, r)
+        ctx.arcTo(x, y + h, x, y, r)
+        ctx.arcTo(x, y, x + w, y, r)
+        ctx.closePath()
+    }
+
     Canvas {
         id: aura
         anchors.fill: parent
@@ -25,6 +39,15 @@ Item {
             const ctx = getContext("2d")
             ctx.reset()
             ctx.clearRect(0, 0, width, height)
+
+            // 圆角裁剪：非最大化时所有绘制都收进窗口的圆角矩形里
+            if (root.edgeToEdge) {
+                ctx.beginPath()
+                ctx.rect(0, 0, width, height)
+            } else {
+                root.roundRectPath(ctx, 0, 0, width, height, root.cornerRadius)
+            }
+            ctx.clip()
 
             const dark = Theme.isDark
             const accent = Theme.color.accent
@@ -61,13 +84,21 @@ Item {
             for (let i = 0; i < count; ++i)
                 ctx.fillRect(rand() * width, rand() * height, 1, 1)
         }
+
+        // 主题切换 / 强调色变化：重绘
+        Connections {
+            target: Theme
+            function onChanged() { aura.requestPaint() }
+        }
     }
 
-    // 顶部一道高光，模拟玻璃边缘
+    // 顶部一道高光，模拟玻璃边缘（圆角处收进圆角边）
     Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
+        anchors.leftMargin: root.edgeToEdge ? 0 : root.cornerRadius
+        anchors.rightMargin: root.edgeToEdge ? 0 : root.cornerRadius
         height: 1
         color: Qt.rgba(255, 255, 255, Theme.isDark ? 0.12 : 0.7)
         visible: !root.edgeToEdge

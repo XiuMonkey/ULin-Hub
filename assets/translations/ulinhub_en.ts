@@ -641,7 +641,7 @@
         <translation>Appearance</translation>
     </message>
     <message id="settings_default_agent_preset">
-        <translation>Default agent</translation>
+        <translation>Agent preset</translation>
     </message>
     <message id="settings_agent_preset_hint">
         <translation>New sessions use this agent; changes also take effect immediately in the current session.</translation>

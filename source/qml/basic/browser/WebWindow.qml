@@ -18,7 +18,7 @@ Window {
     minimumWidth: 640
     minimumHeight: 420
     title: view.title.length > 0 ? view.title : "网页"
-    color: Theme.color.panelBg
+    color: Theme.color.dockBg || Theme.color.panelBg
 
     Item {
         id: toolbar
@@ -125,6 +125,6 @@ Window {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         url: win.initialUrl
-        backgroundColor: Theme.color.panelBg
+        backgroundColor: Theme.color.dockBg || Theme.color.panelBg
     }
 }

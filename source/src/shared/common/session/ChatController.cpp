@@ -478,7 +478,12 @@ QString ChatController::attachmentSource(const QString& attachmentId)
 			file.write(bytes);
 			file.close();
 			m_attachmentSources.insert(attachmentId, QUrl::fromLocalFile(path).toString());
-			emit attachmentSourceReady(attachmentId);
+			// ⚠️ 必须排队发：扩展 RPC 可能是同步回调，而调用方是 QML 的 source 绑定。
+			// 同步 emit 会让 attachmentRevision 在绑定求值过程中变化，QML 判定"绑定写了
+			// 自己依赖的属性"→ 直接废弃 source 绑定，历史图片永远加载不出来。
+			QMetaObject::invokeMethod(this, [this, attachmentId]() {
+				emit attachmentSourceReady(attachmentId);
+			}, Qt::QueuedConnection);
 		},
 		[this, attachmentId](const DshApiClient::RpcError& error) {
 			m_attachmentInFlight.remove(attachmentId);

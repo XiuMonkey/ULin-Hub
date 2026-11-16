@@ -159,6 +159,10 @@ void QmlBridge::init()
 		m_runtime->restartServer();
 		});
 	// Master 切换：切到扩展先停内置 DSH；切回 dsh 复位接管标记并重新拉起内置服务端。
+	connect(m_settings, &SettingsController::masterSwitchStarting, this, [this]() {
+		// 在 SettingsController::closePage() 前发出，设置页可据此跳过收回动画。
+		emit agentSwitchStarting();
+	});
 	connect(m_settings, &SettingsController::masterBackendChangeRequested, this,
 		[this](const QString& backendId) {
 			// 从设置页直接调 selectMasterBackend 的旧路径也要有遮罩；
@@ -617,6 +621,9 @@ void QmlBridge::finishMasterSwitch(bool success)
 	if (success) {
 		const QString name = m_settings ? m_settings->masterBackendName() : target;
 		emit masterSwitchFinished(name.isEmpty() ? target : name);
+		// 等新后端扩展开关/接管稳定后，再打开它的设置面板；扩展自己的
+		// “Agent”页切换内核后，设置无需手动关开即可跟到新后端。
+		QTimer::singleShot(150, this, [this]() { emit agentSettingsRequested(); });
 		if (m_runtime)
 			m_runtime->setStatus(QString());
 		emit statusTextChanged();

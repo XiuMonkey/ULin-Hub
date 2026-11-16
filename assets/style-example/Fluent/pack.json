@@ -1,0 +1,14 @@
+{
+  "packVersion": "1.4.1",
+  "uiAbi": 3,
+  "readme": [
+    "Fluent · Win11 云母（2026-11 定稿 v4）—— 浅色柔和光斑背景 + **实面卡片**（不是玻璃）：窗口 12px、表面 10px、控件 6px、发丝级描边、tonal elevation。",
+    "装法：把本目录里的文件按相对路径合并进 <exe>/resources/ui/（包内没有的文件保持内置），重启客户端。",
+    "造型要点：背景是浅一档的双色光斑（蓝 0.10 / 紫 0.07），内容层是纯实面白卡（#FFFFFF / 深色 #2A2B30），层次靠面色差与发丝线——与 Frost 的玻璃面刻意区分。",
+    "覆盖件：Backdrop（Mica 近似）、Card（实面 + 1px 描边）、ActionButton（6px 圆角、发丝描边、强调色主按钮）、SessionRow（左侧 3px 强调条）、TitleBar（46×32 窗口键）。",
+    "色板要点：浅色底 #F9FAFD→#E9EFF9、强调 #0066CC；深色 #232428→#1A1B20、强调 #60CDFF（按钮近黑字）。",
+    "preview.html 是设计样张，与 QML 数值一一对应。恢复默认：设置 → 外观 → 重置界面包。",
+    "新增壳层覆盖：skin/shell/SidebarSurface（透明侧栏 + 右侧发丝线）、skin/shell/TopBarSurface（顶栏去卡片 + 底部发丝线）——对齐样张的\"消息直接坐在背景上\"。",
+    "1.4.1：删除 skin/chat/UserBubble 覆盖件（旧版拷贝，图片加载有绑定死循环，且缺 attachments/browsers 卡片）；内置气泡已按 radius.panel + userBubbleBg 呈现。"
+  ]
+}

@@ -5,13 +5,16 @@
 
 ## 装法
 
-把本目录的文件按同样的相对路径拷进 `<exe>\styles\`，重启应用：
+把本目录的文件按同样的相对路径拷进 `<exe>\ui\`，重启应用：
 
 ```cmd
-robocopy . "<仓库根>\x64\Release\styles" /E
+robocopy . "<仓库根>\x64\Release\ui" /E
 ```
 
-恢复默认：设置 → 外观 → **重置 QML**，或删掉 `<exe>\styles\`（下次启动重新释放内置包）。
+恢复默认：设置 → 外观 → **重置界面包**，或删掉 `<exe>\ui\`（下次启动重新释放内置包）。
+
+> 2026-11 更新：补齐了后来新增的 18 个色板令牌（`sessionBarBg`、代码块/行内代码、语法高亮、`dangerText`、`linkText`、`toolbarBg` 等），
+> 否则新版界面里代码块和侧栏会回落到"无色"。`packVersion` 升到 1.1.0（`uiAbi` 仍为 3）。
 
 打包副本（与旧 QSS 包同样的分发形态，内容在压缩包根）：
 `misc\ReleaseBuild\StyleExample\Qml-Wallpaper.zip`。
@@ -20,8 +23,8 @@ robocopy . "<仓库根>\x64\Release\styles" /E
 
 | 文件 | 作用 |
 |---|---|
-| `ui/appearance/window/Backdrop.qml` | 壁纸层（含圆角遮罩、描边） |
-| `theme-light.json` / `theme-dark.json` | **完整色板**（56 键），只改了 3 个值 |
+| `skin/window/Backdrop.qml` | 壁纸层（含圆角遮罩、描边） |
+| `theme-light.json` / `theme-dark.json` | **完整色板**（74 键），只改了底/面板/输入卡相关的几个值 |
 | `wallpaper.png` | 1600×1000，alpha 0.45（原版那张原图） |
 
 ## 与原版逐项对应

@@ -144,7 +144,7 @@ Item {
                             anchors.fill: parent
                             radius: Theme.radius.small
                             color: row.selected
-                                ? Theme.color.panelBg
+                                ? Theme.color.pageBg || Theme.color.panelBg
                                 : (row.hovered ? Theme.color.activeBg : "transparent")
                             border.width: row.selected ? 1 : 0
                             border.color: Theme.color.border
@@ -262,7 +262,7 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.radius.card
-                    color: Theme.color.panelBg
+                    color: Theme.color.pageBg || Theme.color.panelBg
                     border.width: 1
                     border.color: Theme.color.border
                 }

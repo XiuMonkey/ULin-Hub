@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import ULinHub 1.0
+import "../../widgets"
 
 CheckBox {
     id: control
@@ -13,7 +14,7 @@ CheckBox {
     palette.windowText: Theme.color.textPrimary
     palette.text: Theme.color.textPrimary
     palette.highlight: Theme.color.textSecondary
-    palette.highlightedText: Theme.color.panelBg
+    palette.highlightedText: Theme.color.controlBg || Theme.color.panelBg
 
     indicator: Rectangle {
         implicitWidth: Theme.size.checkbox
@@ -39,14 +40,11 @@ CheckBox {
                 : Theme.color.inputBorder
         }
 
-        Text {
+        CheckMark {
             anchors.centerIn: parent
             visible: control.checkState === Qt.Checked
-            text: "✓"
-            color: Theme.color.panelBg
-            font.family: "Microsoft YaHei UI"
-            font.pixelSize: Theme.font.small
-            font.weight: Theme.font.weightBold
+            size: 11
+            color: Theme.color.controlBg || Theme.color.panelBg
         }
     }
 }

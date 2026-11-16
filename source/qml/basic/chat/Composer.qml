@@ -12,7 +12,7 @@ Item {
     id: root
 
     // “助手”/“完全权限”这类中性 chip 的底色：比 5% hover 灰深一点，比 activeBg 浅一点。
-    readonly property color neutralChipBg: Theme.isDark ? "#333437" : "#F2F4F6"
+    readonly property color neutralChipBg: Theme.color.tagBg || (Theme.isDark ? "#333437" : "#F2F4F6")
 
     // 工作区 / 模式 / 模型这一行的上下文 chip
     component ContextChip: Rectangle {
@@ -271,8 +271,8 @@ Item {
             color: Theme.color.composerBg || Theme.color.panelBg
             // 聚焦只加深灰色描边，不用 accent 蓝，也不加发光或阴影。
             // 浅色下输入卡边框只做很轻的分隔，别比卡片阴影还抢眼。
-            readonly property color restingBorder: Theme.isDark ? "#2E3034" : "#ECEEF1"
-            readonly property color activeBorder: Theme.isDark ? "#4A4D53" : "#DDE1E6"
+            readonly property color restingBorder: Theme.color.composerBorder || Theme.color.border || (Theme.isDark ? "#2E3034" : "#ECEEF1")
+            readonly property color activeBorder: Theme.color.accent
             border.color: (editor.activeFocus || dropArea.containsDrag) ? activeBorder : restingBorder
             border.width: 1
         }
@@ -937,12 +937,11 @@ Item {
                             width: 16
                             horizontalAlignment: Text.AlignRight
                         }
-                        Text {
+                        CheckMark {
                             visible: modelData.workspaceId === Hub.currentWorkspaceId
                                 || (modelData.ungrouped && Hub.currentWorkspaceId.length === 0)
-                            text: "✓"
+                            size: 12
                             color: Theme.color.accent
-                            font.pixelSize: Theme.font.small
                         }
                     }
 
@@ -1587,12 +1586,12 @@ Item {
                     anchors.leftMargin: 7
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 7
-                    Text {
+                    CheckMark {
                         width: 12
-                        text: screenshotWindow.hideWindowOnShot ? "✓" : ""
+                        height: 12
+                        visible: screenshotWindow.hideWindowOnShot
+                        size: 12
                         color: Theme.color.accent
-                        font.family: "Microsoft YaHei UI"
-                        font.pixelSize: Theme.font.caption
                     }
                     Text {
                         text: "隐藏 ULin Hub 后截图"
@@ -1626,12 +1625,12 @@ Item {
                     anchors.leftMargin: 7
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 7
-                    Text {
+                    CheckMark {
                         width: 12
-                        text: !screenshotWindow.hideWindowOnShot ? "✓" : ""
+                        height: 12
+                        visible: !screenshotWindow.hideWindowOnShot
+                        size: 12
                         color: Theme.color.accent
-                        font.family: "Microsoft YaHei UI"
-                        font.pixelSize: Theme.font.caption
                     }
                     Text {
                         text: "显示窗口截图"
@@ -1726,15 +1725,14 @@ Item {
                         }
                     }
 
-                    Text {
+                    CheckMark {
                         id: optionCheck
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
                         visible: Hub.permissionPreset === modelData.id
-                        text: "✓"
+                        size: 12
                         color: Theme.color.accent
-                        font.pixelSize: Theme.font.caption
                     }
 
                     MouseArea {

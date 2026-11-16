@@ -27,7 +27,7 @@ Column {
         width: parent.width
         height: 30
         radius: Theme.radius.control
-        color: Theme.color.panelBg
+        color: Theme.color.controlBg || Theme.color.panelBg
         border.width: 1
         border.color: input.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
 

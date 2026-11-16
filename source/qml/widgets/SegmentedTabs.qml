@@ -24,7 +24,7 @@ Item {
     readonly property int count: model ? model.length : 0
 
     readonly property color trackColor: Theme.color.trackBg || Theme.color.iconButtonHoverBg   // 轨道底色 / 指示器面：新 token 带兜底，老风格包里没有也能用
-    readonly property color indicatorColor: Theme.color.indicatorBg || Theme.color.panelBg
+    readonly property color indicatorColor: Theme.color.indicatorBg || Theme.color.controlBg || Theme.color.panelBg
 
     // 每颗等宽：取最宽的那颗（官方也是 grid-auto-columns: 1fr —— 等宽才不会让指示器算错位置）
     readonly property real tabWidth: Math.max(48, Math.ceil(measure.implicitWidth) + 2 * tabPaddingX)

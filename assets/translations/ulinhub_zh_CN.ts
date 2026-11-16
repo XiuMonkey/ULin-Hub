@@ -641,7 +641,7 @@
         <translation>外观设置</translation>
     </message>
     <message id="settings_default_agent_preset">
-        <translation>默认 Agent</translation>
+        <translation>Agent 预设</translation>
     </message>
     <message id="settings_agent_preset_hint">
         <translation>新会话将使用该 Agent；修改后对当前会话也会立即生效。</translation>

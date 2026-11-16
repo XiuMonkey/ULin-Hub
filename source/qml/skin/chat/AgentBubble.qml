@@ -279,7 +279,8 @@ Item {
         width: bubble.width
         height: bubble.implicitHeight
         radius: bubble.radius
-        color: Theme.color.panelBg
+        // 皮肤可用 agentBubbleBg 让气泡完全融进背景（阴影源同色，阴影一起消失）
+        color: Theme.color.agentBubbleBg || Theme.color.panelBg
         visible: false   // 只做 MultiEffect 的源（与 widgets/Card.qml 的 surface 同一套写法）
     }
 
@@ -301,7 +302,7 @@ Item {
         width: Math.min(Math.round(root.width * 0.82), 748)   // Web 聊天正文列默认 748px，窗口再宽也不拉满
         implicitHeight: inner.implicitHeight + 2 * Theme.spacing.buttonPadY
         radius: Theme.radius.card
-        color: Theme.color.panelBg
+        color: Theme.color.agentBubbleBg || Theme.color.panelBg
 
         Column {
             id: inner

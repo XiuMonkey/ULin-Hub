@@ -25,7 +25,10 @@
 ## 装法
 
 ```powershell
-Copy-Item -Path "assets\style-packs\frost\*" -Destination "x64\Release\ui\" -Recurse -Force
+Copy-Item -Path "assets\style-example\Frost\*" -Destination "x64\Release\ui\" -Recurse -Force
 ```
 
 重启客户端。恢复默认：设置 → 外观 → 重置界面包。
+
+> 2026-11 更新：安装路径按当前目录结构修正（`assets/style-example/Frost` → `<exe>/ui/`）；
+> `packVersion` 升到 1.1.0。色板与 74 键令牌集对齐，浅/深两套均已包含代码块、语法高亮、危险文字等新增令牌。
