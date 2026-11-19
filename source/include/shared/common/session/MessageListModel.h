@@ -26,6 +26,7 @@ public:
 		ImagesRole,                    // 该行携带的图片附件 [{id, mediaType}]（仅用户行）
 		SegmentsRole,                  // 有序段（QVariantList）
 		ReplyTailRole,                 // 仅流式期间最终 reply 的完整尾文本；稳定段不变
+		ReplyTailPartsRole,            // 流式尾部按 Markdown part 切分，代码块可实时渲染
 		StreamingRole,
 		DeliverablesRole               // Agent 回合的交付文件 [{ path, name, suffix, description }]
 	};
@@ -65,6 +66,9 @@ public:
 	int appendUserWithImages(const QString& text, const QVector<ImageRef>& images);
 	// 连续重复的历史用户消息（引擎快照里可能同一个 prompt 出现两次）不重复插入
 	bool lastRowIsUser(const QString& text, const QVector<ImageRef>& images) const;
+	// 历史重建后确认某条用户消息是否已经能从记录里画出来；没有就由 ChatController
+	// 把本地刚发送的那条补回末尾，避免“开始输出后用户消息被吞”。
+	bool containsUser(const QString& text) const;
 	int appendSystem(const QString& text);
 	// 建一条空 Agent 消息（流式往里填）；返回行号
 	int appendAgent();
@@ -114,6 +118,9 @@ private:
 		QVector<ImageRef> images;   // 仅用户行
 		QVector<DeliverableRef> deliverables;   // 仅 Agent 行
 		QString replyTail;           // 仅流式期间：当前最终 reply 的完整尾文本；收尾时落回稳定段
+		// 流式尾部 part 缓存：避免 data() 被 QML 反复读取时每次重切全文。
+		mutable QVariantList tailParts;
+		mutable bool tailPartsReady = false;
 		bool streaming = false;
 	};
 

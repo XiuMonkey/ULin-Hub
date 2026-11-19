@@ -171,7 +171,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.title
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.title
                     font.weight: Theme.font.weightMedium
                     elide: Text.ElideRight
@@ -398,7 +398,7 @@ Item {
                     visible: body.children.length === 0
                     text: root.emptyHint
                     color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap

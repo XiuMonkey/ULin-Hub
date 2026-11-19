@@ -91,7 +91,7 @@ Item {
             visible: false
             text: root.text
             textFormat: Text.MarkdownText
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
 
@@ -111,7 +111,7 @@ Item {
             color: Theme.color.userBubbleText
             selectionColor: Theme.color.selectionBg
             selectedTextColor: content.color
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
     }
@@ -158,7 +158,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("context_copy_all")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 

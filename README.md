@@ -8,7 +8,8 @@ The first baseline intentionally keeps the existing Qt Widgets UI and build beha
 
 - `source/` — Qt/C++ application and CMake/Visual Studio projects
 - `assets/` — application resources, translations, themes, and bundled server files
-- `assets/resources/server/` — Node runtime, server dependencies, harness configuration, and launch-root data
+- `assets/storage/server/` — Node runtime, server dependencies, harness configuration, and launch-root data（`node` / `node.exe` / `node_modules` 不入库）
+- `source/include/linux-64/`, `source/src/linux-64/` — Linux platform layer (window bridge, server manager, extension stubs, Office conversion)
 - `extensions/` — client extension sources and examples (CodexBackend, PluginTranspiler)
 - `misc/legacy-tests/` — C++ unit tests
 - `misc/tools/` — build, packaging, and diagnostic scripts
@@ -16,6 +17,21 @@ The first baseline intentionally keeps the existing Qt Widgets UI and build beha
 ## Build
 
 The CMake entry point is `source/CMake/CMakeLists.txt`. Configure from the repository root with a Qt 6.5+ installation. On Windows, `source/ULin Hub.slnx` is the Visual Studio solution.
+
+### Linux
+
+```bash
+bash source/CMake/build-linux.sh release
+# 等价于：
+cmake -S source/CMake -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DULINHUB_BUILD_TESTS=OFF
+cmake --build build/cmake -j"$(nproc)"
+```
+
+- 依赖：Qt 6.5+（base / declarative / webengine / webchannel / websockets）、cmake、ninja、g++
+- 产物：`x64/Linux-x64/release/`；release 构建会执行 `stage-runtime.sh`，把 `assets/storage/server` 与 `assets/resources/node` 同步进输出目录
+- 启动：`cd x64/Linux-x64/release && ./run.sh`
+- 构建缓存在 `build/cmake`、产物在 `x64/`，两者都不入库
+- 服务端状态目录固定在 `~/.local/share/ulinhub/harness`：VMware/HGFS 共享目录不支持 Unix 权限，而 `credentials-local` 插件硬性要求 `.credentials.yaml` 为 0600
 
 ## 命名词表（2026-10-18 统一，新增代码照此写）
 

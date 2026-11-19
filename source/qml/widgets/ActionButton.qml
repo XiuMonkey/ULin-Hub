@@ -81,7 +81,7 @@ Item {
         anchors.centerIn: parent
         text: root.text
         color: root.textColor
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.title   // 14px
         font.weight: root.variant === "elevated" ? Theme.font.weightMedium : Font.Normal
     }

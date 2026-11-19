@@ -37,7 +37,7 @@ Item {
         anchors.verticalCenter: logo.verticalCenter
         text: "ULin Hub"   // 产品名不翻译（各语言写法一致），保持一致
         color: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body   // 标题栏产品名在 main-window.qss 里是 13px（= body 档），不是面板标题的 14px
         font.weight: Theme.font.weightBold
     }

@@ -269,7 +269,7 @@ Item {
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
             color: root.darkTheme ? "#9CA3AF" : "#5A626C"
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: 11
             text: root.model === null ? ""
                   : (String(root.model.statusText).length > 0 ? String(root.model.statusText)
@@ -293,7 +293,7 @@ Item {
             anchors.centerIn: parent
             text: "只读"
             color: root.darkTheme ? "#CE7A7A" : "#8A3B3B"
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: 10
         }
     }

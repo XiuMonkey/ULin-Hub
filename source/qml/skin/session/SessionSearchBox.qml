@@ -56,7 +56,7 @@ Item {
             anchors.centerIn: parent
             text: qsTrId("sessionBar_shortcut_search")
             color: Theme.color.textCaption
-            font.family: "Cascadia Code"
+            font.family: Theme.font.monoFamily
             font.pixelSize: Theme.font.small
         }
     }
@@ -68,7 +68,7 @@ Item {
         visible: input.text.length === 0
         text: root.placeholder
         color: Theme.color.textCaption
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         elide: Text.ElideRight
     }
@@ -83,7 +83,7 @@ Item {
         color: Theme.color.textPrimary
         selectionColor: Theme.color.selectionBg
         selectedTextColor: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         selectByMouse: true
         clip: true
@@ -97,8 +97,9 @@ Item {
         }
     }
 
-    Shortcut {   // Ctrl K 聚焦（原型"键盘优先"）：窗口级快捷键，输入法打开时也生效
-        sequence: "Ctrl+K"
+    Shortcut {   // 聚焦搜索（"键盘优先"）：窗口级快捷键，输入法打开时也生效
+        // Cmd+K 没有 StandardKey，按平台在运行期取；QML 仍只有一份
+        sequence: Qt.platform.os === "osx" ? "Meta+K" : "Ctrl+K"
         onActivated: {
             input.forceActiveFocus()
             input.selectAll()

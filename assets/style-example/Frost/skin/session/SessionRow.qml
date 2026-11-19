@@ -106,7 +106,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.title
         color: root.showMeta ? Theme.color.textPrimary : Theme.color.textSecondary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body
         font.weight: root.selected ? Theme.font.weightMedium : Font.Normal
         elide: Text.ElideRight
@@ -120,7 +120,7 @@ Item {
         visible: root.timeText.length > 0
         text: root.timeText
         color: Theme.color.textCaption
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: 10
         opacity: metaFade.value
     }

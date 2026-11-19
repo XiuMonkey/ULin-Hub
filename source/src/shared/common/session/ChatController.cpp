@@ -354,6 +354,18 @@ void ChatController::addImageFiles(const QVariantList& urls)
 	addFiles(urls);   // 旧入口保留：图片继续内联，普通文件也一起接住
 }
 
+void ChatController::addQuote(const QString& text)
+{
+	const QString trimmed = text.trimmed();
+	if (trimmed.isEmpty())
+		return;
+	QVariantMap entry;
+	entry.insert(QStringLiteral("kind"), QStringLiteral("quote"));
+	entry.insert(QStringLiteral("text"), trimmed);
+	m_pendingImages.append(entry);
+	emit pendingAttachmentsChanged();
+}
+
 void ChatController::addBrowserContext(const QVariantMap& card)
 {
 	QVariantMap entry = card;
@@ -517,8 +529,26 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	QVector<MessageListModel::ImageRef> imageRefs;
 	QStringList fileNotes;
 	QStringList browserNotes;
+	QStringList quoteNotes;
 	for (const QVariant& value : m_pendingImages) {
 		const QVariantMap entry = value.toMap();
+		if (entry.value(QStringLiteral("kind")).toString() == QLatin1String("quote")) {
+			const QString quote = entry.value(QStringLiteral("text")).toString();
+			if (!quote.trimmed().isEmpty()) {
+				QString normalized = quote;
+				normalized.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+				normalized.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+				const QStringList lines = normalized.split(QLatin1Char('\n'));
+				QString block;
+				for (const QString& line : lines) {
+					if (!block.isEmpty())
+						block += QLatin1Char('\n');
+					block += QStringLiteral("> ") + line;
+				}
+				quoteNotes.append(block);
+			}
+			continue;
+		}
 		if (entry.value(QStringLiteral("kind")).toString() == QLatin1String("image")) {
 			QJsonObject part;
 			part.insert(QStringLiteral("type"), QStringLiteral("image"));
@@ -553,6 +583,10 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 		emit pendingAttachmentsChanged();
 	}
 	QString promptText = trimmed;
+	if (!quoteNotes.isEmpty()) {
+		const QString quoted = quoteNotes.join(QStringLiteral("\n\n"));
+		promptText = promptText.isEmpty() ? quoted : (quoted + QStringLiteral("\n\n") + promptText);
+	}
 	if (!fileNotes.isEmpty()) {
 		if (!promptText.isEmpty())
 			promptText += QStringLiteral("\n\n");
@@ -567,6 +601,9 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	beginTurn();
 	if (m_messages)
 		m_messages->appendUserWithImages(promptText, imageRefs);
+	// 快照/压缩重建可能比 prompt 先到；先记住这条本地消息，重建时按需补回。
+	m_pendingUserText = promptText;
+	m_pendingUserImages = imageRefs;
 
 	if (Debugger::attachProbeEnabled()) {
 		const QJsonObject payload = SessionCommands::sessionPrompt(sessionId, promptText, imageParts);
@@ -706,6 +743,8 @@ void ChatController::setSession(const QString& sessionId)
 		emit statsLineChanged();
 	}
 	m_loggedEventTypes.clear();
+	m_pendingUserText.clear();
+	m_pendingUserImages.clear();
 	m_messages->clear();
 	m_trace->clear();
 	// 翻页账本也是会话级的：不清的话，新会话的首帧空快照会被"空帧守卫"当噪声丢掉，
@@ -964,6 +1003,16 @@ void ChatController::rebuildFromRecords(const QJsonArray& records)
 		applyHistoryEvent(event);
 	}
 	m_messages->endBatchRebuild();
+
+	// 服务端记录里还没有这条刚发的用户消息（压缩/快照时序）时，别让它从界面上消失。
+	if (!m_pendingUserText.trimmed().isEmpty()) {
+		if (m_messages->containsUser(m_pendingUserText)) {
+			m_pendingUserText.clear();
+			m_pendingUserImages.clear();
+		} else {
+			m_messages->appendUserWithImages(m_pendingUserText, m_pendingUserImages);
+		}
+	}
 
 	qInfo().noquote() << "[Chat] follow snapshot records=" << records.size()
 		<< "types=" << types.join(QLatin1Char(','))
@@ -1447,6 +1496,9 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 	if (type == QStringLiteral("user/message")) {
 		if (isHiddenContextUserMessage(event))
 			return;
+		// 服务端回显了本地消息 ⇒ 不再需要重建补回。
+		m_pendingUserText.clear();
+		m_pendingUserImages.clear();
 		if (isPeerRelayUserMessage(event)) {
 			emit peerActivitySeen();
 			return;

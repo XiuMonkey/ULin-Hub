@@ -49,7 +49,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("schedule_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: 15
                 font.weight: Theme.font.weightBold
             }
@@ -85,7 +85,7 @@ Item {
             anchors.topMargin: 4
             text: qsTrId("schedule_subtitle")
             color: Theme.color.textTertiary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             wrapMode: Text.WordWrap
             elide: Text.ElideRight
@@ -162,7 +162,7 @@ Item {
                                 width: parent.width
                                 text: row.modelData ? row.modelData.title : ""
                                 color: Theme.color.textPrimary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 font.weight: Theme.font.weightMedium
                                 elide: Text.ElideRight
@@ -184,7 +184,7 @@ Item {
                                 Text {
                                     text: row.modelData ? row.modelData.ruleText : ""
                                     color: Theme.color.textTertiary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.caption
                                     elide: Text.ElideRight
                                 }
@@ -193,7 +193,7 @@ Item {
                                     text: (row.modelData && row.modelData.active)
                                         ? (row.modelData.nextRelative || "") : qsTrId("schedule_status_inactive")
                                     color: Theme.color.textTertiary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.caption
                                 }
                             }
@@ -223,7 +223,7 @@ Item {
                         width: parent.width
                         text: Hub.scheduleStatus
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
@@ -234,7 +234,7 @@ Item {
                         visible: Hub.scheduleStatus === qsTrId("schedule_empty")
                         text: qsTrId("schedule_empty_hint")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
@@ -278,7 +278,7 @@ Item {
                         width: parent.width
                         text: qsTrId("schedule_empty_title")
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.lead
                         font.weight: Theme.font.weightBold
                         horizontalAlignment: Text.AlignHCenter
@@ -288,7 +288,7 @@ Item {
                         width: parent.width
                         text: qsTrId("schedule_create_hint")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
@@ -317,7 +317,7 @@ Item {
                         width: parent.width
                         text: page.selectedTask ? page.selectedTask.title : ""
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.display
                         font.weight: Theme.font.weightBold
                         wrapMode: Text.WordWrap
@@ -338,14 +338,14 @@ Item {
                         Text {
                             text: page.selectedTask ? page.selectedTask.statusText : ""
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
 
                         Text {
                             text: page.selectedTask ? ("· " + page.selectedTask.ruleText) : ""
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
                     }
@@ -360,7 +360,7 @@ Item {
                         width: parent.width
                         text: qsTrId("schedule_next")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
 
@@ -370,7 +370,7 @@ Item {
                             ? (page.selectedTask.nextText + "（" + page.selectedTask.nextRelative + "）")
                             : ""
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                     }
 
@@ -378,7 +378,7 @@ Item {
                         width: parent.width
                         text: qsTrId("schedule_prompt")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
 
@@ -395,7 +395,7 @@ Item {
                             width: parent.width
                             text: page.selectedTask ? page.selectedTask.prompt : ""
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                             wrapMode: Text.WordWrap
                             lineHeight: 1.35
@@ -406,7 +406,7 @@ Item {
                         width: parent.width
                         text: qsTrId("schedule_session") + "：" + (page.selectedTask ? page.selectedTask.sessionTitle : "")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         elide: Text.ElideRight
                     }
@@ -416,7 +416,7 @@ Item {
                         visible: page.selectedTask && page.selectedTask.lastDeliveryText.length > 0
                         text: qsTrId("schedule_last_delivery") + "：" + (page.selectedTask ? page.selectedTask.lastDeliveryText : "")
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
 

@@ -10,6 +10,8 @@
 
 #include <QColor>
 #include <QDebug>
+#include <QFontDatabase>
+#include <QGuiApplication>
 #include <QDir>
 #include <QFile>
 #include <QHash>
@@ -96,6 +98,33 @@ namespace
 		return map;
 	}
 
+
+	// 字体族：运行期从已安装字体里挑第一个可用的，避免把平台名字写死进 QML。
+	// 候选顺序 = Win / macOS / Linux 的中文 UI 字体；都没有时退回 Qt 默认。
+	QString pickFamily(const QStringList& candidates)
+	{
+		static const QStringList installed = QFontDatabase::families();
+		for (const QString& candidate : candidates) {
+			if (installed.contains(candidate, Qt::CaseInsensitive))
+				return candidate;
+		}
+		return QGuiApplication::font().family();
+	}
+
+	QString uiFontFamily()
+	{
+		return pickFamily({ QStringLiteral("Microsoft YaHei UI"), QStringLiteral("Microsoft YaHei"),
+			QStringLiteral("PingFang SC"), QStringLiteral("Noto Sans CJK SC"),
+			QStringLiteral("Source Han Sans SC"), QStringLiteral("Segoe UI") });
+	}
+
+	QString monoFontFamily()
+	{
+		return pickFamily({ QStringLiteral("Cascadia Code"), QStringLiteral("Consolas"),
+			QStringLiteral("SF Mono"), QStringLiteral("Menlo"),
+			QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Liberation Mono") });
+	}
+
 	QVariantMap defaultFont()
 	{
 		QVariantMap map;
@@ -109,6 +138,8 @@ namespace
 		map.insert(QStringLiteral("display"), 18);      // popups #initLabel（全项目唯一 18px）
 		map.insert(QStringLiteral("weightBold"), 600);  // 11 处
 		map.insert(QStringLiteral("weightMedium"), 500); // 6 处
+		map.insert(QStringLiteral("uiFamily"), uiFontFamily());     // QML 统一用它，不再写死 Microsoft YaHei
+		map.insert(QStringLiteral("monoFamily"), monoFontFamily());  // 代码块/命令行
 		return map;
 	}
 

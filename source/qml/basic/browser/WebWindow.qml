@@ -93,7 +93,7 @@ Window {
                 verticalAlignment: Text.AlignVCenter
                 text: view.url
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 elide: Text.ElideMiddle
             }

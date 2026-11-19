@@ -149,7 +149,7 @@ Item {
             anchors.centerIn: parent
             text: root.accountInitial
             color: Theme.color.textOnAccent
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.small
             font.weight: Theme.font.weightBold
         }

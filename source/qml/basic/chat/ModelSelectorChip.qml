@@ -56,7 +56,7 @@ Item {
                 // 展开时文字加深到 textPrimary：在淡灰底上如果还保持 textSecondary，
                 // 会和"未展开的另一处 chip"没区别；加深而不上色，仍留在灰阶里。
                 color: menu.visible ? Theme.color.textPrimary : Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 font.weight: Theme.font.weightMedium
             }
@@ -67,7 +67,7 @@ Item {
                 visible: Hub.currentLevelName.length > 0
                 text: Hub.currentLevelName
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -182,7 +182,7 @@ Item {
                 Text {
                     text: qsTrId("model_label")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                     leftPadding: root.textInset
@@ -194,7 +194,7 @@ Item {
                     visible: Hub.modelGroups.length === 0
                     text: qsTrId("model_none_published")
                     color: Theme.color.textCaption
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -215,7 +215,7 @@ Item {
                             visible: Hub.modelGroups.length > 1
                             text: groupHost.modelData.name
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                             font.weight: Theme.font.weightBold
                             font.letterSpacing: 0.5      // 全大写英文靠字距看起来才"是一组"，而不是一个词
@@ -262,7 +262,7 @@ Item {
                 Text {
                     text: qsTrId("model_think_depth")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                     leftPadding: root.textInset
@@ -275,7 +275,7 @@ Item {
                     text: qsTrId("model_think_generic_note")
                     wrapMode: Text.WordWrap
                     color: Theme.color.textCaption
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     leftPadding: root.textInset
                 }

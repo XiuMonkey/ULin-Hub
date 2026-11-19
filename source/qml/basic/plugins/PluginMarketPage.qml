@@ -85,7 +85,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("plugin_market_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.lead
             }
 
@@ -103,7 +103,7 @@ Item {
                     visible: Hub.plugins.busy
                     text: (Hub.plugins.statusText && Hub.plugins.statusText.length > 0) ? Hub.plugins.statusText : "加载中…"
                     color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.small
                 }
                 IconButton {
@@ -255,7 +255,7 @@ Item {
                                 text: card.modelData.name
                                 elide: Text.ElideRight
                                 color: Theme.color.textPrimary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.title
                                 font.weight: Theme.font.weightBold
                             }
@@ -274,7 +274,7 @@ Item {
                                     anchors.centerIn: parent
                                     text: card.modelData.category
                                     color: Theme.color.textSecondary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.small
                                 }
                             }
@@ -288,7 +288,7 @@ Item {
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             lineHeight: 1.25
                         }
@@ -368,7 +368,7 @@ Item {
                             text: installedCard.modelData.name
                             elide: Text.ElideRight
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.title
                         }
 
@@ -386,7 +386,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: installedCard.modelData.version
                                 color: Theme.color.textTertiary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.small
                             }
                         }
@@ -445,7 +445,7 @@ Item {
                 visible: Hub.plugins.installTasks.length > 0
                 text: "安装任务" + (Hub.plugins.activeTaskCount > 0 ? " · " + Hub.plugins.activeTaskCount + " 个进行中" : "")
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -481,7 +481,7 @@ Item {
                                 id: taskAction
                                 text: page.taskActionLabel(modelData.action)
                                 color: Theme.color.textPrimary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                                 font.weight: Theme.font.weightBold
                             }
@@ -490,7 +490,7 @@ Item {
                                 text: page.taskStateLabel(modelData)
                                 color: modelData.state === "failed" ? Theme.color.danger
                                     : (modelData.state === "ok" ? Theme.color.textSecondary : Theme.color.accent)
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                                 font.weight: Theme.font.weightBold
                             }
@@ -501,14 +501,14 @@ Item {
                                 text: modelData.name
                                 elide: Text.ElideRight
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
                             Text {
                                 id: taskElapsed
                                 text: page.taskElapsed(modelData)
                                 color: Theme.color.textTertiary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.small
                             }
                         }
@@ -520,7 +520,7 @@ Item {
                             maximumLineCount: 1
                             wrapMode: Text.NoWrap
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }
@@ -549,7 +549,7 @@ Item {
                         text: qsTrId("plugin_build_scripts_blocked_fmt").arg(Hub.plugins.blockedBuilds.join(", "))
                         wrapMode: Text.WordWrap
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
 
@@ -591,7 +591,7 @@ Item {
                 text: Hub.plugins.installStatus
                 elide: Text.ElideRight
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -600,7 +600,7 @@ Item {
                 visible: Hub.plugins.installLog.length > 0
                 text: Hub.plugins.installLog.slice(Math.max(0, Hub.plugins.installLog.length - 3)).join("\n")
                 color: Theme.color.textCaption
-                font.family: "Consolas"
+                font.family: Theme.font.monoFamily
                 font.pixelSize: Theme.font.small
                 elide: Text.ElideRight
                 maximumLineCount: 3
@@ -639,7 +639,7 @@ Item {
                     y: Math.round((parent.height - height) / 2)   // Row 子项不用锚点：按行高居中的 y（同工具栏那条说明）
                     text: Hub.plugins.pageLabel
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -668,7 +668,7 @@ Item {
                 maximumLineCount: 1
                 wrapMode: Text.NoWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
         }

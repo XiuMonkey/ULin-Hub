@@ -57,7 +57,7 @@ Item {
                 width: Math.min(implicitWidth, ctx.maxLabelWidth)
                 color: ctx.neutral ? Theme.color.textSecondary
                     : (ctx.accent ? Theme.color.accent : Theme.color.textTertiary)
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
                 elide: Text.ElideRight
             }
@@ -100,13 +100,13 @@ Item {
             Text {
                 text: toolButton.prefix
                 color: Theme.color.textTertiary
-                font.family: "Cascadia Code"
+                font.family: Theme.font.monoFamily
                 font.pixelSize: Theme.font.small
             }
             Text {
                 text: toolButton.label
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
         }
@@ -346,9 +346,10 @@ Item {
                             || (modelData.kind === undefined
                                 && modelData.preview !== undefined && modelData.preview.length > 0)
                         readonly property bool isBrowser: modelData.kind === "browser"
+                        readonly property bool isQuote: modelData.kind === "quote"
 
                         // 与 DSH FileCard 同构：240×64、极细描边、输入区同色底；浏览器卡片宽一点放下位置。
-                        width: isBrowser ? 300 : (isImage ? 64 : 240)
+                        width: (isBrowser || isQuote) ? 300 : (isImage ? 64 : 240)
                         height: 64
                         radius: Theme.radius.panel
                         color: isImage ? (Theme.isDark ? "#232427" : "#F2F3F5")
@@ -410,7 +411,7 @@ Item {
                             anchors.topMargin: 8
                             anchors.bottomMargin: 8
                             spacing: 10
-                            visible: !attachmentTile.isImage && !attachmentTile.isBrowser
+                            visible: !attachmentTile.isImage && !attachmentTile.isBrowser && !attachmentTile.isQuote
 
                             Image {
                                 anchors.verticalCenter: parent.verticalCenter
@@ -435,7 +436,7 @@ Item {
                                     text: modelData.name !== undefined ? modelData.name : ""
                                     elide: Text.ElideMiddle
                                     color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                     font.weight: Theme.font.weightMedium
                                 }
@@ -450,13 +451,73 @@ Item {
                                     }
                                     elide: Text.ElideRight
                                     color: Theme.color.textTertiary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.caption
                                 }
                             }
                         }
 
                         // 浏览器上下文卡片：标题 + 元素位置 + 「读取浏览器内容」短提示。
+                        // 消息引用卡：与浏览器引用卡同尺寸/同结构，只是内容来自选中的消息文字。
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 24
+                            anchors.topMargin: 8
+                            anchors.bottomMargin: 8
+                            spacing: 8
+                            visible: attachmentTile.isQuote
+
+                            Rectangle {
+                                width: 30
+                                height: 30
+                                radius: Theme.radius.small
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.isDark ? "#2A2C30" : "#EEF1F5"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "\u275D"
+                                    color: Theme.color.accent
+                                    font.pixelSize: 16
+                                }
+                            }
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(0, parent.width - 38)
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: "引用文本"
+                                    color: Theme.color.textPrimary
+                                    font.family: Theme.font.uiFamily
+                                    font.pixelSize: Theme.font.body
+                                    font.weight: Theme.font.weightMedium
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: modelData.text ? String(modelData.text) : ""
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 2
+                                    wrapMode: Text.Wrap
+                                    color: Theme.color.textSecondary
+                                    font.family: Theme.font.uiFamily
+                                    font.pixelSize: Theme.font.caption
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: "选中文本 · 发送时写为 Markdown 引用"
+                                    elide: Text.ElideRight
+                                    color: Theme.color.textTertiary
+                                    font.family: Theme.font.uiFamily
+                                    font.pixelSize: Theme.font.small
+                                }
+                            }
+                        }
+
                         Row {
                             anchors.fill: parent
                             anchors.leftMargin: 10
@@ -493,7 +554,7 @@ Item {
                                         : (modelData.url !== undefined ? modelData.url : "")
                                     elide: Text.ElideRight
                                     color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                     font.weight: Theme.font.weightMedium
                                 }
@@ -505,7 +566,7 @@ Item {
                                         : (modelData.url !== undefined ? modelData.url : "")
                                     elide: Text.ElideMiddle
                                     color: Theme.color.textTertiary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.caption
                                 }
 
@@ -514,7 +575,7 @@ Item {
                                     text: modelData.prompt !== undefined ? modelData.prompt : "读取浏览器内容"
                                     elide: Text.ElideRight
                                     color: Theme.color.accent
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.small
                                 }
                             }
@@ -624,7 +685,7 @@ Item {
                     color: Theme.color.textPrimary
                     selectionColor: Theme.color.selectionBg
                     selectedTextColor: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body   // 与 SearchField 输入文字同档
                     // 高度等于全文高度，夹取与滚动交给外层 editorView。
                     height: contentHeight + topPadding + bottomPadding
@@ -786,7 +847,7 @@ Item {
                         Text {
                             text: root.permissionLabel
                             color: root.permissionIsFull ? Theme.color.textSecondary : Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                         Text {
@@ -898,7 +959,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("composer_workspace_switch")
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -927,7 +988,7 @@ Item {
                         Text {
                             text: modelData.title
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             elide: Text.ElideRight
                             width: Math.max(0, parent.width - 46)
@@ -965,7 +1026,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("composer_workspace_empty")
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -982,7 +1043,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("workdir_new_session_tip")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
                 MouseArea {
@@ -1008,7 +1069,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("sessionBar_new_workspace")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
                 MouseArea {
@@ -1073,7 +1134,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("composer_agent_current")
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
             Text {
@@ -1083,7 +1144,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("composer_agent_desc")
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -1113,7 +1174,7 @@ Item {
                         Text {
                             text: modelData.label
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             elide: Text.ElideRight
                             width: Math.max(0, parent.width - 24)
@@ -1141,7 +1202,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("composer_agent_empty")
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -1158,7 +1219,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("composer_agent_tools")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
                 MouseArea {
@@ -1430,7 +1491,7 @@ Item {
                     ? "拖动选区移动 · 拖四角调整 · 点完成截图"
                     : "拖动选择截图区域 · Esc 取消"
                 color: "white"
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 z: 20
             }
@@ -1465,7 +1526,7 @@ Item {
                             anchors.centerIn: parent
                             text: "取消"
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
                         MouseArea {
@@ -1486,7 +1547,7 @@ Item {
                             anchors.centerIn: parent
                             text: "完成"
                             color: confirmMouse.containsMouse ? "white" : Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             font.weight: Theme.font.weightBold
                         }
@@ -1572,7 +1633,7 @@ Item {
                 leftPadding: 6
                 text: "截图选项"
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -1598,7 +1659,7 @@ Item {
                     Text {
                         text: "隐藏 ULin Hub 后截图"
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
                 }
@@ -1637,7 +1698,7 @@ Item {
                     Text {
                         text: "显示窗口截图"
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
                 }
@@ -1688,7 +1749,7 @@ Item {
                 leftPadding: 6
                 text: qsTrId("permission_title")
                 color: Theme.color.textCaption
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
             }
 
@@ -1714,14 +1775,14 @@ Item {
                             text: modelData.label
                             color: modelData.id === "danger-full-access"
                                 ? Theme.color.danger : Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
                         Text {
                             text: modelData.description
                             width: parent.width
                             color: Theme.color.textCaption
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                             elide: Text.ElideRight
                         }
@@ -1785,7 +1846,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("permission_confirm_title")
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.title
                     font.weight: Theme.font.weightBold
                 }
@@ -1796,7 +1857,7 @@ Item {
                 width: parent.width - 40
                 text: qsTrId("permission_confirm_desc")
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
@@ -1869,7 +1930,7 @@ Item {
                 text: Hub.statsLine
                 elide: Text.ElideRight
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
                 font.letterSpacing: 0.15
             }
@@ -1993,7 +2054,7 @@ Item {
                                 id: nameText
                                 text: "/" + commandRow.modelData.name
                                 color: Theme.color.textPrimary   // 输入区保持灰阶，不使用 accent 蓝
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -2003,7 +2064,7 @@ Item {
                                 text: commandRow.modelData.hint   // 命令参数提示
                                 visible: text.length > 0
                                 color: Theme.color.textTertiary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -2014,7 +2075,7 @@ Item {
                                                    - (hintText.visible ? rowHost.spacing * 2 : rowHost.spacing))
                                 elide: Text.ElideRight
                                 color: Theme.color.textCaption
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                                 anchors.verticalCenter: parent.verticalCenter
                             }

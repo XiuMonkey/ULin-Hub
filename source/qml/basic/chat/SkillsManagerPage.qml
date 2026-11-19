@@ -95,7 +95,7 @@ Item {
                         text: row.modelData.name
                         elide: Text.ElideRight
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                         font.weight: Theme.font.weightMedium
                     }
@@ -106,7 +106,7 @@ Item {
                         elide: Text.ElideRight
                         maximumLineCount: 1
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
 
@@ -116,7 +116,7 @@ Item {
                         text: row.modelData.path
                         elide: Text.ElideMiddle
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
                 }
@@ -143,7 +143,7 @@ Item {
         elide: Text.ElideRight
         maximumLineCount: 1
         color: Theme.color.textTertiary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         horizontalAlignment: Text.AlignRight
     }
@@ -188,7 +188,7 @@ Item {
                     text: root.selectedSkill ? root.selectedSkill.name : ""
                     elide: Text.ElideRight
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     font.weight: Theme.font.weightMedium
                 }
@@ -198,7 +198,7 @@ Item {
                     text: root.selectedSkill ? root.selectedSkill.path : ""
                     elide: Text.ElideMiddle
                     color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.small
                 }
             }

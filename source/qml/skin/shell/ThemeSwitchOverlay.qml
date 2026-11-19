@@ -46,7 +46,7 @@ Item {
                 text: qsTrId("theme_switching")
                 horizontalAlignment: Text.AlignHCenter
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.lead
             }
         }

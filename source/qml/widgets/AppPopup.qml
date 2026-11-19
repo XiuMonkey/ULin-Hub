@@ -56,7 +56,7 @@ Popup {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.title
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
                 elide: Text.ElideRight

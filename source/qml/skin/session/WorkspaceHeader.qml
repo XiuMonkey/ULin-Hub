@@ -96,7 +96,7 @@ Item {
             anchors.centerIn: parent
             text: root.title.length > 0 ? root.title.charAt(0).toUpperCase() : ""
             color: root.workspaceColor
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: 10   // 设计稿 9.5px；QML font.pixelSize 只有整数，取 10
             font.weight: Font.Bold
         }
@@ -109,7 +109,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.sessionCount
         color: Theme.color.textCaption
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: 10
     }
 
@@ -122,7 +122,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.title
         color: Theme.color.textSecondary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: 13   // 设计稿 12.5px；QML font.pixelSize 只有整数，取 13（Theme.font.body 同值）
         font.weight: 550
         elide: Text.ElideRight

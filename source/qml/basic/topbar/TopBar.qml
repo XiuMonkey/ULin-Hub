@@ -180,7 +180,7 @@ Item {
                 anchors.right: parent.right
                 text: Hub.currentSessionTitle.length > 0 ? Hub.currentSessionTitle : "ULin Hub"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightMedium
                 elide: Text.ElideRight
@@ -207,7 +207,7 @@ Item {
                         return parts.join(" · ")
                     }
                     color: Theme.color.textTertiary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.small
                     elide: Text.ElideRight
                 }

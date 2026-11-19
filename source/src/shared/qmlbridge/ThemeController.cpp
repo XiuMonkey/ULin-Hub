@@ -5,7 +5,6 @@
 #include "common/appearance/ThemeManager.h"
 #include "common/settings/ClientSettings.h"
 #include "qmlbridge/ThemeBridge.h"
-#include "qmlbridge/WindowBridge.h"
 
 namespace
 {
@@ -40,7 +39,6 @@ void ThemeController::toggle()
 
 	ThemeManager::instance().setMode(next);
 	ThemeBridge::instance().reload();
-	WindowBridge::instance().notifyThemeChanged();
 
 	m_switchingTimer.start();
 }

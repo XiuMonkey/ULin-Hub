@@ -1,4 +1,5 @@
 #include "common/files/OfficeTextExtractor.h"
+#include "common/util/ArchiveExtractor.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -22,33 +23,8 @@ QString suffixOf(const QString& path)
 
 bool unzipTo(const QString& archive, const QString& target, QString* error)
 {
-	QProcess proc;
-#ifdef Q_OS_WIN
-	proc.setProgram(QStringLiteral("tar.exe"));
-#else
-	proc.setProgram(QStringLiteral("tar"));
-#endif
-	proc.setArguments({ QStringLiteral("-xf"), QDir::toNativeSeparators(archive),
-		QStringLiteral("-C"), QDir::toNativeSeparators(target) });
-	proc.start();
-	if (!proc.waitForStarted(5000)) {
-		if (error)
-			*error = QStringLiteral("无法启动解包工具");
-		return false;
-	}
-	if (!proc.waitForFinished(20000)) {
-		proc.kill();
-		if (error)
-			*error = QStringLiteral("解包超时");
-		return false;
-	}
-	if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0) {
-		if (error)
-			*error = QStringLiteral("解包失败：%1").arg(
-				QString::fromLocal8Bit(proc.readAllStandardError()).left(200));
-		return false;
-	}
-	return true;
+	// OOXML（docx/xlsx/pptx）本质是 zip：走统一解包器，不再调外部 tar。
+	return ArchiveExtractor::extractTo(archive, target, error);
 }
 
 QString readFileText(const QString& path)

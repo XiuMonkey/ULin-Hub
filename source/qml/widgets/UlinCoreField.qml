@@ -19,7 +19,7 @@ Column {
     Text {
         text: field.label
         color: Theme.color.textSecondary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
     }
 
@@ -37,7 +37,7 @@ Column {
             visible: input.text.length === 0
             text: field.placeholder
             color: Theme.color.textTertiary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
 
@@ -52,7 +52,7 @@ Column {
             clip: true
             color: Theme.color.textPrimary
             selectionColor: Theme.color.selectionBg
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             onTextEdited: field.edited(text)
         }

@@ -48,7 +48,7 @@ Item {
             text: root.text
             // toastBg 两套主题都是深灰，dark 下的 textOnAccent 是近黑，会读不清。
             color: Theme.isDark ? Theme.color.textPrimary : Theme.color.textOnAccent
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
     }

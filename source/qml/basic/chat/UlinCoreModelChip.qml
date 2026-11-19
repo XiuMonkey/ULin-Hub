@@ -39,7 +39,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.cfg.selectedModel.length > 0 ? root.cfg.selectedModel : "选择模型"
                 color: menu.visible ? Theme.color.textPrimary : Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 font.weight: Theme.font.weightMedium
             }
@@ -49,7 +49,7 @@ Item {
                 visible: !root.cfg.selectedProviderHasKey
                 text: "未配置 Key"
                 color: Theme.color.accent
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -152,7 +152,7 @@ Item {
                 Text {
                     text: "ULin Core 模型"
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                     leftPadding: root.textInset
@@ -166,7 +166,7 @@ Item {
                     text: "未配置 API Key：当前会退回 Echo"
                     wrapMode: Text.WordWrap
                     color: Theme.color.accent
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     leftPadding: root.textInset
                     rightPadding: root.textInset
@@ -189,7 +189,7 @@ Item {
                             visible: root.cfg.providers.length > 1
                             text: providerGroup.modelData.name
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                             font.weight: Theme.font.weightBold
                             font.letterSpacing: 0.5
@@ -223,7 +223,7 @@ Item {
                     text: "还没有提供商，请到设置里添加。"
                     wrapMode: Text.WordWrap
                     color: Theme.color.textCaption
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     leftPadding: root.textInset
                     rightPadding: root.textInset

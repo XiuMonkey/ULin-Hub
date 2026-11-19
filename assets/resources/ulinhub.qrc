@@ -90,6 +90,6 @@
         <file>office-viewer/viewer.js</file>
         <file>office-viewer/pdf.min.js</file>
         <file>office-viewer/pdf.worker.min.js</file>
-        <file>server/harness/profiles/web/cordis.patch.yml</file>
+        <file alias="server/harness/profiles/web/cordis.patch.yml">../../assets/storage/server/harness/profiles/web/cordis.patch.yml</file>
     </qresource>
 </RCC>

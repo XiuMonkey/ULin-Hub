@@ -165,7 +165,7 @@ Item {
                         id: statusLabel
                         text: root.connectionText
                         color: root.terminalAttached ? Theme.color.textSecondary : Theme.color.textCaption
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         elide: Text.ElideRight
                     }

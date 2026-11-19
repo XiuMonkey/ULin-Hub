@@ -135,7 +135,7 @@ Popup {
                             ? String(modelData.label)
                             : qsTrId("sessionBar_extension_entry")
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                         elide: Text.ElideRight
                     }
@@ -145,7 +145,7 @@ Popup {
                         visible: extItem.hasDescription
                         text: extItem.hasDescription ? String(modelData.description) : ""
                         color: Theme.color.textCaption
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         elide: Text.ElideRight
                     }
@@ -225,7 +225,7 @@ Popup {
                     color: menuItem.modelData.danger
                         ? (Theme.color.dangerText || Theme.color.danger)
                         : (menuItem.modelData.enabled ? Theme.color.textPrimary : Theme.color.textCaption)
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     elide: Text.ElideRight
                 }

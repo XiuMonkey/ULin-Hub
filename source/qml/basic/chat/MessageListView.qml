@@ -566,7 +566,7 @@ ListView {
                 anchors.centerIn: parent
                 text: Hub.loadingOlder ? qsTrId("common_loading") : qsTrId("common_load_more")   // 不硬编码中文
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -586,6 +586,7 @@ ListView {
         required property string text
         required property var segments
         required property var replyTail
+        required property var replyTailParts
         required property var images
         required property var deliverables
         required property bool streaming
@@ -637,6 +638,7 @@ ListView {
             anchors.right: parent.right
             segments: rowRoot.segments
             replyTail: rowRoot.replyTail
+            replyTailParts: rowRoot.replyTailParts
             deliverables: rowRoot.deliverables
             // 行级标志优先；控制器仍在跑且这是最后一条 agent 时也视为流式。
             streaming: rowRoot.streaming

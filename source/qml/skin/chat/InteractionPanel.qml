@@ -64,7 +64,7 @@ Item {
                 visible: Hub.questionActive
                 text: qsTrId("ask_confirm_questions")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
             }
@@ -102,7 +102,7 @@ Item {
                             width: parent.width
                             text: questionCard.modelData.header
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.title
                             font.weight: Theme.font.weightBold
                             wrapMode: Text.WordWrap
@@ -112,7 +112,7 @@ Item {
                             width: parent.width
                             text: questionCard.modelData.question
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                             wrapMode: Text.WordWrap
                         }
@@ -158,7 +158,7 @@ Item {
                                     anchors.right: parent.right
                                     text: optionRow.modelData.label
                                     color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                     wrapMode: Text.WordWrap
                                 }
@@ -191,7 +191,7 @@ Item {
                             color: Theme.color.textPrimary
                             placeholderTextColor: Theme.color.textCaption
                             selectionColor: Theme.color.selectionBg
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                             leftPadding: Theme.spacing.fieldPadX
                             rightPadding: Theme.spacing.fieldPadX
@@ -262,7 +262,7 @@ Item {
                                 anchors.centerIn: parent
                                 text: "!"
                                 color: Theme.color.danger
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 font.weight: Theme.font.weightBold
                             }
@@ -276,7 +276,7 @@ Item {
                             anchors.rightMargin: 8
                             text: qsTrId("ask_tool_approval_title")
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.title
                             font.weight: Theme.font.weightBold
                             elide: Text.ElideRight
@@ -326,7 +326,7 @@ Item {
                                 width: parent.width
                                 text: Hub.approvalToolName
                                 color: Theme.color.textPrimary
-                                font.family: "Consolas"
+                                font.family: Theme.font.monoFamily
                                 font.pixelSize: Theme.font.caption
                                 wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                                 maximumLineCount: 3
@@ -338,7 +338,7 @@ Item {
                                 width: parent.width
                                 text: Hub.approvalReason
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                                 wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                                 maximumLineCount: 3

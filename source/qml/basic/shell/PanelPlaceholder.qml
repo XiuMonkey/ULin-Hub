@@ -18,7 +18,7 @@ Item {
             width: parent.width
             text: root.title
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap
@@ -28,7 +28,7 @@ Item {
             width: parent.width
             text: root.detail
             color: Theme.color.textTertiary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.Wrap

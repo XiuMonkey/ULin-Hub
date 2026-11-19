@@ -67,7 +67,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.language.length > 0 ? root.language : "text"
                 color: Theme.color.textPrimary
-                font.family: "Consolas"
+                font.family: Theme.font.monoFamily
                 font.pixelSize: Theme.font.small      // 11px（官方 banner 11/18）
             }
 
@@ -128,7 +128,7 @@ Item {
                     color: Theme.color.textPrimary
                     selectionColor: Theme.color.selectionBg
                     selectedTextColor: Theme.color.textPrimary
-                    font.family: "Consolas"
+                    font.family: Theme.font.monoFamily
                     font.pixelSize: Theme.font.small      // 11px（官方 --dsw-font-markdown-code-block）
                 }
             }

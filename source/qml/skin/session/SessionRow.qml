@@ -116,7 +116,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.title
         color: root.showMeta ? Theme.color.textPrimary : Theme.color.textSecondary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: 13   // 设计稿 12.5px；QML font.pixelSize 只有整数，取 13（Theme.font.body 同值）
         font.weight: root.selected ? Theme.font.weightMedium : Font.Normal
         elide: Text.ElideRight
@@ -130,7 +130,7 @@ Item {
         visible: root.timeText.length > 0
         text: root.timeText
         color: Theme.color.textCaption
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: 10
         opacity: metaFade.value
     }

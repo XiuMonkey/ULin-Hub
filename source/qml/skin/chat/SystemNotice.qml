@@ -22,6 +22,6 @@ TextEdit {
     color: Theme.color.systemMessageText
     selectionColor: Theme.color.selectionBg
     selectedTextColor: Theme.color.systemMessageText
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.font.uiFamily
     font.pixelSize: Theme.font.caption
 }

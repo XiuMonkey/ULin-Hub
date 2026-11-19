@@ -65,7 +65,7 @@ Rectangle {
                 // 反而看不出重点。次要行正常态淡一档，选中态回到主色。
                 color: (root.muted && !root.checked) ? Theme.color.textSecondary
                                                     : Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: (root.muted && !root.checked) ? Font.Normal : Theme.font.weightMedium
             }
@@ -76,7 +76,7 @@ Rectangle {
                 text: root.subtitle
                 elide: Text.ElideRight
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
         }

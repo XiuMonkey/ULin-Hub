@@ -894,7 +894,32 @@ void DshApiClient::handleEventsItem(const QJsonValue& value)   // waterfall 是�
 	}
 
 	if (type == QStringLiteral("emit")) {
-		qInfo().noquote() << "[DshApi] emit event:" << item.value(QStringLiteral("event")).toString();
+		const QString eventName = item.value(QStringLiteral("event")).toString();
+		const QJsonValue eventData = item.value(QStringLiteral("data"));
+		qInfo().noquote() << "[DshApi] emit event:" << eventName;
+
+		// $events 的 emit 分支原来只记事件名，api-session/error 的 code/message
+		// 被丢掉，UI 只看到"回合结束"但没有原因。把 error 负载记下来，
+		// 并按 ChatController 认的 session/event 帧转发一次。
+		if (eventName == QStringLiteral("api-session/error")) {
+			qWarning().noquote()
+				<< "[DshApi] api-session/error payload:"
+				<< QJsonDocument(eventData.toObject()).toJson(QJsonDocument::Compact);
+
+			QJsonObject event;
+			event.insert(QStringLiteral("type"), eventName);
+			event.insert(QStringLiteral("data"), eventData);
+
+			QJsonObject payload;
+			payload.insert(QStringLiteral("type"), QStringLiteral("session/event"));
+			payload.insert(QStringLiteral("sessionId"),
+				item.value(QStringLiteral("sessionId")).toString());
+			payload.insert(QStringLiteral("event"), event);
+
+			QJsonObject frame;
+			frame.insert(QStringLiteral("payload"), payload);
+			emit muxFrameReceived(frame);
+		}
 		return;
 	}
 

@@ -82,7 +82,7 @@ Item {
             visible: !root.compact
             text: root.text
             color: root.hovered ? Theme.color.textPrimary : Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             font.weight: Theme.font.weightMedium
 
@@ -97,7 +97,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: root.count
             color: root.count > 0 ? Theme.color.textSecondary : Theme.color.textCaption   // 0 与"有数"要能一眼分开：0 退到 caption 档、不加粗
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             font.weight: root.count > 0 ? Theme.font.weightMedium : Font.Normal
         }
@@ -155,7 +155,7 @@ Item {
             Text {
                 text: root.popupTitle
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 font.weight: Theme.font.weightMedium
             }
@@ -166,7 +166,7 @@ Item {
                 text: root.emptyHint
                 wrapMode: Text.WordWrap
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.small
                 lineHeight: 1.4
             }
@@ -232,7 +232,7 @@ Item {
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             font.weight: Theme.font.weightMedium
                         }
@@ -242,7 +242,7 @@ Item {
                             text: itemRow.modelData.subtitle
                             elide: Text.ElideRight
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }

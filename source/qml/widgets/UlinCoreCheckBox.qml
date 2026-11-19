@@ -7,7 +7,7 @@ import "../../widgets"
 CheckBox {
     id: control
 
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.font.uiFamily
     font.pixelSize: Theme.font.body
     spacing: Theme.spacing.labelGap
 

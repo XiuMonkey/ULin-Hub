@@ -50,7 +50,7 @@ Item {
         // 字色**恒定**：选中/未选中/悬停/按下全一样（用户两次否掉过"字色跟着变"——换色就不协调）。
         // 所以这里刻意不绑 mouseArea 的任何状态；状态反馈只由底色那一档承担。
         color: Theme.color.textSecondary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         font.weight: Font.Normal
     }

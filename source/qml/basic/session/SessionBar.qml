@@ -194,7 +194,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: qsTr("新建工作区")
             color: Theme.color.primaryButtonText
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             font.weight: Theme.font.weightBold
             elide: Text.ElideRight
@@ -208,7 +208,7 @@ Item {
             text: qsTrId("sessionBar_shortcut_new_chat")
             color: Theme.color.primaryButtonText
             opacity: 0.55
-            font.family: "Cascadia Code"
+            font.family: Theme.font.monoFamily
             font.pixelSize: Theme.font.small
         }
 
@@ -221,8 +221,8 @@ Item {
         }
     }
 
-    Shortcut {   // Ctrl N = 新建工作区（与主按钮同一条路）
-        sequence: "Ctrl+N"
+    Shortcut {   // 新建工作区（与主按钮同一条路）：StandardKey，macOS 自动映射为 Cmd+N
+        sequence: StandardKey.New
         onActivated: Hub.createWorkspace()
     }
 
@@ -323,7 +323,7 @@ Item {
                         ? rowRoot.workspaceTitle
                         : qsTrId("sessionBar_pinned")
                     color: Theme.color.textCaption
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -334,7 +334,7 @@ Item {
                     text: rowRoot.sessionCount > 0 ? String(rowRoot.sessionCount) : ""
                     color: Theme.color.textCaption
                     opacity: 0.7
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.small
                 }
             }
@@ -372,7 +372,7 @@ Item {
                 ? qsTrId("sessionBar_no_matches")
                 : qsTrId("sessionBar_no_sessions")
             color: Theme.color.textCaption
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             lineHeight: 1.4
         }
@@ -394,7 +394,7 @@ Item {
         // （workbuddy-backend 接管后 getState/startSignIn 都是真实数据，含"已登录防误登出"）
         onAccountRequested: {
             sessionBar.accountEntryRequested()
-            if (HostUi.accountEntryOwner.length === 0)
+            if ((HostUi.accountEntryOwner || "").length === 0)
                 Hub.settings.openAccountPage()
         }
         onMoreRequested: {
@@ -426,7 +426,7 @@ Item {
             anchors.rightMargin: 10
             text: "登录完成后点这里返回账户"
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             wrapMode: Text.WordWrap
         }
@@ -482,7 +482,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "已归档会话"
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     font.weight: Theme.font.weightBold
                 }
@@ -499,7 +499,7 @@ Item {
                         text: "×"
                         color: closeArchivedMouse.containsMouse
                             ? Theme.color.textPrimary : Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: 18
                     }
 
@@ -557,7 +557,7 @@ Item {
                             text: modelData.title && String(modelData.title).length > 0
                                 ? String(modelData.title) : "未命名会话"
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             elide: Text.ElideRight
                         }
@@ -567,7 +567,7 @@ Item {
                             text: modelData.updatedAt > 0
                                 ? sessionBar.relativeTimeText(modelData.updatedAt) : "已归档"
                             color: Theme.color.textCaption
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }
@@ -590,7 +590,7 @@ Item {
                         Text {
                             text: "还原"
                             color: restoreMouse.containsMouse ? Theme.color.accent : Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
 
                             MouseArea {
@@ -609,7 +609,7 @@ Item {
                         Text {
                             text: "彻底删除"
                             color: deleteMouse.containsMouse ? Theme.color.danger : Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
 
                             MouseArea {
@@ -637,7 +637,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "彻底删除后无法恢复，确定？"
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
 
@@ -651,7 +651,7 @@ Item {
                                 text: "取消"
                                 color: cancelDeleteMouse.containsMouse
                                     ? Theme.color.textPrimary : Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.small
                                 MouseArea {
                                     id: cancelDeleteMouse
@@ -666,7 +666,7 @@ Item {
                             Text {
                                 text: "删除"
                                 color: Theme.color.danger
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.small
                                 font.weight: Theme.font.weightBold
                                 MouseArea {
@@ -689,7 +689,7 @@ Item {
                     visible: archivedList.count === 0
                     text: "没有已归档会话"
                     color: Theme.color.textCaption
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
             }
@@ -743,7 +743,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: sessionBar.pendingIsWorkspace ? qsTrId("workdir_delete_label") : qsTrId("session_delete_label")
             color: deleteHover.containsMouse ? Theme.color.danger : Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
 
@@ -789,7 +789,7 @@ Item {
                     : qsTrId("session_delete_confirm")
                 wrapMode: Text.WordWrap
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
             }
 

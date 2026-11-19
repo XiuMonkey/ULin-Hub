@@ -156,7 +156,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("model_list_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
             }
@@ -167,7 +167,7 @@ Item {
             text: qsTrId("model_list_desc")
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -176,7 +176,7 @@ Item {
             text: page.statusText()
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -186,7 +186,7 @@ Item {
             text: Hub.settings.notice
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary   // 瞬时提示：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -226,7 +226,7 @@ Item {
                                 || Hub.settings.models[rowHost.index - 1].provider !== rowHost.modelData.provider
                             text: rowHost.modelData.providerName
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                             font.weight: Theme.font.weightBold
                             font.letterSpacing: 0.4
@@ -283,7 +283,7 @@ Item {
                                                 text: rowHost.modelData.name
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textPrimary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 // 行标题取 body(13)：原来和页面标题同为 14，
                                                 // 一屏里两个"14"抢层级，模型名反而比"模型列表"更显眼。
                                                 font.pixelSize: Theme.font.body
@@ -295,7 +295,7 @@ Item {
                                                 text: rowHost.modelData.providerName + " · " + rowHost.modelData.id
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textTertiary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
 
@@ -324,7 +324,7 @@ Item {
                                                     text: qsTrId("model_key_missing")
                                                     elide: Text.ElideRight
                                                     color: Theme.color.textTertiary
-                                                    font.family: "Microsoft YaHei UI"
+                                                    font.family: Theme.font.uiFamily
                                                     font.pixelSize: Theme.font.small
                                                 }
                                             }
@@ -346,7 +346,7 @@ Item {
                                                     ? qsTrId("model_source_custom")
                                                     : qsTrId("model_source_adapter_builtin")
                                                 color: Theme.color.textSecondary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.small
                                             }
                                         }
@@ -433,7 +433,7 @@ Item {
                                                 width: page.detailLabelWidth
                                                 text: modelData[0]
                                                 color: Theme.color.textTertiary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
 
@@ -442,7 +442,7 @@ Item {
                                                 text: modelData[1]
                                                 wrapMode: Text.Wrap
                                                 color: Theme.color.textSecondary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
                                         }
@@ -471,7 +471,7 @@ Item {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: "API Key"
                                             color: Theme.color.textTertiary
-                                            font.family: "Microsoft YaHei UI"
+                                            font.family: Theme.font.uiFamily
                                             font.pixelSize: Theme.font.caption
                                         }
 
@@ -505,7 +505,7 @@ Item {
                                         text: page.credentialText(rowHost.providerRow)
                                         wrapMode: Text.WordWrap
                                         color: Theme.color.textCaption
-                                        font.family: "Microsoft YaHei UI"
+                                        font.family: Theme.font.uiFamily
                                         font.pixelSize: Theme.font.small
                                     }
                                 }
@@ -530,7 +530,7 @@ Item {
                     text: qsTrId("model_catalog_empty")
                     wrapMode: Text.WordWrap
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -555,7 +555,7 @@ Item {
                         Text {
                             text: qsTrId("model_add_title")
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                             font.weight: Theme.font.weightBold
                         }
@@ -570,7 +570,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -580,7 +580,7 @@ Item {
                                 height: page.fieldHeight
                                 model: Hub.settings.providers
                                 textRole: "label"
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 leftPadding: Theme.spacing.fieldPadX
                                 rightPadding: Theme.spacing.fieldPadX + Theme.size.dropdownArrowWidth
@@ -597,7 +597,7 @@ Item {
                                     elide: Text.ElideRight
                                     verticalAlignment: Text.AlignVCenter
                                     color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                 }
 
@@ -673,7 +673,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -719,7 +719,7 @@ Item {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: modelData.id
                                         color: Theme.color.textPrimary
-                                        font.family: "Microsoft YaHei UI"
+                                        font.family: Theme.font.uiFamily
                                         font.pixelSize: Theme.font.caption
                                     }
 
@@ -747,7 +747,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -768,7 +768,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -790,7 +790,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -813,7 +813,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -835,7 +835,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -846,7 +846,7 @@ Item {
                             CheckBox {
                                 id: imageInputBox
                                 text: qsTrId("model_supports_image")
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 spacing: Theme.spacing.labelGap
                                 palette.windowText: Theme.color.textPrimary   // 标签色/高亮色也钉在 token 上：不再受全局 QPalette 影响（深色主题下尤其重要）
@@ -903,7 +903,7 @@ Item {
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.color.textSecondary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
 
@@ -922,7 +922,7 @@ Item {
                             text: page.credentialText(page.currentProvider)
                             wrapMode: Text.WordWrap
                             color: Theme.color.textCaption
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
 
@@ -933,7 +933,7 @@ Item {
                                 : qsTrId("model_no_configurable_provider")
                             wrapMode: Text.WordWrap
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
 
@@ -942,7 +942,7 @@ Item {
                             text: Hub.settings.formFeedback
                             wrapMode: Text.WordWrap
                             color: Theme.color.textSecondary   // 表单反馈：原版走强调色（蓝）⇒ 中性灰
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                         }
 

@@ -153,7 +153,7 @@ Column {
                 visible: opacity > 0
                 opacity: (root.iconKind === "" && root.glyph.length > 0 && !root.expanded && !root.hovered) ? 1 : 0
                 color: root.labelColor
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 Behavior on opacity {
                     NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
@@ -195,7 +195,7 @@ Column {
                 - (root.chevronTrailing ? trailingChevron.width + 4 : 0)))
             text: root.title
             color: root.labelColor
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             // 折叠行只有 24px：默认 NoWrap 虽禁自动折行，但命令/工具名里的显式 \n 照样断行，
             // 会把这一行撑高、顶到后面的成员行上（同 EntryChip.qml:228-233 的坑）。
@@ -247,7 +247,7 @@ Column {
                    && (root.keepSummaryWhenExpanded || !root.expanded)
             text: root.summaryLine
             color: root.labelColor   // 官方 .summary 不设 color ⇒ 继承行的 label-tertiary（悬停变 secondary），与标题同步
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             // 与 titleText 同理：显式 wrapMode + maximumLineCount 才能让 elide 真正收成一行
             wrapMode: Text.WrapAtWordBoundaryOrAnywhere

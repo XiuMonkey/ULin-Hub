@@ -79,7 +79,7 @@ Item {
         anchors.centerIn: parent
         text: root.text
         color: root.textColor
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.title
         font.weight: root.variant === "primary" || root.variant === "danger"
             ? Theme.font.weightMedium : Font.Normal

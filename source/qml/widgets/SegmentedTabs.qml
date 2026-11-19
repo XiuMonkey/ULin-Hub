@@ -35,7 +35,7 @@ Item {
     Text {   // 量最宽标签用的隐形文本（与实际标签同字体）
         id: measure
         visible: false
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         font.weight: Theme.font.weightMedium
         text: {
@@ -108,7 +108,7 @@ Item {
                     anchors.centerIn: parent
                     text: modelData.label
                     color: tabItem.isCurrent ? Theme.color.textPrimary : Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
 

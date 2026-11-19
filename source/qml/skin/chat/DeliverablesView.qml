@@ -57,7 +57,7 @@ Item {
                                 ? String(modelData.suffix).toUpperCase()
                                 : "FILE"
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: 8
                             font.weight: Theme.font.weightMedium
                             elide: Text.ElideRight
@@ -76,7 +76,7 @@ Item {
                             text: modelData.name || modelData.path
                             color: Theme.color.textPrimary
                             elide: Text.ElideMiddle
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             font.weight: Theme.font.weightMedium
                         }
@@ -87,7 +87,7 @@ Item {
                                 : modelData.path
                             color: Theme.color.textTertiary
                             elide: Text.ElideMiddle
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }

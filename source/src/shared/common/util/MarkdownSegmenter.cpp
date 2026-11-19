@@ -411,7 +411,7 @@ namespace MarkdownSegmenter
 			applyBlockLayout(block, blockIndex, blockCount);
 	}
 
-	QTextDocumentFragment MarkdownSegmenter::renderFragment(const QString& markdown, const QVariantMap& colors)
+	QTextDocumentFragment renderFragment(const QString& markdown, const QVariantMap& colors)
 	{
 		if (markdown.isEmpty())
 			return QTextDocumentFragment();

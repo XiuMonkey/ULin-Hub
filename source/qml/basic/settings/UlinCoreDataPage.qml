@@ -15,7 +15,7 @@ Item {
         Text {
             text: "数据"
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.title
             font.weight: Theme.font.weightBold
         }
@@ -25,14 +25,14 @@ Item {
             text: "会话记录、模型配置和工作目录都在 data/ulincore 下。"
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
         Text {
             text: "设置文件"
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
         Text {
@@ -40,14 +40,14 @@ Item {
             text: page.cfg.settingsPath
             wrapMode: Text.WrapAnywhere
             color: Theme.color.textPrimary
-            font.family: "Consolas"
+            font.family: Theme.font.monoFamily
             font.pixelSize: Theme.font.small
         }
 
         Text {
             text: "数据目录"
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
         Text {
@@ -55,7 +55,7 @@ Item {
             text: page.cfg.dataDir
             wrapMode: Text.WrapAnywhere
             color: Theme.color.textPrimary
-            font.family: "Consolas"
+            font.family: Theme.font.monoFamily
             font.pixelSize: Theme.font.small
         }
 
@@ -64,7 +64,7 @@ Item {
             text: "会话账本：data/ulincore/sessions/<sessionId>.json\n默认工作区：data/ulincore/launch-root"
             wrapMode: Text.WordWrap
             color: Theme.color.textTertiary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -90,7 +90,7 @@ Item {
         Text {
             text: page.cfg.status
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
     }

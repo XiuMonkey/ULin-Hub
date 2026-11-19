@@ -22,7 +22,7 @@ Item {
         Text {
             text: qsTrId("settings_agent_preset_tab")
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.title
             font.weight: Theme.font.weightBold
             bottomPadding: 2
@@ -32,14 +32,14 @@ Item {
         Text {
             text: "Master"
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
         Text {
             text: "当前 Agent 后端"
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -65,7 +65,7 @@ Item {
                     text: Hub.settings.masterBackendName
                     elide: Text.ElideRight
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                 }
 
@@ -127,7 +127,7 @@ Item {
                             text: modelData.name
                             elide: Text.ElideRight
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                         }
 
@@ -151,14 +151,14 @@ Item {
             text: "切换后会改用对应的 Agent 后端；目前仅内置 DSH。"
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
         Text {
             text: qsTrId("settings_default_agent_preset")
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             // 字段标签取 caption(12) + 次级色：它只是"说明下面这个框是什么"，
             // 取 14/13 会和输入框里的内容同级，读起来分不清谁是标签谁是值。
             font.pixelSize: Theme.font.caption
@@ -193,7 +193,7 @@ Item {
                         : qsTrId("common_loading")
                     elide: Text.ElideRight
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                 }
 
@@ -255,7 +255,7 @@ Item {
                             text: modelData.name
                             elide: Text.ElideRight
                             color: Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                         }
 
@@ -279,7 +279,7 @@ Item {
             text: qsTrId("settings_agent_preset_hint")
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -289,7 +289,7 @@ Item {
             text: Hub.settings.presetFeedback
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary   // 反馈文案：原版走强调色，设置页不出蓝 ⇒ 中性灰（与同页说明文字同档）
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
     }

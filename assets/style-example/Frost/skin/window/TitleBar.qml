@@ -33,7 +33,7 @@ Item {
         anchors.verticalCenter: logo.verticalCenter
         text: "ULin Hub"
         color: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body
         font.weight: Theme.font.weightBold
         font.letterSpacing: 0.6

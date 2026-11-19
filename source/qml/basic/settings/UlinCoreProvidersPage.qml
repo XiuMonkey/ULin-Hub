@@ -44,7 +44,7 @@ Item {
             Text {
                 text: "提供商"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
             }
@@ -54,7 +54,7 @@ Item {
                 text: "为 ULin Core 配置 OpenAI 兼容的提供商；这里选中的 provider/model 会用于下一轮对话。"
                 wrapMode: Text.WordWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -114,7 +114,7 @@ Item {
                                 text: modelData.name
                                 elide: Text.ElideRight
                                 color: Theme.color.textPrimary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.body
                                 font.weight: Theme.font.weightMedium
                             }
@@ -123,20 +123,20 @@ Item {
                                 text: modelData.baseUrl
                                 elide: Text.ElideMiddle
                                 color: Theme.color.textTertiary
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.small
                             }
                             Text {
                                 text: modelData.apiKey.length > 0 ? "Key 已配置" : "Key 未配置"
                                 color: modelData.apiKey.length > 0
                                     ? Theme.color.textTertiary : Theme.color.accent
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
                             Text {
                                 text: modelData.models.length + " 个模型" + (modelData.selected ? " · 当前" : "")
                                 color: modelData.selected ? Theme.color.accent : Theme.color.textCaption
-                                font.family: "Microsoft YaHei UI"
+                                font.family: Theme.font.uiFamily
                                 font.pixelSize: Theme.font.caption
                             }
                         }
@@ -160,7 +160,7 @@ Item {
             Text {
                 text: page.editId === "" ? "添加提供商" : "编辑提供商"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
                 font.weight: Theme.font.weightMedium
             }
@@ -213,7 +213,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.cfg.status
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
             }

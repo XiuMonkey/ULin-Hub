@@ -11,7 +11,7 @@ ComboBox {
     height: 32
     leftPadding: 10
     rightPadding: 30
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.font.uiFamily
     font.pixelSize: Theme.font.body
 
     palette.windowText: Theme.color.textPrimary
@@ -25,7 +25,7 @@ ComboBox {
         elide: Text.ElideRight
         verticalAlignment: Text.AlignVCenter
         color: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body
     }
 

@@ -27,7 +27,7 @@ Item {
             visible: host.children.length === 0
             text: "选择插件后，这里会显示它的内容。"
             color: Theme.color.textTertiary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             wrapMode: Text.WordWrap
         }

@@ -47,7 +47,7 @@ Item {
                  ? (root.active ? "松手：面板变成独立窗口" : "把三个点拖离右栏，面板就变成独立窗口")
                  : (root.active ? "松手：重新附着回右栏" : "把面板拖到右栏位置即重新附着"))
         color: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.caption
         opacity: root.active ? 1.0 : 0.72
     }

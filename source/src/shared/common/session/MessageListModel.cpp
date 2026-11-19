@@ -63,6 +63,18 @@ bool MessageListModel::lastRowIsUser(const QString& text, const QVector<ImageRef
 	return true;
 }
 
+bool MessageListModel::containsUser(const QString& text) const
+{
+	const QString wanted = text.trimmed();
+	if (wanted.isEmpty())
+		return false;
+	for (const Row& row : m_rows) {
+		if (row.kind == User && row.text.trimmed() == wanted)
+			return true;
+	}
+	return false;
+}
+
 int MessageListModel::appendUserWithImages(const QString& text, const QVector<ImageRef>& images)
 {
 	const int row = appendRow(User, text);
@@ -210,6 +222,7 @@ void MessageListModel::appendReplyTail(int row, const QString& text)
 		return;   // 同一快照重复到达 / 迟到的更短快照
 
 	entry.replyTail = text.startsWith(base) ? text : (base + text);
+	entry.tailPartsReady = false;
 	const QModelIndex idx = index(row, 0);
 	if (created)
 		emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole });
@@ -246,6 +259,8 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 		reply.partsReady = false;
 	}
 	entry.replyTail.clear();
+	entry.tailParts.clear();
+	entry.tailPartsReady = false;
 
 	if (notify) {
 		const QModelIndex idx = index(row, 0);
@@ -395,6 +410,13 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 		return segmentsFor(row);
 	case ReplyTailRole:
 		return row.replyTail;
+	case ReplyTailPartsRole:
+		if (!row.tailPartsReady) {
+			row.tailParts = row.replyTail.isEmpty() ? QVariantList()
+				: MarkdownSegmenter::split(row.replyTail);
+			row.tailPartsReady = true;
+		}
+		return row.tailParts;
 	case ImagesRole: {
 		QVariantList images;
 		for (const ImageRef& image : row.images) {
@@ -434,6 +456,7 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	names.insert(ImagesRole, "images");
 	names.insert(SegmentsRole, "segments");
 	names.insert(ReplyTailRole, "replyTail");
+	names.insert(ReplyTailPartsRole, "replyTailParts");
 	names.insert(StreamingRole, "streaming");
 	names.insert(DeliverablesRole, "deliverables");
 	return names;

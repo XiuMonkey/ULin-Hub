@@ -160,7 +160,7 @@ Item {
         selectionColor: Qt.rgba(Theme.color.accent.r, Theme.color.accent.g,   // 选区是一整块半透明底色 + selectedTextColor；默认 #BFDBFE 太实
                                 Theme.color.accent.b, Theme.isDark ? 0.30 : 0.16)
         selectedTextColor: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.markdown || 13
 
         onLinkActivated: root.openLink(link)

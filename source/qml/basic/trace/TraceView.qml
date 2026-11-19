@@ -99,13 +99,13 @@ Item {
                     Text {
                         text: modelData.label
                         color: Theme.color.textCaption
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
                     Text {
                         text: modelData.value
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         font.weight: Theme.font.weightMedium
                     }
@@ -119,7 +119,7 @@ Item {
             visible: (traceRoot.summary.errors || 0) > 0
             text: qsTrId("trace_summary_errors").arg(traceRoot.summary.errors || 0)
             color: Theme.color.danger
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.small
         }
     }
@@ -369,7 +369,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: qsTrId("trace_turn_n").arg(rowRoot.title)
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         font.weight: Theme.font.weightMedium
                     }
@@ -422,7 +422,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: qsTrId("trace_step_n").arg(rowRoot.title)
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
                     Text {
@@ -460,7 +460,7 @@ Item {
                         anchors.centerIn: parent
                         text: traceRoot.kindLabel(rowRoot.kind)
                         color: traceRoot.kindTextColor(rowRoot.kind)
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
                 }
@@ -535,7 +535,7 @@ Item {
                         visible: rowRoot.title.length > 0 && rowRoot.subtitle.length > 0
                         text: rowRoot.subtitle
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         elide: Text.ElideRight
                         maximumLineCount: 1
@@ -561,7 +561,7 @@ Item {
             visible: list.count === 0
             text: qsTrId("trace_empty")
             color: Theme.color.textCaption
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
     }
@@ -606,7 +606,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("trace_detail_title")
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                     elide: Text.ElideRight
@@ -704,7 +704,7 @@ Item {
                         anchors.centerIn: parent
                         text: qsTrId("trace_copy_json")
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                     }
 

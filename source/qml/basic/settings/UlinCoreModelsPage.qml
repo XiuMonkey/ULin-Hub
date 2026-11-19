@@ -66,7 +66,7 @@ Item {
             Text {
                 text: qsTrId("model_list_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
             }
@@ -76,7 +76,7 @@ Item {
                 text: qsTrId("model_list_desc")
                 wrapMode: Text.WordWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -84,7 +84,7 @@ Item {
                 width: parent.width
                 text: "共 " + page.totalModels + " 个模型，" + page.cfg.providers.length + " 个提供方。"
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -94,7 +94,7 @@ Item {
                 text: page.cfg.status
                 wrapMode: Text.WordWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -112,7 +112,7 @@ Item {
                         width: parent.width
                         text: providerGroup.modelData.name
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         font.weight: Theme.font.weightBold
                         font.letterSpacing: 0.4
@@ -166,7 +166,7 @@ Item {
                                                 text: modelData.name
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textPrimary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.body
                                                 font.weight: Theme.font.weightMedium
                                             }
@@ -175,7 +175,7 @@ Item {
                                                 text: providerGroup.modelData.name + " · " + modelData.id
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textSecondary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
                                         }
@@ -194,7 +194,7 @@ Item {
                                                 text: entry.selected
                                                     ? "当前" : qsTrId("model_source_adapter_builtin")
                                                 color: Theme.color.textSecondary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.small
                                             }
                                         }
@@ -242,7 +242,7 @@ Item {
                                                 width: 96
                                                 text: modelData[0]
                                                 color: Theme.color.textTertiary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
                                             Text {
@@ -250,7 +250,7 @@ Item {
                                                 text: modelData[1]
                                                 wrapMode: Text.Wrap
                                                 color: Theme.color.textSecondary
-                                                font.family: "Microsoft YaHei UI"
+                                                font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.caption
                                             }
                                         }
@@ -287,7 +287,7 @@ Item {
                         visible: providerGroup.modelData.models.length === 0
                         text: "该提供商还没有模型。"
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
                 }
@@ -299,7 +299,7 @@ Item {
                 text: "还没有提供商，请先到“提供商”页添加。"
                 wrapMode: Text.WordWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -312,7 +312,7 @@ Item {
                 Text {
                     text: "添加模型"
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     font.weight: Theme.font.weightMedium
                 }

@@ -21,7 +21,7 @@ Item {
         Text {
             text: qsTrId("settings_appearance_tab")
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.title
             font.weight: Theme.font.weightBold
             bottomPadding: 2
@@ -32,7 +32,7 @@ Item {
             text: qsTrId("settings_appearance_desc")
             wrapMode: Text.WordWrap
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
@@ -41,7 +41,7 @@ Item {
             // transparent 底、{{textSecondary}}、font-size 12px。
             text: qsTrId("settings_language_label")
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             topPadding: 4   // 与上面那段说明拉开：同号同色，不加间距会读成同一段
         }
@@ -64,7 +64,7 @@ Item {
             rightPadding: 30                         // 给右侧下拉箭头留位
             model: Hub.settings.languages
             textRole: "name"
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body           // 原版 font-size: 13px
 
             // Basic 风格的 ComboBox 内容项默认吃 QPalette；深色主题下会变成黑字。
@@ -80,7 +80,7 @@ Item {
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
             }
 
@@ -151,7 +151,7 @@ Item {
 
                 width: ListView.view ? ListView.view.width : 0
                 text: languageOption.modelData.name
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
 
                 palette.text: Theme.color.textPrimary
@@ -193,7 +193,7 @@ Item {
             // 原版 #settingsAppearanceFeedback：{{textSecondary}} + 12px（与上面标签同组规则），
             // 不是强调色。
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 

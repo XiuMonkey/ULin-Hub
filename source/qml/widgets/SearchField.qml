@@ -18,7 +18,7 @@ TextField {
     placeholderTextColor: Theme.color.textCaption
     selectionColor: Theme.color.selectionBg
     selectedTextColor: Theme.color.textPrimary
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.font.uiFamily
     font.pixelSize: Theme.font.body
     selectByMouse: true
 

@@ -66,7 +66,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("ext_manager_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.lead
             }
 
@@ -86,7 +86,7 @@ Item {
                     anchors.centerIn: parent
                     text: Hub.extensions.items.length
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.small
                 }
             }
@@ -242,7 +242,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.modelData.label
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                         font.weight: row.selected ? Theme.font.weightMedium : Font.Normal
                         elide: Text.ElideRight
@@ -264,7 +264,7 @@ Item {
                             anchors.centerIn: parent
                             text: row.modelData.kindLabel
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }
@@ -285,7 +285,7 @@ Item {
                             visible: !row.modelData.loaded
                             text: qsTrId("ext_client_not_loaded")
                             color: Theme.color.textTertiary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
 
@@ -326,7 +326,7 @@ Item {
                     width: parent.width
                     text: qsTrId("ext_empty_hint")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -351,7 +351,7 @@ Item {
                 visible: Hub.extensions.restartHint !== ""
                 text: Hub.extensions.restartHint
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 elide: Text.ElideRight
             }
@@ -363,7 +363,7 @@ Item {
                 text: Hub.extensions.status
                 elide: Text.ElideRight
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
         }
@@ -386,7 +386,7 @@ Item {
             width: parent.width
             text: qsTrId("ext_remove_confirm_fmt").arg(confirmPopup.pendingName)
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
             wrapMode: Text.WordWrap
         }

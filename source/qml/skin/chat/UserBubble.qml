@@ -58,10 +58,27 @@ Item {
         return { text: source.replace(/\s+$/, ""), browsers: cards }
     }
 
+    // 发送时引用被拼成 Markdown blockquote；回显时再识别成卡片。
+    function splitQuotes(raw) {
+        var source = String(raw || "")
+        var quotes = []
+        var re = /^ {0,3}>[^\n]*(?:\n {0,3}>[^\n]*)*/gm
+        var match
+        while ((match = re.exec(source)) !== null) {
+            var block = match[0]
+            var text = block.replace(/^ {0,3}>[ \t]?/gm, "").replace(/\s+$/, "")
+            if (text.trim().length > 0)
+                quotes.push({ isQuote: true, title: "引用文本", text: text, url: "", selector: "选中文本", ref: "" })
+        }
+        source = source.replace(re, "").replace(/^\s+|\s+$/g, "")
+        return { text: source, quotes: quotes }
+    }
+
     function splitAttachmentText(raw) {
-        var browserParse = splitBrowserContexts(raw)
+        var quoteParse = splitQuotes(raw)
+        var browserParse = splitBrowserContexts(quoteParse.text)
         var source = browserParse.text
-        var browsers = browserParse.browsers
+        var browsers = quoteParse.quotes.concat(browserParse.browsers)
         var marker = source.lastIndexOf("附件：\n")
         if (marker < 0)
             return { text: source, files: [], browsers: browsers }
@@ -209,25 +226,25 @@ Item {
                         width: parent.width
                         text: modelData.title.length > 0 ? modelData.title : modelData.url
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         font.weight: Theme.font.weightMedium
                         elide: Text.ElideRight
                     }
                     Text {
                         width: parent.width
-                        text: modelData.url
+                        text: modelData.isQuote ? modelData.text : modelData.url
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         elide: Text.ElideMiddle
                     }
                     Text {
                         width: parent.width
                         visible: modelData.selector.length > 0
-                        text: modelData.selector
+                        text: modelData.isQuote ? "选中文本 · Markdown 引用" : modelData.selector
                         color: Theme.color.textCaption
-                        font.family: "Consolas"
+                        font.family: Theme.font.monoFamily
                         font.pixelSize: Theme.font.small
                         elide: Text.ElideRight
                     }
@@ -273,7 +290,7 @@ Item {
                             anchors.centerIn: parent
                             text: root.fileSuffixLabel(modelData.suffix)
                             color: Theme.color.accent
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: 8
                             font.weight: Theme.font.weightBold
                             elide: Text.ElideRight
@@ -292,7 +309,7 @@ Item {
                             text: modelData.name
                             color: Theme.color.textPrimary
                             elide: Text.ElideMiddle
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             font.weight: Theme.font.weightMedium
                         }
@@ -301,7 +318,7 @@ Item {
                             text: modelData.path
                             color: Theme.color.textTertiary
                             elide: Text.ElideMiddle
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
                     }
@@ -371,7 +388,7 @@ Item {
             visible: false
             text: root.displayText
             textFormat: Text.MarkdownText
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body   // 与 Agent 正文同档
         }
         TextEdit {
@@ -390,7 +407,7 @@ Item {
             color: Theme.color.userBubbleText
             selectionColor: Theme.color.selectionBg
             selectedTextColor: content.color
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
         }
     }
@@ -448,7 +465,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("common_copy")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -468,6 +485,35 @@ Item {
                 width: parent.width
                 height: 30
                 radius: 5
+                visible: root.capturedSelection.length > 0
+                color: quoteMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "引用文本"
+                    color: Theme.color.textSecondary
+                    font.family: Theme.font.uiFamily
+                    font.pixelSize: Theme.font.caption
+                }
+
+                MouseArea {
+                    id: quoteMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Hub.quoteMessageText(root.capturedSelection)
+                        copyMenu.close()
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
                 color: copyMouse.containsMouse ? Theme.color.hoverBg : "transparent"
 
                 Text {
@@ -476,7 +522,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("context_copy_all")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 

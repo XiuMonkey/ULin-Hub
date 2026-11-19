@@ -569,7 +569,7 @@ Item {
                         text: qsTrId("empty_conversation_title")
                         horizontalAlignment: Text.AlignHCenter
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.title
                         font.weight: Theme.font.weightMedium
                     }
@@ -580,7 +580,7 @@ Item {
                         horizontalAlignment: Text.AlignHCenter
                         wrapMode: Text.WordWrap
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         lineHeight: 1.4
                     }
@@ -762,7 +762,7 @@ Item {
                 width: Math.min(760, Math.max(320, shell.width * 0.68))
                 text: Hub.masterSwitching ? "正在切换 Agent 后端…" : Hub.statusText
                 color: Theme.isDark ? Theme.color.textPrimary : Theme.color.textOnAccent
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap

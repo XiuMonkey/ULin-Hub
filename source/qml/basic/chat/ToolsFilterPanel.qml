@@ -93,7 +93,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTrId("toolfilter_title")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightMedium
             }
@@ -154,7 +154,7 @@ Item {
             anchors.topMargin: Theme.spacing.labelGap
             text: qsTrId("toolfilter_help_desc")
             color: Theme.color.textSecondary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             wrapMode: Text.WordWrap
         }
@@ -222,7 +222,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             text: row.directory
                             color: row.hidden ? Theme.color.textTertiary : Theme.color.textPrimary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.body
                             font.weight: Theme.font.weightMedium
                             elide: Text.ElideRight
@@ -373,7 +373,7 @@ Item {
                                 ? "   " + qsTrId("toolfilter_params_label") + row.parameters
                                 : "")
                             color: row.toolVisible ? Theme.color.textPrimary : Theme.color.textTertiary
-                            font.family: "Consolas"
+                            font.family: Theme.font.monoFamily
                             font.pixelSize: Theme.font.small
                             elide: Text.ElideRight
                         }
@@ -383,7 +383,7 @@ Item {
                             visible: row.description.length > 0
                             text: row.description
                             color: Theme.color.textSecondary
-                            font.family: "Microsoft YaHei UI"
+                            font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
                             elide: Text.ElideRight
                         }
@@ -418,7 +418,7 @@ Item {
                     ? qsTrId("toolfilter_loading")
                     : (root.statusLine.length > 0 ? root.statusLine : qsTrId("toolfilter_no_tools"))
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
             }
         }
@@ -487,7 +487,7 @@ Item {
                 horizontalAlignment: Text.AlignRight
                 text: root.statusLine
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 elide: Text.ElideRight
             }

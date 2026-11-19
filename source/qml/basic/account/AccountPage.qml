@@ -39,7 +39,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "账户管理"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: 15
                 font.weight: Theme.font.weightBold
             }
@@ -78,7 +78,7 @@ Item {
                         anchors.centerIn: parent
                         text: (Hub.settings.account.name || "D").substring(0, 1)
                         color: Theme.color.textOnAccent
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.title
                         font.weight: Theme.font.weightBold
                     }
@@ -92,7 +92,7 @@ Item {
                             ? (Hub.settings.account.name || "DeepSeek 官方账号")
                             : "未登录 DeepSeek 官方账号"
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                     }
                     Text {
@@ -100,7 +100,7 @@ Item {
                             ? (Hub.settings.account.contact || "已连接")
                             : "登录后可查看官方余额和用量"
                         color: Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                     }
                 }
@@ -112,7 +112,7 @@ Item {
                 width: parent.width
                 text: "官方 DeepSeek 账户"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
                 font.weight: Theme.font.weightBold
             }
@@ -122,7 +122,7 @@ Item {
                 visible: Hub.settings.account.balanceText.length > 0
                 text: "充值余额  " + Hub.settings.account.balanceText
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.body
                 wrapMode: Text.WordWrap
             }
@@ -131,7 +131,7 @@ Item {
                 visible: Hub.settings.account.bonusText.length > 0
                 text: "赠送余额  " + Hub.settings.account.bonusText
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 wrapMode: Text.WordWrap
             }
@@ -141,7 +141,7 @@ Item {
                     && !Hub.settings.account.busy
                 text: "暂时拿不到余额，请稍后刷新"
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
             Text {
@@ -149,7 +149,7 @@ Item {
                 visible: !Hub.settings.account.signedIn
                 text: "当前未登录。点击下方按钮会打开 DeepSeek 官方登录页。"
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 wrapMode: Text.WordWrap
             }
@@ -212,7 +212,7 @@ Item {
                 visible: Hub.settings.account.error.length > 0
                 text: Hub.settings.account.error
                 color: Theme.color.danger
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 wrapMode: Text.WordWrap
             }

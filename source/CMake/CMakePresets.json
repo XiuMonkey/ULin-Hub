@@ -35,6 +35,7 @@
       "displayName": "Linux (Ninja Multi-Config)",
       "description": "Qt 6.5+ 需可被 find_package 找到；否则加 -DCMAKE_PREFIX_PATH=<Qt 目录>。",
       "inherits": "base",
+      "binaryDir": "${sourceDir}/../../build/cmake",
       "generator": "Ninja Multi-Config",
       "condition": {
         "type": "equals",

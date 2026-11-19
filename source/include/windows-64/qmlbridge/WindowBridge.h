@@ -19,6 +19,7 @@
 #include <QString>
 #include <QVariant>
 
+
 class QQuickWindow;
 
 class WindowBridge : public QObject

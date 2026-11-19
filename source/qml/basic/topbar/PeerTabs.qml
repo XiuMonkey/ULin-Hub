@@ -147,7 +147,7 @@ Item {
                         elide: Text.ElideRight
                         color: (!tab.asTab || tab.isCurrent) ? Theme.color.textPrimary
                                                              : Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
 
                         // 标题形态与 TopBar 里那颗普通标题（titleText）逐项对齐：14px / medium
                         font.pixelSize: tab.asTab ? Theme.font.caption : Theme.font.title

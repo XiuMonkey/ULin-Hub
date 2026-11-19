@@ -1,4 +1,5 @@
 #include "ExtensionSystem/ExtensionLoader.h"
+#include "common/util/ArchiveExtractor.h"
 
 #include "ExtensionSystem/ClientExtension.h"
 #include "ExtensionSystem/ExtensionRegistry.h"
@@ -16,7 +17,6 @@
 #include <QJsonParseError>
 #include <QRegularExpression>
 #include <QSet>
-#include <QtCore/private/qzipreader_p.h>
 
 namespace
 {
@@ -432,106 +432,17 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 
 bool ExtensionLoader::extractArchive(const QString& extFilePath, const QString& destDir, QString* error)
 {
+	// 解包本身归 common/util/ArchiveExtractor（zip 安全规则只维护一份）；
+	// 这里只负责"扩展包"这一层的策略：错误怎么记、日志怎么打。
 	qInfo().noquote() << QStringLiteral("[ExtensionLoader] extract start: %1 -> %2").arg(extFilePath, destDir);
-	QElapsedTimer extractTimer;
-	extractTimer.start();
-	QDir().mkpath(destDir);
 
-	QZipReader reader(extFilePath);
-	if (!reader.isReadable()) {
-		m_errorString = QStringLiteral("cannot open extension archive: %1").arg(extFilePath);
+	QString reason;
+	if (!ArchiveExtractor::extractTo(extFilePath, destDir, &reason)) {
+		m_errorString = QStringLiteral("cannot extract extension archive %1: %2").arg(extFilePath, reason);
 		if (error)
 			*error = m_errorString;
 		return false;
 	}
-
-	const QList<QZipReader::FileInfo> infos = reader.fileInfoList();
-	QSet<QString> directoryPaths;
-	for (const QZipReader::FileInfo& info : infos) {
-		QString normalizedPath = info.filePath;
-		normalizedPath.replace(QLatin1Char('\\'), QLatin1Char('/'));
-		const bool markedDirectory = info.isDir || normalizedPath.endsWith(QLatin1Char('/'));
-		normalizedPath = QDir::cleanPath(normalizedPath);
-		if (markedDirectory)
-			directoryPaths.insert(normalizedPath);
-
-		qsizetype separator = normalizedPath.indexOf(QLatin1Char('/'));   // 有些 ZIP 工具既丢目录标志也丢结尾斜杠；此时凡是别的条目的父路径，都仍按目录对待
-		while (separator >= 0) {
-			directoryPaths.insert(normalizedPath.left(separator));
-			separator = normalizedPath.indexOf(QLatin1Char('/'), separator + 1);
-		}
-	}
-
-	for (const QZipReader::FileInfo& info : infos) {
-		QString entryPath = info.filePath;   // 兼容某些打包工具生成的反斜杠路径（例如 Compress-Archive）
-		entryPath.replace(QLatin1Char('\\'), QLatin1Char('/'));
-		entryPath = QDir::cleanPath(entryPath);
-		if (entryPath.isEmpty() || entryPath == QStringLiteral(".")
-			|| entryPath == QStringLiteral("..") || entryPath.startsWith(QStringLiteral("../"))
-			|| QDir::isAbsolutePath(entryPath) || entryPath.contains(QLatin1Char(':'))) {
-			m_errorString = QStringLiteral("unsafe path in extension archive: %1").arg(info.filePath);
-			if (error)
-				*error = m_errorString;
-			qWarning().noquote() << QStringLiteral("[ExtensionLoader]") << m_errorString;
-			return false;
-		}
-
-		const QString destPath = QDir(destDir).filePath(entryPath);
-		const bool isDirectory = info.isDir || info.filePath.endsWith(QLatin1Char('/'))
-			|| info.filePath.endsWith(QLatin1Char('\\')) || directoryPaths.contains(entryPath);
-		if (isDirectory) {
-			if (!QDir().mkpath(destPath) && !QFileInfo(destPath).isDir()) {
-				m_errorString = QStringLiteral("cannot create extracted directory: %1").arg(destPath);
-				if (error)
-					*error = m_errorString;
-				qWarning().noquote() << QStringLiteral("[ExtensionLoader]") << m_errorString;
-				return false;
-			}
-			continue;
-		}
-
-		// Windows 上 QZipReader 可能报出没有结尾斜杠、也没有目录标志的目录条目；这些父目录在解前面的
-		// 文件时可能已经建好，所以别把它当文件去打开。
-		if (QFileInfo(destPath).isDir())
-			continue;
-
-		const QString parentDir = QFileInfo(destPath).absolutePath();
-		if (!QDir().mkpath(parentDir)) {
-			m_errorString = QStringLiteral("cannot create extracted file directory: %1").arg(parentDir);
-			if (error)
-				*error = m_errorString;
-			qWarning().noquote() << QStringLiteral("[ExtensionLoader]") << m_errorString;
-			return false;
-		}
-		QFile outFile(destPath);
-		if (!outFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-			m_errorString = QStringLiteral("cannot write extracted file: %1 (%2)")
-				.arg(destPath, outFile.errorString());
-			if (error)
-				*error = m_errorString;
-			qWarning().noquote() << QStringLiteral("[ExtensionLoader]") << m_errorString;
-			return false;
-		}
-
-		QByteArray data = reader.fileData(info.filePath);
-		if (data.isEmpty() && entryPath != info.filePath)
-			data = reader.fileData(entryPath);
-
-		if (data.isEmpty() && info.size > 0) {
-			outFile.close();
-			m_errorString = QStringLiteral("extracted file is empty: %1").arg(info.filePath);
-			if (error)
-				*error = m_errorString;
-			qWarning().noquote() << QStringLiteral("[ExtensionLoader]") << m_errorString;
-			return false;
-		}
-
-		outFile.write(data);
-		outFile.close();
-	}
-
-	qInfo().noquote() << QStringLiteral("[ExtensionLoader] extract finished, elapsed=%1 ms")
-		.arg(extractTimer.elapsed());
 	return true;
 }
 

@@ -54,6 +54,8 @@ void UlinCoreMasterAgent::setDataDir(const QString& dir)
 	}
 	auto& settings = UlinCoreSettings::instance();
 	settings.setDataDir(m_dataDir);
+	if (m_kernel && !m_dataDir.isEmpty())
+		m_kernel->setIntentsPath(m_dataDir + QStringLiteral("/intents.json"));
 	if (!m_settingsConnected) {
 		connect(&settings, &UlinCoreSettings::saved, this, &UlinCoreMasterAgent::reloadSettings);
 		m_settingsConnected = true;
@@ -167,6 +169,8 @@ void UlinCoreMasterAgent::ensureKernel()
 
 	m_kernel = new UlinCoreKernel(this);
 	m_kernel->setModel(m_model ? m_model : std::make_shared<UlinCoreEchoModel>());
+	if (!m_dataDir.isEmpty())
+		m_kernel->setIntentsPath(m_dataDir + QStringLiteral("/intents.json"));
 
 	UlinCoreKernel::Options options;
 	options.systemPrompt = m_systemPrompt.isEmpty()

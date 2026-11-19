@@ -30,6 +30,8 @@ Item {
     }
     // 仅最终 reply 的流式尾文本；thinking/tool 不走这里。
     property string replyTail: ""
+    // 流式结尾的 Markdown part 切分；有它时代码块也按 part 实时渲染。
+    property var replyTailParts: []
     property bool streaming: false
     // 只在“研究”阶段（最后一块是 thinking/tool 组成的过程块）显示爬行提示；
     // 一旦开始输出正文（最后一块是 reply），提示直接收起，不做动画。
@@ -442,9 +444,10 @@ Item {
                     // 正文段：正文 / 代码块按出现顺序；用数字模型避免每个 chunk 重建。
                     readonly property bool replyTailActive: !!blockData.final
                         && root.replyTail.length > 0
-                    readonly property var replyParts: (blockData.kind === "reply"
-                        && !replyTailActive && blockData.part.parts)
-                        ? blockData.part.parts
+                    readonly property var replyParts: (blockData.kind === "reply")
+                        ? (replyTailActive
+                            ? root.replyTailParts
+                            : (blockData.part.parts || []))
                         : []
 
                     Repeater {
@@ -479,7 +482,8 @@ Item {
                     }
                     // 最终 reply 的流式尾：只更新这一块，稳定 segments/Repeater 不重建。
                     MarkdownBody {
-                        visible: block.replyTailActive
+                        // 有 part 切分时正文/代码块都走上面的 Repeater；这里只做旧路径兜底。
+                        visible: block.replyTailActive && block.replyParts.length === 0
                         width: block.width
                         text: block.replyTailActive ? root.replyTail : ""
                     }
@@ -532,7 +536,7 @@ Item {
                 id: streamingText
                 text: qsTrId("chat_streaming_hint")
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
         }
@@ -613,7 +617,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("common_copy")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
@@ -633,6 +637,35 @@ Item {
                 width: parent.width
                 height: 30
                 radius: 5
+                visible: root.capturedSelection.length > 0
+                color: quoteMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "引用文本"
+                    color: Theme.color.textSecondary
+                    font.family: Theme.font.uiFamily
+                    font.pixelSize: Theme.font.caption
+                }
+
+                MouseArea {
+                    id: quoteMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Hub.quoteMessageText(root.capturedSelection)
+                        copyMenu.close()
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                radius: 5
                 color: copyMouse.containsMouse ? Theme.color.hoverBg : "transparent"
 
                 Text {
@@ -641,7 +674,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: qsTrId("context_copy_all")
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 

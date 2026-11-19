@@ -74,6 +74,16 @@ QJsonObject accountClientArgs()
 	return args;
 }
 
+QString formatBalanceAmount(const QString& raw)
+{
+	// 服务端余额是高精度小数；界面上只保留两位，避免 12.345678901 这种长串。
+	bool ok = false;
+	const double value = raw.trimmed().toDouble(&ok);
+	if (!ok)
+		return raw;
+	return QString::number(value, 'f', 2);
+}
+
 QString walletText(const QJsonArray& wallets)
 {
 	QStringList parts;
@@ -84,9 +94,10 @@ QString walletText(const QJsonArray& wallets)
 		const QString currency = wallet.value(QStringLiteral("currency")).toString();
 		if (balance.isEmpty())
 			continue;
+		const QString amount = formatBalanceAmount(balance);
 		parts.append(currency == QLatin1String("CNY")
-			? QStringLiteral("¥%1").arg(balance)
-			: QStringLiteral("%1 %2").arg(balance, currency));
+			? QStringLiteral("¥%1").arg(amount)
+			: QStringLiteral("%1 %2").arg(amount, currency));
 	}
 	return parts.join(QStringLiteral(" · "));
 }

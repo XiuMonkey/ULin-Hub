@@ -33,7 +33,7 @@ Rectangle {
         color: Theme.color.textPrimary
         selectionColor: Theme.color.selectionBg
         selectedTextColor: Theme.color.textPrimary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body
     }
 
@@ -45,7 +45,7 @@ Rectangle {
         text: root.placeholder
         elide: Text.ElideRight
         color: Theme.color.textTertiary
-        font.family: "Microsoft YaHei UI"
+        font.family: Theme.font.uiFamily
         font.pixelSize: Theme.font.body
     }
 }

@@ -148,7 +148,7 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "松开以添加文件"
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.lead
                     font.weight: Theme.font.weightBold
                 }
@@ -157,7 +157,7 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "图片会内联显示，其他文件以附件卡片加入"
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
             }

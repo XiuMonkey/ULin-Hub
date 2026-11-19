@@ -19,7 +19,7 @@ Item {
                 ? qsTrId("placeholder_session_current")
                 : qsTrId("placeholder_session_none")
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.lead
             font.weight: Theme.font.weightBold
         }
@@ -33,7 +33,7 @@ Item {
                 : qsTrId("placeholder_session_hint")
             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
             color: Theme.color.textSecondary
-            font.family: "Consolas"
+            font.family: Theme.font.monoFamily
             font.pixelSize: Theme.font.caption
         }
     }

@@ -34,9 +34,14 @@ ui_*.h
 assets/resources/translations/*.qm
 
 # Node runtime dependencies (recreated from the lockfile; Node runtime is retained)
-assets/resources/server/node_modules/
-# 引擎 node.exe 也不再进 git（85.5MB，发布时另行下载/打包）
-assets/resources/server/node.exe
+# 实际位置：assets/storage/server（原 storage/ 已迁入 assets/）
+assets/storage/server/node_modules/
+assets/storage/server/node.exe
+assets/storage/server/node
+# 兼容旧布局
+storage/server/node_modules/
+storage/server/node.exe
+storage/server/node
 
 build_smoke/
 

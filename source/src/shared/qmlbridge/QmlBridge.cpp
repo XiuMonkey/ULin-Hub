@@ -13,6 +13,7 @@
 #include "common/util/CodeHighlighter.h"
 #include "common/util/Debugger.h"
 #include "common/util/MarkdownSegmenter.h"
+#include "common/ClientInfo.h"   // kPlatform：少量运行期平台分支（打开路径等）
 #include "core/ClientRuntime.h"
 #include "core/ServerManager.h"
 #include "common/agent/dsh/DshApiClient.h"
@@ -951,6 +952,12 @@ void QmlBridge::askBrowserContext(const QVariantMap& context)
 	});
 }
 
+void QmlBridge::quoteMessageText(const QString& text)
+{
+	if (m_chat)
+		m_chat->addQuote(text);
+}
+
 void QmlBridge::removeAttachment(int index)
 {
 	if (m_chat)
@@ -1385,12 +1392,21 @@ void QmlBridge::openSkillPath(const QString& path)
 
 	// 不要在主线程同步走 QDesktopServices：.md 的默认处理程序可能是 Electron/DDE
 	// 应用（本机是 WorkBuddy），它若卡住，ShellExecute 会把 ULin Hub 一起拖成未响应。
-	// 交给独立的 cmd start：默认程序仍按系统关联选择，但宿主立刻返回。
+	// 交给独立的系统命令：默认程序仍按系统关联选择，但宿主立刻返回。
+	// 平台差异只有"用哪个程序打开"这一句 —— 属于运行期语义差异，按 ClientInfo::kPlatform 分支；
+	// 实现差异大的（Office 转换、解包）已经整体迁到平台目录，不在 shared 里做条件编译。
 	const QString target = QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath());
-	if (!QProcess::startDetached(QStringLiteral("cmd.exe"),
-			{ QStringLiteral("/c"), QStringLiteral("start"), QString(), target })) {
+	const QString platform = QString::fromLatin1(ClientInfo::kPlatform);
+	bool launched = false;
+	if (platform.startsWith(QLatin1String("Windows")))
+		launched = QProcess::startDetached(QStringLiteral("cmd.exe"),
+			{ QStringLiteral("/c"), QStringLiteral("start"), QString(), target });
+	else if (platform.startsWith(QLatin1String("macOS")))
+		launched = QProcess::startDetached(QStringLiteral("open"), { target });
+	else
+		launched = QProcess::startDetached(QStringLiteral("xdg-open"), { target });
+	if (!launched)
 		qWarning().noquote() << "[Skills] failed to launch shell handler for" << target;
-	}
 }
 
 // ---- 右侧栏：纯界面开关（不涉及数据，也就不需要会话/服务端）----

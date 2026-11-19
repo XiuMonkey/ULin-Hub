@@ -79,10 +79,34 @@ qt_standard_project_setup()
 #
 # include/ 下的头文件必须一并交给 target：AUTOMOC 只扫描「出现在 target 源文件
 # 列表里」的头文件，而本项目头文件与 .cpp 不同目录，不满足「同名同目录」的推断规则。
-if(WIN32)
+# 平台层是整块目录：include/<platform>/ 与 src/<platform>/ 一一对应，
+# 由 ULINHUB_PLATFORM 选中其中一份，其余平台目录完全不参与构建。
+# 显式指定用于交叉检查或新增平台时验证目录是否齐全；留空则按宿主系统自动判定。
+set(ULINHUB_PLATFORM "" CACHE STRING
+	"平台层目录名（留空自动判定；已提供 windows-64 / linux-64）")
+
+if(ULINHUB_PLATFORM)
+	if(NOT IS_DIRECTORY "${ULINHUB_ROOT}/src/${ULINHUB_PLATFORM}")
+		message(FATAL_ERROR
+			"指定的平台层不存在：src/${ULINHUB_PLATFORM}")
+	endif()
+	message(STATUS "ULin Hub: 显式指定平台层 ${ULINHUB_PLATFORM}")
+elseif(WIN32)
 	set(ULINHUB_PLATFORM "windows-64")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	set(ULINHUB_PLATFORM "linux-64")
+	message(STATUS "ULin Hub: Linux 平台层（内置 DSH 服务端 + 客户端扩展 ABI 已接入；工具扩展待补）")
 else()
-	message(FATAL_ERROR "ULin Hub: 还没有为当前平台提供 src/${ULINHUB_PLATFORM}/ 实现")
+	message(FATAL_ERROR
+		"ULin Hub: 还没有为当前平台提供平台层实现。已支持：windows-64、linux-64")
+endif()
+
+# WIN32_EXECUTABLE 只在 Windows 有意义。用 unset（而非空字符串）：
+# ${VAR} 展开后是零个参数，避免把一个空字符串当成源文件传给 qt_add_executable。
+if(WIN32)
+	set(ULINHUB_EXECUTABLE_WIN32 WIN32)
+else()
+	unset(ULINHUB_EXECUTABLE_WIN32)
 endif()
 
 file(GLOB_RECURSE ULINHUB_SOURCES CONFIGURE_DEPENDS
@@ -130,7 +154,7 @@ endif()
 # ------------------------------------------------------------------
 # 主程序（对应 ULin Hub.vcxproj）
 # ------------------------------------------------------------------
-qt_add_executable(ulinhub WIN32
+qt_add_executable(ulinhub ${ULINHUB_EXECUTABLE_WIN32}
 	${ULINHUB_SOURCES}
 	"${ULINHUB_ROOT}/../assets/resources/ulinhub.qrc"
 	# QML 壳的资源（source/qml/）：单独一份 qrc，与 .vcxproj 的 <QtRcc Include="qml\qml.qrc" /> 对应
@@ -144,6 +168,28 @@ set_target_properties(ulinhub PROPERTIES
 	#    构建静默通过，exe 里却一个资源都没有（图标/语言包/样式模板，以及 QML 壳的 qml/*.qml）。
 	#    .vcxproj 侧由 Qt VS Tools 的 QtRcc 负责，不受影响。
 	AUTORCC ON)
+
+# Linux 构建输出统一放到 <repo>/x64/Linux-x64/{debug,release}。
+# Windows 继续由 .vcxproj 的 OutDir 决定，不动。
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+		set(ULINHUB_LINUX_CONFIG "debug")
+	else()
+		set(ULINHUB_LINUX_CONFIG "release")
+	endif()
+	set(ULINHUB_LINUX_OUTPUT
+		"${ULINHUB_ROOT}/../x64/Linux-x64/${ULINHUB_LINUX_CONFIG}")
+	set_target_properties(ulinhub PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${ULINHUB_LINUX_OUTPUT}")
+
+	# Release 才同步运行环境；Debug 保持纯二进制，方便调试。
+	if(CMAKE_BUILD_TYPE STREQUAL "Release")
+		add_custom_command(TARGET ulinhub POST_BUILD
+			COMMAND bash "${ULINHUB_ROOT}/CMake/stage-runtime.sh"
+				"$<TARGET_FILE_DIR:ulinhub>"
+			COMMENT "同步 Linux release 运行环境（storage/server + node）")
+	endif()
+endif()
 
 target_include_directories(ulinhub PRIVATE
 	"${ULINHUB_ROOT}/include/shared"
@@ -184,6 +230,17 @@ if(NOT TARGET Qt6::CorePrivate)
 endif()
 
 target_link_libraries(ulinhub PRIVATE Qt6::CorePrivate)
+
+# Linux 扩展 ABI：HostExports 的 ULinHubHostAbiVersion / ULinHubHostRegistryFind
+# 需要从主程序导出，扩展才能用 QLibrary::resolve 取到。
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	target_link_options(ulinhub PRIVATE "-rdynamic")
+	# Linux 的 Thunk 用 libffi 按运行时签名调用工具扩展 .so；Windows 仍是自生成 x64 thunk。
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(FFI REQUIRED libffi)
+	target_include_directories(ulinhub PRIVATE ${FFI_INCLUDE_DIRS})
+	target_link_libraries(ulinhub PRIVATE ${FFI_LIBRARIES})
+endif()
 
  # 图标资源脚本：非 Windows 平台没有这个文件（.ico/.rc 是 Windows 专用）
 if(WIN32)

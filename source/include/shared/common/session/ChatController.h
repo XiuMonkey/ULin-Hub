@@ -144,6 +144,8 @@ public:
 	// 浏览器上下文卡片（侧栏浏览器右键「询问 Agent」产生）：
 	// {kind:"browser", ref, url, title, selector, prompt} —— 发送时拼成一段「用工具读取」的提示。
 	void addBrowserContext(const QVariantMap& card);
+	// 消息区右键「引用文本」：暂存一条引用，输入框显示卡片，发送时拼成 Markdown blockquote。
+	void addQuote(const QString& text);
 	Q_INVOKABLE void removePendingAttachment(int index);
 	Q_INVOKABLE void clearPendingAttachments();
 	// attachmentId -> file:// 源（异步取字节并落临时文件；首次返回空）
@@ -258,6 +260,9 @@ private:
 	// 于是一轮被拆成好几个气泡；而 lastAgentRow 只看"最后一行是不是 agent"，
 	// 中间插进系统提示（command/done）就会断掉。回合边界才是正确判据。
 	int m_turnRow = -1;
+	// 本地刚发送、但服务端快照/压缩重建可能暂时还没带回来的用户消息；重建时补回。
+	QString m_pendingUserText;
+	QVector<MessageListModel::ImageRef> m_pendingUserImages;
 	// "会话被旧进程占用"自愈：只重试一次（重试期间再失败就只报错，别无限重启服务端）
 	bool m_pendingRetry = false;
 	QString m_retryText;

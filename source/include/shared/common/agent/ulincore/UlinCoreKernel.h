@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/agent/ulincore/UlinCoreIntentStore.h"
+#include "common/agent/ulincore/UlinCoreInvocation.h"
 #include "common/agent/ulincore/UlinCoreModel.h"
 #include "common/agent/ulincore/UlinCoreSession.h"
 #include "common/agent/ulincore/UlinCoreTool.h"
@@ -14,7 +16,7 @@ namespace UlinCore
 {
 class UlinCoreJournal;
 
-// 自研内核：user → model → tool → model → … → final。
+// 自研内核：user → 二次解析 → Intent / Prompt → model / tool → … → final。
 // 只负责编排与状态机；模型、工具、持久化都可替换。
 class UlinCoreKernel : public QObject
 {
@@ -38,6 +40,10 @@ public:
 
 	UlinCoreSession* session() const { return m_session; }
 	UlinCoreToolRegistry& tools() { return m_tools; }
+	UlinCoreIntentStore& intents() { return m_intents; }
+
+	// data/ulincore/intents.json；加载后自动把有调用链的 Intent 注册成 Tool。
+	void setIntentsPath(const QString& filePath);
 
 	void setOptions(const Options& options);
 	Options options() const { return m_options; }
@@ -73,9 +79,24 @@ private:
 	void emitTurnFinished(bool ok, const QString& error, const QString& finalText, bool cancelled);
 	void journal(const QString& type, const QJsonObject& payload);
 
+	// Intent 入口
+	void runParsed(const UlinCoreInvocation& invocation);
+	void runPromptText(const QString& rawText, const QString& promptText);
+	void runRecipeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
+	void finishRecipe(int generation, const QString& callId, const Intent& intent,
+		const QJsonObject& args, const ToolResult& result);
+	void finishEmptyTurn(const QString& rawText);
+	void savePromptIntent(const UlinCoreInvocation& invocation, const QString& prompt);
+	void saveLiteralIntent(const Intent& intent);
+	void addIntent(const Intent& intent);
+	void registerIntentTool(const Intent& intent);
+	QJsonObject effectiveParameters(const Intent& intent, const QJsonObject& args) const;
+
 	std::shared_ptr<UlinCoreModel> m_model;
 	UlinCoreSession* m_session = nullptr;
 	UlinCoreToolRegistry m_tools;
+	UlinCoreIntentStore m_intents;
+	QString m_intentsPath;
 	Options m_options;
 	std::unique_ptr<UlinCoreJournal> m_journal;
 	QThreadPool* m_toolPool = nullptr;

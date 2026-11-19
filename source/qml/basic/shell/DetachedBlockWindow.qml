@@ -82,7 +82,7 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     text: win.info && win.info.title ? win.info.title : qsTrId("panelBar_title")
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                     elide: Text.ElideRight

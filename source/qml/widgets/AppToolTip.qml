@@ -114,7 +114,7 @@ Item {
             anchors.centerIn: parent
             text: root.text
             color: Theme.color.textPrimary
-            font.family: "Microsoft YaHei UI"
+            font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
             wrapMode: Text.NoWrap
         }

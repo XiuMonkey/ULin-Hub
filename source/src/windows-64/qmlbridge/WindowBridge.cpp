@@ -8,6 +8,7 @@
 #include "common/platform/win/NativeWindowFilter.h"
 
 #include "common/appearance/ThemeManager.h"
+#include "qmlbridge/ThemeBridge.h"
 
 #include <QDebug>
 #include <QEvent>
@@ -41,8 +42,10 @@ WindowBridge& WindowBridge::instance()
 WindowBridge::WindowBridge(QObject* parent)
 	: QObject(parent)
 {
-	// 唯一用途是喂 QML 面的 hoveredControl 属性；该属性全仓无人读（悬停反馈由 QML 自己画），
-	// 已随死成员一起删除，所以本构造函数不再订阅任何东西。
+	// 换肤后重刷原生着色：由平台实现自己订阅主题信号。
+	// shared 侧因此不需要认识任何"窗口"类型（ThemeBridge::changed 已经发出）。
+	connect(&ThemeBridge::instance(), &ThemeBridge::changed,
+		this, &WindowBridge::notifyThemeChanged);
 }
 
 void WindowBridge::attachWindow(QObject* window)

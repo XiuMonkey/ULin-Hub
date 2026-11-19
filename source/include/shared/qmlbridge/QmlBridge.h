@@ -212,6 +212,8 @@ public:
 	// 侧栏浏览器右键「询问 Agent」：把 {url,title,selector,selectedText,text,html,pageText}
 	// 推给 ulin-kit 插件（POST /api/ulin-kit/browser-context），并在输入框生成一张卡片。
 	Q_INVOKABLE void askBrowserContext(const QVariantMap& context);
+	// 消息区右键「引用文本」：选中文字直接进入输入框引用卡，发送时由 ChatController 拼 Markdown。
+	Q_INVOKABLE void quoteMessageText(const QString& text);
 	Q_INVOKABLE void removeAttachment(int index);
 	Q_INVOKABLE QString attachmentSource(const QString& attachmentId);
 

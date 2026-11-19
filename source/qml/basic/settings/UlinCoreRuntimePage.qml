@@ -26,7 +26,7 @@ Item {
             Text {
                 text: "运行时"
                 color: Theme.color.textPrimary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.title
                 font.weight: Theme.font.weightBold
             }
@@ -36,14 +36,14 @@ Item {
                 text: "这些设置影响内核本身；修改后点保存，下一轮生效。"
                 wrapMode: Text.WordWrap
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
             Text {
                 text: "系统提示词"
                 color: Theme.color.textSecondary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
             }
 
@@ -65,7 +65,7 @@ Item {
                     selectByMouse: true
                     color: Theme.color.textPrimary
                     selectionColor: Theme.color.selectionBg
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     onTextChanged: if (activeFocus) page.cfg.systemPrompt = text
                 }
@@ -142,7 +142,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.cfg.status
                     color: Theme.color.textSecondary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
             }

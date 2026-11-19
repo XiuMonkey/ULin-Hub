@@ -341,7 +341,7 @@
     <ClInclude Include="include\shared\common\appearance\CardShadow.h">
       <Filter>include\shared\common\appearance</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\ClientInfo.h">
+    <ClInclude Include="include\windows-64\common\ClientInfo.h">
       <Filter>include\common</Filter>
     </ClInclude>
     <ClInclude Include="include\shared\VirtualClass\VirtualCommon.h">

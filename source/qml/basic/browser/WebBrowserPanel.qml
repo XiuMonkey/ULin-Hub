@@ -161,7 +161,7 @@ Item {
                     width: parent.width - 3 * 30 - 2 * parent.spacing
                     height: 28
                     selectByMouse: true
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
                     color: Theme.color.textPrimary
                     placeholderText: "输入网址或搜索词，回车打开"
@@ -242,7 +242,7 @@ Item {
                 visible: !view.loading && view.url.toString() === "" && view.title.length === 0
                 text: "输入网址或搜索词后回车"
                 color: Theme.color.textTertiary
-                font.family: "Microsoft YaHei UI"
+                font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
                 horizontalAlignment: Text.AlignHCenter
                 lineHeight: 1.4
@@ -386,7 +386,7 @@ Item {
                         color: menuRow.accent
                             ? Theme.color.textPrimary
                             : (menuRow.rowEnabled ? Theme.color.textPrimary : Theme.color.textCaption)
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.body
                         font.weight: menuRow.accent ? Theme.font.weightBold : Font.Normal
                         elide: Text.ElideRight

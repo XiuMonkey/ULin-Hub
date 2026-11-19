@@ -211,7 +211,7 @@ Item {
                         text: block.title
                         elide: Text.ElideRight
                         color: block.current ? Theme.color.textPrimary : Theme.color.textSecondary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         font.weight: block.current ? Theme.font.weightMedium : Font.Normal
                     }
@@ -357,7 +357,7 @@ Item {
                         text: dragGhost.blockTitle
                         elide: Text.ElideRight
                         color: Theme.color.textPrimary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.caption
                         font.weight: Theme.font.weightMedium
                     }
@@ -409,7 +409,7 @@ Item {
                         width: parent.width
                         text: "打开一个面板"
                         color: Theme.color.textTertiary
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         font.weight: Theme.font.weightBold
                         font.letterSpacing: 0.4
@@ -483,7 +483,7 @@ Item {
                                     width: parent.width
                                     text: launcherRow.modelData.label
                                     color: Theme.color.textPrimary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                     font.weight: Theme.font.weightMedium
                                     elide: Text.ElideRight
@@ -493,7 +493,7 @@ Item {
                                     text: launcherRow.modelData.hint
                                     elide: Text.ElideRight
                                     color: Theme.color.textTertiary
-                                    font.family: "Microsoft YaHei UI"
+                                    font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.caption
                                 }
                             }
@@ -517,7 +517,7 @@ Item {
                         text: "面板会保留在右栏，可随时切换；关闭右栏不会结束终端会话。"
                         wrapMode: Text.WordWrap
                         color: Theme.color.textCaption
-                        font.family: "Microsoft YaHei UI"
+                        font.family: Theme.font.uiFamily
                         font.pixelSize: Theme.font.small
                         lineHeight: 1.3
                     }
@@ -634,7 +634,7 @@ Item {
                     text: dragGhostWindow.blockTitle
                     elide: Text.ElideRight
                     color: Theme.color.textPrimary
-                    font.family: "Microsoft YaHei UI"
+                    font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                     font.weight: Theme.font.weightMedium
                 }

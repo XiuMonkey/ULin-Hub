@@ -133,6 +133,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\shared\common\util\ArchiveExtractor.cpp" />
     <ClCompile Include="src\shared\common\util\ConnectionManager.cpp" />
     <QtRcc Include="..\assets\resources\ulinhub.qrc" />
     <!-- QML 壳的资源（source/qml/）。单独一份 qrc：一份 QML 目录 = 一个自洽的界面子树 -->
@@ -155,8 +156,8 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\qmlbridge\ExtensionManagerController.cpp" />
     <ClCompile Include="src\shared\common\util\UrlInput.cpp" />
     <ClCompile Include="src\shared\qmlbridge\FileBrowserBridge.cpp" />
-    <ClCompile Include="src\shared\common\files\OfficeTextExtractor.cpp" />
-    <ClCompile Include="src\shared\common\files\OfficeConverter.cpp" />
+    <ClCompile Include="src\windows-64\common\files\OfficeTextExtractor.cpp" />
+    <ClCompile Include="src\windows-64\common\files\OfficeConverter.cpp" />
     <ClCompile Include="src\shared\common\files\FileBrowserService.cpp" />
     <ClCompile Include="src\shared\qmlbridge\UrlInputBridge.cpp" />
     <ClCompile Include="src\shared\common\shell\PanelBarDockModel.cpp" />
@@ -260,6 +261,11 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreMasterAgent.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreOpenAiModel.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreSettings.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreBinding.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreIntent.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreIntentStore.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreParser.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreRecipeTool.cpp" />
     <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp" />
     <ClCompile Include="src\shared\network\SessionPrefetcher.cpp" />
     <ClCompile Include="src\shared\common\appearance\ThemeManager.cpp" />
@@ -302,10 +308,11 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClInclude Include="include\windows-64\ExtensionSystem\ClientExtension.h" />
     <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionRegistry.h" />
     <ClInclude Include="include\windows-64\ExtensionSystem\ExtensionInstallTask.h" />
+    <ClInclude Include="include\shared\common\util\ArchiveExtractor.h" />
     <ClInclude Include="include\shared\common\util\CodeHighlighter.h" />
     <ClInclude Include="include\shared\common\appearance\InteractionHandler.h" />
     <ClInclude Include="include\shared\common\appearance\CardShadow.h" />
-    <ClInclude Include="include\shared\common\ClientInfo.h" />
+    <ClInclude Include="include\windows-64\common\ClientInfo.h" />
     <ClInclude Include="include\shared\VirtualClass\VirtualCommon.h" />
     <ClInclude Include="include\shared\VirtualClass\VirtualApiTakeover.h" />
     <QtMoc Include="include\windows-64\ExtensionSystem\HostUi.h" />
@@ -328,6 +335,12 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreJournal.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreTool.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreTypes.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreBinding.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreIntent.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreIntentStore.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreInvocation.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreParser.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreRecipeTool.h" />
     <QtMoc Include="include\shared\common\appearance\ThemeManager.h" />
     <QtMoc Include="include\shared\common\appearance\TranslationManager.h" />
     <!-- QML 壳的窗口桥与 token：QML 单例注册要 moc -->

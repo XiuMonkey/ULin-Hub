@@ -1,8 +1,13 @@
 #include "common/agent/ulincore/UlinCoreKernel.h"
 
+#include "common/agent/ulincore/UlinCoreBinding.h"
+#include "common/agent/ulincore/UlinCoreIntentStore.h"
 #include "common/agent/ulincore/UlinCoreJournal.h"
+#include "common/agent/ulincore/UlinCoreParser.h"
+#include "common/agent/ulincore/UlinCoreRecipeTool.h"
 
-#include <QJsonObject>
+#include <QDebug>
+#include <QJsonDocument>
 #include <QMetaObject>
 #include <QPointer>
 #include <QRunnable>
@@ -66,6 +71,19 @@ void UlinCoreKernel::setJournalPath(const QString& filePath)
 		m_journal->setFilePath(filePath);
 }
 
+void UlinCoreKernel::setIntentsPath(const QString& filePath)
+{
+	m_intentsPath = filePath;
+	m_intents.setFilePath(filePath);
+	QString error;
+	if (!m_intents.load(&error))
+		qWarning().noquote() << "[UlinCore] intent store load failed:" << error;
+	for (const Intent& intent : m_intents.all()) {
+		if (intent.hasChain())
+			registerIntentTool(intent);
+	}
+}
+
 void UlinCoreKernel::run(const QString& userText)
 {
 	const QString text = userText.trimmed();
@@ -77,12 +95,117 @@ void UlinCoreKernel::run(const QString& userText)
 		emit errorOccurred(QStringLiteral("kernel is already running"));
 		return;
 	}
+
+	runParsed(UlinCoreParser::parse(userText));
+}
+
+void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
+{
+	if (invocation.kind == InvocationKind::Error) {
+		emit errorOccurred(invocation.error.isEmpty()
+			? QStringLiteral("invalid intent syntax")
+			: invocation.error);
+		return;
+	}
+
+	if (invocation.kind == InvocationKind::Prompt || invocation.kind == InvocationKind::Empty) {
+		QString prompt = invocation.promptText;
+		if (prompt.trimmed().isEmpty())
+			prompt = invocation.rawText;
+		runPromptText(invocation.rawText, prompt);
+		return;
+	}
+
+	const QString name = invocation.intentName;
+	const bool known = m_intents.contains(name);
+	Intent intent = known ? m_intents.find(name) : Intent();
+	if (known) {
+		const QJsonObject params = effectiveParameters(intent, invocation.args);
+		const bool usePrompt = invocation.hasAsPrompt
+			? invocation.asPrompt
+			: (intent.hasPrompt() && !intent.hasChain());
+		QString prompt = invocation.hasPromptTemplate
+			? invocation.promptTemplate
+			: intent.promptTemplate;
+
+		if (usePrompt) {
+			if (prompt.trimmed().isEmpty()) {
+				emit errorOccurred(QStringLiteral("intent %1 has no prompt template").arg(name));
+				return;
+			}
+			runPromptText(invocation.rawText,
+				expandPromptTemplate(prompt, params));
+			return;
+		}
+
+		if (!intent.hasChain()) {
+			finishEmptyTurn(invocation.rawText);
+			return;
+		}
+		runRecipeIntent(intent, params, invocation.rawText);
+		return;
+	}
+
+	// 未知 Intent，但带了 Prompt：创建可复用 PromptIntent。
+	if (invocation.hasPromptTemplate && !invocation.promptTemplate.trimmed().isEmpty()) {
+		Intent promptIntent;
+		promptIntent.name = name;
+		promptIntent.description = QStringLiteral("Saved prompt intent");
+		promptIntent.promptTemplate = invocation.promptTemplate;
+		promptIntent.parameters = inferParameters(invocation.args);
+		const bool persist = invocation.hasSave ? invocation.save : true;
+		if (persist)
+			addIntent(promptIntent);
+
+		if (invocation.hasAsPrompt && !invocation.asPrompt
+			&& !promptIntent.hasChain()) {
+			finishEmptyTurn(invocation.rawText);
+			return;
+		}
+		runPromptText(invocation.rawText,
+			expandPromptTemplate(promptIntent.promptTemplate, invocation.args));
+		return;
+	}
+
+	// 未知 Intent，但名称是已有工具：按直接工具命令执行。
+	if (m_tools.find(name)) {
+		Intent direct;
+		direct.name = name;
+		direct.description = QStringLiteral("Direct tool invocation");
+		direct.parameters = inferParameters(invocation.args);
+		IntentStep step;
+		step.tool = name;
+		QJsonObject refs;
+		for (auto it = invocation.args.constBegin(); it != invocation.args.constEnd(); ++it) {
+			refs.insert(it.key(), QJsonObject{
+				{ QStringLiteral("$param"), it.key() }
+			});
+		}
+		step.arguments = refs;
+		direct.steps.append(step);
+
+		if (invocation.hasSave && invocation.save)
+			saveLiteralIntent(direct);
+
+		runRecipeIntent(direct, invocation.args, invocation.rawText);
+		return;
+	}
+
+	// 不是已注册 Intent，也不是工具：按 Prompt fallback。
+	QString prompt = invocation.promptText.trimmed();
+	if (prompt.isEmpty())
+		prompt = invocation.rawText;
+	runPromptText(invocation.rawText, prompt);
+}
+
+void UlinCoreKernel::runPromptText(const QString& rawText, const QString& promptText)
+{
 	if (!m_model) {
 		emit errorOccurred(QStringLiteral("no model set"));
 		return;
 	}
 
-	m_session->appendUserText(text);
+	m_session->appendUserText(promptText);
 	m_running = true;
 	m_cancelled = false;
 	m_steps = 0;
@@ -92,10 +215,174 @@ void UlinCoreKernel::run(const QString& userText)
 
 	journal(QStringLiteral("turn/start"), QJsonObject{
 		{ QStringLiteral("turnId"), m_turnId },
-		{ QStringLiteral("text"), text }
+		{ QStringLiteral("text"), rawText },
+		{ QStringLiteral("prompt"), promptText }
 	});
 	emit turnStarted(m_turnId);
 	startStep(m_generation);
+}
+
+void UlinCoreKernel::runRecipeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText)
+{
+	m_session->appendUserText(rawText);
+	m_running = true;
+	m_cancelled = false;
+	m_steps = 0;
+	m_turnUsage = Usage();
+	m_turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	++m_generation;
+
+	const QString callId = QStringLiteral("intent-") + m_turnId;
+	journal(QStringLiteral("turn/start"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("text"), rawText },
+		{ QStringLiteral("intent"), intent.name },
+		{ QStringLiteral("arguments"), args }
+	});
+	emit turnStarted(m_turnId);
+	emit toolStarted(m_turnId, callId, intent.name, args);
+	journal(QStringLiteral("tool/call"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("callId"), callId },
+		{ QStringLiteral("name"), intent.name },
+		{ QStringLiteral("arguments"), args }
+	});
+
+	const int generation = m_generation;
+	const ToolContext context = m_options.toolContext;
+	QPointer<UlinCoreKernel> self(this);
+	auto recipe = std::make_shared<UlinCoreRecipeTool>(intent, &m_tools);
+	m_toolPool->start(new ToolRunnable(
+		[self, generation, callId, intent, args, context, recipe]() {
+			const ToolResult result = recipe->execute(args, context);
+			if (!self)
+				return;
+			QMetaObject::invokeMethod(self.data(),
+				[self, generation, callId, intent, args, result]() {
+					if (UlinCoreKernel* kernel = self.data())
+						kernel->finishRecipe(generation, callId, intent, args, result);
+				},
+				Qt::QueuedConnection);
+		}));
+}
+
+void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const Intent& intent,
+	const QJsonObject& args, const ToolResult& result)
+{
+	Q_UNUSED(args)
+	if (generation != m_generation || !m_running || m_cancelled)
+		return;
+
+	QString content = result.ok
+		? result.content
+		: (result.error.isEmpty() ? QStringLiteral("intent failed") : result.error);
+	if (content.size() > m_options.maxToolResultChars) {
+		const int dropped = content.size() - m_options.maxToolResultChars;
+		content = content.left(m_options.maxToolResultChars)
+			+ QStringLiteral("\n...[truncated %1 chars]").arg(dropped);
+	}
+
+	ToolResult stored = result;
+	stored.content = content;
+	m_session->append(Message::toolResult(callId, intent.name, content, !result.ok));
+	journal(QStringLiteral("tool/result"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("callId"), callId },
+		{ QStringLiteral("name"), intent.name },
+		{ QStringLiteral("ok"), result.ok },
+		{ QStringLiteral("content"), content }
+	});
+	emit toolFinished(m_turnId, callId, intent.name, stored);
+
+	if (!result.ok) {
+		finishTurn(generation, false, result.error, QString(), false);
+		return;
+	}
+
+	if (!content.isEmpty() && content != QStringLiteral("ok")) {
+		Message assistant = Message::assistant(content);
+		m_session->append(assistant);
+		emit assistantMessage(assistant);
+		journal(QStringLiteral("assistant/message"), QJsonObject{
+			{ QStringLiteral("turnId"), m_turnId },
+			{ QStringLiteral("text"), content }
+		});
+	}
+	finishTurn(generation, true, QString(), content, false);
+}
+
+void UlinCoreKernel::finishEmptyTurn(const QString& rawText)
+{
+	m_session->appendUserText(rawText);
+	m_running = true;
+	m_cancelled = false;
+	m_steps = 0;
+	m_turnUsage = Usage();
+	m_turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	++m_generation;
+	journal(QStringLiteral("turn/start"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("text"), rawText }
+	});
+	emit turnStarted(m_turnId);
+	finishTurn(m_generation, true, QString(), QString(), false);
+}
+
+QJsonObject UlinCoreKernel::effectiveParameters(const Intent& intent, const QJsonObject& args) const
+{
+	QJsonObject params;
+	for (const IntentParameter& parameter : intent.parameters) {
+		if (!parameter.name.isEmpty() && !parameter.defaultValue.isUndefined())
+			params.insert(parameter.name, parameter.defaultValue);
+	}
+	for (auto it = args.constBegin(); it != args.constEnd(); ++it)
+		params.insert(it.key(), it.value());
+	return params;
+}
+
+void UlinCoreKernel::savePromptIntent(const UlinCoreInvocation& invocation, const QString& prompt)
+{
+	if (invocation.intentName.trimmed().isEmpty() || prompt.trimmed().isEmpty())
+		return;
+	Intent intent;
+	intent.name = invocation.intentName;
+	intent.description = QStringLiteral("Saved prompt intent");
+	intent.promptTemplate = prompt;
+	intent.parameters = inferParameters(invocation.args);
+	addIntent(intent);
+}
+
+void UlinCoreKernel::saveLiteralIntent(const Intent& intent)
+{
+	if (!intent.hasChain() || intent.name.trimmed().isEmpty())
+		return;
+	// 命令名可以和内置工具同名：命令路径优先走已保存 Intent；
+	// 工具路径仍保留内置工具，避免一个用户 Recipe 覆盖 Agent 的底层能力。
+	addIntent(intent);
+}
+
+void UlinCoreKernel::addIntent(const Intent& intent)
+{
+	if (intent.name.trimmed().isEmpty())
+		return;
+	m_intents.add(intent);
+	if (!m_intentsPath.isEmpty()) {
+		QString error;
+		if (!m_intents.save(&error))
+			qWarning().noquote() << "[UlinCore] intent store save failed:" << error;
+	}
+	if (intent.hasChain())
+		registerIntentTool(intent);
+}
+
+void UlinCoreKernel::registerIntentTool(const Intent& intent)
+{
+	if (!intent.hasChain())
+		return;
+	// 同名内置工具优先保留给 Agent；命令入口通过 IntentStore 命中。
+	if (m_tools.find(intent.name))
+		return;
+	m_tools.add(std::make_shared<UlinCoreRecipeTool>(intent, &m_tools));
 }
 
 void UlinCoreKernel::cancel()
@@ -158,6 +445,15 @@ void UlinCoreKernel::startStep(int generation)
 		: m_options.systemPrompt;
 	request.messages = m_session->messages();
 	request.tools = m_tools.schemas();
+
+	const QString catalog = m_intents.catalogText();
+	if (!catalog.isEmpty()) {
+		request.systemPrompt += QStringLiteral(
+			"\n\nSaved intents:\n%1\n"
+			"When a saved intent declares parameters, refer to them with "
+			"{\"$param\":\"name\"} in tool arguments instead of hard-coding the current value.")
+			.arg(catalog);
+	}
 
 	const ModelCallbacks callbacks = makeCallbacks(generation);
 	const std::shared_ptr<UlinCoreModel> model = m_model;
