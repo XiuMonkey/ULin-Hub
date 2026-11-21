@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/types/UlinCoreTypes.h"
+#include "common/agent/ulincore/types/UlinCoreTypes.h"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -62,8 +62,8 @@ QJsonObject Message::toJson() const
 		{ QStringLiteral("text"), text },
 		{ QStringLiteral("thinking"), thinking },
 		{ QStringLiteral("intentCalls"), calls },
-		{ QStringLiteral("toolCallId"), toolCallId },
-		{ QStringLiteral("toolName"), toolName },
+		{ QStringLiteral("intentCallId"), intentCallId },
+		{ QStringLiteral("intentName"), intentName },
 		{ QStringLiteral("isError"), isError },
 		{ QStringLiteral("createdAt"), createdAt }
 	};
@@ -75,11 +75,15 @@ Message Message::fromJson(const QJsonObject& json)
 	message.role = roleFromName(json.value(QStringLiteral("role")).toString());
 	message.text = json.value(QStringLiteral("text")).toString();
 	message.thinking = json.value(QStringLiteral("thinking")).toString();
-	const QJsonArray calls = json.value(QStringLiteral("intentCalls")).toArray();
+	const QJsonArray calls = json.value(QStringLiteral("intentCalls")).toArray().isEmpty()
+		? json.value(QStringLiteral("toolCalls")).toArray()
+		: json.value(QStringLiteral("intentCalls")).toArray();
 	for (const QJsonValue& value : calls)
 		message.intentCalls.append(IntentCall::fromJson(value.toObject()));
-	message.toolCallId = json.value(QStringLiteral("toolCallId")).toString();
-	message.toolName = json.value(QStringLiteral("toolName")).toString();
+	message.intentCallId = json.value(QStringLiteral("intentCallId")).toString(
+		json.value(QStringLiteral("toolCallId")).toString());
+	message.intentName = json.value(QStringLiteral("intentName")).toString(
+		json.value(QStringLiteral("toolName")).toString());
 	message.isError = json.value(QStringLiteral("isError")).toBool();
 	message.createdAt = static_cast<qint64>(json.value(QStringLiteral("createdAt")).toDouble());
 	return message;
@@ -108,8 +112,8 @@ Message Message::intentResult(const QString& callId, const QString& name, const 
 {
 	Message message;
 	message.role = Role::IntentResponse;
-	message.toolCallId = callId;
-	message.toolName = name;
+	message.intentCallId = callId;
+	message.intentName = name;
 	message.text = text;
 	message.isError = isError;
 	message.createdAt = QDateTime::currentMSecsSinceEpoch();

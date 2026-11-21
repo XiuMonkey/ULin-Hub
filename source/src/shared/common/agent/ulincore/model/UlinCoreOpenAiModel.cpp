@@ -63,7 +63,7 @@ QJsonObject messageToJson(const Message& message)
 	}
 	case Role::IntentResponse:
 		object.insert(QStringLiteral("role"), QStringLiteral("tool"));
-		object.insert(QStringLiteral("tool_call_id"), message.toolCallId);
+		object.insert(QStringLiteral("tool_call_id"), message.intentCallId);
 		object.insert(QStringLiteral("content"), message.text);
 		break;
 	}

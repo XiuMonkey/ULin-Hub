@@ -41,8 +41,8 @@ struct Message
 	QString text;
 	QString thinking;
 	QList<IntentCall> intentCalls;   // Assistant 消息里的工具调用
-	QString toolCallId;          // Tool 消息对应哪次调用
-	QString toolName;
+	QString intentCallId;          // Tool 消息对应哪次调用
+	QString intentName;
 	bool isError = false;
 	qint64 createdAt = 0;
 

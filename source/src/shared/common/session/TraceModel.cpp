@@ -1,4 +1,4 @@
-﻿// 这里刻意**不碰 UI**：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
+// 这里刻意**不碰 UI**：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
 // 模型只吐数据（kind + 数字 + 原文）。这样加语言不用改 C++，也不会出现"模型里塞中文"的老问题。
 
 #include "common/session/TraceModel.h"
@@ -567,7 +567,8 @@ void TraceModel::projectEvent(const QJsonObject& event)
 
 	if (type == QStringLiteral("tool/result")) {
 		const QJsonObject message = data.value(QStringLiteral("message")).toObject();
-		const QString callId = message.value(QStringLiteral("toolCallId")).toString();
+		const QString callId = message.value(QStringLiteral("intentCallId")).toString(
+			message.value(QStringLiteral("toolCallId")).toString());
 		const QJsonObject error = data.value(QStringLiteral("error")).toObject();
 		const bool failed = message.value(QStringLiteral("isError")).toBool() || !error.isEmpty();
 
