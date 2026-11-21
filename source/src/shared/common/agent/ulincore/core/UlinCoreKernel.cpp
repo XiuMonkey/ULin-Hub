@@ -565,13 +565,105 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 		{ QStringLiteral("turnId"), m_turnId },
 		{ QStringLiteral("callId"), call.id },
 		{ QStringLiteral("name"), call.name },
-		{ QStringLiteral("arguments"), call.arguments }
+		{ QStringLiteral("arguments"), call.arguments },
+		{ QStringLiteral("metadata"), call.metadata }
 	});
 
-	const Intent intent = m_intents.find(call.name);
+	QStringList tags;
+	const QJsonValue tagsValue = call.metadata.value(QStringLiteral("tags"));
+	if (tagsValue.isArray()) {
+		for (const QJsonValue& tag : tagsValue.toArray()) {
+			if (tag.isString())
+				tags.append(tag.toString());
+		}
+	}
+	const bool defineOnly = tags.contains(QStringLiteral("defineOnly"));
+	const bool asPrompt = tags.contains(QStringLiteral("asPrompt"));
+	const bool asSkill = tags.contains(QStringLiteral("asSkill"));
+	const bool hasSaveTag = tags.contains(QStringLiteral("save"));
+	const bool agentTag = tags.contains(QStringLiteral("agentEngaged"))
+		|| tags.contains(QStringLiteral("skillRequired"));
+	if (agentTag) {
+		completeTool(generation, calls, index, call,
+			ToolResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
+		return;
+	}
+	if ((asPrompt || asSkill) && hasSaveTag) {
+		completeTool(generation, calls, index, call,
+			ToolResult::failure(QStringLiteral("save cannot be combined with asPrompt/asSkill")));
+		return;
+	}
+	if (defineOnly && !hasSaveTag) {
+		completeTool(generation, calls, index, call,
+			ToolResult::failure(QStringLiteral("defineOnly requires save")));
+		return;
+	}
+
+	Intent intent;
+	const QJsonValue definitionValue = call.metadata.value(QStringLiteral("Intent"));
+	if (definitionValue.isObject()) {
+		if (asPrompt || asSkill) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("Intent definition cannot use asPrompt/asSkill")));
+			return;
+		}
+		intent = Intent::fromJson(definitionValue.toObject());
+		intent.name = call.name;
+		if (intent.name.trimmed().isEmpty()) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("intent definition requires a name")));
+			return;
+		}
+		if (!intent.hasPrompt() && !intent.hasSkill() && !intent.hasChain() && !intent.hasNative()) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
+			return;
+		}
+		addIntent(intent);
+		if (defineOnly) {
+			completeTool(generation, calls, index, call,
+				ToolResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
+			return;
+		}
+		if (!intent.hasChain() && !intent.hasNative()) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(call.name)));
+			return;
+		}
+	} else {
+		if (defineOnly) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("defineOnly requires Intent:{...}")));
+			return;
+		}
+		intent = m_intents.find(call.name);
+	}
 	if (intent.name.isEmpty()) {
 		completeTool(generation, calls, index, call,
 			ToolResult::failure(QStringLiteral("unknown intent: %1").arg(call.name)));
+		return;
+	}
+
+	if (asPrompt || asSkill) {
+		const QJsonObject params = effectiveParameters(intent, call.arguments);
+		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
+		if (prompt.isEmpty())
+			prompt = intent.promptTemplate;
+		if (prompt.trimmed().isEmpty()) {
+			completeTool(generation, calls, index, call,
+				ToolResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
+			return;
+		}
+		QString content = expandPromptTemplate(prompt, params);
+		if (asSkill) {
+			if (!intent.hasSkill()) {
+				completeTool(generation, calls, index, call,
+					ToolResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
+				return;
+			}
+			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(intent.skill, params);
+		}
+		completeTool(generation, calls, index, call, ToolResult::success(content));
 		return;
 	}
 
