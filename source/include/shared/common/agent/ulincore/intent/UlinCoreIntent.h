@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // ULinCore 的统一 Intent 数据模型。
 // Prompt-only Intent、工具/Recipe Intent 都走这一套；命令和工具只是 Intent 的入口视图。
@@ -33,13 +33,13 @@ struct Intent
 {
 	QString name;
 	QString description;
-	QString promptTemplate;   // 非空 = 可以按 Prompt 执行
+	QString prompt;   // 非空 = 可以按 Prompt 执行
 	QString skill;            // 非空 = 方法说明；不能单独执行
 	QVector<IntentParameter> parameters;
 	QVector<IntentStep> steps; // 非空 = 有调用链
 	QString executor;          // 非空 = 有客户端原生执行器
 
-	bool hasPrompt() const { return !promptTemplate.trimmed().isEmpty(); }
+	bool hasPrompt() const { return !prompt.trimmed().isEmpty(); }
 	bool hasSkill() const { return !skill.trimmed().isEmpty(); }
 	bool hasChain() const { return !steps.isEmpty(); }
 	bool hasNative() const { return !executor.trimmed().isEmpty(); }

@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/intent/UlinCoreIntentStore.h"
+﻿#include "common/agent/ulincore/intent/UlinCoreIntentStore.h"
 
 #include <QDir>
 #include <QFile>

@@ -1,8 +1,8 @@
-#include "common/agent/ulincore/executor/UlinCoreExecutor.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreExecutor.h"
 
 #include "common/agent/ulincore/executor/UlinCoreBuiltinExecutors.h"
-#include "common/agent/ulincore/tool/UlinCoreBuiltinTools.h"
-#include "common/agent/ulincore/tool/UlinCoreTool.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinTools.h"
+#include "common/agent/ulincore/executor/UlinCoreTool.h"
 
 #include <memory>
 

@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -43,7 +43,7 @@ QJsonObject messageToJson(const Message& message)
 		if (!message.toolCalls.isEmpty()) {
 			QJsonArray calls;
 			for (const ToolCall& call : message.toolCalls) {
-				calls.append(QJsonObject{
+				QJsonObject callObject{
 					{ QStringLiteral("id"), call.id },
 					{ QStringLiteral("type"), QStringLiteral("function") },
 					{ QStringLiteral("function"), QJsonObject{
@@ -51,7 +51,10 @@ QJsonObject messageToJson(const Message& message)
 						{ QStringLiteral("arguments"), QString::fromUtf8(
 							QJsonDocument(call.arguments).toJson(QJsonDocument::Compact)) }
 					} }
-				});
+				};
+				if (!call.metadata.isEmpty())
+					callObject.insert(QStringLiteral("metadata"), call.metadata);
+				calls.append(callObject);
 			}
 			object.insert(QStringLiteral("tool_calls"), calls);
 		}
@@ -191,10 +194,14 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 		ToolCall& target = m_calls[index];
 		if (call.contains(QStringLiteral("id")))
 			target.id = call.value(QStringLiteral("id")).toString();
+		if (call.value(QStringLiteral("metadata")).isObject())
+			target.metadata = call.value(QStringLiteral("metadata")).toObject();
 
 		const QJsonObject function = call.value(QStringLiteral("function")).toObject();
 		if (function.contains(QStringLiteral("name")))
 			target.name = function.value(QStringLiteral("name")).toString();
+		if (function.value(QStringLiteral("metadata")).isObject())
+			target.metadata = function.value(QStringLiteral("metadata")).toObject();
 		const QJsonValue arguments = function.value(QStringLiteral("arguments"));
 		if (arguments.isString())
 			m_callArguments[index] += arguments.toString();

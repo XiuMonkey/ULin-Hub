@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "common/agent/ulincore/executor/UlinCoreExecutor.h"
 #include "common/agent/ulincore/intent/UlinCoreIntent.h"

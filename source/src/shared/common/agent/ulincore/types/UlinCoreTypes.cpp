@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/types/UlinCoreTypes.h"
+﻿#include "common/agent/ulincore/types/UlinCoreTypes.h"
 
 #include <QDateTime>
 #include <QJsonArray>

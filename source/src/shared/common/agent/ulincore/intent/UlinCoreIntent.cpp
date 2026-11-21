@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/intent/UlinCoreIntent.h"
+﻿#include "common/agent/ulincore/intent/UlinCoreIntent.h"
 
 #include <QJsonArray>
 
@@ -53,7 +53,7 @@ QJsonObject Intent::toJson() const
 	return QJsonObject{
 		{ QStringLiteral("name"), name },
 		{ QStringLiteral("description"), description },
-		{ QStringLiteral("prompt"), promptTemplate },
+		{ QStringLiteral("prompt"), prompt },
 		{ QStringLiteral("skill"), skill },
 		{ QStringLiteral("executor"), executor },
 		{ QStringLiteral("parameters"), parameterArray },
@@ -66,7 +66,7 @@ Intent Intent::fromJson(const QJsonObject& json)
 	Intent intent;
 	intent.name = json.value(QStringLiteral("name")).toString();
 	intent.description = json.value(QStringLiteral("description")).toString();
-	intent.promptTemplate = json.value(QStringLiteral("prompt")).toString();
+	intent.prompt = json.value(QStringLiteral("prompt")).toString();
 	intent.skill = json.value(QStringLiteral("skill")).toString();
 	intent.executor = json.value(QStringLiteral("executor")).toString();
 	for (const QJsonValue& value : json.value(QStringLiteral("parameters")).toArray())

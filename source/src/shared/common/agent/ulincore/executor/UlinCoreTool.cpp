@@ -1,6 +1,6 @@
-﻿#include "common/agent/ulincore/tool/UlinCoreTool.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreTool.h"
 
-#include "common/agent/ulincore/tool/UlinCoreBuiltinTools.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinTools.h"
 
 #include <utility>
 

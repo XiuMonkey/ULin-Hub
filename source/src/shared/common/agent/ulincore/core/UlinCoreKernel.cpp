@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/core/UlinCoreKernel.h"
+﻿#include "common/agent/ulincore/core/UlinCoreKernel.h"
 
 #include "common/agent/ulincore/intent/UlinCoreBinding.h"
 #include "common/agent/ulincore/intent/UlinCoreIntentStore.h"
@@ -149,8 +149,8 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 				emit errorOccurred(QStringLiteral("asPrompt and asSkill cannot both be set"));
 				return;
 			}
-			const QString prompt = invocation.hasPromptTemplate
-				? invocation.promptTemplate : intent.promptTemplate;
+			const QString prompt = invocation.hasPromptOverride
+				? invocation.promptOverride : intent.prompt;
 			if (prompt.trimmed().isEmpty() || !intent.hasSkill()) {
 				emit errorOccurred(QStringLiteral("intent %1 needs both prompt and skill for asSkill").arg(name));
 				return;
@@ -164,9 +164,9 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		const bool usePrompt = invocation.asPrompt()
 			? true
 			: intent.defaultPromptMode();
-		QString prompt = invocation.hasPromptTemplate
-			? invocation.promptTemplate
-			: intent.promptTemplate;
+		QString prompt = invocation.hasPromptOverride
+			? invocation.promptOverride
+			: intent.prompt;
 
 		if (usePrompt) {
 			if (prompt.trimmed().isEmpty()) {
@@ -191,18 +191,18 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	}
 
 	// 未知 Intent，但带了 Prompt：创建可复用 PromptIntent。
-	if (invocation.hasPromptTemplate && !invocation.promptTemplate.trimmed().isEmpty()) {
+	if (invocation.hasPromptOverride && !invocation.promptOverride.trimmed().isEmpty()) {
 		Intent promptIntent;
 		promptIntent.name = name;
 		promptIntent.description = QStringLiteral("Saved prompt intent");
-		promptIntent.promptTemplate = invocation.promptTemplate;
+		promptIntent.prompt = invocation.promptOverride;
 		promptIntent.parameters = inferParameters(invocation.args);
 		const bool persist = invocation.save();
 		if (persist)
 			addIntent(promptIntent);
 
 		runPromptText(invocation.rawText,
-			expandPromptTemplate(promptIntent.promptTemplate, invocation.args));
+			expandPromptTemplate(promptIntent.prompt, invocation.args));
 		return;
 	}
 
@@ -374,7 +374,7 @@ void UlinCoreKernel::savePromptIntent(const UlinCoreInvocation& invocation, cons
 	Intent intent;
 	intent.name = invocation.intentName;
 	intent.description = QStringLiteral("Saved prompt intent");
-	intent.promptTemplate = prompt;
+	intent.prompt = prompt;
 	intent.parameters = inferParameters(invocation.args);
 	addIntent(intent);
 }
@@ -643,7 +643,7 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 		const QJsonObject params = effectiveParameters(intent, call.arguments);
 		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
 		if (prompt.isEmpty())
-			prompt = intent.promptTemplate;
+			prompt = intent.prompt;
 		if (prompt.trimmed().isEmpty()) {
 			completeTool(generation, calls, index, call,
 				ToolResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));

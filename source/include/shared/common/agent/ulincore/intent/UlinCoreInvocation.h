@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "common/agent/ulincore/intent/UlinCoreIntent.h"
 
@@ -30,8 +30,8 @@ struct UlinCoreInvocation
 	Intent definition;        // Intent:{...}
 	bool execute = true;      // defineOnly -> false
 
-	QString promptTemplate;   // 元数据里的 prompt，可覆盖本次 PromptTemplate
-	bool hasPromptTemplate = false;
+	QString promptOverride;   // 元数据里的 prompt，可覆盖本次 Intent.prompt
+	bool hasPromptOverride = false;
 
 	bool hasTag(const QString& tag) const { return tags.contains(tag); }
 	bool asPrompt() const { return hasTag(QStringLiteral("asPrompt")); }

@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/executor/UlinCoreIntentExecutor.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreIntentExecutor.h"
 
 #include "common/agent/ulincore/intent/UlinCoreBinding.h"
 

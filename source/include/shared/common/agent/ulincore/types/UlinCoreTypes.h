@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 自研 Agent 内核的基础数据类型。
 //

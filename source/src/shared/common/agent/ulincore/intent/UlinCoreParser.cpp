@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/intent/UlinCoreParser.h"
+﻿#include "common/agent/ulincore/intent/UlinCoreParser.h"
 
 #include <QChar>
 #include <QJsonArray>
@@ -355,8 +355,8 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 
 		const QJsonValue prompt = metadata.value(QStringLiteral("prompt"));
 		if (prompt.isString()) {
-			invocation.promptTemplate = prompt.toString();
-			invocation.hasPromptTemplate = true;
+			invocation.promptOverride = prompt.toString();
+			invocation.hasPromptOverride = true;
 		}
 
 		const QJsonValue tagsValue = valueIgnoreCase(metadata, QStringLiteral("tags"));

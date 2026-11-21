@@ -262,7 +262,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketModel.cpp" />
     <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketInstaller.cpp" />
     <ClCompile Include="src\shared\common\agent\ModelSelectionService.cpp" />
-    <ClCompile Include="src\shared\common\agent\ulincore\tool\UlinCoreBuiltinTools.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\executor\UlinCoreBuiltinTools.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\model\UlinCoreEchoModel.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreJournal.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreKernel.cpp" />
@@ -271,7 +271,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\agent\ulincore\executor\UlinCoreBuiltinIntents.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\executor\UlinCoreIntentExecutor.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreSession.cpp" />
-    <ClCompile Include="src\shared\common\agent\ulincore\tool\UlinCoreTool.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\executor\UlinCoreTool.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\types\UlinCoreTypes.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreMasterAgent.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\model\UlinCoreOpenAiModel.cpp" />
@@ -357,9 +357,9 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <QtMoc Include="include\shared\common\agent\AgentManager.h" />
     <ClInclude Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketModel.h" />
     <ClInclude Include="include\shared\common\agent\ModelSelectionService.h" />
-    <ClInclude Include="include\shared\common\agent\ulincore\tool\UlinCoreBuiltinTools.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\executor\UlinCoreBuiltinTools.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\core\UlinCoreJournal.h" />
-    <ClInclude Include="include\shared\common\agent\ulincore\tool\UlinCoreTool.h" />
+    <ClInclude Include="include\shared\common\agent\ulincore\executor\UlinCoreTool.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\types\UlinCoreTypes.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\intent\UlinCoreBinding.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\intent\UlinCoreIntent.h" />
