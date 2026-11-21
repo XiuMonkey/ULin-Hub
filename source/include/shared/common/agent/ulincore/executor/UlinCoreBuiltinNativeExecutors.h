@@ -3,5 +3,5 @@
 namespace UlinCore
 {
 class UlinCoreNativeRegistry;
-void registerBuiltinExecutors(UlinCoreNativeRegistry& registry);
+void registerBuiltinNativeExecutors(UlinCoreNativeRegistry& registry);
 } // namespace UlinCore

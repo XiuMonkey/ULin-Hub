@@ -18,7 +18,7 @@ enum class Role
 	System,
 	User,
 	Assistant,
-	Tool
+	IntentResponse
 };
 
 QString roleName(Role role);
@@ -40,7 +40,7 @@ struct Message
 	Role role = Role::User;
 	QString text;
 	QString thinking;
-	QList<IntentCall> toolCalls;   // Assistant 消息里的工具调用
+	QList<IntentCall> intentCalls;   // Assistant 消息里的工具调用
 	QString toolCallId;          // Tool 消息对应哪次调用
 	QString toolName;
 	bool isError = false;
@@ -51,7 +51,7 @@ struct Message
 
 	static Message user(const QString& text);
 	static Message assistant(const QString& text, const QString& thinking = QString());
-	static Message toolResult(const QString& callId, const QString& name, const QString& text, bool isError);
+	static Message intentResult(const QString& callId, const QString& name, const QString& text, bool isError);
 };
 
 struct Usage
@@ -63,6 +63,17 @@ struct Usage
 	void add(const Usage& other);
 	QJsonObject toJson() const;
 	static Usage fromJson(const QJsonObject& json);
+};
+
+struct ExecuteResult
+{
+	bool ok = false;
+	QString content;
+	QJsonObject data;
+	QString error;
+
+	static ExecuteResult success(const QString& content, const QJsonObject& data = {});
+	static ExecuteResult failure(const QString& error);
 };
 
 struct IntentResult

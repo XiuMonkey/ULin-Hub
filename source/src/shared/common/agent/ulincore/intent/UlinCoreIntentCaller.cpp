@@ -41,9 +41,11 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 				.arg(m_intent.name, m_intent.executor));
 
 		++g_executorDepth;
-		const IntentResult result = executor->execute(arguments, context);
+		const ExecuteResult result = executor->execute(arguments, context);
 		--g_executorDepth;
-		return result;
+		return result.ok
+			? IntentResult::success(result.content, result.data)
+			: IntentResult::failure(result.error);
 	}
 
 	if (m_intent.steps.isEmpty())

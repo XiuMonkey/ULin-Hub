@@ -28,7 +28,7 @@ void UlinCoreNativeImplementationRegistry::add(std::shared_ptr<UlinCoreNativeImp
 
 void UlinCoreNativeImplementationRegistry::addBuiltins()
 {
-	registerBuiltinExecutorBackends(*this);
+	registerBuiltinNativeImplementations(*this);
 }
 
 UlinCoreNativeImplementation* UlinCoreNativeImplementationRegistry::find(const QString& name) const

@@ -106,25 +106,25 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("path") } }
 			};
 		}
-		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(), &error);
 			if (path.isEmpty())
-				return IntentResult::failure(error);
+				return ExecuteResult::failure(error);
 
 			QFile file(path);
 			if (!file.open(QIODevice::ReadOnly))
-				return IntentResult::failure(QStringLiteral("cannot open %1: %2")
+				return ExecuteResult::failure(QStringLiteral("cannot open %1: %2")
 					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 requested = static_cast<qint64>(args.value(QStringLiteral("maxBytes")).toInt(65536));
 			const qint64 limit = qBound<qint64>(1, requested, kMaxReadBytes);
 			const QByteArray raw = file.read(limit);
 			if (raw.contains('\0'))
-				return IntentResult::failure(QStringLiteral("binary file, use a dedicated viewer"));
-			return IntentResult::success(QString::fromUtf8(raw));
+				return ExecuteResult::failure(QStringLiteral("binary file, use a dedicated viewer"));
+			return ExecuteResult::success(QString::fromUtf8(raw));
 		}
 	};
 
@@ -152,17 +152,17 @@ namespace
 				} }
 			};
 		}
-		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(QStringLiteral(".")), &error);
 			if (path.isEmpty())
-				return IntentResult::failure(error);
+				return ExecuteResult::failure(error);
 
 			const QDir dir(path);
 			if (!dir.exists())
-				return IntentResult::failure(QStringLiteral("not a directory: ")
+				return ExecuteResult::failure(QStringLiteral("not a directory: ")
 					+ args.value(QStringLiteral("path")).toString());
 
 			const int maxEntries = qBound(1, args.value(QStringLiteral("maxEntries")).toInt(200), 2000);
@@ -181,7 +181,7 @@ namespace
 					? rel + QLatin1Char('/')
 					: QStringLiteral("%1 (%2 bytes)").arg(rel).arg(info.size()));
 			}
-			return IntentResult::success(lines.join(QLatin1Char('\n')));
+			return ExecuteResult::success(lines.join(QLatin1Char('\n')));
 		}
 	};
 
@@ -213,31 +213,31 @@ namespace
 				} }
 			};
 		}
-		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			if (!ctx.allowWrites)
-				return IntentResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
+				return ExecuteResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
 
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(), &error);
 			if (path.isEmpty())
-				return IntentResult::failure(error);
+				return ExecuteResult::failure(error);
 
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			const QByteArray bytes = args.value(QStringLiteral("content")).toString().toUtf8();
 			QFile file(path);
 			if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-				return IntentResult::failure(QStringLiteral("cannot write %1: %2")
+				return ExecuteResult::failure(QStringLiteral("cannot write %1: %2")
 					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 written = file.write(bytes);
 			file.close();
 			if (written != bytes.size())
-				return IntentResult::failure(QStringLiteral("short write: %1/%2").arg(written).arg(bytes.size()));
+				return ExecuteResult::failure(QStringLiteral("short write: %1/%2").arg(written).arg(bytes.size()));
 
 			const QString relative = relativeToRoot(root, path);
-			return IntentResult::success(QStringLiteral("wrote %1 bytes to %2").arg(written).arg(relative),
+			return ExecuteResult::success(QStringLiteral("wrote %1 bytes to %2").arg(written).arg(relative),
 				QJsonObject{
 					{ QStringLiteral("path"), relative },
 					{ QStringLiteral("bytes"), written }
@@ -269,17 +269,17 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("query") } }
 			};
 		}
-		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString query = args.value(QStringLiteral("query")).toString();
 			if (query.isEmpty())
-				return IntentResult::failure(QStringLiteral("query is empty"));
+				return ExecuteResult::failure(QStringLiteral("query is empty"));
 
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString base = resolveInside(root, args.value(QStringLiteral("path")).toString(QStringLiteral(".")), &error);
 			if (base.isEmpty())
-				return IntentResult::failure(error);
+				return ExecuteResult::failure(error);
 
 			const bool caseSensitive = args.value(QStringLiteral("caseSensitive")).toBool(false);
 			const int maxResults = qBound(1, args.value(QStringLiteral("maxResults")).toInt(50), 500);
@@ -311,13 +311,13 @@ namespace
 				}
 			}
 
-			return IntentResult::success(hits.isEmpty() ? QStringLiteral("no matches")
+			return ExecuteResult::success(hits.isEmpty() ? QStringLiteral("no matches")
 				: hits.join(QLatin1Char('\n')));
 		}
 	};
 } // namespace
 
-void registerBuiltinExecutorBackends(UlinCoreNativeImplementationRegistry& registry)
+void registerBuiltinNativeImplementations(UlinCoreNativeImplementationRegistry& registry)
 {
 	registry.add(std::make_shared<ReadFileTool>());
 	registry.add(std::make_shared<ListDirTool>());

@@ -311,7 +311,7 @@ void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const I
 
 	IntentResult stored = result;
 	stored.content = content;
-	m_session->append(Message::toolResult(callId, intent.name, content, !result.ok));
+	m_session->append(Message::intentResult(callId, intent.name, content, !result.ok));
 	journal(QStringLiteral("tool/result"), QJsonObject{
 		{ QStringLiteral("turnId"), m_turnId },
 		{ QStringLiteral("callId"), callId },
@@ -520,7 +520,7 @@ void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& cal
 	const QString fullThinking = thinking.isEmpty() ? m_pendingThinking : thinking;
 
 	Message assistant = Message::assistant(fullText, fullThinking);
-	assistant.toolCalls = calls;
+	assistant.intentCalls = calls;
 	if (!fullText.isEmpty() || !calls.isEmpty()) {
 		m_session->append(assistant);
 		emit assistantMessage(assistant);
@@ -528,7 +528,7 @@ void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& cal
 			{ QStringLiteral("turnId"), m_turnId },
 			{ QStringLiteral("text"), fullText },
 			{ QStringLiteral("thinking"), fullThinking },
-			{ QStringLiteral("toolCalls"), static_cast<int>(calls.size()) }
+			{ QStringLiteral("intentCalls"), static_cast<int>(calls.size()) }
 		});
 	}
 
@@ -698,7 +698,7 @@ void UlinCoreKernel::completeIntentCall(int generation, const QList<IntentCall>&
 	IntentResult stored = result;
 	stored.content = content;
 
-	m_session->append(Message::toolResult(call.id, call.name, content, !result.ok));
+	m_session->append(Message::intentResult(call.id, call.name, content, !result.ok));
 	journal(QStringLiteral("tool/result"), QJsonObject{
 		{ QStringLiteral("turnId"), m_turnId },
 		{ QStringLiteral("callId"), call.id },

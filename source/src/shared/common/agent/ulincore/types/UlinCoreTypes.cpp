@@ -14,7 +14,7 @@ QString roleName(Role role)
 		return QStringLiteral("user");
 	case Role::Assistant:
 		return QStringLiteral("assistant");
-	case Role::Tool:
+	case Role::IntentResponse:
 		return QStringLiteral("tool");
 	}
 	return QStringLiteral("user");
@@ -27,7 +27,7 @@ Role roleFromName(const QString& name)
 	if (name == QStringLiteral("assistant"))
 		return Role::Assistant;
 	if (name == QStringLiteral("tool"))
-		return Role::Tool;
+		return Role::IntentResponse;
 	return Role::User;
 }
 
@@ -54,14 +54,14 @@ IntentCall IntentCall::fromJson(const QJsonObject& json)
 QJsonObject Message::toJson() const
 {
 	QJsonArray calls;
-	for (const IntentCall& call : toolCalls)
+	for (const IntentCall& call : intentCalls)
 		calls.append(call.toJson());
 
 	return QJsonObject{
 		{ QStringLiteral("role"), roleName(role) },
 		{ QStringLiteral("text"), text },
 		{ QStringLiteral("thinking"), thinking },
-		{ QStringLiteral("toolCalls"), calls },
+		{ QStringLiteral("intentCalls"), calls },
 		{ QStringLiteral("toolCallId"), toolCallId },
 		{ QStringLiteral("toolName"), toolName },
 		{ QStringLiteral("isError"), isError },
@@ -75,9 +75,9 @@ Message Message::fromJson(const QJsonObject& json)
 	message.role = roleFromName(json.value(QStringLiteral("role")).toString());
 	message.text = json.value(QStringLiteral("text")).toString();
 	message.thinking = json.value(QStringLiteral("thinking")).toString();
-	const QJsonArray calls = json.value(QStringLiteral("toolCalls")).toArray();
+	const QJsonArray calls = json.value(QStringLiteral("intentCalls")).toArray();
 	for (const QJsonValue& value : calls)
-		message.toolCalls.append(IntentCall::fromJson(value.toObject()));
+		message.intentCalls.append(IntentCall::fromJson(value.toObject()));
 	message.toolCallId = json.value(QStringLiteral("toolCallId")).toString();
 	message.toolName = json.value(QStringLiteral("toolName")).toString();
 	message.isError = json.value(QStringLiteral("isError")).toBool();
@@ -104,10 +104,10 @@ Message Message::assistant(const QString& text, const QString& thinking)
 	return message;
 }
 
-Message Message::toolResult(const QString& callId, const QString& name, const QString& text, bool isError)
+Message Message::intentResult(const QString& callId, const QString& name, const QString& text, bool isError)
 {
 	Message message;
-	message.role = Role::Tool;
+	message.role = Role::IntentResponse;
 	message.toolCallId = callId;
 	message.toolName = name;
 	message.text = text;
@@ -137,6 +137,24 @@ Usage Usage::fromJson(const QJsonObject& json)
 	usage.promptTokens = json.value(QStringLiteral("promptTokens")).toInt();
 	usage.completionTokens = json.value(QStringLiteral("completionTokens")).toInt();
 	return usage;
+}
+
+ExecuteResult ExecuteResult::success(const QString& content, const QJsonObject& data)
+{
+	ExecuteResult result;
+	result.ok = true;
+	result.content = content;
+	result.data = data;
+	return result;
+}
+
+ExecuteResult ExecuteResult::failure(const QString& error)
+{
+	ExecuteResult result;
+	result.ok = false;
+	result.error = error;
+	result.content = QStringLiteral("error: ") + error;
+	return result;
 }
 
 IntentResult IntentResult::success(const QString& content, const QJsonObject& data)

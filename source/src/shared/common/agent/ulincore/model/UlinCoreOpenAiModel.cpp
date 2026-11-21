@@ -42,9 +42,9 @@ QJsonObject messageToJson(const Message& message)
 	case Role::Assistant: {
 		object.insert(QStringLiteral("role"), QStringLiteral("assistant"));
 		object.insert(QStringLiteral("content"), message.text);
-		if (!message.toolCalls.isEmpty()) {
+		if (!message.intentCalls.isEmpty()) {
 			QJsonArray calls;
-			for (const IntentCall& call : message.toolCalls) {
+			for (const IntentCall& call : message.intentCalls) {
 				QJsonObject callObject{
 					{ QStringLiteral("id"), call.id },
 					{ QStringLiteral("type"), QStringLiteral("function") },
@@ -61,7 +61,7 @@ QJsonObject messageToJson(const Message& message)
 		}
 		break;
 	}
-	case Role::Tool:
+	case Role::IntentResponse:
 		object.insert(QStringLiteral("role"), QStringLiteral("tool"));
 		object.insert(QStringLiteral("tool_call_id"), message.toolCallId);
 		object.insert(QStringLiteral("content"), message.text);
@@ -188,8 +188,8 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 			m_callbacks.onDelta(text, thinking);
 	}
 
-	const QJsonArray toolCalls = delta.value(QStringLiteral("tool_calls")).toArray();
-	for (const QJsonValue& value : toolCalls) {
+	const QJsonArray intentCalls = delta.value(QStringLiteral("tool_calls")).toArray();
+	for (const QJsonValue& value : intentCalls) {
 		const QJsonObject call = value.toObject();
 		const int index = call.value(QStringLiteral("index")).toInt(m_calls.size());
 		IntentCall& target = m_calls[index];

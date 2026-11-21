@@ -18,7 +18,7 @@ public:
 	{
 	}
 
-	IntentResult execute(const QJsonObject& arguments, const ExecutorContext& context) override
+	ExecuteResult execute(const QJsonObject& arguments, const ExecutorContext& context) override
 	{
 		NativeContext legacy;
 		legacy.workspaceRoot = context.workspaceRoot;
@@ -34,7 +34,7 @@ private:
 };
 }
 
-void registerBuiltinExecutors(UlinCoreNativeRegistry& registry)
+void registerBuiltinNativeExecutors(UlinCoreNativeRegistry& registry)
 {
 	// 旧 tool 实现暂作为执行器后端；schema/name 已由 Intent 接管。
 	UlinCoreNativeImplementationRegistry legacy;

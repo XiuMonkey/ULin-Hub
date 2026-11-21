@@ -28,7 +28,7 @@ public:
 	virtual QString name() const = 0;
 	virtual QString description() const = 0;
 	virtual QJsonObject parametersSchema() const = 0;
-	virtual IntentResult execute(const QJsonObject& arguments, const NativeContext& context) = 0;
+	virtual ExecuteResult execute(const QJsonObject& arguments, const NativeContext& context) = 0;
 
 	QJsonObject schema() const;   // 包成 OpenAI function schema
 };

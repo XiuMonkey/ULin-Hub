@@ -12,7 +12,7 @@ void UlinCoreNativeRegistry::add(const QString& id, std::shared_ptr<UlinCoreNati
 
 void UlinCoreNativeRegistry::addBuiltins()
 {
-	registerBuiltinExecutors(*this);
+	registerBuiltinNativeExecutors(*this);
 }
 
 std::shared_ptr<UlinCoreNativeExecutor> UlinCoreNativeRegistry::findShared(const QString& id) const

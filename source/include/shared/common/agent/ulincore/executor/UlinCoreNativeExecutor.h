@@ -22,7 +22,7 @@ class UlinCoreNativeExecutor
 {
 public:
 	virtual ~UlinCoreNativeExecutor() = default;
-	virtual IntentResult execute(const QJsonObject& arguments, const ExecutorContext& context) = 0;
+	virtual ExecuteResult execute(const QJsonObject& arguments, const ExecutorContext& context) = 0;
 };
 
 class UlinCoreNativeRegistry
