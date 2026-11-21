@@ -144,15 +144,15 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
-		if (invocation.hasAsSkill && invocation.asSkill) {
-			if (invocation.hasAsPrompt && invocation.asPrompt) {
-				emit errorOccurred(QStringLiteral("AsPrompt and AsSkill cannot both be true"));
+		if (invocation.asSkill()) {
+			if (invocation.asPrompt()) {
+				emit errorOccurred(QStringLiteral("asPrompt and asSkill cannot both be set"));
 				return;
 			}
 			const QString prompt = invocation.hasPromptTemplate
 				? invocation.promptTemplate : intent.promptTemplate;
 			if (prompt.trimmed().isEmpty() || !intent.hasSkill()) {
-				emit errorOccurred(QStringLiteral("intent %1 needs both prompt and skill for AsSkill").arg(name));
+				emit errorOccurred(QStringLiteral("intent %1 needs both prompt and skill for asSkill").arg(name));
 				return;
 			}
 			const QString method = expandPromptTemplate(intent.skill, params);
@@ -161,8 +161,8 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 			return;
 		}
 
-		const bool usePrompt = invocation.hasAsPrompt
-			? invocation.asPrompt
+		const bool usePrompt = invocation.asPrompt()
+			? true
 			: intent.defaultPromptMode();
 		QString prompt = invocation.hasPromptTemplate
 			? invocation.promptTemplate
@@ -197,15 +197,10 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		promptIntent.description = QStringLiteral("Saved prompt intent");
 		promptIntent.promptTemplate = invocation.promptTemplate;
 		promptIntent.parameters = inferParameters(invocation.args);
-		const bool persist = invocation.hasSave ? invocation.save : true;
+		const bool persist = invocation.save();
 		if (persist)
 			addIntent(promptIntent);
 
-		if (invocation.hasAsPrompt && !invocation.asPrompt
-			&& !promptIntent.hasChain()) {
-			finishEmptyTurn(invocation.rawText);
-			return;
-		}
 		runPromptText(invocation.rawText,
 			expandPromptTemplate(promptIntent.promptTemplate, invocation.args));
 		return;

@@ -353,7 +353,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		}
 		pos = close + 1;
 
-		const QJsonValue prompt = valueIgnoreCase(metadata, QStringLiteral("Prompt"));
+		const QJsonValue prompt = metadata.value(QStringLiteral("prompt"));
 		if (prompt.isString()) {
 			invocation.promptTemplate = prompt.toString();
 			invocation.hasPromptTemplate = true;
@@ -376,26 +376,6 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		const QStringList& tags = invocation.tags;
 		if (tags.contains(QStringLiteral("defineOnly")))
 			invocation.execute = false;
-		if (tags.contains(QStringLiteral("asPrompt"))) {
-			invocation.hasAsPrompt = true;
-			invocation.asPrompt = true;
-		}
-		if (tags.contains(QStringLiteral("asSkill"))) {
-			invocation.hasAsSkill = true;
-			invocation.asSkill = true;
-		}
-		if (tags.contains(QStringLiteral("save"))) {
-			invocation.hasSave = true;
-			invocation.save = true;
-		}
-		if (tags.contains(QStringLiteral("agentEngaged"))) {
-			invocation.hasAgentEngaged = true;
-			invocation.agentEngaged = true;
-		}
-		if (tags.contains(QStringLiteral("skillRequired"))) {
-			invocation.hasSkill = true;
-			invocation.hasSkillFlag = true;
-		}
 
 		// 标签先做最小合法性校验；具体 Intent 是否存在/可执行由 Kernel 校验。
 		static const QStringList knownTags{
@@ -464,29 +444,6 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.kind = InvocationKind::Error;
 			invocation.error = QStringLiteral("Intent definition cannot be combined with execution/agent tags");
 			return invocation;
-		}
-
-		bool has = false;
-		bool value = false;
-		if (boolValue(metadata, QStringLiteral("isSave"), &has, &value)) {
-			invocation.hasSave = true;
-			invocation.save = value;
-		}
-		if (boolValue(metadata, QStringLiteral("isAgentEngaged"), &has, &value)) {
-			invocation.hasAgentEngaged = true;
-			invocation.agentEngaged = value;
-		}
-		if (boolValue(metadata, QStringLiteral("hasSkill"), &has, &value)) {
-			invocation.hasSkill = true;
-			invocation.hasSkillFlag = value;
-		}
-		if (boolValue(metadata, QStringLiteral("AsSkill"), &has, &value)) {
-			invocation.hasAsSkill = true;
-			invocation.asSkill = value;
-		}
-		if (boolValue(metadata, QStringLiteral("AsPrompt"), &has, &value)) {
-			invocation.hasAsPrompt = true;
-			invocation.asPrompt = value;
 		}
 	}
 

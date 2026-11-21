@@ -30,19 +30,16 @@ struct UlinCoreInvocation
 	Intent definition;        // Intent:{...}
 	bool execute = true;      // defineOnly -> false
 
-	QString promptTemplate;   // 元数据里的 Prompt，可覆盖本次 PromptTemplate
+	QString promptTemplate;   // 元数据里的 prompt，可覆盖本次 PromptTemplate
 	bool hasPromptTemplate = false;
-	bool hasAsPrompt = false;
-	bool asPrompt = false;
-	bool save = false;
-	bool hasSave = false;
-	bool agentEngaged = false;
-	bool hasAgentEngaged = false;
-	bool hasSkill = false;          // hasSkill 元数据是否存在
-	bool hasSkillFlag = false;      // hasSkill 的布尔值：强制方案包含 skill
-	bool asSkill = false;
-	bool hasAsSkill = false;
-	bool createPromptIntent = false;
+
+	bool hasTag(const QString& tag) const { return tags.contains(tag); }
+	bool asPrompt() const { return hasTag(QStringLiteral("asPrompt")); }
+	bool asSkill() const { return hasTag(QStringLiteral("asSkill")); }
+	bool save() const { return hasTag(QStringLiteral("save")); }
+	bool agentEngaged() const { return hasTag(QStringLiteral("agentEngaged")); }
+	bool skillRequired() const { return hasTag(QStringLiteral("skillRequired")); }
+	bool defineOnly() const { return hasTag(QStringLiteral("defineOnly")); }
 
 	QString error;
 };

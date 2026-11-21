@@ -280,7 +280,6 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\agent\ulincore\intent\UlinCoreIntent.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\intent\UlinCoreIntentStore.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\intent\UlinCoreParser.cpp" />
-    <ClCompile Include="src\shared\common\agent\ulincore\tool\UlinCoreRecipeTool.cpp" />
     <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp" />
     <ClCompile Include="src\shared\network\SessionPrefetcher.cpp" />
     <ClCompile Include="src\shared\common\appearance\ThemeManager.cpp" />
@@ -367,7 +366,6 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClInclude Include="include\shared\common\agent\ulincore\intent\UlinCoreIntentStore.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\intent\UlinCoreInvocation.h" />
     <ClInclude Include="include\shared\common\agent\ulincore\intent\UlinCoreParser.h" />
-    <ClInclude Include="include\shared\common\agent\ulincore\tool\UlinCoreRecipeTool.h" />
     <QtMoc Include="include\shared\common\appearance\ThemeManager.h" />
     <QtMoc Include="include\shared\common\appearance\TranslationManager.h" />
     <!-- QML 壳的窗口桥与 token：QML 单例注册要 moc -->
