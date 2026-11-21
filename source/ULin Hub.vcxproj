@@ -275,6 +275,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\agent\ulincore\types\UlinCoreTypes.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreMasterAgent.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\model\UlinCoreOpenAiModel.cpp" />
+    <ClCompile Include="src\shared\common\agent\ulincore\protocol\UlinCoreModelProtocol.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\settings\UlinCoreSettings.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\intent\UlinCoreBinding.cpp" />
     <ClCompile Include="src\shared\common\agent\ulincore\intent\UlinCoreIntent.cpp" />

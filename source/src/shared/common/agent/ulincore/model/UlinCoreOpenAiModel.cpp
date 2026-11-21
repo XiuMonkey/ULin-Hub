@@ -1,4 +1,6 @@
-﻿#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+
+#include "common/agent/ulincore/protocol/UlinCoreModelProtocol.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -49,11 +51,10 @@ QJsonObject messageToJson(const Message& message)
 					{ QStringLiteral("function"), QJsonObject{
 						{ QStringLiteral("name"), call.name },
 						{ QStringLiteral("arguments"), QString::fromUtf8(
-							QJsonDocument(call.arguments).toJson(QJsonDocument::Compact)) }
+							QJsonDocument(Protocol::encodeToolArguments(call.arguments, call.metadata))
+								.toJson(QJsonDocument::Compact)) }
 					} }
 				};
-				if (!call.metadata.isEmpty())
-					callObject.insert(QStringLiteral("metadata"), call.metadata);
 				calls.append(callObject);
 			}
 			object.insert(QStringLiteral("tool_calls"), calls);
@@ -112,7 +113,7 @@ void UlinCoreOpenAiModel::start(const ModelRequest& request, const ModelCallback
 		{ QStringLiteral("max_tokens"), m_config.maxTokens }
 	};
 	if (!request.tools.isEmpty())
-		body.insert(QStringLiteral("tools"), request.tools);
+		body.insert(QStringLiteral("tools"), Protocol::encodeToolSchemas(request.tools));
 
 	QNetworkRequest networkRequest(QUrl(endpointFor(m_config.baseUrl)));
 	networkRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
@@ -266,8 +267,12 @@ void UlinCoreOpenAiModel::complete()
 		if (!arguments.isEmpty()) {
 			QJsonParseError error{};
 			const QJsonDocument document = QJsonDocument::fromJson(arguments.toUtf8(), &error);
-			if (document.isObject())
-				call.arguments = document.object();
+			if (document.isObject()) {
+				QJsonObject metadata;
+				call.arguments = Protocol::decodeToolArguments(document.object(), &metadata);
+				if (!metadata.isEmpty())
+					call.metadata = metadata;
+			}
 		}
 		if (call.name.isEmpty())
 			continue;
