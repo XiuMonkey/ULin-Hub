@@ -12,7 +12,9 @@
 #include "network/SessionCommands.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -30,6 +32,13 @@
 namespace
 {
 	constexpr int kStreamFlushMs = 33;
+
+	QString textDigest(const QString& text)
+	{
+		return QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(),
+			QCryptographicHash::Sha1).toHex().left(12));
+	}
+
 	constexpr int kTurnWatchdogMs = 30000;        // 这么久没有本会话事件就认为后端没在干活（没配模型 / resume 失败）
 	constexpr int kCancelRepeatGuardMs = 1500;    // 停止键连点去重窗口：只认第一次，期间靠 cancelling 表态
 	constexpr int kCancelConfirmMs = 8000;        // 发出 cancel 后等不到 turn/end 就本地强制收尾（服务端可能没实现中断）
@@ -1346,6 +1355,11 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		// 刻意不在这里清 m_turnRow：服务端有时在 turn/end 之后才补最后一条
 		// assistant/message 快照；清掉后再来会新建一个气泡，整段回复重复。
 		// 下一轮 turn/start / user/message / beginTurn 会重置它。
+		qInfo().noquote() << "[ChatRecv] turn/end"
+			<< "seq=" << event.value(QStringLiteral("seq")).toInt()
+			<< "streaming=" << m_streaming
+			<< "turnRow=" << m_turnRow
+			<< "pending=" << m_pending.size();
 		const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
 			.value(QStringLiteral("usage")).toObject();
 		if (!usage.isEmpty()) {
@@ -1368,6 +1382,14 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		// 收尾：已流式显示过就不重复追加，只把最后一段封存
 		const QString thinking = extractThinking(event);
 		const QString reply = extractReply(event);
+		const int seq = event.value(QStringLiteral("seq")).toInt();
+		qInfo().noquote() << "[ChatRecv] assistant/message"
+			<< "seq=" << seq
+			<< "streaming=" << m_streaming
+			<< "turnRow=" << m_turnRow
+			<< "thinking=" << thinking.size() << textDigest(thinking)
+			<< "reply=" << reply.size() << textDigest(reply)
+			<< "pending=" << m_pending.size();
 		const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
 			.value(QStringLiteral("usage")).toObject();
 		// 先把流式残余结算掉：否则整段快照会被 bufferChunk 并进同一条 Pending，
@@ -1395,6 +1417,13 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		const QString chunkType = extractChunkType(event);
 		if (chunk.isEmpty())
 			return;
+		qInfo().noquote() << "[ChatRecv] assistant/chunk"
+			<< "seq=" << event.value(QStringLiteral("seq")).toInt()
+			<< "type=" << chunkType
+			<< "len=" << chunk.size() << textDigest(chunk)
+			<< "streaming=" << m_streaming
+			<< "turnRow=" << m_turnRow
+			<< "pending=" << m_pending.size();
 
 		// chunk.type 缺失时按正文处理；已知类型之外的显式类型才丢弃
 		const bool thinking = chunkType == QStringLiteral("reasoning-delta");
@@ -1588,9 +1617,16 @@ void ChatController::flushPending()
 
 	const QVector<Pending> pending = m_pending;
 	m_pending.clear();
+	qInfo().noquote() << "[ChatFlush] entries=" << pending.size();
 	// 同一批里可能按顺序含 reply / thinking / toolCall；模型按到达顺序落段，缓冲不能重排它们。
-	for (const Pending& entry : pending)
+	for (const Pending& entry : pending) {
+		qInfo().noquote() << "[ChatFlush]"
+			<< "row=" << entry.row
+			<< "type=" << entry.type
+			<< "len=" << entry.text.size() << textDigest(entry.text)
+			<< "tool=" << entry.toolName;
 		m_messages->appendChunk(entry.row, entry.type, entry.text, entry.toolName);
+	}
 }
 
 void ChatController::setStreaming(bool streaming)

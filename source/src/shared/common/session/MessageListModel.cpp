@@ -4,12 +4,19 @@
 
 #include "common/util/MarkdownSegmenter.h"
 
+#include <QCryptographicHash>
+#include <QDebug>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QStringList>
 
 namespace
 {
+	QString textDigest(const QString& text)
+	{
+		return QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(),
+			QCryptographicHash::Sha1).toHex().left(12));
+	}
 	QString normalizedForDedup(const QString& text)
 	{
 		return text.simplified();
@@ -227,6 +234,12 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 		return;
 
 	Row& entry = m_rows[row];
+	qInfo().noquote() << "[ChatChunk] in"
+		<< "row=" << row << "type=" << type
+		<< "len=" << text.size() << textDigest(text)
+		<< "streaming=" << entry.streaming
+		<< "segments=" << entry.segments.size()
+		<< "replyTail=" << entry.replyTail.size();
 
 	// 只有"最终 reply"走增量尾：流式期间只发 ReplyTailRole，稳定段与过程组一个都不重建。
 	// 占位段放在末尾是因为它确实是当前最新的段；AgentBubble 始终按 segments 原序渲染，不做重排。
@@ -251,8 +264,11 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 		for (const Segment& existing : entry.segments) {
 			if (existing.type == type
 					&& (existing.text == incoming
-						|| normalizedForDedup(existing.text) == incomingNorm))
+						|| normalizedForDedup(existing.text) == incomingNorm)) {
+				qInfo().noquote() << "[ChatChunk] drop-exact"
+					<< "row=" << row << "type=" << type << textDigest(incoming);
 				return;
+			}
 		}
 	}
 
@@ -266,9 +282,16 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			continue;
 		const QString previousNorm = normalizedForDedup(previous.text);
 		if (previous.text == incoming || previousNorm == incomingNorm
-				|| previousNorm.startsWith(incomingNorm))
+				|| previousNorm.startsWith(incomingNorm)) {
+			qInfo().noquote() << "[ChatChunk] drop-prefix"
+				<< "row=" << row << "type=" << type << textDigest(incoming)
+				<< "prev=" << previous.text.size() << textDigest(previous.text);
 			return;
+		}
 		if (incomingNorm.startsWith(previousNorm)) {
+			qInfo().noquote() << "[ChatChunk] replace-grow"
+				<< "row=" << row << "type=" << type
+				<< "prev=" << previous.text.size() << "next=" << incoming.size();
 			previous.text = type == QLatin1String("thinking")
 				? dedupeThinkingParagraphs(incoming) : incoming;
 			previous.partsReady = false;
@@ -285,12 +308,18 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			const QString lastNorm = normalizedForDedup(last.text);
 			if (type == QLatin1String("thinking")) {
 				// 同一份思考快照被重复追加，而不是真正的增量。
-				if (!incomingNorm.isEmpty() && lastNorm.endsWith(incomingNorm))
+				if (!incomingNorm.isEmpty() && lastNorm.endsWith(incomingNorm)) {
+					qInfo().noquote() << "[ChatChunk] drop-tail-dup"
+						<< "row=" << row << "type=" << type << textDigest(incoming);
 					return;
+				}
 				last.text = dedupeThinkingParagraphs(last.text + incoming);
 			} else {
 				last.text += incoming;
 			}
+			qInfo().noquote() << "[ChatChunk] append-last"
+				<< "row=" << row << "type=" << type
+				<< "len=" << incoming.size() << "total=" << last.text.size();
 			last.partsReady = false;  // text 变了 ⇒ 缓存的 markdown 切分作废（见 Segment::parts）
 			touchRow(row);
 			return;
@@ -302,6 +331,9 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	segment.text = incoming;
 	segment.toolName = toolName;
 	entry.segments.append(segment);
+	qInfo().noquote() << "[ChatChunk] new-segment"
+		<< "row=" << row << "type=" << type
+		<< "len=" << incoming.size() << "segments=" << entry.segments.size();
 	touchRow(row);
 }
 
