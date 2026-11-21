@@ -372,6 +372,12 @@ void MessageListModel::replaceThinkingSnapshot(int row, const QString& text)
 void MessageListModel::appendReplyTail(int row, const QString& text)
 {
 	Row& entry = m_rows[row];
+	qInfo().noquote() << "[ReplyTail] in"
+		<< "row=" << row
+		<< "len=" << text.size() << textDigest(text)
+		<< "streaming=" << entry.streaming
+		<< "segments=" << entry.segments.size()
+		<< "tail=" << entry.replyTail.size() << textDigest(entry.replyTail);
 
 	// 尾文本必须挂在最后一段 reply 上；最后一段是思考/工具时先补一个空 reply 占位，
 	// 这样段顺序仍是真实输出顺序，AgentBubble 不需要做任何重排。
@@ -382,14 +388,28 @@ void MessageListModel::appendReplyTail(int row, const QString& text)
 		placeholder.type = QLatin1String("reply");
 		placeholder.partsReady = true;   // 空文本，避免 segmentsFor 在这里切分
 		entry.segments.append(placeholder);
+		qInfo().noquote() << "[ReplyTail] create-placeholder"
+			<< "row=" << row << "segments=" << entry.segments.size();
 	}
 
 	Segment& reply = entry.segments.last();
 	const QString base = entry.replyTail.isEmpty() ? reply.text : entry.replyTail;
-	if (base == text || base.startsWith(text))
+	if (base == text || base.startsWith(text)) {
+		qInfo().noquote() << "[ReplyTail] drop"
+			<< "row=" << row
+			<< "base=" << base.size() << textDigest(base)
+			<< "incoming=" << text.size() << textDigest(text);
 		return;   // 同一快照重复到达 / 迟到的更短快照
+	}
 
+	const QString oldTail = entry.replyTail;
 	entry.replyTail = text.startsWith(base) ? text : (base + text);
+	qInfo().noquote() << "[ReplyTail] set"
+		<< "row=" << row
+		<< "old=" << oldTail.size() << textDigest(oldTail)
+		<< "base=" << base.size() << textDigest(base)
+		<< "new=" << entry.replyTail.size() << textDigest(entry.replyTail)
+		<< "replace=" << text.startsWith(base);
 	entry.tailPartsReady = false;
 	const QModelIndex idx = index(row, 0);
 	if (created)
@@ -403,8 +423,15 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 	if (row < 0 || row >= m_rows.size())
 		return false;
 	Row& entry = m_rows[row];
-	if (entry.replyTail.isEmpty())
+	if (entry.replyTail.isEmpty()) {
+		qInfo().noquote() << "[ReplyTail] commit-skip"
+			<< "row=" << row << "reason=empty-tail";
 		return false;
+	}
+	qInfo().noquote() << "[ReplyTail] commit-in"
+		<< "row=" << row
+		<< "tail=" << entry.replyTail.size() << textDigest(entry.replyTail)
+		<< "segments=" << entry.segments.size();
 
 	int replyIndex = -1;
 	for (int i = entry.segments.size() - 1; i >= 0; --i) {
@@ -413,6 +440,8 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 			break;
 		}
 	}
+	const int oldReplySize = replyIndex >= 0 ? entry.segments.at(replyIndex).text.size() : 0;
+	const QString oldReplyHash = replyIndex >= 0 ? textDigest(entry.segments.at(replyIndex).text) : QString();
 
 	if (replyIndex < 0) {
 		// 防御：正常路径下 appendReplyTail 已经建好占位段。
@@ -429,6 +458,12 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 	entry.replyTail.clear();
 	entry.tailParts.clear();
 	entry.tailPartsReady = false;
+	qInfo().noquote() << "[ReplyTail] commit-done"
+		<< "row=" << row
+		<< "replyIndex=" << replyIndex
+		<< "prev=" << oldReplySize << oldReplyHash
+		<< "next=" << (replyIndex >= 0 ? entry.segments.at(replyIndex).text.size() : 0)
+		<< "segments=" << entry.segments.size();
 
 	if (notify) {
 		const QModelIndex idx = index(row, 0);
