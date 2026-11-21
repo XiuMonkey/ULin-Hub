@@ -1,6 +1,7 @@
 #include "common/agent/ulincore/intent/UlinCoreParser.h"
 
 #include <QChar>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -40,6 +41,44 @@ int findMatching(const QString& text, int open)
 		if (c == QLatin1Char('{'))
 			++depth;
 		else if (c == QLatin1Char('}')) {
+			--depth;
+			if (depth == 0)
+				return i;
+		}
+	}
+	return -1;
+}
+
+// 元数据值里允许出现 JSON object/array（Intent、tags）；按括号配对切出原文。
+int findMatchingValue(const QString& text, int open)
+{
+	if (open < 0 || open >= text.size())
+		return -1;
+	const QChar opener = text.at(open);
+	if (opener != QLatin1Char('{') && opener != QLatin1Char('['))
+		return -1;
+	const QChar closer = (opener == QLatin1Char('{')) ? QLatin1Char('}') : QLatin1Char(']');
+	int depth = 0;
+	bool inString = false;
+	bool escape = false;
+	for (int i = open; i < text.size(); ++i) {
+		const QChar c = text.at(i);
+		if (inString) {
+			if (escape)
+				escape = false;
+			else if (c == QLatin1Char('\\'))
+				escape = true;
+			else if (c == QLatin1Char('"'))
+				inString = false;
+			continue;
+		}
+		if (c == QLatin1Char('"')) {
+			inString = true;
+			continue;
+		}
+		if (c == opener)
+			++depth;
+		else if (c == closer) {
 			--depth;
 			if (depth == 0)
 				return i;
@@ -130,6 +169,32 @@ bool parseKeyValueBody(const QString& body, bool colon, QJsonObject* out, QStrin
 		++i;
 		while (i < n && isSpace(body.at(i)))
 			++i;
+
+		// tags:["asPrompt"] / Intent:{...}：值本身是结构化 JSON。
+		if (i < n && (body.at(i) == QLatin1Char('{') || body.at(i) == QLatin1Char('['))) {
+			const int close = findMatchingValue(body, i);
+			if (close < 0) {
+				if (error)
+					*error = QStringLiteral("unterminated structured value for %1").arg(key);
+				return false;
+			}
+			QJsonParseError parseError;
+			const QJsonDocument doc = QJsonDocument::fromJson(
+				body.mid(i, close - i + 1).toUtf8(), &parseError);
+			if (parseError.error != QJsonParseError::NoError) {
+				if (error)
+					*error = QStringLiteral("invalid JSON for %1: %2")
+						.arg(key, parseError.errorString());
+				return false;
+			}
+			out->insert(key, doc.isArray() ? QJsonValue(doc.array()) : QJsonValue(doc.object()));
+			i = close + 1;
+			while (i < n && isSpace(body.at(i)))
+				++i;
+			if (i < n && body.at(i) == QLatin1Char(','))
+				++i;
+			continue;
+		}
 
 		QString value;
 		if (i < n && body.at(i) == QLatin1Char('"')) {
@@ -293,6 +358,114 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.promptTemplate = prompt.toString();
 			invocation.hasPromptTemplate = true;
 		}
+
+		const QJsonValue tagsValue = valueIgnoreCase(metadata, QStringLiteral("tags"));
+		if (tagsValue.isArray()) {
+			for (const QJsonValue& tag : tagsValue.toArray()) {
+				if (tag.isString() && !tag.toString().trimmed().isEmpty())
+					invocation.tags.append(tag.toString().trimmed());
+			}
+		}
+
+		const QJsonValue definition = valueIgnoreCase(metadata, QStringLiteral("Intent"));
+		if (definition.isObject()) {
+			invocation.definition = Intent::fromJson(definition.toObject());
+			invocation.hasDefinition = true;
+		}
+
+		const QStringList& tags = invocation.tags;
+		if (tags.contains(QStringLiteral("defineOnly")))
+			invocation.execute = false;
+		if (tags.contains(QStringLiteral("asPrompt"))) {
+			invocation.hasAsPrompt = true;
+			invocation.asPrompt = true;
+		}
+		if (tags.contains(QStringLiteral("asSkill"))) {
+			invocation.hasAsSkill = true;
+			invocation.asSkill = true;
+		}
+		if (tags.contains(QStringLiteral("save"))) {
+			invocation.hasSave = true;
+			invocation.save = true;
+		}
+		if (tags.contains(QStringLiteral("agentEngaged"))) {
+			invocation.hasAgentEngaged = true;
+			invocation.agentEngaged = true;
+		}
+		if (tags.contains(QStringLiteral("skillRequired"))) {
+			invocation.hasSkill = true;
+			invocation.hasSkillFlag = true;
+		}
+
+		// 标签先做最小合法性校验；具体 Intent 是否存在/可执行由 Kernel 校验。
+		static const QStringList knownTags{
+			QStringLiteral("asPrompt"), QStringLiteral("asSkill"),
+			QStringLiteral("save"), QStringLiteral("agentEngaged"),
+			QStringLiteral("skillRequired"), QStringLiteral("defineOnly")
+		};
+		QStringList seenTags;
+		for (const QString& tag : tags) {
+			if (!knownTags.contains(tag)) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("unknown tag: %1").arg(tag);
+				return invocation;
+			}
+			if (seenTags.contains(tag)) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("duplicate tag: %1").arg(tag);
+				return invocation;
+			}
+			seenTags.append(tag);
+		}
+		const bool tagAsPrompt = tags.contains(QStringLiteral("asPrompt"));
+		const bool tagAsSkill = tags.contains(QStringLiteral("asSkill"));
+		const bool tagSave = tags.contains(QStringLiteral("save"));
+		const bool tagAgent = tags.contains(QStringLiteral("agentEngaged"));
+		const bool tagSkill = tags.contains(QStringLiteral("skillRequired"));
+		const bool tagDefineOnly = tags.contains(QStringLiteral("defineOnly"));
+		if (tagAsPrompt && tagAsSkill) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("asPrompt and asSkill cannot both be set");
+			return invocation;
+		}
+		if (tagSave && (tagAsPrompt || tagAsSkill)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("save cannot be combined with asPrompt/asSkill");
+			return invocation;
+		}
+		if (tagSkill && !tagAgent) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("skillRequired requires agentEngaged");
+			return invocation;
+		}
+		if ((tagAgent || tagSkill) && !tagSave) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("agentEngaged/skillRequired requires save");
+			return invocation;
+		}
+		if (tagDefineOnly) {
+			if (!invocation.hasDefinition) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("defineOnly requires Intent:{...}");
+				return invocation;
+			}
+			if (!tagSave) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("defineOnly requires save");
+				return invocation;
+			}
+			if (tagAsPrompt || tagAsSkill || tagAgent || tagSkill) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("defineOnly cannot be combined with execution/agent tags");
+				return invocation;
+			}
+		}
+		if (invocation.hasDefinition && (tagAsPrompt || tagAsSkill || tagAgent || tagSkill)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("Intent definition cannot be combined with execution/agent tags");
+			return invocation;
+		}
+
 		bool has = false;
 		bool value = false;
 		if (boolValue(metadata, QStringLiteral("isSave"), &has, &value)) {

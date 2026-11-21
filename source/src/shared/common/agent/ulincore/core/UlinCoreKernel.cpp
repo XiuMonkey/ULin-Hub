@@ -115,6 +115,31 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	}
 
 	const QString name = invocation.intentName;
+	if (!invocation.execute && !invocation.hasDefinition) {
+		emit errorOccurred(QStringLiteral("definition payload required for defineOnly"));
+		return;
+	}
+	if (invocation.hasDefinition) {
+		if (name.trimmed().isEmpty()) {
+			emit errorOccurred(QStringLiteral("intent definition requires a name"));
+			return;
+		}
+		Intent definition = invocation.definition;
+		definition.name = name;
+		if (!definition.hasPrompt() && !definition.hasSkill()
+				&& !definition.hasChain() && !definition.hasNative()) {
+			emit errorOccurred(QStringLiteral("intent %1 definition is empty").arg(name));
+			return;
+		}
+		addIntent(definition);
+		if (!invocation.execute)
+			return;
+		if (!definition.hasChain() && !definition.hasNative()) {
+			emit errorOccurred(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(name));
+			return;
+		}
+	}
+
 	const bool known = m_intents.contains(name);
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {

@@ -4,6 +4,7 @@
 
 #include <QJsonObject>
 #include <QString>
+#include <QStringList>
 
 namespace UlinCore
 {
@@ -23,6 +24,11 @@ struct UlinCoreInvocation
 	QString intentName;
 	QString promptText;       // Prompt fallback 时真正发给模型的文本
 	QJsonObject args;
+
+	QStringList tags;         // 单数组标签
+	bool hasDefinition = false;
+	Intent definition;        // Intent:{...}
+	bool execute = true;      // defineOnly -> false
 
 	QString promptTemplate;   // 元数据里的 Prompt，可覆盖本次 PromptTemplate
 	bool hasPromptTemplate = false;

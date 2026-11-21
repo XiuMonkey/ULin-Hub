@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/types/UlinCoreTypes.h"
+#include "common/agent/ulincore/types/UlinCoreTypes.h"
 
 #include <QDateTime>
 #include <QJsonArray>
@@ -36,7 +36,8 @@ QJsonObject ToolCall::toJson() const
 	return QJsonObject{
 		{ QStringLiteral("id"), id },
 		{ QStringLiteral("name"), name },
-		{ QStringLiteral("arguments"), arguments }
+		{ QStringLiteral("arguments"), arguments },
+		{ QStringLiteral("metadata"), metadata }
 	};
 }
 
@@ -46,6 +47,7 @@ ToolCall ToolCall::fromJson(const QJsonObject& json)
 	call.id = json.value(QStringLiteral("id")).toString();
 	call.name = json.value(QStringLiteral("name")).toString();
 	call.arguments = json.value(QStringLiteral("arguments")).toObject();
+	call.metadata = json.value(QStringLiteral("metadata")).toObject();
 	return call;
 }
 

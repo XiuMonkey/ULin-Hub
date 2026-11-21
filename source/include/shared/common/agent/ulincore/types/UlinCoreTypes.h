@@ -29,6 +29,7 @@ struct ToolCall
 	QString id;
 	QString name;
 	QJsonObject arguments;
+	QJsonObject metadata;   // tags / Intent；由 ULin 自有工具协议携带
 
 	QJsonObject toJson() const;
 	static ToolCall fromJson(const QJsonObject& json);
