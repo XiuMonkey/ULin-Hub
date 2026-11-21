@@ -1,4 +1,4 @@
-// 见 CommandController.h：斜杠命令的发现 / 过滤 / 执行。
+﻿// 见 CommandController.h：斜杠命令的发现 / 过滤 / 执行。
 
 #include "common/session/CommandController.h"
 

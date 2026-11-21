@@ -1,6 +1,6 @@
-#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+﻿#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
 
-#include "common/agent/ulincore/protocol/UlinCoreModelProtocol.h"
+#include "common/agent/ulincore/model/protocol/UlinCoreModelProtocol.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -44,7 +44,7 @@ QJsonObject messageToJson(const Message& message)
 		object.insert(QStringLiteral("content"), message.text);
 		if (!message.toolCalls.isEmpty()) {
 			QJsonArray calls;
-			for (const ToolCall& call : message.toolCalls) {
+			for (const IntentCall& call : message.toolCalls) {
 				QJsonObject callObject{
 					{ QStringLiteral("id"), call.id },
 					{ QStringLiteral("type"), QStringLiteral("function") },
@@ -192,7 +192,7 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 	for (const QJsonValue& value : toolCalls) {
 		const QJsonObject call = value.toObject();
 		const int index = call.value(QStringLiteral("index")).toInt(m_calls.size());
-		ToolCall& target = m_calls[index];
+		IntentCall& target = m_calls[index];
 		if (call.contains(QStringLiteral("id")))
 			target.id = call.value(QStringLiteral("id")).toString();
 		if (call.value(QStringLiteral("metadata")).isObject())
@@ -258,11 +258,11 @@ void UlinCoreOpenAiModel::complete()
 		return;
 	m_finished = true;
 
-	QList<ToolCall> calls;
+	QList<IntentCall> calls;
 	QList<int> keys = m_calls.keys();
 	std::sort(keys.begin(), keys.end());
 	for (int key : keys) {
-		ToolCall call = m_calls.value(key);
+		IntentCall call = m_calls.value(key);
 		const QString arguments = m_callArguments.value(key);
 		if (!arguments.isEmpty()) {
 			QJsonParseError error{};

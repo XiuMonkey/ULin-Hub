@@ -47,7 +47,7 @@ private:
 	QByteArray m_buffer;
 	QString m_text;
 	QString m_thinking;
-	QHash<int, ToolCall> m_calls;
+	QHash<int, IntentCall> m_calls;
 	QHash<int, QString> m_callArguments;
 	Usage m_usage;
 	QString m_finishReason;

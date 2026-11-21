@@ -267,10 +267,10 @@ void UlinCoreKernel::runRecipeIntent(const Intent& intent, const QJsonObject& ar
 	const ExecutorContext context = m_options.toolContext;
 	QPointer<UlinCoreKernel> self(this);
 	auto resolver = [this](const QString& name) { return m_intents.find(name); };
-	auto recipe = std::make_shared<UlinCoreIntentExecutor>(intent, &m_executors, resolver);
+	auto recipe = std::make_shared<UlinCoreIntentCaller>(intent, &m_executors, resolver);
 	m_toolPool->start(new ToolRunnable(
 		[self, generation, callId, intent, args, context, recipe]() {
-			const ToolResult result = recipe->execute(args, context);
+			const IntentResult result = recipe->call(args, context);
 			if (!self)
 				return;
 			QMetaObject::invokeMethod(self.data(),
@@ -294,7 +294,7 @@ void UlinCoreKernel::runNativeIntent(const Intent& intent, const QJsonObject& ar
 }
 
 void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const Intent& intent,
-	const QJsonObject& args, const ToolResult& result)
+	const QJsonObject& args, const IntentResult& result)
 {
 	Q_UNUSED(args)
 	if (generation != m_generation || !m_running || m_cancelled)
@@ -303,13 +303,13 @@ void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const I
 	QString content = result.ok
 		? result.content
 		: (result.error.isEmpty() ? QStringLiteral("intent failed") : result.error);
-	if (content.size() > m_options.maxToolResultChars) {
-		const int dropped = content.size() - m_options.maxToolResultChars;
-		content = content.left(m_options.maxToolResultChars)
+	if (content.size() > m_options.maxIntentResultChars) {
+		const int dropped = content.size() - m_options.maxIntentResultChars;
+		content = content.left(m_options.maxIntentResultChars)
 			+ QStringLiteral("\n...[truncated %1 chars]").arg(dropped);
 	}
 
-	ToolResult stored = result;
+	IntentResult stored = result;
 	stored.content = content;
 	m_session->append(Message::toolResult(callId, intent.name, content, !result.ok));
 	journal(QStringLiteral("tool/result"), QJsonObject{
@@ -450,7 +450,7 @@ ModelCallbacks UlinCoreKernel::makeCallbacks(int generation)
 		m_pendingThinking += thinking;
 		emit assistantDelta(m_turnId, text, thinking);
 	};
-	callbacks.onComplete = [this, generation](const QList<ToolCall>& calls, const QString& text,
+	callbacks.onComplete = [this, generation](const QList<IntentCall>& calls, const QString& text,
 		const QString& thinking, const Usage& usage, const QString& finishReason) {
 		handleComplete(generation, calls, text, thinking, usage, finishReason);
 	};
@@ -504,7 +504,7 @@ void UlinCoreKernel::startStep(int generation)
 	});
 }
 
-void UlinCoreKernel::handleComplete(int generation, const QList<ToolCall>& calls, const QString& text,
+void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& calls, const QString& text,
 	const QString& thinking, const Usage& usage, const QString& finishReason)
 {
 	Q_UNUSED(finishReason)
@@ -542,10 +542,10 @@ void UlinCoreKernel::handleComplete(int generation, const QList<ToolCall>& calls
 		return;
 	}
 
-	executeTool(generation, calls, 0);
+	callIntent(generation, calls, 0);
 }
 
-void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, int index)
+void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, int index)
 {
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
@@ -554,7 +554,7 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 		return;
 	}
 
-	const ToolCall call = calls.at(index);
+	const IntentCall call = calls.at(index);
 	emit toolStarted(m_turnId, call.id, call.name, call.arguments);
 	journal(QStringLiteral("tool/call"), QJsonObject{
 		{ QStringLiteral("turnId"), m_turnId },
@@ -579,18 +579,18 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 	const bool agentTag = tags.contains(QStringLiteral("agentEngaged"))
 		|| tags.contains(QStringLiteral("skillRequired"));
 	if (agentTag) {
-		completeTool(generation, calls, index, call,
-			ToolResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
+		completeIntentCall(generation, calls, index, call,
+			IntentResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
 		return;
 	}
 	if ((asPrompt || asSkill) && hasSaveTag) {
-		completeTool(generation, calls, index, call,
-			ToolResult::failure(QStringLiteral("save cannot be combined with asPrompt/asSkill")));
+		completeIntentCall(generation, calls, index, call,
+			IntentResult::failure(QStringLiteral("save cannot be combined with asPrompt/asSkill")));
 		return;
 	}
 	if (defineOnly && !hasSaveTag) {
-		completeTool(generation, calls, index, call,
-			ToolResult::failure(QStringLiteral("defineOnly requires save")));
+		completeIntentCall(generation, calls, index, call,
+			IntentResult::failure(QStringLiteral("defineOnly requires save")));
 		return;
 	}
 
@@ -598,44 +598,44 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 	const QJsonValue definitionValue = call.metadata.value(QStringLiteral("Intent"));
 	if (definitionValue.isObject()) {
 		if (asPrompt || asSkill) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("Intent definition cannot use asPrompt/asSkill")));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("Intent definition cannot use asPrompt/asSkill")));
 			return;
 		}
 		intent = Intent::fromJson(definitionValue.toObject());
 		intent.name = call.name;
 		if (intent.name.trimmed().isEmpty()) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("intent definition requires a name")));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("intent definition requires a name")));
 			return;
 		}
 		if (!intent.hasPrompt() && !intent.hasSkill() && !intent.hasChain() && !intent.hasNative()) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
 			return;
 		}
 		addIntent(intent);
 		if (defineOnly) {
-			completeTool(generation, calls, index, call,
-				ToolResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
 			return;
 		}
 		if (!intent.hasChain() && !intent.hasNative()) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(call.name)));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(call.name)));
 			return;
 		}
 	} else {
 		if (defineOnly) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("defineOnly requires Intent:{...}")));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("defineOnly requires Intent:{...}")));
 			return;
 		}
 		intent = m_intents.find(call.name);
 	}
 	if (intent.name.isEmpty()) {
-		completeTool(generation, calls, index, call,
-			ToolResult::failure(QStringLiteral("unknown intent: %1").arg(call.name)));
+		completeIntentCall(generation, calls, index, call,
+			IntentResult::failure(QStringLiteral("unknown intent: %1").arg(call.name)));
 		return;
 	}
 
@@ -645,43 +645,43 @@ void UlinCoreKernel::executeTool(int generation, const QList<ToolCall>& calls, i
 		if (prompt.isEmpty())
 			prompt = intent.prompt;
 		if (prompt.trimmed().isEmpty()) {
-			completeTool(generation, calls, index, call,
-				ToolResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
+			completeIntentCall(generation, calls, index, call,
+				IntentResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
 			return;
 		}
 		QString content = expandPromptTemplate(prompt, params);
 		if (asSkill) {
 			if (!intent.hasSkill()) {
-				completeTool(generation, calls, index, call,
-					ToolResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
+				completeIntentCall(generation, calls, index, call,
+					IntentResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
 				return;
 			}
 			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(intent.skill, params);
 		}
-		completeTool(generation, calls, index, call, ToolResult::success(content));
+		completeIntentCall(generation, calls, index, call, IntentResult::success(content));
 		return;
 	}
 
 	const ExecutorContext context = m_options.toolContext;
 	QPointer<UlinCoreKernel> self(this);
 	auto resolver = [this](const QString& name) { return m_intents.find(name); };
-	auto executor = std::make_shared<UlinCoreIntentExecutor>(intent, &m_executors, resolver);
+	auto executor = std::make_shared<UlinCoreIntentCaller>(intent, &m_executors, resolver);
 	m_toolPool->start(new ToolRunnable(
 		[self, generation, calls, index, call, executor, context]() {
-			const ToolResult result = executor->execute(call.arguments, context);
+			const IntentResult result = executor->call(call.arguments, context);
 			if (!self)
 				return;
 			QMetaObject::invokeMethod(self.data(),
 				[self, generation, calls, index, call, result]() {
 					if (UlinCoreKernel* kernel = self.data())
-						kernel->completeTool(generation, calls, index, call, result);
+						kernel->completeIntentCall(generation, calls, index, call, result);
 				},
 				Qt::QueuedConnection);
 		}));
 }
 
-void UlinCoreKernel::completeTool(int generation, const QList<ToolCall>& calls, int index,
-	const ToolCall& call, const ToolResult& result)
+void UlinCoreKernel::completeIntentCall(int generation, const QList<IntentCall>& calls, int index,
+	const IntentCall& call, const IntentResult& result)
 {
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
@@ -689,13 +689,13 @@ void UlinCoreKernel::completeTool(int generation, const QList<ToolCall>& calls, 
 	QString content = result.ok
 		? result.content
 		: (result.error.isEmpty() ? QStringLiteral("tool failed") : result.error);
-	if (content.size() > m_options.maxToolResultChars) {
-		const int dropped = content.size() - m_options.maxToolResultChars;
-		content = content.left(m_options.maxToolResultChars)
+	if (content.size() > m_options.maxIntentResultChars) {
+		const int dropped = content.size() - m_options.maxIntentResultChars;
+		content = content.left(m_options.maxIntentResultChars)
 			+ QStringLiteral("\n...[truncated %1 chars]").arg(dropped);
 	}
 
-	ToolResult stored = result;
+	IntentResult stored = result;
 	stored.content = content;
 
 	m_session->append(Message::toolResult(call.id, call.name, content, !result.ok));
@@ -708,7 +708,7 @@ void UlinCoreKernel::completeTool(int generation, const QList<ToolCall>& calls, 
 	});
 	emit toolFinished(m_turnId, call.id, call.name, stored);
 
-	executeTool(generation, calls, index + 1);
+	callIntent(generation, calls, index + 1);
 }
 
 void UlinCoreKernel::finishTurn(int generation, bool ok, const QString& error,

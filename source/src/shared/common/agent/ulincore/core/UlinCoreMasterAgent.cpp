@@ -207,17 +207,17 @@ void UlinCoreMasterAgent::ensureKernel()
 				{ QStringLiteral("name"), name },
 				{ QStringLiteral("arguments"), arguments }
 			});
-			forwardToolCall(name, arguments);
+			forwardIntentCall(name, arguments);
 		});
 	connect(m_kernel, &UlinCoreKernel::toolFinished, this,
-		[this](const QString&, const QString&, const QString&, const ToolResult& result) {
+		[this](const QString&, const QString&, const QString&, const IntentResult& result) {
 			m_streamedThisTurn = false;   // 下一段模型输出可能不再流式
 			const QString content = result.ok ? result.content : result.error;
 			appendSessionEvent(QStringLiteral("tool/result"), QJsonObject{
 				{ QStringLiteral("message"), content },
 				{ QStringLiteral("ok"), result.ok }
 			});
-			forwardToolResult(content, result.ok);
+			forwardIntentResult(content, result.ok);
 		});
 	connect(m_kernel, &UlinCoreKernel::turnFinished, this,
 		[this](const TurnResult& result) {
@@ -511,7 +511,7 @@ void UlinCoreMasterAgent::forwardText(const QString& text, const QString& thinki
 	}
 }
 
-void UlinCoreMasterAgent::forwardToolCall(const QString& name, const QJsonObject& arguments)
+void UlinCoreMasterAgent::forwardIntentCall(const QString& name, const QJsonObject& arguments)
 {
 	forwardEvent(QStringLiteral("tool/call"), QJsonObject{
 		{ QStringLiteral("name"), name },
@@ -519,7 +519,7 @@ void UlinCoreMasterAgent::forwardToolCall(const QString& name, const QJsonObject
 	});
 }
 
-void UlinCoreMasterAgent::forwardToolResult(const QString& content, bool ok)
+void UlinCoreMasterAgent::forwardIntentResult(const QString& content, bool ok)
 {
 	forwardEvent(QStringLiteral("tool/result"), QJsonObject{
 		{ QStringLiteral("message"), content },

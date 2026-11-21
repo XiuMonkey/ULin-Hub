@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 会话消息列表的 QML 模型：一行 = 一条消息（用户 / Agent / 系统提示）。
 // Agent 消息内部是**有序段**（thinking / reply / toolCall / toolResult），交错顺序不会丢；reply 段按代码围栏切成单元。
@@ -80,7 +80,7 @@ public:
 	// assistant/message 的 thinking 是权威快照：替换最后一段 thinking，而不是追加。
 	void replaceThinkingSnapshot(int row, const QString& text);
 	// 工具结果贴到该行最后一个 toolCall 段上（一次调用的结果就在那张卡片里）；没有就新开 toolResult 段
-	void appendToolResult(int row, const QString& text);
+	void appendIntentResult(int row, const QString& text);
 	void setStreaming(int row, bool streaming);
 	void appendDeliverables(int row, const QVector<DeliverableRef>& files);
 	// 累加一轮里多个模型步骤的 usage。字段缺失时按 0 处理。

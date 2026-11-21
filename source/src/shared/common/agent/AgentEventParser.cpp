@@ -1,4 +1,4 @@
-// DSH Mux 流 JSON 解析接口实现；不依赖任何 UI 类，可单独复用。
+﻿// DSH Mux 流 JSON 解析接口实现；不依赖任何 UI 类，可单独复用。
 
 #include "common/agent/AgentEventParser.h"
 
@@ -116,9 +116,9 @@ QString extractReply(const QJsonObject& event)
 	return parts.join(QLatin1Char('\n'));
 }
 
-ToolCallInfo extractToolCall(const QJsonObject& event)
+IntentCallInfo extractIntentCall(const QJsonObject& event)
 {
-	ToolCallInfo info;
+	IntentCallInfo info;
 	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
 	info.name = data.value(QStringLiteral("name")).toString();
 	info.valid = !info.name.isEmpty();
@@ -134,9 +134,9 @@ ToolCallInfo extractToolCall(const QJsonObject& event)
 	return info;
 }
 
-ToolResultInfo extractToolResult(const QJsonObject& event)
+IntentResultInfo extractIntentResult(const QJsonObject& event)
 {
-	ToolResultInfo info;
+	IntentResultInfo info;
 	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
 	info.message = data.value(QStringLiteral("message")).toString();
 	info.valid = !info.message.isEmpty();

@@ -10,14 +10,14 @@ UlinCoreEchoModel::UlinCoreEchoModel(QObject* parent)
 {
 }
 
-void UlinCoreEchoModel::setScriptedToolCall(const QString& name, const QJsonObject& arguments)
+void UlinCoreEchoModel::setScriptedIntentCall(const QString& name, const QJsonObject& arguments)
 {
 	m_scriptName = name;
 	m_scriptArgs = arguments;
 	m_scriptConsumed = false;
 }
 
-void UlinCoreEchoModel::clearScriptedToolCall()
+void UlinCoreEchoModel::clearScriptedIntentCall()
 {
 	m_scriptName.clear();
 	m_scriptArgs = QJsonObject();
@@ -38,7 +38,7 @@ void UlinCoreEchoModel::start(const ModelRequest& request, const ModelCallbacks&
 		// 第一步按脚本发一次工具调用，让内核跑通 tool → model 回路。
 		if (!m_scriptConsumed && !m_scriptName.isEmpty()) {
 			m_scriptConsumed = true;
-			ToolCall call;
+			IntentCall call;
 			call.id = QStringLiteral("echo-call-1");
 			call.name = m_scriptName;
 			call.arguments = m_scriptArgs;

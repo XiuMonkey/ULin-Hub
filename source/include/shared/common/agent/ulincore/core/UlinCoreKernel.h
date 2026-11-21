@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "common/agent/ulincore/executor/UlinCoreExecutor.h"
-#include "common/agent/ulincore/executor/UlinCoreIntentExecutor.h"
+#include "common/agent/ulincore/executor/UlinCoreNativeExecutor.h"
+#include "common/agent/ulincore/intent/UlinCoreIntentCaller.h"
 #include "common/agent/ulincore/intent/UlinCoreIntentStore.h"
 #include "common/agent/ulincore/intent/UlinCoreInvocation.h"
 #include "common/agent/ulincore/model/UlinCoreModel.h"
@@ -28,7 +28,7 @@ public:
 	struct Options
 	{
 		int maxSteps = 24;
-		int maxToolResultChars = 20000;
+		int maxIntentResultChars = 20000;
 		int toolThreads = 4;
 		QString systemPrompt;
 		ExecutorContext toolContext;
@@ -41,7 +41,7 @@ public:
 	std::shared_ptr<UlinCoreModel> model() const { return m_model; }
 
 	UlinCoreSession* session() const { return m_session; }
-	UlinCoreExecutorRegistry& executors() { return m_executors; }
+	UlinCoreNativeRegistry& executors() { return m_executors; }
 	UlinCoreIntentStore& intents() { return m_intents; }
 
 	// data/ulincore/intents.json；加载后自动把有调用链的 Intent 注册成 Tool。
@@ -64,7 +64,7 @@ signals:
 	void assistantDelta(const QString& turnId, const QString& text, const QString& thinking);
 	void assistantMessage(const UlinCore::Message& message);
 	void toolStarted(const QString& turnId, const QString& callId, const QString& name, const QJsonObject& arguments);
-	void toolFinished(const QString& turnId, const QString& callId, const QString& name, const UlinCore::ToolResult& result);
+	void toolFinished(const QString& turnId, const QString& callId, const QString& name, const UlinCore::IntentResult& result);
 	void turnFinished(const UlinCore::TurnResult& result);
 	void errorOccurred(const QString& message);
 	void usageChanged(const UlinCore::Usage& usage);
@@ -72,11 +72,11 @@ signals:
 private:
 	ModelCallbacks makeCallbacks(int generation);
 	void startStep(int generation);
-	void handleComplete(int generation, const QList<ToolCall>& calls, const QString& text,
+	void handleComplete(int generation, const QList<IntentCall>& calls, const QString& text,
 		const QString& thinking, const Usage& usage, const QString& finishReason);
-	void executeTool(int generation, const QList<ToolCall>& calls, int index);
-	void completeTool(int generation, const QList<ToolCall>& calls, int index,
-		const ToolCall& call, const ToolResult& result);
+	void callIntent(int generation, const QList<IntentCall>& calls, int index);
+	void completeIntentCall(int generation, const QList<IntentCall>& calls, int index,
+		const IntentCall& call, const IntentResult& result);
 	void finishTurn(int generation, bool ok, const QString& error, const QString& finalText, bool cancelled);
 	void emitTurnFinished(bool ok, const QString& error, const QString& finalText, bool cancelled);
 	void journal(const QString& type, const QJsonObject& payload);
@@ -87,7 +87,7 @@ private:
 	void runRecipeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
 	void runNativeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
 	void finishRecipe(int generation, const QString& callId, const Intent& intent,
-		const QJsonObject& args, const ToolResult& result);
+		const QJsonObject& args, const IntentResult& result);
 	void finishEmptyTurn(const QString& rawText);
 	void savePromptIntent(const UlinCoreInvocation& invocation, const QString& prompt);
 	void saveLiteralIntent(const Intent& intent);
@@ -98,7 +98,7 @@ private:
 
 	std::shared_ptr<UlinCoreModel> m_model;
 	UlinCoreSession* m_session = nullptr;
-	UlinCoreExecutorRegistry m_executors;
+	UlinCoreNativeRegistry m_executors;
 	UlinCoreIntentStore m_intents;
 	QString m_intentsPath;
 	Options m_options;

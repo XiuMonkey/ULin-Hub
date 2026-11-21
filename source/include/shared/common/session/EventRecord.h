@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 会话记录（session 事件流）的外壳拆解。
 // 服务端推送/持久化的一行可能是 { seq, event: {...} } 也可能直接是事件对象，

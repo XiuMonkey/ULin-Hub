@@ -1,4 +1,4 @@
-#include "common/session/SessionCatalog.h"
+﻿#include "common/session/SessionCatalog.h"
 
 #include <QCoreApplication>
 #include <QDir>

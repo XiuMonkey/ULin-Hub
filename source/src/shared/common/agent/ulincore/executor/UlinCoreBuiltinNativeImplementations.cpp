@@ -1,6 +1,6 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutorBackends.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinNativeImplementations.h"
 
-#include "common/agent/ulincore/executor/UlinCoreExecutorBackend.h"
+#include "common/agent/ulincore/executor/UlinCoreNativeImplementation.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -81,7 +81,7 @@ namespace
 		return false;
 	}
 
-	class ReadFileTool : public UlinCoreExecutorBackend
+	class ReadFileTool : public UlinCoreNativeImplementation
 	{
 	public:
 		QString name() const override { return QStringLiteral("read_file"); }
@@ -106,29 +106,29 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("path") } }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
+		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(), &error);
 			if (path.isEmpty())
-				return ToolResult::failure(error);
+				return IntentResult::failure(error);
 
 			QFile file(path);
 			if (!file.open(QIODevice::ReadOnly))
-				return ToolResult::failure(QStringLiteral("cannot open %1: %2")
+				return IntentResult::failure(QStringLiteral("cannot open %1: %2")
 					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 requested = static_cast<qint64>(args.value(QStringLiteral("maxBytes")).toInt(65536));
 			const qint64 limit = qBound<qint64>(1, requested, kMaxReadBytes);
 			const QByteArray raw = file.read(limit);
 			if (raw.contains('\0'))
-				return ToolResult::failure(QStringLiteral("binary file, use a dedicated viewer"));
-			return ToolResult::success(QString::fromUtf8(raw));
+				return IntentResult::failure(QStringLiteral("binary file, use a dedicated viewer"));
+			return IntentResult::success(QString::fromUtf8(raw));
 		}
 	};
 
-	class ListDirTool : public UlinCoreExecutorBackend
+	class ListDirTool : public UlinCoreNativeImplementation
 	{
 	public:
 		QString name() const override { return QStringLiteral("list_dir"); }
@@ -152,17 +152,17 @@ namespace
 				} }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
+		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(QStringLiteral(".")), &error);
 			if (path.isEmpty())
-				return ToolResult::failure(error);
+				return IntentResult::failure(error);
 
 			const QDir dir(path);
 			if (!dir.exists())
-				return ToolResult::failure(QStringLiteral("not a directory: ")
+				return IntentResult::failure(QStringLiteral("not a directory: ")
 					+ args.value(QStringLiteral("path")).toString());
 
 			const int maxEntries = qBound(1, args.value(QStringLiteral("maxEntries")).toInt(200), 2000);
@@ -181,11 +181,11 @@ namespace
 					? rel + QLatin1Char('/')
 					: QStringLiteral("%1 (%2 bytes)").arg(rel).arg(info.size()));
 			}
-			return ToolResult::success(lines.join(QLatin1Char('\n')));
+			return IntentResult::success(lines.join(QLatin1Char('\n')));
 		}
 	};
 
-	class WriteFileTool : public UlinCoreExecutorBackend
+	class WriteFileTool : public UlinCoreNativeImplementation
 	{
 	public:
 		QString name() const override { return QStringLiteral("write_file"); }
@@ -213,31 +213,31 @@ namespace
 				} }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
+		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			if (!ctx.allowWrites)
-				return ToolResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
+				return IntentResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
 
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString path = resolveInside(root, args.value(QStringLiteral("path")).toString(), &error);
 			if (path.isEmpty())
-				return ToolResult::failure(error);
+				return IntentResult::failure(error);
 
 			QDir().mkpath(QFileInfo(path).absolutePath());
 			const QByteArray bytes = args.value(QStringLiteral("content")).toString().toUtf8();
 			QFile file(path);
 			if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-				return ToolResult::failure(QStringLiteral("cannot write %1: %2")
+				return IntentResult::failure(QStringLiteral("cannot write %1: %2")
 					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 written = file.write(bytes);
 			file.close();
 			if (written != bytes.size())
-				return ToolResult::failure(QStringLiteral("short write: %1/%2").arg(written).arg(bytes.size()));
+				return IntentResult::failure(QStringLiteral("short write: %1/%2").arg(written).arg(bytes.size()));
 
 			const QString relative = relativeToRoot(root, path);
-			return ToolResult::success(QStringLiteral("wrote %1 bytes to %2").arg(written).arg(relative),
+			return IntentResult::success(QStringLiteral("wrote %1 bytes to %2").arg(written).arg(relative),
 				QJsonObject{
 					{ QStringLiteral("path"), relative },
 					{ QStringLiteral("bytes"), written }
@@ -245,7 +245,7 @@ namespace
 		}
 	};
 
-	class SearchTextTool : public UlinCoreExecutorBackend
+	class SearchTextTool : public UlinCoreNativeImplementation
 	{
 	public:
 		QString name() const override { return QStringLiteral("search_text"); }
@@ -269,17 +269,17 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("query") } }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
+		IntentResult execute(const QJsonObject& args, const NativeContext& ctx) override
 		{
 			const QString query = args.value(QStringLiteral("query")).toString();
 			if (query.isEmpty())
-				return ToolResult::failure(QStringLiteral("query is empty"));
+				return IntentResult::failure(QStringLiteral("query is empty"));
 
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
 			const QString base = resolveInside(root, args.value(QStringLiteral("path")).toString(QStringLiteral(".")), &error);
 			if (base.isEmpty())
-				return ToolResult::failure(error);
+				return IntentResult::failure(error);
 
 			const bool caseSensitive = args.value(QStringLiteral("caseSensitive")).toBool(false);
 			const int maxResults = qBound(1, args.value(QStringLiteral("maxResults")).toInt(50), 500);
@@ -311,13 +311,13 @@ namespace
 				}
 			}
 
-			return ToolResult::success(hits.isEmpty() ? QStringLiteral("no matches")
+			return IntentResult::success(hits.isEmpty() ? QStringLiteral("no matches")
 				: hits.join(QLatin1Char('\n')));
 		}
 	};
 } // namespace
 
-void registerBuiltinExecutorBackends(UlinCoreExecutorBackendRegistry& registry)
+void registerBuiltinExecutorBackends(UlinCoreNativeImplementationRegistry& registry)
 {
 	registry.add(std::make_shared<ReadFileTool>());
 	registry.add(std::make_shared<ListDirTool>());

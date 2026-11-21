@@ -1,4 +1,4 @@
-#include "common/util/Debugger.h"
+﻿#include "common/util/Debugger.h"
 #include "common/util/Format.h"
 #include "common/util/Json.h"
 #include "common/session/EventRecord.h"
@@ -1073,7 +1073,7 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("tool/call")) {
-		const ToolCallInfo tool = extractToolCall(event);
+		const IntentCallInfo tool = extractIntentCall(event);
 		if (tool.valid)
 			m_messages->appendChunk(agentRowForTurn(), QStringLiteral("toolCall"),
 				jsonIndented(tool.arguments), tool.name);
@@ -1081,9 +1081,9 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("tool/result")) {
-		const ToolResultInfo result = extractToolResult(event);
+		const IntentResultInfo result = extractIntentResult(event);
 		if (result.valid)
-			m_messages->appendToolResult(agentRowForTurn(), result.message);
+			m_messages->appendIntentResult(agentRowForTurn(), result.message);
 		return;
 	}
 
@@ -1457,7 +1457,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("tool/call")) {
-		const ToolCallInfo tool = extractToolCall(event);
+		const IntentCallInfo tool = extractIntentCall(event);
 		if (tool.valid) {
 			bufferChunk(agentRowForTurn(), QStringLiteral("toolCall"),
 				jsonIndented(tool.arguments), tool.name);
@@ -1468,10 +1468,10 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("tool/result")) {
-		const ToolResultInfo result = extractToolResult(event);
+		const IntentResultInfo result = extractIntentResult(event);
 		if (result.valid) {
 			flushPending();  // 工具结果是整段落的，直接落盘（并先把缓冲刷掉，保证顺序）
-			m_messages->appendToolResult(agentRowForTurn(), result.message);
+			m_messages->appendIntentResult(agentRowForTurn(), result.message);
 			m_turnHadOutput = true;
 			setStreaming(true);
 		}

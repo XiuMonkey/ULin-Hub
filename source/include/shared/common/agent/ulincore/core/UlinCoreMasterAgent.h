@@ -20,7 +20,7 @@ namespace UlinCore
 //   · 激活后接管出站 API，session/prompt 由本类驱动 UlinCoreKernel；
 //   · 内核信号翻成宿主认识的 session/event 帧（assistant/chunk、tool/call…）。
 //
-// 这是 DSH 协议适配层，不是内核本身：内核仍然只认 UlinCore::Message / ToolCall。
+// 这是 DSH 协议适配层，不是内核本身：内核仍然只认 UlinCore::Message / IntentCall。
 class UlinCoreMasterAgent : public QObject, public VirtualMasterAgent, public VirtualApiSink
 {
 	Q_OBJECT
@@ -81,8 +81,8 @@ private:
 	void saveState() const;
 	void forwardEvent(const QString& type, const QJsonObject& data);
 	void forwardText(const QString& text, const QString& thinking);
-	void forwardToolCall(const QString& name, const QJsonObject& arguments);
-	void forwardToolResult(const QString& content, bool ok);
+	void forwardIntentCall(const QString& name, const QJsonObject& arguments);
+	void forwardIntentResult(const QString& content, bool ok);
 	void forwardFullMessage(const Message& message);
 	QJsonArray messageContent(const Message& message) const;
 

@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreIntentExecutor.h"
+﻿#include "common/agent/ulincore/intent/UlinCoreIntentCaller.h"
 
 #include "common/agent/ulincore/intent/UlinCoreBinding.h"
 
@@ -14,7 +14,7 @@ thread_local int g_executorDepth = 0;
 constexpr int kMaxExecutorDepth = 32;
 }
 
-UlinCoreIntentExecutor::UlinCoreIntentExecutor(Intent intent, UlinCoreExecutorRegistry* executors,
+UlinCoreIntentCaller::UlinCoreIntentCaller(Intent intent, UlinCoreNativeRegistry* executors,
 	IntentResolver resolver)
 	: m_intent(std::move(intent))
 	, m_executors(executors)
@@ -22,32 +22,32 @@ UlinCoreIntentExecutor::UlinCoreIntentExecutor(Intent intent, UlinCoreExecutorRe
 {
 }
 
-ToolResult UlinCoreIntentExecutor::execute(const QJsonObject& arguments, const ExecutorContext& context)
+IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const ExecutorContext& context)
 {
 	if (g_executorDepth >= kMaxExecutorDepth)
-		return ToolResult::failure(QStringLiteral("intent execution recursion limit reached"));
+		return IntentResult::failure(QStringLiteral("intent execution recursion limit reached"));
 	if (!m_executors)
-		return ToolResult::failure(QStringLiteral("intent executor has no executor registry"));
+		return IntentResult::failure(QStringLiteral("intent executor has no executor registry"));
 
 	if (m_intent.hasNative()) {
 		QString id = m_intent.executor;
 		if (id.startsWith(QStringLiteral("builtin.")))
 			id = id.mid(8);
 		if (id == m_intent.name)
-			return ToolResult::failure(QStringLiteral("intent %1 cannot execute itself").arg(m_intent.name));
+			return IntentResult::failure(QStringLiteral("intent %1 cannot execute itself").arg(m_intent.name));
 		const auto executor = m_executors->findShared(id);
 		if (!executor)
-			return ToolResult::failure(QStringLiteral("unknown executor in intent %1: %2")
+			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
 				.arg(m_intent.name, m_intent.executor));
 
 		++g_executorDepth;
-		const ToolResult result = executor->execute(arguments, context);
+		const IntentResult result = executor->execute(arguments, context);
 		--g_executorDepth;
 		return result;
 	}
 
 	if (m_intent.steps.isEmpty())
-		return ToolResult::failure(QStringLiteral("intent %1 has no executable form").arg(m_intent.name));
+		return IntentResult::failure(QStringLiteral("intent %1 has no executable form").arg(m_intent.name));
 
 	++g_executorDepth;
 	QStringList output;
@@ -55,20 +55,20 @@ ToolResult UlinCoreIntentExecutor::execute(const QJsonObject& arguments, const E
 		const Intent target = m_resolve ? m_resolve(step.intent) : Intent();
 		if (target.name.isEmpty()) {
 			--g_executorDepth;
-			return ToolResult::failure(QStringLiteral("unknown intent in recipe %1: %2")
+			return IntentResult::failure(QStringLiteral("unknown intent in recipe %1: %2")
 				.arg(m_intent.name, step.intent));
 		}
-		UlinCoreIntentExecutor nested(target, m_executors, m_resolve);
-		const ToolResult result = nested.execute(resolveBindings(step.arguments, arguments), context);
+		UlinCoreIntentCaller nested(target, m_executors, m_resolve);
+		const IntentResult result = nested.call(resolveBindings(step.arguments, arguments), context);
 		if (!result.ok) {
 			--g_executorDepth;
-			return ToolResult::failure(result.error.isEmpty()
+			return IntentResult::failure(result.error.isEmpty()
 				? QStringLiteral("step failed: %1").arg(step.intent) : result.error);
 		}
 		if (!result.content.isEmpty())
 			output.append(result.content);
 	}
 	--g_executorDepth;
-	return ToolResult::success(output.isEmpty() ? QStringLiteral("ok") : output.join(QLatin1Char('\n')));
+	return IntentResult::success(output.isEmpty() ? QStringLiteral("ok") : output.join(QLatin1Char('\n')));
 }
 } // namespace UlinCore

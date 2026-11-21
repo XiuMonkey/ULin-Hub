@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 轨迹视图的数据面（对照官方 @deepseek-ai/dsh-client-ui-trajectory）。
 // 官方那套是"纯投影"：不额外问服务端要数据，而是把会话事件账本（turn/step/消息/工具/压缩）

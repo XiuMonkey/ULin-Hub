@@ -1,18 +1,18 @@
-#pragma once
+﻿#pragma once
 
 // DSH mux 流 JSON 的解析接口，独立于 UI。
 
 #include <QJsonObject>
 #include <QString>
 
-struct ToolCallInfo
+struct IntentCallInfo
 {
 	QString name;
 	QJsonObject arguments;
 	bool valid = false;
 };
 
-struct ToolResultInfo
+struct IntentResultInfo
 {
 	QString message;
 	bool valid = false;
@@ -24,5 +24,5 @@ QString extractEventText(const QJsonObject& event);
 QString extractChunkType(const QJsonObject& event);
 QString extractThinking(const QJsonObject& event);
 QString extractReply(const QJsonObject& event);
-ToolCallInfo extractToolCall(const QJsonObject& event);
-ToolResultInfo extractToolResult(const QJsonObject& event);
+IntentCallInfo extractIntentCall(const QJsonObject& event);
+IntentResultInfo extractIntentResult(const QJsonObject& event);

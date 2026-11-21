@@ -1,4 +1,4 @@
-// 见 MessageListModel.h：会话消息列表模型。
+﻿// 见 MessageListModel.h：会话消息列表模型。
 
 #include "common/session/MessageListModel.h"
 
@@ -472,7 +472,7 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 	return true;
 }
 
-void MessageListModel::appendToolResult(int row, const QString& text)
+void MessageListModel::appendIntentResult(int row, const QString& text)
 {
 	if (row < 0 || row >= m_rows.size() || text.isEmpty())
 		return;

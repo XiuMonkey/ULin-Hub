@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 会话相关“功能逻辑”的统一入口（无 Qt Widget 依赖）：拉取并解析 session.list、触发侧栏重建与自动选中、
 // session.create、标题回填、清空 DSH home 会话数据。回调都在主线程触发（DshApiClient 的回调本来就在主线程）。

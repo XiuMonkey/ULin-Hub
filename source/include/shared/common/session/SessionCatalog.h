@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 侧边栏"工作区 / 会话"列表的纯逻辑模型（无 Qt Widget 依赖）：解析 session.list 回包，维护
 // sessionId 的归属/标题/归档，并派生分组与自动选中结果。工作区不随 session.list 返回，只由

@@ -1,4 +1,4 @@
-// 见 SessionListModel.h：把工作区与会话摊平成一行一行的列表。
+﻿// 见 SessionListModel.h：把工作区与会话摊平成一行一行的列表。
 
 #include "common/session/SessionListModel.h"
 

@@ -31,7 +31,7 @@ Role roleFromName(const QString& name)
 	return Role::User;
 }
 
-QJsonObject ToolCall::toJson() const
+QJsonObject IntentCall::toJson() const
 {
 	return QJsonObject{
 		{ QStringLiteral("id"), id },
@@ -41,9 +41,9 @@ QJsonObject ToolCall::toJson() const
 	};
 }
 
-ToolCall ToolCall::fromJson(const QJsonObject& json)
+IntentCall IntentCall::fromJson(const QJsonObject& json)
 {
-	ToolCall call;
+	IntentCall call;
 	call.id = json.value(QStringLiteral("id")).toString();
 	call.name = json.value(QStringLiteral("name")).toString();
 	call.arguments = json.value(QStringLiteral("arguments")).toObject();
@@ -54,7 +54,7 @@ ToolCall ToolCall::fromJson(const QJsonObject& json)
 QJsonObject Message::toJson() const
 {
 	QJsonArray calls;
-	for (const ToolCall& call : toolCalls)
+	for (const IntentCall& call : toolCalls)
 		calls.append(call.toJson());
 
 	return QJsonObject{
@@ -77,7 +77,7 @@ Message Message::fromJson(const QJsonObject& json)
 	message.thinking = json.value(QStringLiteral("thinking")).toString();
 	const QJsonArray calls = json.value(QStringLiteral("toolCalls")).toArray();
 	for (const QJsonValue& value : calls)
-		message.toolCalls.append(ToolCall::fromJson(value.toObject()));
+		message.toolCalls.append(IntentCall::fromJson(value.toObject()));
 	message.toolCallId = json.value(QStringLiteral("toolCallId")).toString();
 	message.toolName = json.value(QStringLiteral("toolName")).toString();
 	message.isError = json.value(QStringLiteral("isError")).toBool();
@@ -139,18 +139,18 @@ Usage Usage::fromJson(const QJsonObject& json)
 	return usage;
 }
 
-ToolResult ToolResult::success(const QString& content, const QJsonObject& data)
+IntentResult IntentResult::success(const QString& content, const QJsonObject& data)
 {
-	ToolResult result;
+	IntentResult result;
 	result.ok = true;
 	result.content = content;
 	result.data = data;
 	return result;
 }
 
-ToolResult ToolResult::failure(const QString& error)
+IntentResult IntentResult::failure(const QString& error)
 {
-	ToolResult result;
+	IntentResult result;
 	result.ok = false;
 	result.error = error;
 	result.content = QStringLiteral("error: ") + error;

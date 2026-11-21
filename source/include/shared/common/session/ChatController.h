@@ -3,7 +3,7 @@
 // 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
 // 解析辅助函数直接复用既有的 common/agent/AgentEventParser（extractReply / extractThinking /
-// extractToolCall / extractToolResult / extractEventText / extractChunkType），所以语义不会漂。
+// extractIntentCall / extractIntentResult / extractEventText / extractChunkType），所以语义不会漂。
 // 与现有实现的差异（有意）：
 //  * 不再有"控件树缓存 + 离屏分批建控件"：QML 的 ListView 自己复用 delegate；
 // * 流式改用 33ms 合并缓冲。

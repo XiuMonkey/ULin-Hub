@@ -1,12 +1,12 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreExecutorBackend.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreNativeImplementation.h"
 
-#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutorBackends.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinNativeImplementations.h"
 
 #include <utility>
 
 namespace UlinCore
 {
-QJsonObject UlinCoreExecutorBackend::schema() const
+QJsonObject UlinCoreNativeImplementation::schema() const
 {
 	return QJsonObject{
 		{ QStringLiteral("type"), QStringLiteral("function") },
@@ -18,7 +18,7 @@ QJsonObject UlinCoreExecutorBackend::schema() const
 	};
 }
 
-void UlinCoreExecutorBackendRegistry::add(std::shared_ptr<UlinCoreExecutorBackend> tool)
+void UlinCoreNativeImplementationRegistry::add(std::shared_ptr<UlinCoreNativeImplementation> tool)
 {
 	if (!tool)
 		return;
@@ -26,23 +26,23 @@ void UlinCoreExecutorBackendRegistry::add(std::shared_ptr<UlinCoreExecutorBacken
 	m_tools.insert(key, std::move(tool));
 }
 
-void UlinCoreExecutorBackendRegistry::addBuiltins()
+void UlinCoreNativeImplementationRegistry::addBuiltins()
 {
 	registerBuiltinExecutorBackends(*this);
 }
 
-UlinCoreExecutorBackend* UlinCoreExecutorBackendRegistry::find(const QString& name) const
+UlinCoreNativeImplementation* UlinCoreNativeImplementationRegistry::find(const QString& name) const
 {
 	const auto it = m_tools.constFind(name);
 	return it == m_tools.constEnd() ? nullptr : it.value().get();
 }
 
-std::shared_ptr<UlinCoreExecutorBackend> UlinCoreExecutorBackendRegistry::findShared(const QString& name) const
+std::shared_ptr<UlinCoreNativeImplementation> UlinCoreNativeImplementationRegistry::findShared(const QString& name) const
 {
 	return m_tools.value(name);
 }
 
-QList<QString> UlinCoreExecutorBackendRegistry::names() const
+QList<QString> UlinCoreNativeImplementationRegistry::names() const
 {
 	QList<QString> result;
 	result.reserve(m_tools.size());
@@ -52,7 +52,7 @@ QList<QString> UlinCoreExecutorBackendRegistry::names() const
 	return result;
 }
 
-QJsonArray UlinCoreExecutorBackendRegistry::schemas() const
+QJsonArray UlinCoreNativeImplementationRegistry::schemas() const
 {
 	QJsonArray result;
 	QList<QString> keys = m_tools.keys();

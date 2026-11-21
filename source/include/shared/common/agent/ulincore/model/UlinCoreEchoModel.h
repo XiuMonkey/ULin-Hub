@@ -17,8 +17,8 @@ public:
 	void start(const ModelRequest& request, const ModelCallbacks& callbacks) override;
 	void cancel() override;
 
-	void setScriptedToolCall(const QString& name, const QJsonObject& arguments);
-	void clearScriptedToolCall();
+	void setScriptedIntentCall(const QString& name, const QJsonObject& arguments);
+	void clearScriptedIntentCall();
 
 private:
 	ModelCallbacks m_callbacks;

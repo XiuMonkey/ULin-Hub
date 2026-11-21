@@ -3,7 +3,7 @@
 // 自研 Agent 内核的基础数据类型。
 //
 // 这里刻意不依赖 DSH 的 wire 格式：dsh/ 适配层负责把 DSH 的 session/event 翻译成
-// Message / ToolCall / ToolResult，内核只认这些类型。这样换模型、换传输、做单测时，
+// Message / IntentCall / IntentResult，内核只认这些类型。这样换模型、换传输、做单测时，
 // 内核本身不用改。
 
 #include <QJsonObject>
@@ -24,7 +24,7 @@ enum class Role
 QString roleName(Role role);
 Role roleFromName(const QString& name);
 
-struct ToolCall
+struct IntentCall
 {
 	QString id;
 	QString name;
@@ -32,7 +32,7 @@ struct ToolCall
 	QJsonObject metadata;   // tags / Intent；由 ULin 自有工具协议携带
 
 	QJsonObject toJson() const;
-	static ToolCall fromJson(const QJsonObject& json);
+	static IntentCall fromJson(const QJsonObject& json);
 };
 
 struct Message
@@ -40,7 +40,7 @@ struct Message
 	Role role = Role::User;
 	QString text;
 	QString thinking;
-	QList<ToolCall> toolCalls;   // Assistant 消息里的工具调用
+	QList<IntentCall> toolCalls;   // Assistant 消息里的工具调用
 	QString toolCallId;          // Tool 消息对应哪次调用
 	QString toolName;
 	bool isError = false;
@@ -65,15 +65,15 @@ struct Usage
 	static Usage fromJson(const QJsonObject& json);
 };
 
-struct ToolResult
+struct IntentResult
 {
 	bool ok = false;
 	QString content;
 	QJsonObject data;
 	QString error;
 
-	static ToolResult success(const QString& content, const QJsonObject& data = {});
-	static ToolResult failure(const QString& error);
+	static IntentResult success(const QString& content, const QJsonObject& data = {});
+	static IntentResult failure(const QString& error);
 };
 
 struct TurnResult
@@ -87,8 +87,8 @@ struct TurnResult
 };
 } // namespace UlinCore
 
-Q_DECLARE_METATYPE(UlinCore::ToolCall)
+Q_DECLARE_METATYPE(UlinCore::IntentCall)
 Q_DECLARE_METATYPE(UlinCore::Message)
 Q_DECLARE_METATYPE(UlinCore::Usage)
-Q_DECLARE_METATYPE(UlinCore::ToolResult)
+Q_DECLARE_METATYPE(UlinCore::IntentResult)
 Q_DECLARE_METATYPE(UlinCore::TurnResult)
