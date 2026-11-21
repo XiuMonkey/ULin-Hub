@@ -2,8 +2,8 @@
 
 namespace UlinCore
 {
-class UlinCoreToolRegistry;
+class UlinCoreExecutorBackendRegistry;
 
 // 注册只读/受限写工具：read_file / list_dir / write_file / search_text。
-void registerBuiltinTools(UlinCoreToolRegistry& registry);
+void registerBuiltinExecutorBackends(UlinCoreExecutorBackendRegistry& registry);
 } // namespace UlinCore

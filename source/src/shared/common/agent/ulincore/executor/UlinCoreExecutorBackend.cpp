@@ -1,12 +1,12 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreTool.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreExecutorBackend.h"
 
-#include "common/agent/ulincore/executor/UlinCoreBuiltinTools.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutorBackends.h"
 
 #include <utility>
 
 namespace UlinCore
 {
-QJsonObject UlinCoreTool::schema() const
+QJsonObject UlinCoreExecutorBackend::schema() const
 {
 	return QJsonObject{
 		{ QStringLiteral("type"), QStringLiteral("function") },
@@ -18,7 +18,7 @@ QJsonObject UlinCoreTool::schema() const
 	};
 }
 
-void UlinCoreToolRegistry::add(std::shared_ptr<UlinCoreTool> tool)
+void UlinCoreExecutorBackendRegistry::add(std::shared_ptr<UlinCoreExecutorBackend> tool)
 {
 	if (!tool)
 		return;
@@ -26,23 +26,23 @@ void UlinCoreToolRegistry::add(std::shared_ptr<UlinCoreTool> tool)
 	m_tools.insert(key, std::move(tool));
 }
 
-void UlinCoreToolRegistry::addBuiltins()
+void UlinCoreExecutorBackendRegistry::addBuiltins()
 {
-	registerBuiltinTools(*this);
+	registerBuiltinExecutorBackends(*this);
 }
 
-UlinCoreTool* UlinCoreToolRegistry::find(const QString& name) const
+UlinCoreExecutorBackend* UlinCoreExecutorBackendRegistry::find(const QString& name) const
 {
 	const auto it = m_tools.constFind(name);
 	return it == m_tools.constEnd() ? nullptr : it.value().get();
 }
 
-std::shared_ptr<UlinCoreTool> UlinCoreToolRegistry::findShared(const QString& name) const
+std::shared_ptr<UlinCoreExecutorBackend> UlinCoreExecutorBackendRegistry::findShared(const QString& name) const
 {
 	return m_tools.value(name);
 }
 
-QList<QString> UlinCoreToolRegistry::names() const
+QList<QString> UlinCoreExecutorBackendRegistry::names() const
 {
 	QList<QString> result;
 	result.reserve(m_tools.size());
@@ -52,7 +52,7 @@ QList<QString> UlinCoreToolRegistry::names() const
 	return result;
 }
 
-QJsonArray UlinCoreToolRegistry::schemas() const
+QJsonArray UlinCoreExecutorBackendRegistry::schemas() const
 {
 	QJsonArray result;
 	QList<QString> keys = m_tools.keys();

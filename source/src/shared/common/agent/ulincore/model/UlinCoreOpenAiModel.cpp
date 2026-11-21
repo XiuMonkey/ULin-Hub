@@ -1,4 +1,4 @@
-#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+﻿#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>

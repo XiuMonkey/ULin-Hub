@@ -1,6 +1,6 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinTools.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutorBackends.h"
 
-#include "common/agent/ulincore/executor/UlinCoreTool.h"
+#include "common/agent/ulincore/executor/UlinCoreExecutorBackend.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -81,7 +81,7 @@ namespace
 		return false;
 	}
 
-	class ReadFileTool : public UlinCoreTool
+	class ReadFileTool : public UlinCoreExecutorBackend
 	{
 	public:
 		QString name() const override { return QStringLiteral("read_file"); }
@@ -106,7 +106,7 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("path") } }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ToolContext& ctx) override
+		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
@@ -128,7 +128,7 @@ namespace
 		}
 	};
 
-	class ListDirTool : public UlinCoreTool
+	class ListDirTool : public UlinCoreExecutorBackend
 	{
 	public:
 		QString name() const override { return QStringLiteral("list_dir"); }
@@ -152,7 +152,7 @@ namespace
 				} }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ToolContext& ctx) override
+		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
@@ -185,7 +185,7 @@ namespace
 		}
 	};
 
-	class WriteFileTool : public UlinCoreTool
+	class WriteFileTool : public UlinCoreExecutorBackend
 	{
 	public:
 		QString name() const override { return QStringLiteral("write_file"); }
@@ -213,7 +213,7 @@ namespace
 				} }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ToolContext& ctx) override
+		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
 		{
 			if (!ctx.allowWrites)
 				return ToolResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
@@ -245,7 +245,7 @@ namespace
 		}
 	};
 
-	class SearchTextTool : public UlinCoreTool
+	class SearchTextTool : public UlinCoreExecutorBackend
 	{
 	public:
 		QString name() const override { return QStringLiteral("search_text"); }
@@ -269,7 +269,7 @@ namespace
 				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("query") } }
 			};
 		}
-		ToolResult execute(const QJsonObject& args, const ToolContext& ctx) override
+		ToolResult execute(const QJsonObject& args, const ExecutorBackendContext& ctx) override
 		{
 			const QString query = args.value(QStringLiteral("query")).toString();
 			if (query.isEmpty())
@@ -317,7 +317,7 @@ namespace
 	};
 } // namespace
 
-void registerBuiltinTools(UlinCoreToolRegistry& registry)
+void registerBuiltinExecutorBackends(UlinCoreExecutorBackendRegistry& registry)
 {
 	registry.add(std::make_shared<ReadFileTool>());
 	registry.add(std::make_shared<ListDirTool>());

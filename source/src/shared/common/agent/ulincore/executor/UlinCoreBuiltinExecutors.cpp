@@ -1,8 +1,8 @@
 ﻿#include "common/agent/ulincore/executor/UlinCoreExecutor.h"
 
 #include "common/agent/ulincore/executor/UlinCoreBuiltinExecutors.h"
-#include "common/agent/ulincore/executor/UlinCoreBuiltinTools.h"
-#include "common/agent/ulincore/executor/UlinCoreTool.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutorBackends.h"
+#include "common/agent/ulincore/executor/UlinCoreExecutorBackend.h"
 
 #include <memory>
 
@@ -13,14 +13,14 @@ namespace
 class ToolExecutorAdapter : public UlinCoreExecutor
 {
 public:
-	explicit ToolExecutorAdapter(std::shared_ptr<UlinCoreTool> tool)
+	explicit ToolExecutorAdapter(std::shared_ptr<UlinCoreExecutorBackend> tool)
 		: m_tool(std::move(tool))
 	{
 	}
 
 	ToolResult execute(const QJsonObject& arguments, const ExecutorContext& context) override
 	{
-		ToolContext legacy;
+		ExecutorBackendContext legacy;
 		legacy.workspaceRoot = context.workspaceRoot;
 		legacy.sessionId = context.sessionId;
 		legacy.turnId = context.turnId;
@@ -30,14 +30,14 @@ public:
 	}
 
 private:
-	std::shared_ptr<UlinCoreTool> m_tool;
+	std::shared_ptr<UlinCoreExecutorBackend> m_tool;
 };
 }
 
 void registerBuiltinExecutors(UlinCoreExecutorRegistry& registry)
 {
 	// 旧 tool 实现暂作为执行器后端；schema/name 已由 Intent 接管。
-	UlinCoreToolRegistry legacy;
+	UlinCoreExecutorBackendRegistry legacy;
 	legacy.addBuiltins();
 	for (const QString& name : legacy.names()) {
 		const auto tool = legacy.findShared(name);

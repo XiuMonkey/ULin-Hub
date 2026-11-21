@@ -11,7 +11,7 @@
 
 namespace UlinCore
 {
-struct ToolContext
+struct ExecutorBackendContext
 {
 	QString workspaceRoot;
 	QString sessionId;
@@ -20,30 +20,30 @@ struct ToolContext
 	bool allowShell = false;    // 预留：run_shell 之类的高危工具
 };
 
-class UlinCoreTool
+class UlinCoreExecutorBackend
 {
 public:
-	virtual ~UlinCoreTool() = default;
+	virtual ~UlinCoreExecutorBackend() = default;
 
 	virtual QString name() const = 0;
 	virtual QString description() const = 0;
 	virtual QJsonObject parametersSchema() const = 0;
-	virtual ToolResult execute(const QJsonObject& arguments, const ToolContext& context) = 0;
+	virtual ToolResult execute(const QJsonObject& arguments, const ExecutorBackendContext& context) = 0;
 
 	QJsonObject schema() const;   // 包成 OpenAI function schema
 };
 
-class UlinCoreToolRegistry
+class UlinCoreExecutorBackendRegistry
 {
 public:
-	void add(std::shared_ptr<UlinCoreTool> tool);
+	void add(std::shared_ptr<UlinCoreExecutorBackend> tool);
 	void addBuiltins();
-	UlinCoreTool* find(const QString& name) const;
-	std::shared_ptr<UlinCoreTool> findShared(const QString& name) const;
+	UlinCoreExecutorBackend* find(const QString& name) const;
+	std::shared_ptr<UlinCoreExecutorBackend> findShared(const QString& name) const;
 	QList<QString> names() const;
 	QJsonArray schemas() const;
 
 private:
-	QHash<QString, std::shared_ptr<UlinCoreTool>> m_tools;
+	QHash<QString, std::shared_ptr<UlinCoreExecutorBackend>> m_tools;
 };
 } // namespace UlinCore
