@@ -1402,7 +1402,8 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			const int row = agentRowForTurn();
 			if (!usage.isEmpty())
 				m_messages->addUsage(row, usage);
-			bufferChunk(row, QStringLiteral("thinking"), thinking);
+			if (!thinking.isEmpty())
+				m_messages->replaceThinkingSnapshot(row, thinking);
 			bufferChunk(row, QStringLiteral("reply"), reply);
 			m_turnHadOutput = true;
 		}

@@ -337,6 +337,38 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	touchRow(row);
 }
 
+void MessageListModel::replaceThinkingSnapshot(int row, const QString& text)
+{
+	if (row < 0 || row >= m_rows.size() || text.isEmpty())
+		return;
+
+	Row& entry = m_rows[row];
+	const QString incoming = dedupeThinkingParagraphs(text);
+	const QString incomingNorm = normalizedForDedup(incoming);
+	for (int i = entry.segments.size() - 1; i >= 0; --i) {
+		Segment& segment = entry.segments[i];
+		if (segment.type != QLatin1String("thinking"))
+			continue;
+		if (segment.text == incoming
+				|| normalizedForDedup(segment.text) == incomingNorm) {
+			qInfo().noquote() << "[ChatChunk] drop-thinking-snapshot"
+				<< "row=" << row << textDigest(incoming);
+			return;
+		}
+		qInfo().noquote() << "[ChatChunk] replace-thinking"
+			<< "row=" << row
+			<< "prev=" << segment.text.size() << textDigest(segment.text)
+			<< "next=" << incoming.size() << textDigest(incoming);
+		segment.text = incoming;
+		segment.partsReady = false;
+		touchRow(row);
+		return;
+	}
+
+	// 当前 step 还没有 thinking 段（例如只收到最终快照），按普通追加落段。
+	appendChunk(row, QStringLiteral("thinking"), incoming);
+}
+
 void MessageListModel::appendReplyTail(int row, const QString& text)
 {
 	Row& entry = m_rows[row];

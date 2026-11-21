@@ -77,6 +77,8 @@ public:
 
 	// 流式/历史共用的追加入口：type = "thinking" | "reply" | "toolCall" | "toolResult"
 	void appendChunk(int row, const QString& type, const QString& text, const QString& toolName = QString());
+	// assistant/message 的 thinking 是权威快照：替换最后一段 thinking，而不是追加。
+	void replaceThinkingSnapshot(int row, const QString& text);
 	// 工具结果贴到该行最后一个 toolCall 段上（一次调用的结果就在那张卡片里）；没有就新开 toolResult 段
 	void appendToolResult(int row, const QString& text);
 	void setStreaming(int row, bool streaming);
