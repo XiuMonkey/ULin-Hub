@@ -212,14 +212,25 @@ void AgentSessionClient::emitSessionEventFrame(const QString& sessionId, const Q
 	wrapped.insert(QStringLiteral("event"), event);
 	record.append(wrapped);
 	const QJsonArray normalized = SessionCommands::eventsFromRecords(record);
-	const QJsonObject visibleEvent = normalized.isEmpty() ? event : normalized.first().toObject();
 
-	QJsonObject payload;
-	payload.insert(QStringLiteral("type"), QStringLiteral("session/event"));
-	payload.insert(QStringLiteral("sessionId"), sessionId);
-	payload.insert(QStringLiteral("event"), visibleEvent);
+	// 一条原始事件归一化后可能是**多条**：失败回合会先补一条展示用的 assistant/message，
+	// 再原样跟一条 turn/end。这里必须逐条转发 —— 只发 first() 会把 turn/end 吞掉，
+	// 界面就永久停在"正在输出 / 停止键"（与快照重放那条 bug 同源）。
+	QJsonArray frames;
+	if (normalized.isEmpty())
+		frames.append(event);
+	else
+		frames = normalized;
 
-	QJsonObject legacyFrame;
-	legacyFrame.insert(QStringLiteral("payload"), payload);
-	emit muxFrameReceived(legacyFrame);
+	for (const QJsonValue& value : frames) {
+		const QJsonObject visibleEvent = value.toObject();
+		QJsonObject payload;
+		payload.insert(QStringLiteral("type"), QStringLiteral("session/event"));
+		payload.insert(QStringLiteral("sessionId"), sessionId);
+		payload.insert(QStringLiteral("event"), visibleEvent);
+
+		QJsonObject legacyFrame;
+		legacyFrame.insert(QStringLiteral("payload"), payload);
+		emit muxFrameReceived(legacyFrame);
+	}
 }

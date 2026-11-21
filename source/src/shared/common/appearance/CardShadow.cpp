@@ -3,9 +3,10 @@
 #include <QHash>
 #include <QPainter>
 #include <QPixmap>
-#include <QRegularExpression>
 #include <QSize>
 #include <QString>
+
+#include "common/util/ColorText.h"
 
 #include <cmath>
 
@@ -139,34 +140,10 @@ namespace CardShadow
 		return QMargins(blur, qMax(0, blur - spec.dy), blur, blur + qMax(0, spec.dy));
 	}
 
+	// 兼容旧入口：解析实现在 util/ColorText.h（rgb()/rgba() 与 #RRGGBB 等同一份）。
 	QColor parseColor(const QString& text)
 	{
-		const QString trimmed = text.trimmed();
-		if (trimmed.isEmpty())
-			return QColor();
-
-		static const QRegularExpression fn(QStringLiteral(   // rgb() / rgba()：QColor 自己不会解析，这里补上
-			"^rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*"
-			"(?:,\\s*([0-9]*\\.?[0-9]+)\\s*(%)?\\s*)?\\)$"));
-		const QRegularExpressionMatch m = fn.match(trimmed);
-		if (m.hasMatch()) {
-			QColor color(m.captured(1).toInt(), m.captured(2).toInt(), m.captured(3).toInt());
-			const QString alphaText = m.captured(4);
-			if (!alphaText.isEmpty()) {
-				const double value = alphaText.toDouble();
-				int alpha = 255;
-				if (!m.captured(5).isEmpty())
-					alpha = qRound(value * 255.0 / 100.0);
-				else if (value <= 1.0)
-					alpha = qRound(value * 255.0);
-				else
-					alpha = qRound(value);
-				color.setAlpha(qBound(0, alpha, 255));
-			}
-			return color;
-		}
-
-		return QColor(trimmed);  // 其余交给 QColor：#RRGGBB / #AARRGGBB / SVG 颜色名
+		return parseColorText(text);
 	}
 
 	void paint(QPainter& painter, const QRect& cardRect, const Spec& spec, const QColor& color, qreal devicePixelRatio, const QMargins& padOverride)

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // QmlBridge —— **QML 唯一的门**（QML 单例名 `Hub`）。
 // 分层规矩：
@@ -21,11 +21,13 @@
 // 分层依赖方向（自上而下，不许反向）：
 //  qmlbridge → core / common/session / common/appearance → common/util / network
 
-#include "common/pluginmarket/PluginMarketController.h"
+#include "common/agent/dsh/pluginmarket/PluginMarketController.h"
 #include "common/session/CommandController.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
-#include "qmlbridge/ExtensionManagerController.h"
+#include "qmlbridge/BridgeControllers.h"
+#include "qmlbridge/ExtensionsBridge.h"
+#include "ExtensionSystem/ExtensionManagerPage.h"
 
 #include <QObject>
 #include <QHash>
@@ -48,11 +50,11 @@ Q_DECLARE_OPAQUE_POINTER(ToolsFilter*)
 class QmlBridge : public QObject
 {
 	Q_OBJECT
-	Q_PROPERTY(SessionListModel* sessions READ sessions CONSTANT)
-	Q_PROPERTY(SettingsController* settings READ settings CONSTANT)  // 设置页数据面（模型 / API key）：QML 走 Hub.settings.*
-	Q_PROPERTY(PluginMarketController* plugins READ plugins CONSTANT)  // 插件市场数据面：QML 走 Hub.plugins.*
-	Q_PROPERTY(ExtensionManagerController* extensions READ extensions CONSTANT)  // 扩展管理数据面：QML 走 Hub.extensions.*
-	Q_PROPERTY(CommandController* commands READ commands CONSTANT)  // 斜杠命令（发现/过滤/执行）：QML 走 Hub.commands.*
+	Q_PROPERTY(SessionsBridge* sessions READ sessions CONSTANT)
+	Q_PROPERTY(SettingsBridge* settings READ settings CONSTANT)  // 设置页数据面（模型 / API key）：QML 走 Hub.settings.*
+	Q_PROPERTY(PluginMarketBridge* plugins READ plugins CONSTANT)  // 插件市场数据面：QML 走 Hub.plugins.*
+	Q_PROPERTY(ExtensionsBridge* extensions READ extensions CONSTANT)  // 扩展管理数据面：QML 走 Hub.extensions.*
+	Q_PROPERTY(CommandBridge* commands READ commands CONSTANT)  // 斜杠命令（发现/过滤/执行）：QML 走 Hub.commands.*
 	Q_PROPERTY(bool questionActive READ questionActive NOTIFY interactionChanged)
 	Q_PROPERTY(QVariantList questions READ questions NOTIFY interactionChanged)
 	Q_PROPERTY(QVariantList answerSelections READ answerSelections NOTIFY answerSelectionsChanged)
@@ -100,15 +102,16 @@ class QmlBridge : public QObject
 	Q_PROPERTY(bool themeSwitching READ themeSwitching NOTIFY themeSwitchingChanged)
 	// 工具过滤器：模型（common/agent/ToolsFilter）+ 面板开关。QML 用 Hub.toolsFilter.* 取数据、
 	// 用 Hub.toolsFilterOpen 决定面板是否装载；面板里的关闭走 closeToolsFilter。
-	Q_PROPERTY(ToolsFilter* toolsFilter READ toolsFilter CONSTANT)
+	Q_PROPERTY(ToolsFilterBridge* toolsFilter READ toolsFilter CONSTANT)
 	Q_PROPERTY(bool toolsFilterOpen READ toolsFilterOpen NOTIFY toolsFilterOpenChanged)
 	// Agent 过滤器里的“技能管理”页：官方 skills/list 的投影（只读目录 + 打开指令文件）。
 	Q_PROPERTY(QVariantList skills READ skills NOTIFY skillsChanged)
 	Q_PROPERTY(bool skillsBusy READ skillsBusy NOTIFY skillsChanged)
 	Q_PROPERTY(QString skillsStatus READ skillsStatus NOTIFY skillsChanged)
-	// 当前会话的权限预设（read-only / workspace-write / danger-full-access）。
-	// 数据来自 session/projections 的 values.permissions.currentValue；切换走 /permission 命令。
-	Q_PROPERTY(QString permissionPreset READ permissionPreset NOTIFY permissionPresetChanged)
+	// 当前会话的权限状态；具体预设字符串仍是 C++ 内部数据，QML 只读 UI 语义。
+	Q_PROPERTY(QString permissionLabel READ permissionLabel NOTIFY permissionPresetChanged)
+	Q_PROPERTY(bool permissionIsFull READ permissionIsFull NOTIFY permissionPresetChanged)
+	Q_PROPERTY(QVariantList permissionOptions READ permissionOptions CONSTANT)
 	// 右侧栏（面板坞）开合：纯界面状态，QML 用它决定面板是否装载 / 压窄多少；
 	// 顶栏那颗 ◫ 走 togglePanelBar，面板自己的 ✕ 走 closePanelBar。
 	Q_PROPERTY(bool panelBarOpen READ panelBarOpen NOTIFY panelBarOpenChanged)
@@ -130,11 +133,11 @@ public:
 	static QmlBridge& instance();  // 程序级唯一实例；刻意不析构 —— QML 单例注册要求它活过引擎
 	void init();  // 启动期调用（QML 装载之前）：建核心对象、接线、拉起内置服务端
 
-	SessionListModel* sessions() const { return m_sessions; }
-	SettingsController* settings() const { return m_settings; }
-	PluginMarketController* plugins() const { return m_plugins; }
-	ExtensionManagerController* extensions() const { return m_extensions; }
-	CommandController* commands() const { return m_commands; }
+	SessionsBridge* sessions() const { return m_sessionsBridge; }
+	SettingsBridge* settings() const { return m_settingsBridge; }
+	PluginMarketBridge* plugins() const { return m_pluginsBridge; }
+	ExtensionsBridge* extensions() const { return m_extensionsBridge; }
+	CommandBridge* commands() const { return m_commandsBridge; }
 
 	bool questionActive() const;
 	QVariantList questions() const;
@@ -190,7 +193,13 @@ public:
 	// 权限预设：读当前会话的 projection；切换通过命令 /permission <preset> 走引擎的官方写路径。
 	Q_INVOKABLE void refreshPermissionPreset();
 	Q_INVOKABLE void setPermissionPreset(const QString& preset);
+	Q_INVOKABLE bool permissionOptionActive(const QString& preset) const;
+	Q_INVOKABLE bool permissionOptionIsFull(const QString& preset) const;
+	Q_INVOKABLE void setFullAccessPermission();
 	QString permissionPreset() const { return m_permissionPreset; }
+	QString permissionLabel() const;
+	bool permissionIsFull() const;
+	QVariantList permissionOptions() const;
 	Q_INVOKABLE void createSession(const QString& workspaceId = QString());
 	Q_INVOKABLE void createWorkspace();               // 选目录在桥里（QFileDialog 是控件层的活），RPC 在 runtime
 	Q_INVOKABLE void deleteSession(const QString& sessionId);
@@ -228,7 +237,7 @@ public:
 
 	Q_INVOKABLE void toggleTheme();
 	bool themeSwitching() const;
-	ToolsFilter* toolsFilter() const { return m_toolsFilter; }
+	ToolsFilterBridge* toolsFilter() const { return m_toolsFilterBridge; }
 	bool toolsFilterOpen() const { return m_toolsFilterOpen; }
 	QVariantList skills() const { return m_skills; }
 	QVariantList scheduleTasks() const { return m_scheduleTasks; }
@@ -366,11 +375,17 @@ private:
 	QHash<QObject*, MarkdownDocumentState> m_markdownDocuments;
 
 	ToolsFilter* m_toolsFilter = nullptr;
+	ToolsFilterBridge* m_toolsFilterBridge = nullptr;
 	SessionListModel* m_sessions = nullptr;
+	SessionsBridge* m_sessionsBridge = nullptr;
 	SettingsController* m_settings = nullptr;
+	SettingsBridge* m_settingsBridge = nullptr;
 	PluginMarketController* m_plugins = nullptr;
-	ExtensionManagerController* m_extensions = nullptr;
+	PluginMarketBridge* m_pluginsBridge = nullptr;
+	ExtensionManagerPage* m_extensions = nullptr;
+	ExtensionsBridge* m_extensionsBridge = nullptr;
 	CommandController* m_commands = nullptr;
+	CommandBridge* m_commandsBridge = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	QString m_permissionPreset;   // 当前会话权限预设；空 = 还没读到投影
 	bool m_masterSwitching = false;

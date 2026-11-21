@@ -1,6 +1,7 @@
 #include "common/files/FileBrowserService.h"
 #include "common/files/OfficeTextExtractor.h"
 #include "common/files/OfficeConverter.h"
+#include "common/util/Format.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -8,18 +9,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QUuid>
-
-namespace
-{
-QString humanSize(qint64 bytes)
-{
-	if (bytes < 1024)
-		return QStringLiteral("%1 B").arg(bytes);
-	if (bytes < 1024 * 1024)
-		return QStringLiteral("%1 KB").arg(QString::number(bytes / 1024.0, 'f', 1));
-	return QStringLiteral("%1 MB").arg(QString::number(bytes / (1024.0 * 1024.0), 'f', 1));
-}
-} // namespace
 
 FileBrowserService::FileBrowserService(QObject* parent)
 	: QObject(parent)
@@ -168,7 +157,7 @@ void FileBrowserService::refresh()
 		row.insert(QStringLiteral("name"), info.fileName());
 		row.insert(QStringLiteral("path"), QDir::cleanPath(info.absoluteFilePath()));
 		row.insert(QStringLiteral("isDir"), info.isDir());
-		row.insert(QStringLiteral("sizeText"), info.isDir() ? QString() : humanSize(info.size()));
+		row.insert(QStringLiteral("sizeText"), info.isDir() ? QString() : formatByteSize(info.size()));
 		rows.append(row);
 	}
 	m_entries = rows;

@@ -20,6 +20,10 @@ namespace DshHostIndex
 	inline constexpr const char* kTopBar = "topBar";
 	inline constexpr const char* kSessionBar = "sessionBar";
 	inline constexpr const char* kComposer = "composer";
+	// 消息区 / 设置页 / 右栏根：与上面同级的 QML 宿主对象，扩展可直接注入。
+	inline constexpr const char* kMessageList = "messageList";
+	inline constexpr const char* kSettingsPage = "settingsPage";
+	inline constexpr const char* kPanelBar = "panelBar";
 	// 扩展 UI 宿主单例（HostUi）：转成 VirtualUiHost* 拿上面这些对象、挂载/卸载扩展自己的 QML；
 	// 同一个单例也实现 VirtualBlockBackendHost*（**顶替**面板坞某个块的**后端**，与"追加"相对），所以不再单列 index。
 	inline constexpr const char* kUiHost = "uiHost";
@@ -45,4 +49,14 @@ namespace DshHostIndex
 	// 与 VirtualBlockBackendHost 的 OpenBlockUrl / CloseBlock 并存：那两条是"给函数套虚接口层"（第 2 条），
 	// 适合只要稳定 ABI、不想依赖模型类布局的扩展；需要看更多状态时直取模型即可。
 	inline constexpr const char* kPanelBarDock = "panelBarDock";
+
+	// 业务对象：与 apiClient / themeManager / panelBarDock 同级的单例。
+	// 顺序固定，新增只追加；扩展侧按同一份 HostIndex 查询。
+	inline constexpr const char* kSessionList = "sessionList";
+	inline constexpr const char* kSettingsController = "settingsController";
+	inline constexpr const char* kChatController = "chatController";
+	inline constexpr const char* kCommandController = "commandController";
+	inline constexpr const char* kPluginMarket = "pluginMarket";
+	inline constexpr const char* kFileBrowser = "fileBrowser";
+	inline constexpr const char* kExtensionManager = "extensionManager";
 }

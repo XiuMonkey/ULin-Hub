@@ -4,14 +4,16 @@
 // 目录、文本读取、办公文档解析、分页等逻辑都在 common/files/ 下，不在本文件。
 
 #include "common/files/FileBrowserService.h"
+#include "VirtualClass/VirtualHostServices.h"
 
 #include <QObject>
 #include <QString>
 #include <QVariantList>
 
-class FileBrowserBridge : public QObject
+class FileBrowserBridge : public QObject, public VirtualFileBrowserHost
 {
 	Q_OBJECT
+		Q_INTERFACES(VirtualFileBrowserHost)
 	Q_PROPERTY(QString rootPath READ rootPath NOTIFY rootPathChanged)
 	Q_PROPERTY(QString currentPath READ currentPath NOTIFY currentPathChanged)
 	Q_PROPERTY(QVariantList entries READ entries NOTIFY entriesChanged)
@@ -74,6 +76,15 @@ public:
 	Q_INVOKABLE int pageStartLineAt(int index) const { return m_service.pageStartLineAt(index); }
 	Q_INVOKABLE int pageLineCountAt(int index) const { return m_service.pageLineCountAt(index); }
 	Q_INVOKABLE int pageSpan() const { return m_service.pageSpan(); }
+
+	// VirtualFileBrowserHost：只转调真实函数。
+	QString FileBrowserRootPath() const override { return rootPath(); }
+	QString FileBrowserCurrentPath() const override { return currentPath(); }
+	void FileBrowserOpenRoot(const QString& path) override { openRoot(path); }
+	void FileBrowserNavigate(const QString& path) override { navigate(path); }
+	void FileBrowserOpenFile(const QString& path) override { openFile(path); }
+	void FileBrowserRefresh() override { refresh(); }
+	void FileBrowserCloseFile() override { closeFile(); }
 
 signals:
 	void rootPathChanged();

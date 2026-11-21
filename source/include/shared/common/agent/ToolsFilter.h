@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // ToolsFilter —— 工具过滤器（对应 DSH 侧 `ulin-kit` 暴露的 `/api/tools-filter`）。
 // 本类由 `common/appearance/TopBarTools.{h,cpp}` 迁移而来，原来那套名字退役。
@@ -67,17 +67,17 @@ public:
 	bool degraded() const { return m_degraded; }
 
 	// 打开面板时调：拉该会话的工具目录（没有配置文件时由插件建一份初始版）
-	Q_INVOKABLE void refresh(const QString& sessionId);
+	void refresh(const QString& sessionId);
 	// 勾选变化后立即整份写回
-	Q_INVOKABLE void save();
+	void save();
 	// 界面上的展开/收起（纯显示，不落盘、不写 IsExpanded）
-	Q_INVOKABLE void toggleDirectory(const QString& directoryName);
+	void toggleDirectory(const QString& directoryName);
 	// 单个工具勾选
-	Q_INVOKABLE void setToolVisible(const QString& toolName, bool visible);
+	void setToolVisible(const QString& toolName, bool visible);
 	// 目录头右侧那颗胶囊开关：**写配置**（折叠 = 整组对模型隐藏）
-	Q_INVOKABLE void setDirectoryHidden(const QString& directoryName, bool hidden);
+	void setDirectoryHidden(const QString& directoryName, bool hidden);
 	// 全部显示 / 全部隐藏
-	Q_INVOKABLE void setAllVisible(bool visible);
+	void setAllVisible(bool visible);
 
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 分层：本文件在 common/shell/ —— **领域与纯逻辑层**（块列表的状态机本体：
 // 增删、同类编号、活动索引收敛、"关光了回主界面"都在这里）。它不 import 任何 QML 概念
@@ -110,32 +110,32 @@ public:
 	void setWebEngineAvailable(bool available);
 
 	// 开一个块：追加 + 激活 + 离开主界面
-	Q_INVOKABLE void open(const QString& kind);
+	void open(const QString& kind);
 	// 开一个**带初始地址的浏览器块**：与 open("browser") 走同一条路径（同类编号 / 追加即激活 /
 	// 离开主界面），只多记一个初始地址并**返回它的稳定 id**（"blk-N"；url 为空则拒绝，返回空串）。
 	// 调用方拿 id 就能用 closeBlock 关它 —— 谁开的谁记 id，模型不记"是谁开的"。
-	Q_INVOKABLE QString openUrl(const QString& url, const QString& title);
+	QString openUrl(const QString& url, const QString& title);
 	// 保存网页块当前地址（脱离/回附、切块后重新实例化时恢复原页面）。
-	Q_INVOKABLE void setBlockUrl(const QString& blockId, const QString& url);
+	void setBlockUrl(const QString& blockId, const QString& url);
 	// 按稳定 id 关一块（不存在/已关 = 什么都不做，返回 false）。与 close(index) 同一条收敛逻辑。
-	Q_INVOKABLE bool closeBlock(const QString& blockId);
+	bool closeBlock(const QString& blockId);
 	// 当前所有块的稳定 id（按打开顺序）。给"我这块还开着吗"这类判断用。
-	Q_INVOKABLE QStringList blockIds() const;
+	QStringList blockIds() const;
 	// 单块脱离/回附：脱离后从右栏标签条移除，blockInfo 仍可拿到视图路由给独立窗口。
-	Q_INVOKABLE bool detachBlock(const QString& blockId);
-	Q_INVOKABLE bool attachBlock(const QString& blockId);
+	bool detachBlock(const QString& blockId);
+	bool attachBlock(const QString& blockId);
 	// 关闭独立块窗口：丢弃已脱离的块，不回附右栏。
-	Q_INVOKABLE bool discardDetachedBlock(const QString& blockId);
-	Q_INVOKABLE QVariantMap blockInfo(const QString& blockId) const;
+	bool discardDetachedBlock(const QString& blockId);
+	QVariantMap blockInfo(const QString& blockId) const;
 	QStringList detachedBlocks() const;
 	// 关第 index 个块（越界忽略）；关光了回主界面，活动索引收敛到有效值
-	Q_INVOKABLE void close(int index);
+	void close(int index);
 	// 切换到第 index 个块（越界忽略；切换同时离开主界面）
-	Q_INVOKABLE void activate(int index);
+	void activate(int index);
 	// 拖动页签重排：from/to 都是当前行索引；活动块按稳定 id 跟随，不因换位丢失选中。
-	Q_INVOKABLE void moveBlock(int from, int to);
+	void moveBlock(int from, int to);
 	// ⌂ 主界面：只切显示，块保留
-	Q_INVOKABLE void showHome();
+	void showHome();
 
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;

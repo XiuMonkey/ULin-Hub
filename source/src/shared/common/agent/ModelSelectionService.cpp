@@ -243,6 +243,55 @@ namespace ModelSelectionService
 	}
 
 	// 删除模型：把"去掉该条目后的整份数组"写回去（数组写入即整体替换）
+	QString providerKeyRef(const QString& route)
+	{
+		QString ref;
+		ref.reserve(route.size() + 8);
+		for (const QChar ch : route) {
+			if (ch.isLetterOrNumber())
+				ref.append(ch.toUpper());
+			else
+				ref.append(QLatin1Char('_'));
+		}
+		ref.append(QStringLiteral("_API_KEY"));
+		return ref;
+	}
+
+	void createCustomProvider(DshApiClient* api, const SettingsNamespace& namespaceView, const CustomProviderRequest& request,
+		const std::function<void(const SettingsNamespace& updated)>& onCreated,
+		const std::function<void(const DshApiClient::RpcError& error)>& onError)
+	{
+		if (!api || !request.isValid()) {
+			if (onError) {
+				DshApiClient::RpcError error;
+				error.code = QStringLiteral("invalid-request");
+				error.message = QStringLiteral("提供商信息不完整");
+				onError(error);
+			}
+			return;
+		}
+		QJsonObject model;
+		model.insert(QStringLiteral("id"), request.modelId);
+		if (!request.modelName.trimmed().isEmpty())
+			model.insert(QStringLiteral("name"), request.modelName.trimmed());
+		QJsonObject profile;
+		if (!request.displayName.trimmed().isEmpty())
+			profile.insert(QStringLiteral("displayName"), request.displayName.trimmed());
+		if (!request.apiKeyRef.isEmpty())
+			profile.insert(QStringLiteral("apiKeyEnv"), request.apiKeyRef);
+		profile.insert(QStringLiteral("api"), request.api);
+		profile.insert(QStringLiteral("baseURL"), request.baseURL.trimmed());
+		profile.insert(QStringLiteral("models"), QJsonArray{ model });
+
+		QJsonArray ops;
+		QJsonObject op;
+		op.insert(QStringLiteral("op"), QStringLiteral("set"));
+		op.insert(QStringLiteral("path"), QJsonArray{ QStringLiteral("providers"), request.route });
+		op.insert(QStringLiteral("value"), profile);
+		ops.append(op);
+		mutateSettings(api, QStringLiteral("llm-pi-ai"), ops, namespaceView, onCreated, onError);
+	}
+
 	void removeModel(DshApiClient* api, const ConfigurableProvider& provider, const SettingsNamespace& namespaceView, const QString& modelId, const std::function<void(const SettingsNamespace& updated)>& onRemoved, const std::function<void(const DshApiClient::RpcError& error)>& onError)
 	{
 		if (!api || modelId.isEmpty() || provider.settingsNs.isEmpty()) {

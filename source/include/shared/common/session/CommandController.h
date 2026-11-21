@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 分层：本文件在 common/session/ —— **领域与纯逻辑层**（命令文法的判定与过滤、
 // 候选状态机、RPC 结果翻信号都在这里）。它不 import 任何 QML 概念，可以脱离 QML 引擎单测。
@@ -23,11 +23,14 @@
 #include <QString>
 #include <QVariantList>
 
+#include "VirtualClass/VirtualHostServices.h"
+
 class DshApiClient;
 
-class CommandController : public QObject
+class CommandController : public QObject, public VirtualCommandHost
 {
 	Q_OBJECT
+		Q_INTERFACES(VirtualCommandHost)
 	// 当前会话可用的命令：[{ name, description, hint, takesAttachments }]
 	Q_PROPERTY(QVariantList items READ items NOTIFY itemsChanged)
 	Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
@@ -48,14 +51,20 @@ public:
 	static bool looksLikeCommand(const QString& line);
 
 	// 当前输入命中的候选：只在"还在敲命令名"时返回（`/com` 会过滤，`/compact ` 之后不再弹菜单）。
-	Q_INVOKABLE QVariantList matching(const QString& text) const;
+	QVariantList matching(const QString& text) const;
 
 	// 拉当前会话的命令表（会话切换后、或用户刚打出 `/` 时调）
-	Q_INVOKABLE void refresh(const QString& sessionId);
+	void refresh(const QString& sessionId);
 	// 清空命令表（切到子代理会话时用：commands/list 只接受普通会话，问了必回 session/agent-busy）
 	void clear();
 	// 执行整条命令行（含参数原文）
-	Q_INVOKABLE void execute(const QString& sessionId, const QString& line);
+	void execute(const QString& sessionId, const QString& line);
+
+	// VirtualCommandHost：只转调真实函数。
+	bool CommandAvailable() const override { return available(); }
+	QVariantList CommandItems() const override { return items(); }
+	void CommandRefresh(const QString& sessionId) override { refresh(sessionId); }
+	void CommandExecute(const QString& sessionId, const QString& line) override { execute(sessionId, line); }
 
 signals:
 	void itemsChanged();

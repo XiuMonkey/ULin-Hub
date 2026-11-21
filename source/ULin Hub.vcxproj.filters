@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="..\assets\resources">
@@ -13,7 +13,7 @@
     <Filter Include="include\shared\common\appearance">
       <UniqueIdentifier>{8e9f52e7-588a-4a8f-96e4-f0c305e00373}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\shared\common\pluginmarket">
+    <Filter Include="include\shared\common\agent\dsh\pluginmarket">
       <UniqueIdentifier>{c6457437-e951-4915-99f4-54d6808c01a8}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\shared\common\session">
@@ -46,7 +46,7 @@
     <Filter Include="src\shared\common\appearance">
       <UniqueIdentifier>{2c729aac-d850-42c2-9457-61794f6a5a00}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\shared\common\pluginmarket">
+    <Filter Include="src\shared\common\agent\dsh\pluginmarket">
       <UniqueIdentifier>{52329574-dc5f-4e36-929d-75bf988d1ce7}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\shared\common\session">
@@ -108,6 +108,16 @@
     <ClCompile Include="src\shared\qmlbridge\QmlBridge.cpp">
       <Filter>src\qmlbridge</Filter>
     </ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgeUlinCoreSettings.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgeSettings.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgePluginMarket.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgeCommand.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\SessionsBridge.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgeToolsFilter.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgeSystem.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\BridgePanelBarDock.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
+    <ClCompile Include="src\shared\common\appearance\ThemeTokens.cpp"><Filter>src\shared\common\appearance</Filter></ClCompile>
+    <ClCompile Include="src\shared\common\terminal\TerminalProtocolState.cpp"><Filter>src\shared\common\terminal</Filter></ClCompile>
     <ClCompile Include="src\shared\qmlbridge\ThemeController.cpp">
       <Filter>src\qmlbridge</Filter>
     </ClCompile>
@@ -129,12 +139,11 @@
     <ClCompile Include="src\shared\common\settings\SettingsController.cpp">
       <Filter>src\shared\common\settings</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\pluginmarket\PluginMarketController.cpp">
-      <Filter>src\shared\common\pluginmarket</Filter>
+    <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketController.cpp">
+      <Filter>src\shared\common\agent\dsh\pluginmarket</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\qmlbridge\ExtensionManagerController.cpp">
-      <Filter>src\qmlbridge</Filter>
-    </ClCompile>
+    <ClCompile Include="src\shared\ExtensionSystem\ExtensionManagerPage.cpp"><Filter>src\shared\ExtensionSystem</Filter></ClCompile>
+    <ClCompile Include="src\shared\qmlbridge\ExtensionsBridge.cpp"><Filter>src\qmlbridge</Filter></ClCompile>
     <ClCompile Include="src\shared\common\agent\dsh\DshApiClient.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
@@ -183,46 +192,46 @@
     <ClCompile Include="src\shared\common\agent\AgentSessionClient.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\pluginmarket\PluginMarketClient.cpp">
-      <Filter>src\shared\common\pluginmarket</Filter>
+    <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketClient.cpp">
+      <Filter>src\shared\common\agent\dsh\pluginmarket</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\pluginmarket\PluginMarketModel.cpp">
-      <Filter>src\shared\common\pluginmarket</Filter>
+    <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketModel.cpp">
+      <Filter>src\shared\common\agent\dsh\pluginmarket</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\pluginmarket\PluginMarketInstaller.cpp">
-      <Filter>src\shared\common\pluginmarket</Filter>
+    <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketInstaller.cpp">
+      <Filter>src\shared\common\agent\dsh\pluginmarket</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\agent\ModelSelectionService.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreBuiltinTools.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\tool\UlinCoreBuiltinTools.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreEchoModel.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\model\UlinCoreEchoModel.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreJournal.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreJournal.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreKernel.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreKernel.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreSession.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreSession.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreTool.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\tool\UlinCoreTool.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreTypes.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\types\UlinCoreTypes.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreMasterAgent.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\core\UlinCoreMasterAgent.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreOpenAiModel.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\model\UlinCoreOpenAiModel.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\agent\ulincore\UlinCoreSettings.cpp">
+    <ClCompile Include="src\shared\common\agent\ulincore\settings\UlinCoreSettings.cpp">
       <Filter>src\shared\common\agent</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\appearance\TranslationManager.cpp">
@@ -380,22 +389,22 @@
     <QtMoc Include="include\shared\common\agent\AgentSessionClient.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <ClInclude Include="include\shared\common\pluginmarket\PluginMarketModel.h">
-      <Filter>include\shared\common\pluginmarket</Filter>
+    <ClInclude Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketModel.h">
+      <Filter>include\shared\common\agent\dsh\pluginmarket</Filter>
     </ClInclude>
     <ClInclude Include="include\shared\common\agent\ModelSelectionService.h">
       <Filter>include\shared\common\agent</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreBuiltinTools.h">
+    <ClInclude Include="include\shared\common\agent\ulincore\tool\UlinCoreBuiltinTools.h">
       <Filter>include\shared\common\agent</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreJournal.h">
+    <ClInclude Include="include\shared\common\agent\ulincore\core\UlinCoreJournal.h">
       <Filter>include\shared\common\agent</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreTool.h">
+    <ClInclude Include="include\shared\common\agent\ulincore\tool\UlinCoreTool.h">
       <Filter>include\shared\common\agent</Filter>
     </ClInclude>
-    <ClInclude Include="include\shared\common\agent\ulincore\UlinCoreTypes.h">
+    <ClInclude Include="include\shared\common\agent\ulincore\types\UlinCoreTypes.h">
       <Filter>include\shared\common\agent</Filter>
     </ClInclude>
     <ClInclude Include="include\windows-64\common\platform\win\NativeWindowFilter.h">
@@ -445,11 +454,11 @@
     <QtMoc Include="include\shared\network\SessionPrefetcher.h">
       <Filter>src\core</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\pluginmarket\PluginMarketClient.h">
-      <Filter>include\shared\common\pluginmarket</Filter>
+    <QtMoc Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketClient.h">
+      <Filter>include\shared\common\agent\dsh\pluginmarket</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\pluginmarket\PluginMarketInstaller.h">
-      <Filter>include\shared\common\pluginmarket</Filter>
+    <QtMoc Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketInstaller.h">
+      <Filter>include\shared\common\agent\dsh\pluginmarket</Filter>
     </QtMoc>
     <QtMoc Include="include\shared\common\util\ConnectionManager.h">
       <Filter>include\shared\common\util</Filter>
@@ -478,6 +487,17 @@
     <QtMoc Include="include\shared\qmlbridge\QmlBridge.h">
       <Filter>include\qmlbridge</Filter>
     </QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgeUlinCoreSettings.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgeSettings.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgePluginMarket.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgeCommand.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\SessionsBridge.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgeToolsFilter.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgeSystem.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\BridgePanelBarDock.h"><Filter>include\qmlbridge</Filter></QtMoc>
+    <ClInclude Include="include\shared\qmlbridge\BridgeCommon.h"><Filter>include\qmlbridge</Filter></ClInclude>
+    <ClInclude Include="include\shared\common\appearance\ThemeTokens.h"><Filter>include\shared\common\appearance</Filter></ClInclude>
+    <ClInclude Include="include\shared\common\terminal\TerminalProtocolState.h"><Filter>include\shared\common\terminal</Filter></ClInclude>
     <QtMoc Include="include\shared\qmlbridge\ThemeController.h">
       <Filter>include\qmlbridge</Filter>
     </QtMoc>
@@ -493,36 +513,35 @@
     <QtMoc Include="include\shared\common\agent\ToolsFilter.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreEchoModel.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\model\UlinCoreEchoModel.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreKernel.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\core\UlinCoreKernel.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreModel.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\model\UlinCoreModel.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreSession.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\core\UlinCoreSession.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreMasterAgent.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\core\UlinCoreMasterAgent.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreOpenAiModel.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\model\UlinCoreOpenAiModel.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\agent\ulincore\UlinCoreSettings.h">
+    <QtMoc Include="include\shared\common\agent\ulincore\settings\UlinCoreSettings.h">
       <Filter>include\shared\common\agent</Filter>
     </QtMoc>
     <QtMoc Include="include\shared\common\settings\SettingsController.h">
       <Filter>include\shared\common\settings</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\common\pluginmarket\PluginMarketController.h">
-      <Filter>include\shared\common\pluginmarket</Filter>
+    <QtMoc Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketController.h">
+      <Filter>include\shared\common\agent\dsh\pluginmarket</Filter>
     </QtMoc>
-    <QtMoc Include="include\shared\qmlbridge\ExtensionManagerController.h">
-      <Filter>include\qmlbridge</Filter>
-    </QtMoc>
+    <QtMoc Include="include\shared\ExtensionSystem\ExtensionManagerPage.h"><Filter>include\shared\ExtensionSystem</Filter></QtMoc>
+    <QtMoc Include="include\shared\qmlbridge\ExtensionsBridge.h"><Filter>include\qmlbridge</Filter></QtMoc>
     <QtMoc Include="include\shared\qmlbridge\TerminalVtModel.h">
       <Filter>include\qmlbridge</Filter>
     </QtMoc>

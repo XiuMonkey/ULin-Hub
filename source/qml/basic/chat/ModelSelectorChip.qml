@@ -21,7 +21,7 @@ Item {
     signal selectModelRequested(string provider, string model)
     signal selectLevelRequested(string levelId)
 
-    visible: Hub.hasModels && Hub.settings.masterBackend !== "ulincore"
+    visible: Hub.hasModels && !Hub.settings.ulincoreMode
     width: visible ? chipRow.implicitWidth + 2 * Theme.spacing.labelGap : 0   // 宽 = 内容宽 + 左右各 labelGap(8)：与上面 "chip 文字落在编辑器文字列线上" 的推导配套
     height: Theme.size.selectorChipHeight
 

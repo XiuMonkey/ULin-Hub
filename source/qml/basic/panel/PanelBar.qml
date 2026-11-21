@@ -14,6 +14,8 @@ import "../../widgets"
 Item {
     id: root
 
+    Component.onCompleted: HostUi.registerItem("panelBar", root)
+
     default property alias contentData: body.data   // 内容注入点：外部子项落到 body 里（不是落到卡片根上）
     property string title: qsTrId("panelBar_title")   // 头部标题
     property string emptyHint: qsTrId("panelBar_empty_hint")   // 没有注入内容时的占位

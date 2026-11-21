@@ -1,8 +1,10 @@
-// 见 include/common/session/TraceModel.h：会话事件账本 -> 轨迹记录表。
 // 这里刻意**不碰 UI**：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
 // 模型只吐数据（kind + 数字 + 原文）。这样加语言不用改 C++，也不会出现"模型里塞中文"的老问题。
 
 #include "common/session/TraceModel.h"
+#include "common/util/Format.h"
+#include "common/util/Json.h"
+#include "common/session/EventRecord.h"
 
 #include <QDateTime>
 #include <QJsonDocument>
@@ -11,14 +13,6 @@
 
 namespace
 {
-	QJsonObject unwrapRecord(const QJsonValue& value)
-	{
-		QJsonObject event = value.toObject();
-		if (event.value(QStringLiteral("event")).isObject())
-			event = event.value(QStringLiteral("event")).toObject();
-		return event;
-	}
-
 	qint64 eventTime(const QJsonObject& event)
 	{
 		return static_cast<qint64>(event.value(QStringLiteral("time")).toDouble());
@@ -76,34 +70,6 @@ namespace
 		if (flat.size() > limit)
 			return flat.left(limit) + QStringLiteral("…");
 		return flat;
-	}
-
-	QString elapsed(qint64 ms)
-	{
-		if (ms <= 0)
-			return QString();
-		if (ms < 1000)
-			return QString::number(ms) + QStringLiteral("ms");
-		if (ms < 60000)
-			return QString::number(ms / 1000.0, 'f', 1) + QStringLiteral("s");
-		return QString::number(ms / 60000) + QStringLiteral("m")
-			+ QString::number((ms % 60000) / 1000) + QStringLiteral("s");
-	}
-
-	QString compactCount(qint64 value)
-	{
-		if (value <= 0)
-			return QString();
-		if (value < 1000)
-			return QString::number(value);
-		if (value < 1000000)
-			return QString::number(value / 1000.0, 'f', 1) + QStringLiteral("k");
-		return QString::number(value / 1000000.0, 'f', 1) + QStringLiteral("M");
-	}
-
-	QString prettyJson(const QJsonObject& object)
-	{
-		return QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Indented));
 	}
 
 	QString timeText(qint64 ms)
@@ -427,7 +393,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.live = true;
 		row.depth = 0;
 		row.seq = seq;
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		m_currentTurnRow = appendRow(row);
 		return;
 	}
@@ -442,8 +408,8 @@ void TraceModel::projectEvent(const QJsonObject& event)
 				? reasonValue.toObject().value(QStringLiteral("kind")).toString()
 				: reasonValue.toString();
 			if (timeMs > 0 && m_turnStartMs > 0)
-				row->durationText = elapsed(timeMs - m_turnStartMs);
-			row->detail = prettyJson(event);
+				row->durationText = formatElapsed(timeMs - m_turnStartMs);
+			row->detail = jsonIndented(event);
 		}
 		return;
 	}
@@ -461,7 +427,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.live = true;
 		row.depth = 1;
 		row.seq = seq;
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		m_currentStepRow = appendRow(row);
 		return;
 	}
@@ -471,9 +437,9 @@ void TraceModel::projectEvent(const QJsonObject& event)
 			markTouched(m_currentStepRow);
 			row->live = false;
 			row->statusKind.clear();
-			row->detail = prettyJson(event);
+			row->detail = jsonIndented(event);
 			if (timeMs > 0 && m_stepStartMs > 0)
-				row->durationText = elapsed(timeMs - m_stepStartMs);
+				row->durationText = formatElapsed(timeMs - m_stepStartMs);
 		}
 		return;
 	}
@@ -494,7 +460,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.timeText = timeText(timeMs);
 		row.depth = 2;
 		row.seq = seq;
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -524,23 +490,23 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.depth = 2;
 		row.seq = seq;
 		if (inputTokens > 0 || outputTokens > 0)
-			row.tokensText = QStringLiteral("↑") + compactCount(inputTokens)
-				+ QStringLiteral(" ↓") + compactCount(outputTokens);
+			row.tokensText = QStringLiteral("↑") + formatCompactCount(inputTokens)
+				+ QStringLiteral(" ↓") + formatCompactCount(outputTokens);
 
 		if (firstToken > 0 && lastToken > firstToken) {
 			const qint64 generation = lastToken - firstToken;   // TTFT 从"这一步开始"量（官方口径）；步骤起点未知时退化成只报生成耗时
 			if (m_stepStartMs > 0 && firstToken >= m_stepStartMs) {
-				row.durationText = QStringLiteral("TTFT ") + elapsed(firstToken - m_stepStartMs)
-					+ QStringLiteral(" · ") + elapsed(generation);
+				row.durationText = QStringLiteral("TTFT ") + formatElapsed(firstToken - m_stepStartMs)
+					+ QStringLiteral(" · ") + formatElapsed(generation);
 			} else {
-				row.durationText = elapsed(generation);
+				row.durationText = formatElapsed(generation);
 			}
 		}
 		if (data.value(QStringLiteral("interrupted")).toBool()) {
 			row.statusKind = QStringLiteral("warn");
 			row.statusText = QStringLiteral("interrupted");
 		}
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -558,8 +524,8 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.seq = seq;
 		row.statusKind = QStringLiteral("warn");
 		if (firstToken > 0 && lastToken > firstToken)
-			row.durationText = elapsed(lastToken - firstToken);
-		row.detail = prettyJson(event);
+			row.durationText = formatElapsed(lastToken - firstToken);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -588,7 +554,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 
 		QJsonObject detail;
 		detail.insert(QStringLiteral("call"), event);
-		row.detail = prettyJson(detail);
+		row.detail = jsonIndented(detail);
 
 		const int rowIndex = appendRow(row);
 		if (!callId.isEmpty()) {
@@ -627,12 +593,12 @@ void TraceModel::projectEvent(const QJsonObject& event)
 
 			const qint64 startedAt = m_callTimes.value(callId, 0);   // 耗时只能靠两条事件的 time 差（账本里没有专门计时字段）—— 官方 Inspect 的 Timing 页同口径
 			if (startedAt > 0 && timeMs > startedAt)
-				row->durationText = elapsed(timeMs - startedAt);
+				row->durationText = formatElapsed(timeMs - startedAt);
 
 			QJsonObject detail;
 			detail.insert(QStringLiteral("call"), m_callEvents.value(callId));
 			detail.insert(QStringLiteral("result"), event);
-			row->detail = prettyJson(detail);
+			row->detail = jsonIndented(detail);
 		} else {
 			Row orphan;   // 结果没有对应的 call（历史被截断 / 分页边界）：单独成行，不要吞掉
 			orphan.kind = QStringLiteral("tool");
@@ -643,7 +609,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 			orphan.seq = seq;
 			orphan.statusKind = failed ? QStringLiteral("error") : QStringLiteral("ok");
 			orphan.statusText = error.value(QStringLiteral("code")).toString();
-			orphan.detail = prettyJson(event);
+			orphan.detail = jsonIndented(event);
 			appendRow(orphan);
 			if (failed)
 				++m_errors;
@@ -664,7 +630,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.timeText = timeText(timeMs);
 		row.depth = 2;
 		row.seq = seq;
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -679,7 +645,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.depth = 2;
 		row.seq = seq;
 		row.statusKind = type.endsWith(QLatin1String("/end")) ? QStringLiteral("ok") : QString();
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -692,7 +658,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		row.depth = 2;
 		row.seq = seq;
 		row.statusKind = QStringLiteral("warn");
-		row.detail = prettyJson(event);
+		row.detail = jsonIndented(event);
 		appendRow(row);
 		return;
 	}
@@ -711,7 +677,7 @@ void TraceModel::recomputeSummary()
 	summary.insert(QStringLiteral("outputTokens"), static_cast<qlonglong>(m_outputTokens));
 	summary.insert(QStringLiteral("durationMs"),
 		m_firstTimeMs > 0 && m_lastTimeMs > m_firstTimeMs ? m_lastTimeMs - m_firstTimeMs : 0LL);
-	summary.insert(QStringLiteral("durationText"), elapsed(m_lastTimeMs - m_firstTimeMs));
+	summary.insert(QStringLiteral("durationText"), formatElapsed(m_lastTimeMs - m_firstTimeMs));
 	m_summary = summary;
 	emit summaryChanged();
 }

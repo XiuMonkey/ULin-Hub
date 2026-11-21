@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
@@ -11,6 +11,7 @@
 
 #include "common/agent/ModelSelectionService.h"
 #include "common/session/MessageListModel.h"
+#include "VirtualClass/VirtualHostServices.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
 //  实例化 QMetaType 校验，此时类型不完整就触发
 //  "Pointer Meta Types must either point to fully-defined types or be declared with
@@ -33,9 +34,10 @@ class QJsonArray;
 class QJsonObject;
 class QTimer;
 
-class ChatController : public QObject
+class ChatController : public QObject, public VirtualChatHost
 {
 	Q_OBJECT
+		Q_INTERFACES(VirtualChatHost)
 	Q_PROPERTY(MessageListModel* messages READ messages CONSTANT)
 	// 轨迹视图的记录表（对照官方 dsh-client-ui-trajectory）：与本类吃同一条事件流，
 	// 只是不做"翻译成气泡"，而是把账本事件原样摊成按轮次分组的记录。
@@ -65,6 +67,17 @@ class ChatController : public QObject
 	// 放在本类而不是再开一个类：它与会话同生命周期（换会话即清空），与 modelGroups/statsLine 同一档
 	// 会话级实时数据；网络细节仍在 DshApiClient。
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
+
+	// VirtualChatHost：只转调真实函数，扩展不直接拿到 面。
+	QString ChatSessionId() const override { return sessionId(); }
+	bool ChatStreaming() const override { return streaming(); }
+	int ChatMessageCount() const override { return messageCount(); }
+	void ChatSetSession(const QString& sessionId) override { setSession(sessionId); }
+	void ChatCancel() override { cancel(); }
+	void ChatRefreshModelCatalog() override { refreshModelCatalog(); }
+	void ChatSelectModel(const QString& provider, const QString& model) override { selectModel(provider, model); }
+	void ChatSelectLevel(const QString& levelId) override { selectLevel(levelId); }
+	void ChatAddQuote(const QString& text) override { addQuote(text); }
 
 public:
 	explicit ChatController(DshApiClient* api, AgentSessionClient* agentSession, QObject* parent = nullptr);
@@ -139,32 +152,32 @@ public:
 	// ---- 图片附件（协议：session/prompt 的 image 部件；读回用 session/attachment）----
 	QVariantList pendingAttachments() const { return m_pendingImages; }
 	// 图片走内联 base64；普通文件先落成待发卡片，正文里带本地路径。
-	Q_INVOKABLE void addFiles(const QVariantList& urls);
-	Q_INVOKABLE void addImageFiles(const QVariantList& urls);   // 兼容旧调用，等价 addFiles
+	void addFiles(const QVariantList& urls);
+	void addImageFiles(const QVariantList& urls);   // 兼容旧调用，等价 addFiles
 	// 浏览器上下文卡片（侧栏浏览器右键「询问 Agent」产生）：
 	// {kind:"browser", ref, url, title, selector, prompt} —— 发送时拼成一段「用工具读取」的提示。
 	void addBrowserContext(const QVariantMap& card);
 	// 消息区右键「引用文本」：暂存一条引用，输入框显示卡片，发送时拼成 Markdown blockquote。
 	void addQuote(const QString& text);
-	Q_INVOKABLE void removePendingAttachment(int index);
-	Q_INVOKABLE void clearPendingAttachments();
+	void removePendingAttachment(int index);
+	void clearPendingAttachments();
 	// attachmentId -> file:// 源（异步取字节并落临时文件；首次返回空）
-	Q_INVOKABLE QString attachmentSource(const QString& attachmentId);
+	QString attachmentSource(const QString& attachmentId);
 
-	Q_INVOKABLE void submitAnswers(const QVariantList& answers);
+	void submitAnswers(const QVariantList& answers);
 	QVariantList answerSelections() const { return m_answerSelections; }
-	Q_INVOKABLE void resetAnswerSelections();
-	Q_INVOKABLE void toggleAnswerOption(int questionIndex, const QString& label);
-	Q_INVOKABLE void setAnswerCustom(int questionIndex, const QString& text);
-	Q_INVOKABLE void submitAnswerSelections();
+	void resetAnswerSelections();
+	void toggleAnswerOption(int questionIndex, const QString& label);
+	void setAnswerCustom(int questionIndex, const QString& text);
+	void submitAnswerSelections();
 	// QML 调用：审批结果（true = allowed-once，false = rejected）
-	Q_INVOKABLE void respondApproval(bool allow);
+	void respondApproval(bool allow);
 
 	bool olderAvailable() const { return m_hasOlder; }
 	bool loadingOlder() const { return m_loadingOlder; }
 	bool sessionLoading() const { return m_sessionLoading; }
 	// 拉更早的一页（session/page + beforeSeq）：插到内容头部，QML 侧用 olderPrepended 补偿锚点
-	Q_INVOKABLE void loadOlder();
+	void loadOlder();
 
 public slots:
 	// follow 首帧快照（session/follow）：历史 + 游标 + 是否还有更早内容

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 分层：本文件在 common/session/ —— **领域与纯逻辑层**（模型本体：摊平算法、
 // 折叠状态机、行的角色名映射都在这里）。它不 import 任何 QML 概念（只用 QtCore 的 QAbstractListModel），
@@ -62,7 +62,7 @@ public:
 	QString filterText() const { return m_filterText; }
 	// 搜索过滤：空串恢复全部；非空时大小写不敏感匹配会话标题（标题为空回退到会话 id，与 TitleRole 一致）。
 	// Q_INVOKABLE：搜索框在 QML 里直接 `Hub.sessions.setFilterText(text)`。
-	Q_INVOKABLE void setFilterText(const QString& text);
+	void setFilterText(const QString& text);
 
 	// 底层数据**不归本模型所有**：目录由 core/ClientRuntime 持有并更新，
 	// 本模型只读它、把它摊平成行。别在这里写目录 —— 那些 RPC 的回包处理都在 ClientRuntime 里。
@@ -72,13 +72,13 @@ public:
 	QString selectedSessionId() const { return m_selectedSessionId; }
 
 	// 折叠/展开某个工作区（只影响显示，不写配置）
-	Q_INVOKABLE void toggleWorkspace(const QString& workspaceId);
-	Q_INVOKABLE bool isWorkspaceExpanded(const QString& workspaceId) const;
+	void toggleWorkspace(const QString& workspaceId);
+	bool isWorkspaceExpanded(const QString& workspaceId) const;
 	// 输入框上下文带的工作区切换菜单：只返回"工作区表头"行（不含置顶/会话），
 	// 每项 { workspaceId, title, count, ungrouped }，供 QML Repeater 直接使用。
-	Q_INVOKABLE QVariantList workspaceItems() const;
+	QVariantList workspaceItems() const;
 	// 切到某工作区时优先打开它最近的一条会话；没有会话则返回空串（由 QML 决定新建）。
-	Q_INVOKABLE QString firstSessionForWorkspace(const QString& workspaceId) const;
+	QString firstSessionForWorkspace(const QString& workspaceId) const;
 
 	int rowCount(const QModelIndex& parent = QModelIndex()) const override;
 	QVariant data(const QModelIndex& index, int role) const override;

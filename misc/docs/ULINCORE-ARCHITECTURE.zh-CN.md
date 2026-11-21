@@ -336,7 +336,7 @@ RawInput
 示例：
 
 ```text
-/it cleanmypc{directory="c:/"}
+/it cleanmypc{directory:"c:/"}
   -> {
        "prompt": "帮我清理[directory]",
        "isSave": true,
@@ -348,19 +348,24 @@ RawInput
 
 | 字段 | 语义 |
 |---|---|
-| `prompt` | 本次意图的 canonical 描述或模板 |
+| `prompt` | 本次意图的 canonical 描述或模板（what） |
 | `isSave` | 成功后是否固化成可复用能力 |
-| `isAgentEngaged` | 固化时是否让模型整理行为 |
-| `AsPrompt` | 本次是否按 PromptTemplate 展开，而不是走调用链 |
+| `isAgentEngaged` | 固化时是否让 Agent 设计处理方案（prompt / skill / steps / executor 可组合） |
+| `hasSkill` | 强制 Agent 方案必须包含 skill 字段；仅在 isAgentEngaged=true 时有意义 |
+| `AsPrompt` | 本次是否只按 PromptTemplate 展开 |
+| `AsSkill` | 本次是否使用 prompt + 已保存的 skill（规划中） |
 
 约束：
 
 - `prompt` 不能覆盖命令参数的执行语义；如果它改变执行行为，应产生新的 Intent。
 - `isSave` 不是模型一句话就能触发；由解析层/Kernel 处理。
+- `isAgentEngaged=true` 时，Agent 可以决定优化 prompt、补充 skill、构造 steps、绑定已有 executor，或多个组合。
+- `hasSkill=true` 表示 Agent 方案必须包含非空 `skill`；没有生成出 skill 则保存失败/回退。
+- `hasSkill=true` 但 `isAgentEngaged=false` 时忽略（或按宿主策略报错），不产生 skill。
 - `isAgentEngaged` 控制固化方式，不控制基础解析是否经过模型。
 - `AsPrompt=true` 要求 Intent 有 PromptTemplate；没有则报错。
-- `AsPrompt=false` 要求 Intent 有调用链；没有则返回空，不报错。
 - `AsPrompt` 未指定时：prompt-only Intent 默认走 prompt；带调用链的 Intent 默认走 chain。
+- `AsSkill=true` 要求 prompt 和 skill 都非空；skill 不能单独执行。
 
 ### 6.3 Prompt fallback
 
@@ -634,7 +639,7 @@ UlinCoreBinding
 ### 14.1 泛化保存
 
 ```text
-/it cleanmypc{directory="c:/"}
+/it cleanmypc{directory:"c:/"}
   -> {
        "prompt": "帮我清理[directory]",
        "isSave": true,
@@ -655,7 +660,7 @@ UlinCoreBinding
 ### 14.2 字面量保存
 
 ```text
-/it copy{from="/tmp/a", to="/tmp/b"}
+/it copy{from:"/tmp/a", to:"/tmp/b"}
   -> {
        "prompt": "复制 [from] 到 [to]",
        "isSave": true,

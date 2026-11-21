@@ -828,6 +828,23 @@ namespace ModelSelectionService
 	void addModel(DshApiClient* api, const ConfigurableProvider& provider, const SettingsNamespace& namespaceView, const AddModelRequest& request, const std::function<void(const SettingsNamespace& updated)>& onAdded, const std::function<void(const DshApiClient::RpcError& error)>& onError);
 	// 读-改-写整份数组；id 不在列表里时不写服务端，直接回报
 	void removeModel(DshApiClient* api, const ConfigurableProvider& provider, const SettingsNamespace& namespaceView, const QString& modelId, const std::function<void(const SettingsNamespace& updated)>& onRemoved, const std::function<void(const DshApiClient::RpcError& error)>& onError);
+	// 自定义提供商：在 llm-pi-ai 的 providers.<route> 写出一条完整 profile。
+	// 只负责写 profile；API key 由调用方按 apiKeyRef 走 credentials/set。
+	struct CustomProviderRequest
+	{
+		QString route;
+		QString displayName;
+		QString baseURL;
+		QString api;
+		QString modelId;
+		QString modelName;
+		QString apiKeyRef;
+		bool isValid() const { return !route.isEmpty() && !baseURL.isEmpty() && !api.isEmpty() && !modelId.isEmpty(); }
+	};
+	QString providerKeyRef(const QString& route);
+	void createCustomProvider(DshApiClient* api, const SettingsNamespace& namespaceView, const CustomProviderRequest& request,
+		const std::function<void(const SettingsNamespace& updated)>& onCreated,
+		const std::function<void(const DshApiClient::RpcError& error)>& onError);
 	void describeCredential(DshApiClient* api, const QString& ref, const std::function<void(const CredentialStatus& status)>& onDescribed, const std::function<void(const DshApiClient::RpcError& error)>& onError);
 	void saveCredential(DshApiClient* api, const QString& ref, const QString& value, const std::function<void()>& onSaved, const std::function<void(const DshApiClient::RpcError& error)>& onError);
 }

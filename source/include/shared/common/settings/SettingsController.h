@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 分层：本文件在 common/settings/ —— **领域层**（设置页的数据面与视图状态机：
 // provider/凭据/模型写回、Agent 预设、服务端地址、外观项的装配与反馈文案都在这里），
@@ -18,6 +18,7 @@
 // 本类只负责"持有视图状态 + 暴露给 QML + 把回调翻成信号"。
 
 #include "common/agent/ModelSelectionService.h"
+#include "VirtualClass/VirtualHostServices.h"
 
 #include <QObject>
 #include <QString>
@@ -29,9 +30,10 @@ class QTimer;
 
 namespace UlinCore { class UlinCoreSettings; }
 
-class SettingsController : public QObject
+class SettingsController : public QObject, public VirtualSettingsHost
 {
 	Q_OBJECT
+		Q_INTERFACES(VirtualSettingsHost)
 		Q_PROPERTY(bool open READ isOpen NOTIFY openChanged)
 		Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
 		Q_PROPERTY(bool writable READ writable NOTIFY viewChanged)
@@ -106,45 +108,59 @@ public:
 	bool accountLoginHint() const { return m_accountLoginHint; }
 	QString formFeedback() const { return m_formFeedback; }
 
-	Q_INVOKABLE void openPage();
-	Q_INVOKABLE void closePage();
-	Q_INVOKABLE void setPage(int page);
+	void openPage();
+	void closePage();
+	void setPage(int page);
 	// 重新拉 provider 清单与凭据状态
-	Q_INVOKABLE void refresh();
+	void refresh();
 	// 保存 API key（credentials/set）；provider 为路由 id
-	Q_INVOKABLE void saveApiKey(const QString& provider, const QString& apiKey);
+	void saveApiKey(const QString& provider, const QString& apiKey);
 	// 用当前 key（可空 = 用服务端已存/环境里的）拉候选模型
-	Q_INVOKABLE void discover(const QString& provider, const QString& apiKey);
+	void discover(const QString& provider, const QString& apiKey);
 	// 把候选模型加进该 provider 的 models 列表
-	Q_INVOKABLE void addModel(const QString& provider, const QString& modelId, const QString& displayName);
+	void addModel(const QString& provider, const QString& modelId, const QString& displayName);
+	// DSH 自定义提供商：写 llm-pi-ai 的 providers.<route>，并可选保存 API key。
+	void createCustomProvider(const QString& route, const QString& displayName,
+		const QString& baseUrl, const QString& api, const QString& modelId,
+		const QString& modelName, const QString& apiKey);
 	// 原版"新增模型"表单的一次提交（校验 → 可选写凭据 → 整份写回模型），文案用原版 qtTrId
-	Q_INVOKABLE void submitModelForm(const QString& provider, const QString& modelId, const QString& displayName, const QString& contextWindow, const QString& maxTokens, const QString& efforts, const QString& apiKey);
+	void submitModelForm(const QString& provider, const QString& modelId, const QString& displayName, const QString& contextWindow, const QString& maxTokens, const QString& efforts, const QString& apiKey);
 	// 原版 routeHint：写回地址 + 覆盖范围提醒 + 只读提醒（ModelListPanel::routeHint）
-	Q_INVOKABLE QString routeHint(const QString& provider) const;
+	QString routeHint(const QString& provider) const;
 	// 该路由是否 pi-ai
-	Q_INVOKABLE bool routeIsPiAi(const QString& provider) const;
+	bool routeIsPiAi(const QString& provider) const;
+	// VirtualSettingsHost：只转调真实函数，不把 面直接交给扩展。
+	QString SettingsMasterBackend() const override { return masterBackend(); }
+	QString SettingsServerUrl() const override { return serverUrl(); }
+	bool SettingsOpen() const override { return isOpen(); }
+	int SettingsPage() const override { return page(); }
+	void SettingsRefresh() override { refresh(); }
+	void SettingsRefreshMasterBackends() override { refreshMasterBackends(); }
+	void SettingsOpenPage() override { openPage(); }
+	void SettingsClosePage() override { closePage(); }
+	void SettingsSetPage(int page) override { setPage(page); }
 	// 删除一个模型条目（settings/mutate 里整份写回）
-	Q_INVOKABLE void removeModel(const QString& provider, const QString& modelId);
+	void removeModel(const QString& provider, const QString& modelId);
 	// Agent 预设：设为默认（settings/update）
-	Q_INVOKABLE void selectDefaultPreset(const QString& presetId);
-	Q_INVOKABLE void selectMasterBackend(const QString& backendId);
-	Q_INVOKABLE void refreshMasterBackends();
+	void selectDefaultPreset(const QString& presetId);
+	void selectMasterBackend(const QString& backendId);
+	void refreshMasterBackends();
 	// 服务端地址：写入本地 SettingsStore 后请宿主重启内置服务端
-	Q_INVOKABLE void saveServerUrl(const QString& url);
+	void saveServerUrl(const QString& url);
 	// 外观：切语言（立即生效，无需重启）与重置风格包
-	Q_INVOKABLE void setLanguage(const QString& code);
-	Q_INVOKABLE void resetStyles();
+	void setLanguage(const QString& code);
+	void resetStyles();
 	// ---- DeepSeek 官方账号 ----
-	Q_INVOKABLE void openAccountPage();
-	Q_INVOKABLE void dismissAccountLoginHint();
-	Q_INVOKABLE void closeAccountPage();
-	Q_INVOKABLE void refreshAccount();
-	Q_INVOKABLE void startAccountSignIn();
-	Q_INVOKABLE void cancelAccountSignIn();
-	Q_INVOKABLE void signOutAccount();
-	Q_INVOKABLE void openAccountUsage();
-	Q_INVOKABLE void openAccountTopUp();
-	Q_INVOKABLE void openAccountAuthorize();
+	void openAccountPage();
+	void dismissAccountLoginHint();
+	void closeAccountPage();
+	void refreshAccount();
+	void startAccountSignIn();
+	void cancelAccountSignIn();
+	void signOutAccount();
+	void openAccountUsage();
+	void openAccountTopUp();
+	void openAccountAuthorize();
 
 signals:
 	void openChanged();
@@ -170,6 +186,8 @@ signals:
 	void serverRestartRequested();
 	// 新增模型后宿主可以刷新输入区的模型选择器
 	void modelAdded(const QString& provider, const QString& modelId);
+	// 凭据变化后目录可见性可能变化，宿主应重拉会话模型目录
+	void modelCatalogChanged();
 	// 风格包已重置（`Style` 单例的磁盘包被清掉并重放），请宿主热重载 QML 侧 token。
 	// ⚠️ 本类在 common（领域层），**不许**直接调 qmlbridge 的 ThemeBridge / WindowBridge；
 	// 这条信号由 qmlbridge/QmlBridge 接住落地。

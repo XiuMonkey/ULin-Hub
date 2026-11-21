@@ -17,14 +17,14 @@
         <file>basic/extensions/ExtensionManagerPage.qml</file>
         <file>basic/plugins/PluginMarketPage.qml</file>
         <file>basic/account/AccountPage.qml</file>
-        <file>basic/settings/AgentPresetPage.qml</file>
+        <file>basic/settings/dsh/AgentPresetPage.qml</file>
         <file>basic/settings/AppearancePage.qml</file>
-        <file>basic/settings/ModelListPage.qml</file>
-        <file>basic/settings/ServerPage.qml</file>
-        <file>basic/settings/UlinCoreProvidersPage.qml</file>
-        <file>basic/settings/UlinCoreModelsPage.qml</file>
-        <file>basic/settings/UlinCoreRuntimePage.qml</file>
-        <file>basic/settings/UlinCoreDataPage.qml</file>
+        <file>basic/settings/dsh/ModelListPage.qml</file>
+        <file>basic/settings/dsh/ServerPage.qml</file>
+        <file>basic/settings/ulincore/ModelsPage.qml</file>
+        <file>basic/settings/ulincore/UlinCoreModelAdapter.qml</file>
+        <file>basic/settings/ulincore/RuntimePage.qml</file>
+        <file>basic/settings/ulincore/DataPage.qml</file>
         <file>basic/schedule/SchedulePage.qml</file>
         <file>basic/settings/SettingsPage.qml</file>
         <file>basic/shell/ConversationPlaceholder.qml</file>
@@ -86,15 +86,17 @@
         <file>widgets/ActionButton.qml</file>
         <file>widgets/CheckMark.qml</file>
         <file>widgets/AppPopup.qml</file>
+    <file>widgets/AppProgressBar.qml</file>
+    <file>widgets/AppStageProgress.qml</file>
         <file>widgets/AppScrollBar.qml</file>
         <file>widgets/AppToolTip.qml</file>
         <file>widgets/BusySpinner.qml</file>
         <file>widgets/Card.qml</file>
         <file>widgets/Collapsible.qml</file>
         <!-- ULin Core 设置页共用的表单控件（输入框 / 下拉 / 勾选） -->
-        <file>widgets/UlinCoreField.qml</file>
-        <file>widgets/UlinCoreComboBox.qml</file>
-        <file>widgets/UlinCoreCheckBox.qml</file>
+        <file>skin/settings/UlinCoreField.qml</file>
+        <file>skin/settings/UlinCoreComboBox.qml</file>
+        <file>skin/settings/UlinCoreCheckBox.qml</file>
         <file>widgets/IconButton.qml</file>
         <!-- 单色 SVG 图标载体（侧栏新图标全部走它；qrc 资源在 assets/resources/ulinhub.qrc） -->
         <file>widgets/LineIcon.qml</file>

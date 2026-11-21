@@ -223,12 +223,22 @@ namespace SessionCommands
 					const QString text = code.isEmpty()
 						? QStringLiteral("[Request failed] %1").arg(detail)
 						: QStringLiteral("[Request failed: %1] %2").arg(code, detail);
+
+					// ⚠️ 失败回合：**保留 turn/end 本尊**，只额外补一条展示用的 assistant/message。
+					// 以前这里把 turn/end 直接改成 assistant/message ⇒ 回合边界丢了，快照重放时
+					// ChatController::rebuildFromRecords 会算出"最后一个回合还开着"，界面永久停在
+					// "正在输出 / 停止键"，重启也没用（账本里本来就是这么记的）。
+					// 合成事件不带 seq：调用方按 seq 去重，带上会和 turn/end 撞车把边界又吃掉。
 					QJsonObject message;
 					message.insert(QStringLiteral("content"), text);
 					QJsonObject legacyData;
 					legacyData.insert(QStringLiteral("message"), message);
-					event.insert(QStringLiteral("type"), QStringLiteral("assistant/message"));
-					event.insert(QStringLiteral("data"), legacyData);
+
+					QJsonObject errorEvent;
+					errorEvent.insert(QStringLiteral("type"), QStringLiteral("assistant/message"));
+					errorEvent.insert(QStringLiteral("time"), event.value(QStringLiteral("time")));
+					errorEvent.insert(QStringLiteral("data"), legacyData);
+					events.append(errorEvent);
 				}
 			}
 			event.remove(QStringLiteral("surfaceOp"));

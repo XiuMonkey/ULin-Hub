@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 分层：本文件在 common/appearance/ —— **领域层**（风格包目录的解析与
 // uiAbi 门控、磁盘包遮蔽/回退的判定、URL 缓存都在这里，与它下游的 ThemeManager 同层）。
@@ -39,11 +39,11 @@ public:
 	void init(const QString& stylesDir);
 
 	// QML 侧唯一入口：逻辑路径 -> 可加载 URL（磁盘包优先 / qrc 兜底），结果缓存
-	Q_INVOKABLE QString url(const QString& logicalPath) const;
+	QString url(const QString& logicalPath) const;
 	// 重置：删掉磁盘上的包文件（含 pack.json），再重新释放内置包（theme-*.json / *.qss 不动）
-	Q_INVOKABLE bool reset();
+	bool reset();
 	// 重新做门控与缓存失效（用户/扩展改过磁盘包后调用）
-	Q_INVOKABLE void reload();
+	void reload();
 
 	QString packVersion() const { return m_packVersion; }
 	QString stylesDir() const { return m_stylesDir; }

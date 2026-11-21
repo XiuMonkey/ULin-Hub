@@ -5,9 +5,37 @@
 #include "common/util/MarkdownSegmenter.h"
 
 #include <QFileInfo>
+#include <QRegularExpression>
+#include <QStringList>
 
 namespace
 {
+	QString normalizedForDedup(const QString& text)
+	{
+		return text.simplified();
+	}
+
+	// 过程思考有时会把同一段带不同空白的快照重复追加。只对 thinking 做
+	// “相邻重复段落”折叠，不能动最终 reply，否则会改用户可见正文。
+	QString dedupeThinkingParagraphs(const QString& text)
+	{
+		if (text.trimmed().isEmpty())
+			return text;
+		const QStringList parts = text.split(QRegularExpression(QStringLiteral("\\n\\s*\\n")),
+			Qt::KeepEmptyParts);
+		QStringList out;
+		QString previous;
+		for (const QString& part : parts) {
+			const QString normalized = normalizedForDedup(part);
+			if (!normalized.isEmpty() && normalized == previous)
+				continue;
+			out.append(part);
+			if (!normalized.isEmpty())
+				previous = normalized;
+		}
+		return out.join(QStringLiteral("\n\n"));
+	}
+
 	QString kindName(int kind)
 	{
 		switch (kind) {
@@ -123,6 +151,54 @@ void MessageListModel::appendDeliverables(int row, const QVector<DeliverableRef>
 	}
 }
 
+void MessageListModel::addUsage(int row, const QJsonObject& usage)
+{
+	if (row < 0 || row >= m_rows.size() || usage.isEmpty())
+		return;
+
+	auto addNumber = [&usage](QJsonObject& target, const QString& targetKey,
+		const QStringList& sourceKeys) {
+		double value = target.value(targetKey).toDouble(0);
+		for (const QString& key : sourceKeys) {
+			if (usage.contains(key)) {
+				value += usage.value(key).toDouble(0);
+				break;
+			}
+		}
+		if (value != 0 || !target.contains(targetKey))
+			target.insert(targetKey, value);
+	};
+
+	Row& target = m_rows[row];
+	QJsonObject merged = target.usage;
+	addNumber(merged, QStringLiteral("inputTokens"),
+		{ QStringLiteral("inputTokens"), QStringLiteral("promptTokens") });
+	addNumber(merged, QStringLiteral("outputTokens"),
+		{ QStringLiteral("outputTokens"), QStringLiteral("completionTokens") });
+	addNumber(merged, QStringLiteral("cacheReadTokens"),
+		{ QStringLiteral("cacheReadTokens"), QStringLiteral("cacheReadInputTokens") });
+	addNumber(merged, QStringLiteral("cacheWriteTokens"),
+		{ QStringLiteral("cacheWriteTokens"), QStringLiteral("cacheWriteInputTokens") });
+	addNumber(merged, QStringLiteral("reasoningTokens"),
+		{ QStringLiteral("reasoningTokens") });
+	addNumber(merged, QStringLiteral("totalTokens"),
+		{ QStringLiteral("totalTokens"), QStringLiteral("total") });
+
+	if (!merged.contains(QStringLiteral("totalTokens"))) {
+		const double input = merged.value(QStringLiteral("inputTokens")).toDouble(0)
+			+ merged.value(QStringLiteral("cacheReadTokens")).toDouble(0)
+			+ merged.value(QStringLiteral("cacheWriteTokens")).toDouble(0);
+		merged.insert(QStringLiteral("totalTokens"),
+			input + merged.value(QStringLiteral("outputTokens")).toDouble(0));
+	}
+
+	target.usage = merged;
+	if (!m_batchRebuild) {
+		const QModelIndex idx = index(row, 0);
+		emit dataChanged(idx, idx, { UsageRole });
+	}
+}
+
 // 上面三个的公共动作：占行号 → beginInsertRows → 追加 → endInsertRows → 报数
 int MessageListModel::appendRow(int kind, const QString& text)
 {
@@ -163,6 +239,23 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	// 再走下面的既有追加逻辑。
 	commitReplyTail(row, true);
 
+	QString incoming = text;
+	if (type == QLatin1String("thinking"))
+		incoming = dedupeThinkingParagraphs(text);
+	const QString incomingNorm = normalizedForDedup(incoming);
+
+	// 重连/历史回放时，同一个 thinking/reply 快照可能隔着工具或正文再次出现。
+	// 只比较“最近一段同类型”会漏掉这种跨段重复，导致同一个分析出现两个过程组。
+	// thinking/reply 的重复直接丢弃；空白差异也按同一段处理。
+	if (type == QLatin1String("thinking") || type == QLatin1String("reply")) {
+		for (const Segment& existing : entry.segments) {
+			if (existing.type == type
+					&& (existing.text == incoming
+						|| normalizedForDedup(existing.text) == incomingNorm))
+				return;
+		}
+	}
+
 	// 引擎的 assistant/message 有时是**整段快照**而不是增量（同一 turn 的工具前后会重复发）。
 	// 若本次文本与同类上一段相同/是其前缀，跳过；若是它的累积版本，直接替换，避免正文重复两遍。
 	for (int i = entry.segments.size() - 1; i >= 0; --i) {
@@ -171,10 +264,13 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			continue;
 		if (type == QLatin1String("toolCall") && previous.toolName != toolName)
 			continue;
-		if (previous.text == text || previous.text.startsWith(text))
+		const QString previousNorm = normalizedForDedup(previous.text);
+		if (previous.text == incoming || previousNorm == incomingNorm
+				|| previousNorm.startsWith(incomingNorm))
 			return;
-		if (text.startsWith(previous.text)) {
-			previous.text = text;
+		if (incomingNorm.startsWith(previousNorm)) {
+			previous.text = type == QLatin1String("thinking")
+				? dedupeThinkingParagraphs(incoming) : incoming;
 			previous.partsReady = false;
 			touchRow(row);
 			return;
@@ -186,7 +282,15 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	if (!entry.segments.isEmpty()) {
 		Segment& last = entry.segments.last();
 		if (last.type == type && (type != QLatin1String("toolCall") || last.toolName == toolName)) {
-			last.text += text;
+			const QString lastNorm = normalizedForDedup(last.text);
+			if (type == QLatin1String("thinking")) {
+				// 同一份思考快照被重复追加，而不是真正的增量。
+				if (!incomingNorm.isEmpty() && lastNorm.endsWith(incomingNorm))
+					return;
+				last.text = dedupeThinkingParagraphs(last.text + incoming);
+			} else {
+				last.text += incoming;
+			}
 			last.partsReady = false;  // text 变了 ⇒ 缓存的 markdown 切分作废（见 Segment::parts）
 			touchRow(row);
 			return;
@@ -195,7 +299,7 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 
 	Segment segment;
 	segment.type = type;
-	segment.text = text;
+	segment.text = incoming;
 	segment.toolName = toolName;
 	entry.segments.append(segment);
 	touchRow(row);
@@ -225,9 +329,9 @@ void MessageListModel::appendReplyTail(int row, const QString& text)
 	entry.tailPartsReady = false;
 	const QModelIndex idx = index(row, 0);
 	if (created)
-		emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole });
+		emit dataChanged(idx, idx, { SegmentsRole, ReplyTailRole, ReplyTailPartsRole });
 	else
-		emit dataChanged(idx, idx, { ReplyTailRole });
+		emit dataChanged(idx, idx, { ReplyTailRole, ReplyTailPartsRole });
 }
 
 bool MessageListModel::commitReplyTail(int row, bool notify)
@@ -443,6 +547,8 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 	}
 	case StreamingRole:
 		return row.streaming;
+	case UsageRole:
+		return row.usage.toVariantMap();
 	default:
 		return QVariant();
 	}
@@ -459,5 +565,6 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	names.insert(ReplyTailPartsRole, "replyTailParts");
 	names.insert(StreamingRole, "streaming");
 	names.insert(DeliverablesRole, "deliverables");
+	names.insert(UsageRole, "usage");
 	return names;
 }

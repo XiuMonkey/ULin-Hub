@@ -1,15 +1,16 @@
-// 见 SettingsController.h：设置页数据面。
+﻿// 见 SettingsController.h：设置页数据面。
 
 #include "common/settings/SettingsController.h"
 
 #include "common/appearance/ThemeManager.h"
 #include "common/appearance/TranslationManager.h"
 #include "common/agent/AgentPresetService.h"
-#include "common/agent/ulincore/UlinCoreSettings.h"
+#include "common/agent/ulincore/settings/UlinCoreSettings.h"
 #include "common/settings/SettingsStore.h"
 #include "common/agent/dsh/DshApiClient.h"
 
 #include <QJsonArray>
+#include <QRegularExpression>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QQmlEngine>
@@ -855,6 +856,72 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 		});
 }
 
+void SettingsController::createCustomProvider(const QString& route, const QString& displayName,
+	const QString& baseUrl, const QString& api, const QString& modelId,
+	const QString& modelName, const QString& apiKey)
+{
+	const QString trimmedRoute = route.trimmed();
+	static const QRegularExpression routePattern(QStringLiteral("^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"));
+	if (!routePattern.match(trimmedRoute).hasMatch()) {
+		setFormFeedback(QStringLiteral("提供商 ID 需以小写字母开头，只能包含小写字母、数字和短横线。"));
+		return;
+	}
+	for (const QVariant& value : m_providers) {
+		if (value.toMap().value(QStringLiteral("provider")).toString() == trimmedRoute) {
+			setFormFeedback(QStringLiteral("已有提供商使用了这个 ID。"));
+			return;
+		}
+	}
+	const QString trimmedUrl = baseUrl.trimmed();
+	if (trimmedUrl.isEmpty() || (!trimmedUrl.startsWith(QStringLiteral("http://"))
+			&& !trimmedUrl.startsWith(QStringLiteral("https://")))) {
+		setFormFeedback(QStringLiteral("请填写有效的 http(s) API 地址。"));
+		return;
+	}
+	if (api.trimmed().isEmpty() || modelId.trimmed().isEmpty()) {
+		setFormFeedback(QStringLiteral("请选择 API 协议并至少填写一个模型 ID。"));
+		return;
+	}
+	const SettingsNamespace* ns = m_view.findNamespace(QStringLiteral("llm-pi-ai"));
+	if (!ns) {
+		setFormFeedback(QStringLiteral("当前 DSH 没有挂载 llm-pi-ai，无法新增自定义提供商。"));
+		return;
+	}
+
+	const QString key = apiKey.trimmed();
+	ModelSelectionService::CustomProviderRequest request;
+	request.route = trimmedRoute;
+	request.displayName = displayName.trimmed();
+	request.baseURL = trimmedUrl;
+	request.api = api.trimmed();
+	request.modelId = modelId.trimmed();
+	request.modelName = modelName.trimmed();
+	request.apiKeyRef = key.isEmpty() ? QString() : ModelSelectionService::providerKeyRef(trimmedRoute);
+
+	setBusy(true);
+	setFormFeedback(QStringLiteral("正在保存提供商…"));
+	const SettingsNamespace nsCopy = *ns;
+	ModelSelectionService::createCustomProvider(m_api, nsCopy, request,
+		[this, request, key, nsCopy](const SettingsNamespace&) {
+			setFormFeedback(QStringLiteral("提供商已保存：%1").arg(request.route));
+			if (!key.isEmpty()) {
+				ModelSelectionService::saveCredential(m_api, request.apiKeyRef, key,
+					[this]() { setBusy(false); refresh(); },
+					[this](const DshApiClient::RpcError& error) {
+						setBusy(false);
+						setFormFeedback(QStringLiteral("提供商已保存，但 API key 写入失败：%1").arg(error.message));
+					});
+				return;
+			}
+			setBusy(false);
+			refresh();
+		},
+		[this](const DshApiClient::RpcError& error) {
+			setBusy(false);
+			setFormFeedback(QStringLiteral("保存提供商失败：%1 %2").arg(error.code, error.message));
+		});
+}
+
 void SettingsController::refresh()
 {
 	if (!m_api)
@@ -1055,6 +1122,9 @@ void SettingsController::saveApiKey(const QString& provider, const QString& apiK
 			setBusy(false);
 			setStatus(qtTrId("model_credential_written_fmt").arg(ref));
 			refresh();  // 重新查状态：界面上的"已配置"要立刻反映出来
+			// 凭据写入后，原本因缺 Key 而不出现在会话模型目录里的模型会变得可用；
+			// 通知宿主立即重拉会话模型目录，避免必须切会话才看到新模型。
+			emit modelCatalogChanged();
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);

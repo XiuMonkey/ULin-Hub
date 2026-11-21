@@ -81,18 +81,29 @@ fi
 
 mkdir -p "$APP_DIR/resources"
 RES="$APP_DIR/resources"
+STAGE_STAMP="$RES/server/.ulinhub-stage-stamp"
 
-echo "==> 展开运行环境 -> $RES/server"
-rm -rf "$RES/server"
-mkdir -p "$RES/server"
-# 复制到 HGFS 时不能带 -a：-a 会保留 symlink/硬链接，HGFS 既不支持 symlink，
-# 也不允许 cp 为 .bin 建硬链接。用 -rL 跟随 symlink 成实体文件，只保留 mode/timestamp。
-cp -rL --preserve=mode,timestamps "$RUNTIME_CACHE/." "$RES/server/"
-rm -f "$RES/server/node.exe"
+# 编译一次就整份复制 300MB+ 到 HGFS 是构建慢的主因；源/缓存没变时保留已有运行环境。
+if [ -f "$STAGE_STAMP" ] && [ -x "$RES/server/node" ] \
+	&& [ -z "$(find "$RUNTIME_CACHE" -newer "$STAGE_STAMP" -print -quit 2>/dev/null)" ] \
+	&& [ -z "$(find "$ROOT/assets/resources/node" -newer "$STAGE_STAMP" -print -quit 2>/dev/null)" ]; then
+	echo "==> 运行环境未变化，跳过重复复制"
+else
+	echo "==> 展开运行环境 -> $RES/server"
+	rm -rf "$RES/server"
+	mkdir -p "$RES/server"
+	# 复制到 HGFS 时不能带 -a：-a 会保留 symlink/硬链接，HGFS 既不支持 symlink，
+	# 也不允许 cp 为 .bin 建硬链接。用 -rL 跟随 symlink 成实体文件，只保留 mode/timestamp。
+	cp -rL --preserve=mode,timestamps "$RUNTIME_CACHE/." "$RES/server/"
+	rm -f "$RES/server/node.exe"
+	touch "$STAGE_STAMP"
+fi
 
-echo "==> 复制 assets/resources/node -> $RES/node"
-rm -rf "$RES/node"
-cp -a "$ROOT/assets/resources/node" "$RES/node"
+if [ ! -d "$RES/node" ] || [ -n "$(find "$ROOT/assets/resources/node" -newer "$RES/node" -print -quit 2>/dev/null)" ]; then
+	echo "==> 复制 assets/resources/node -> $RES/node"
+	rm -rf "$RES/node"
+	cp -a "$ROOT/assets/resources/node" "$RES/node"
+fi
 
 if [ -f "$ROOT/assets/resources/webengine/qtwebengine_resources.pak" ]; then
 	echo "==> 复制 WebEngine 资源"

@@ -58,6 +58,8 @@
         <file>icons/ui/tools.svg</file>
         <file>icons/ui/trace.svg</file>
         <file>icons/ui/model.svg</file>
+        <file>icons/ui/copy.svg</file>
+        <file>icons/ui/usage.svg</file>
         <file>icons/ui/server.svg</file>
         <file>config/highlight-rules.json</file>
         <file alias="styles/theme-light.json">styles/theme-light.json</file>

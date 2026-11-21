@@ -1,5 +1,6 @@
-﻿#include "ExtensionSystem/ExtensionLoader.h"
+#include "ExtensionSystem/ExtensionLoader.h"
 #include "common/util/ArchiveExtractor.h"
+#include "common/util/FileOps.h"
 
 #include "ExtensionSystem/ClientExtension.h"
 #include "ExtensionSystem/ExtensionRegistry.h"
@@ -20,52 +21,6 @@
 
 namespace
 {
-	bool copyRecursively(const QString& srcPath, const QString& dstPath, QString* error)
-	{
-		const QDir srcDir(srcPath);
-		if (!srcDir.exists()) {
-			if (error)
-				*error = QStringLiteral("source directory does not exist: %1").arg(srcPath);
-			return false;
-		}
-
-		QDir dstDir(dstPath);
-		if (!dstDir.exists() && !dstDir.mkpath(QStringLiteral("."))) {
-			if (error)
-				*error = QStringLiteral("cannot create directory: %1").arg(dstPath);
-			return false;
-		}
-
-		const QFileInfoList entries = srcDir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-		for (const QFileInfo& info : entries) {
-			const QString target = dstPath + QStringLiteral("/") + info.fileName();
-			if (info.isDir()) {
-				if (!copyRecursively(info.absoluteFilePath(), target, error))
-					return false;
-			}
-			else {
-				if (QFile::exists(target) && !QFile::remove(target)) {
-					if (error)
-						*error = QStringLiteral("cannot remove old file: %1").arg(target);
-					return false;
-				}
-				if (!QFile::copy(info.absoluteFilePath(), target)) {
-					if (error)
-						*error = QStringLiteral("cannot copy file: %1 -> %2").arg(info.absoluteFilePath(), target);
-					return false;
-				}
-			}
-		}
-
-		return true;
-	}
-
-	bool removeRecursively(const QString& path)
-	{
-		QDir dir(path);
-		return dir.removeRecursively();
-	}
-
 	QString readPluginName(const QString& pluginDir)
 	{
 		const QString packagePath = pluginDir + QStringLiteral("/package.json");
@@ -100,28 +55,6 @@ namespace
 		}
 
 		return names;
-	}
-
-	void stripUtf8BomFromJsonFiles(const QString& dirPath)
-	{
-		QDirIterator it(dirPath, { QStringLiteral("*.json") }, QDir::Files, QDirIterator::Subdirectories);
-		while (it.hasNext()) {
-			const QString filePath = it.next();
-			QFile file(filePath);
-			if (!file.open(QIODevice::ReadOnly))
-				continue;
-
-			QByteArray data = file.readAll();
-			file.close();
-
-			if (data.startsWith("\xEF\xBB\xBF")) {
-				QByteArray cleaned = data.mid(3);
-				if (file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-					file.write(cleaned);
-					file.close();
-				}
-			}
-		}
 	}
 
 	// 极简 JSON5 → QJsonObject：剥掉 // 与 /* */ 注释、去掉尾随逗号，再交给 QJsonDocument（它只认严格

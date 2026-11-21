@@ -16,6 +16,7 @@
 #include <QStringList>
 
 class QWidget;
+class QTimer;
 
 class ThemeManager : public QObject, public VirtualTheme
 {
@@ -33,6 +34,11 @@ public:
 	void init(const QString& stylesDir, Mode mode);
 
 	void setMode(Mode mode);
+
+	// 用户显式切换浅/深：写 AppearanceSetting + 切模式 + 通知 QML token 重载。
+	// 过渡卡片状态也在这里，ThemeController 只做转发。
+	void toggleTheme();
+	bool themeSwitching() const { return m_themeSwitching; }
 
 	// 重读风格包目录里的调色板并安装 QPalette（QML 侧 token 热重载由 ThemeBridge 负责）
 	void reload();
@@ -130,4 +136,11 @@ private:
 	// 当前生效的调色板 + 两套模式的缓存（QSS 镜像已随 QSS 一起删除）
 	QHash<QString, QString> m_palette;
 	QHash<QString, QHash<QString, QString>> m_paletteCache;
+
+	QTimer* m_switchingTimer = nullptr;
+	bool m_themeSwitching = false;
+
+signals:
+	void themeChanged();
+	void themeSwitchingChanged();
 };

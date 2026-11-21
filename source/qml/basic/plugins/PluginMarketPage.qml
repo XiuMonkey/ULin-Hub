@@ -444,6 +444,8 @@ Item {
                 width: parent.width
                 visible: Hub.plugins.installTasks.length > 0
                 text: "安装任务" + (Hub.plugins.activeTaskCount > 0 ? " · " + Hub.plugins.activeTaskCount + " 个进行中" : "")
+                    + (Hub.plugins.progressActive && Hub.plugins.progressPercent >= 0
+                        ? " · " + Math.round(Hub.plugins.progressPercent) + "%" : "")
                 color: Theme.color.textSecondary
                 font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
@@ -523,6 +525,7 @@ Item {
                             font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
+
                     }
                 }
             }
@@ -563,31 +566,38 @@ Item {
                 }
             }
 
-            Rectangle {
+            // 操作进度只有**一条**，画在任务列表上方（任务行里不再重复画）。
+            // 服务端给了真实阶段 ⇒ 4 段阶段条（解析/下载/链接/构建），不编造整体百分比；
+            // 没有阶段（市场包自装 / 市场自己拉 GitHub 包）⇒ 不定态滑动条。
+            AppStageProgress {
                 width: parent.width
-                height: 4
-                radius: 2
-                color: Theme.color.inputBg
-                visible: Hub.plugins.installing
+                height: 5
+                visible: Hub.plugins.progressActive && !Hub.plugins.installing && Hub.plugins.progressStage > 0
+                stage: Hub.plugins.progressStage
+                count: 4
+            }
 
-                Rectangle {
-                    id: installBar
-                    width: Math.max(24, parent.width * 0.3)
-                    height: parent.height
-                    radius: 2
-                    color: Theme.color.accent
-
-                    SequentialAnimation on x {
-                        running: Hub.plugins.installing
-                        loops: Animation.Infinite
-                        NumberAnimation { from: 0; to: installBar.parent.width - installBar.width; duration: 900; easing.type: Easing.InOutSine }
-                        NumberAnimation { from: installBar.parent.width - installBar.width; to: 0; duration: 900; easing.type: Easing.InOutSine }
-                    }
-                }
+            AppProgressBar {
+                width: parent.width
+                height: 5
+                visible: Hub.plugins.installing || (Hub.plugins.progressActive && Hub.plugins.progressStage <= 0)
+                value: -1
             }
 
             Text {
                 width: parent.width
+                visible: Hub.plugins.progressActive || Hub.plugins.installing
+                text: Hub.plugins.progressText.length > 0 ? Hub.plugins.progressText : Hub.plugins.installStatus
+                elide: Text.ElideRight
+                color: Theme.color.textSecondary
+                font.family: Theme.font.uiFamily
+                font.pixelSize: Theme.font.caption
+            }
+
+            Text {
+                width: parent.width
+                // 有进度条时这行让位（进度行已经在说同一件事）；结束后再显示结果文案。
+                visible: !Hub.plugins.progressActive
                 text: Hub.plugins.installStatus
                 elide: Text.ElideRight
                 color: Theme.color.textSecondary

@@ -1,7 +1,9 @@
-#include "core/ServerManager.h"
+﻿#include "core/ServerManager.h"
 #include "common/util/ConnectionManager.h"
 #include "ExtensionSystem/ExtensionRegistry.h"
 #include "common/settings/SettingsStore.h"
+#include "common/agent/dsh/pluginmarket/BuiltinMarker.h"
+#include "common/util/Process.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -42,74 +44,6 @@ namespace
 			return envUrl;
 
 		return usableServerUrl(SettingsStore::serverUrl());
-	}
-
-	QString builtinMarkerPath(const QString& profileDir)   // 内置插件台账 .ulin-hub-builtin.json：revision 是插件源 SHA1 前缀，内容变了下次启动重装
-	{
-		return profileDir + QStringLiteral("/.ulin-hub-builtin.json");
-	}
-
-	QString builtinSourceRevision(const QString& sourceDir)
-	{
-		QCryptographicHash hash(QCryptographicHash::Sha1);
-		const QDir dir(sourceDir);
-		QStringList names = dir.entryList(QDir::Files, QDir::Name);
-		names.sort();
-
-		for (const QString& name : names) {
-			QFile file(sourceDir + QLatin1Char('/') + name);
-			if (!file.open(QIODevice::ReadOnly))
-				return QString();
-
-			hash.addData(name.toUtf8());
-			hash.addData(file.readAll());
-			file.close();
-		}
-
-		return QString::fromLatin1(hash.result().toHex().left(12));
-	}
-
-	QString recordedBuiltinRevision(const QString& profileDir, const QString& pluginName)
-	{
-		QFile file(builtinMarkerPath(profileDir));
-		if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-			return QString();
-
-		const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-		file.close();
-		if (!doc.isObject())
-			return QString();
-
-		return doc.object().value(QStringLiteral("plugins")).toObject()
-			.value(pluginName).toObject().value(QStringLiteral("revision")).toString();
-	}
-
-	void recordBuiltinRevision(const QString& profileDir, const QString& pluginName, const QString& revision)
-	{
-		QJsonObject plugins;
-		QFile existing(builtinMarkerPath(profileDir));
-		if (existing.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			const QJsonDocument doc = QJsonDocument::fromJson(existing.readAll());
-			existing.close();
-			if (doc.isObject())
-				plugins = doc.object().value(QStringLiteral("plugins")).toObject();
-		}
-
-		QJsonObject entry = plugins.value(pluginName).toObject();
-		entry.insert(QStringLiteral("revision"), revision);
-		entry.insert(QStringLiteral("installedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
-		plugins.insert(pluginName, entry);
-
-		QJsonObject root;
-		root.insert(QStringLiteral("comment"),
-			QStringLiteral("ULin Hub builtin plugins: revision of the embedded source that is currently installed."));
-		root.insert(QStringLiteral("plugins"), plugins);
-
-		QFile out(builtinMarkerPath(profileDir));
-		if (out.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-			out.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-			out.close();
-		}
 	}
 
 	// qrc 插件目录逐文件写到目标目录；.json 落盘前去掉 UTF-8 BOM（Node 的 JSON.parse 会被噎住）
@@ -228,32 +162,6 @@ namespace
 	// 用成员的话，新实例的 start() 会把内置进程重新拉起（见 DshApiClient::Takenover）
 	bool g_backendTakenover = false;
 
-	// 内置引擎自己会起子进程（终端 shell、MCP 服务…），只杀 node 本身会留孙子。
-	// taskkill /T 按**PID** 连坐子树 —— 绝不按镜像名（用户可能自己跑着 DSH，那条以前踩过）。
-	// 只在 Job Object 建不出来/加不进去时用：那是兜底里的兜底。
-#ifdef Q_OS_WIN
-	bool killProcessTree(qint64 pid, int waitMs)
-	{
-		if (pid <= 0)
-			return false;
-
-		const QString systemRoot = qEnvironmentVariable("SystemRoot");
-		const QString taskkillPath = systemRoot + QStringLiteral("/System32/taskkill.exe");
-		QProcess killer;
-		killer.setProgram(QFile::exists(taskkillPath) ? taskkillPath : QStringLiteral("taskkill"));
-		killer.setArguments(QStringList{ QStringLiteral("/PID"), QString::number(pid),
-			QStringLiteral("/T"), QStringLiteral("/F") });
-		killer.setProcessChannelMode(QProcess::MergedChannels);
-		killer.start();
-		if (!killer.waitForStarted(waitMs))
-			return false;
-
-		const bool finished = killer.waitForFinished(waitMs);
-		const int exitCode = finished ? killer.exitCode() : -1;
-		qInfo().noquote() << QStringLiteral("[ServerManager] taskkill /PID %1 /T /F -> exit=%2").arg(pid).arg(exitCode);
-		return finished && exitCode == 0;
-	}
-#endif
 }
 
 ServerManager::ServerManager(QObject* parent)
@@ -1054,13 +962,13 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 			continue;
 		}
 
-		const QString revision = builtinSourceRevision(sourceDir);
+		const QString revision = BuiltinMarker::sourceRevision(sourceDir);
 		if (revision.isEmpty()) {
 			qWarning().noquote() << QStringLiteral("[ServerManager] 内置插件内容不可读: %1").arg(sourceDir);
 			continue;
 		}
 
-		const QString recorded = recordedBuiltinRevision(profileDir, pluginName);
+		const QString recorded = BuiltinMarker::recordedRevision(profileDir, pluginName);
 		if (recorded == revision) {
 			qDebug().noquote() << QStringLiteral("[ServerManager] 内置插件已装且未变更: %1 (rev %2)")
 				.arg(pluginName, revision);
@@ -1075,7 +983,7 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 			continue;
 		}
 
-		recordBuiltinRevision(profileDir, pluginName, revision);
+		BuiltinMarker::recordRevision(profileDir, pluginName, revision);
 		qInfo().noquote() << QStringLiteral("[ServerManager] 内置插件%1: %2 (rev %3)")
 			.arg(recorded.isEmpty() ? QStringLiteral("已安装") : QStringLiteral("已更新")).arg(pluginName, revision);
 	}

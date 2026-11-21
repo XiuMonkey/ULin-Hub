@@ -13,6 +13,8 @@ ListView {
     id: list
 
     property bool followBottom: true   // 是否跟随最新消息贴底
+    // 滚动条把手拖动中：暂停 contentY 夹取/贴底/锚点恢复，松手后统一收口。
+    property bool scrollBarDragging: false
 
     // 宽度正被外层动画驱动时，不逐帧贴底，并暂停气泡阴影；由 Shell 的 messageLoader 注入。
     property bool widthAnimating: false
@@ -33,7 +35,20 @@ ListView {
     cacheBuffer: count <= fullBuildRowLimit ? 100000 : Math.round(Math.max(600, height) * 2)   // 只设它不会真正全建，还要 pinStep() 配合
     ScrollBar.vertical: AppScrollBar {
         // 用户主动拖滚动条时先退出贴底，否则 maxContentY 会把把手夹回去。
-        onPressedChanged: if (pressed) list.followBottom = false
+        // 拖动期间还要冻结 contentY 的边界夹取：ListView 的 contentHeight 是估值，
+        // 虚拟化行在拖动中不断物化会让估值变化；此时再写 contentY 会和把手互相拉扯。
+        onPressedChanged: {
+            if (pressed) {
+                list.scrollBarDragging = true
+                list.stopWheelAnim()
+                list.followBottom = false
+                list.pinTargetY = -1
+            } else {
+                // 保持 dragging=true 到下一轮事件循环，避免松手瞬间的
+                // contentY 更新又被旧边界夹取。
+                Qt.callLater(list.settleScrollBarDrag)
+            }
+        }
     }   // 不要开 reuseItems：高度差异大时 indexAt() 会失效
 
     property bool bottomSettling: false   // 结束帧解冻期间持续锁底
@@ -65,6 +80,27 @@ ListView {
         if (wheelAnim.running)
             wheelAnim.stop()
         wheelTargetY = -1
+    }
+
+    // 松手后只做一次边界收口，避免拖动过程中反复写 contentY。
+    function settleScrollBarDrag() {
+        if (!scrollBarDragging)
+            return
+        scrollBarDragging = false
+        var lo = minContentY
+        var hi = Math.max(scrollMaxContentY, minContentY)
+        var y = contentY
+        if (y < lo)
+            y = lo
+        else if (y > hi)
+            y = hi
+        if (Math.abs(y - contentY) > 0.5) {
+            clampingY = true
+            contentY = y
+            clampingY = false
+        }
+        pinTargetY = contentY
+        followBottom = contentY >= scrollMaxContentY - 2
     }
 
     // 一次滚轮 → 更新 contentY 与 followBottom，返回实际 dy（0 = 没东西可滚）。
@@ -304,7 +340,7 @@ ListView {
     // 贴底过程中的临时越界由 pinStep 自行收敛。
     onContentYChanged: {
         if (pinning || clampingY || bottomAnchorAdjusting || height <= 0
-                || widthResizing)
+                || widthResizing || scrollBarDragging)
             return
         var lo = minContentY
         var hi = followBottom ? maxContentY : scrollMaxContentY
@@ -325,17 +361,24 @@ ListView {
         list.stopWheelAnim()
         list.followBottom = false
     }
-    onMovementEnded: followBottom = pinTargetY >= 0 && Math.abs(contentY - pinTargetY) <= 30
+    onMovementEnded: {
+        if (readingSettling || scrollBarDragging)
+            return
+        followBottom = pinTargetY >= 0 && Math.abs(contentY - pinTargetY) <= 30
+    }
 
     // 内容一变就贴底。必须用 Qt.callLater 排到本轮布局之后：直接赋值会被 ListView 的
     // 保持可见项调整覆盖，计时器节流在流式输出时又等不到空档。
     function scheduleFollowPin() {
         // pinning 期间不重开一轮，否则 pinAttempts 归零，长会话会卡在缓冲区底。
-        if (pinning || !followBottom || widthAnimating)
+        // readingSettling：用户正在展开/收起消息内的块，不能用贴底覆盖视口锚点。
+        if (pinning || !followBottom || widthAnimating || readingSettling)
             return
         Qt.callLater(pinToBottom)
     }
     onContentHeightChanged: {
+        if (scrollBarDragging)   // 拖动期内容高是估值，任何贴底/夹取都会和把手打架
+            return
         if (bottomSettling && followBottom)
             bottomSettleTimer.restart()
         if (!followBottom && viewportAnchorIndex >= 0 && (widthAnimating || readingSettling)) {
@@ -379,6 +422,16 @@ ListView {
     property int viewportAnchorIndex: -1
     property real viewportAnchorOffset: 0
     property bool readingSettling: false
+    // 用户展开/收起消息内的过程组：先退出贴底并锚定视口。
+    // 否则 contentHeight 一变，scheduleFollowPin 会把刚展开的内容重新滚到底部，
+    // 表现就是“滚动条闪一下、内容没有真正展开”。
+    function beginRowLayoutInteraction() {
+        if (followBottom)
+            followBottom = false
+        readingSettling = true
+        rememberViewportAnchor()
+        readingSettleTimer.restart()
+    }
     function rememberViewportAnchor() {
         viewportAnchorIndex = -1
         viewportAnchorOffset = 0
@@ -528,6 +581,7 @@ ListView {
 
     // 列表带着已有消息创建时 countChanged 不会补发，这里主动批量贴底一次。
     Component.onCompleted: {
+        HostUi.registerItem("messageList", list)
         if (count > 0 && followBottom) {
             awaitingFirstPin = true
             bulkBuildPending = count <= fullBuildRowLimit
@@ -589,6 +643,7 @@ ListView {
         required property var replyTailParts
         required property var images
         required property var deliverables
+        required property var usage
         required property bool streaming
         required property int index
 
@@ -640,9 +695,11 @@ ListView {
             replyTail: rowRoot.replyTail
             replyTailParts: rowRoot.replyTailParts
             deliverables: rowRoot.deliverables
+            usage: rowRoot.usage
             // 行级标志优先；控制器仍在跑且这是最后一条 agent 时也视为流式。
             streaming: rowRoot.streaming
                 || (Hub.streaming && rowRoot.kind === "agent" && rowRoot.index === list.count - 1)
+            onLayoutToggled: list.beginRowLayoutInteraction()
         }
     }
 }

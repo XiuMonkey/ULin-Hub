@@ -15,30 +15,66 @@
 
 ```
 include/shared/common/agent/ulincore/
-  UlinCoreTypes.h         Message / ToolCall / ToolResult / Usage / TurnResult
-  UlinCoreModel.h         模型适配层接口（流式增量 + 工具调用 + 用量）
-  UlinCoreEchoModel.h     无网络确定性模型，用于回环测试
-  UlinCoreOpenAiModel.h   OpenAI 兼容流式模型（/chat/completions + SSE）
-  UlinCoreSettings.h      data/ulincore/settings.json 的设置门面（模型/提示词/线程）
-  UlinCoreTool.h          Tool 接口 + 注册表（OpenAI function schema）
-  UlinCoreBuiltinTools.h  read_file / list_dir / write_file / search_text
-  UlinCoreSession.h       一次会话的消息账本 + snapshot/restore
-  UlinCoreKernel.h        内核状态机
-  UlinCoreJournal.h       JSONL 事件账本
-  UlinCoreMasterAgent.h   Master Agent 注册 + DSH 出站适配（VirtualMasterAgent / VirtualApiSink）
+  types/
+    UlinCoreTypes.h         Message / ToolCall / ToolResult / Usage / TurnResult
+  intent/
+    UlinCoreIntent.h        统一 Intent 数据模型
+    UlinCoreInvocation.h    Intent 调用/结果
+    UlinCoreIntentStore.h   Intent 持久化
+    UlinCoreParser.h        提示词/Intent 解析
+    UlinCoreBinding.h       参数绑定
+  model/
+    UlinCoreModel.h         模型适配层接口（流式增量 + 工具调用 + 用量）
+    UlinCoreEchoModel.h     无网络确定性模型，用于回环测试
+    UlinCoreOpenAiModel.h   OpenAI 兼容流式模型（/chat/completions + SSE）
+  tool/
+    UlinCoreTool.h          Tool 接口 + 注册表（OpenAI function schema）
+    UlinCoreBuiltinTools.h  read_file / list_dir / write_file / search_text
+    UlinCoreRecipeTool.h    Recipe 工具
+  core/
+    UlinCoreSession.h       一次会话的消息账本 + snapshot/restore
+    UlinCoreKernel.h        内核状态机
+    UlinCoreJournal.h       JSONL 事件账本
+    UlinCoreMasterAgent.h   Master Agent 注册 + DSH 出站适配
+  settings/
+    UlinCoreSettings.h      data/ulincore/settings.json 的设置门面
 
 src/shared/common/agent/ulincore/
-  UlinCoreTypes.cpp
-  UlinCoreEchoModel.cpp
-  UlinCoreOpenAiModel.cpp
-  UlinCoreSettings.cpp
-  UlinCoreTool.cpp
-  UlinCoreBuiltinTools.cpp
-  UlinCoreSession.cpp
-  UlinCoreKernel.cpp
-  UlinCoreJournal.cpp
-  UlinCoreMasterAgent.cpp
+  按同名的 types / intent / model / tool / core / settings 分目录
 ```
+
+## 统一 Intent 模型
+
+Prompt、Chain、原生工具不是三种类，而是同一个 `Intent` 的三种能力：
+
+```text
+prompt 非空    -> Prompt 执行
+steps 非空     -> Chain 执行
+executor 非空  -> 客户端原生执行器
+```
+
+JSON：
+
+```json5
+{
+  name: 'read_file',
+  description: '读取文件',
+  parameters: [{ name: 'path', type: 'string' }],
+  prompt: '',
+  steps: [],
+  executor: 'builtin.read_file',
+}
+```
+
+`prompt + steps` 可以同时存在：默认走 Chain，调用时用 `AsPrompt: true` 强行走 Prompt。
+
+`IntentStep` 引用另一个 Intent：
+
+```json
+{ "intent": "read_file", "arguments": { "path": { "$param": "path" } } }
+```
+
+`IntentStep` 只使用 `intent` 字段，不再兼容旧字段 `tool`。
 
 ## 一轮 turn 的时序
 
@@ -66,8 +102,8 @@ run(userText)
 ## 最小用法
 
 ```cpp
-#include "common/agent/ulincore/UlinCoreKernel.h"
-#include "common/agent/ulincore/UlinCoreEchoModel.h"
+#include "common/agent/ulincore/core/UlinCoreKernel.h"
+#include "common/agent/ulincore/model/UlinCoreEchoModel.h"
 
 auto* kernel = new UlinCore::UlinCoreKernel(parent);
 kernel->setModel(std::make_shared<UlinCore::UlinCoreEchoModel>());

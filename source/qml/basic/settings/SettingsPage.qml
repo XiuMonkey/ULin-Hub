@@ -12,8 +12,10 @@ import "../../widgets"
 Item {
     id: page
 
+    Component.onCompleted: HostUi.registerItem("settingsPage", page)
+
     // Master 后端切到自研内核时，第一页（原“模型列表”）自动换成 ULin Core 设置。
-    readonly property bool ulincoreMode: Hub.settings.masterBackend === "ulincore"
+    readonly property bool ulincoreMode: Hub.settings.ulincoreMode
 
     implicitWidth: 632
     implicitHeight: 432
@@ -97,8 +99,7 @@ Item {
                         // ulincore 模式下换一套导航：提供商 / 模型 / 运行时 / 数据 / Agent / 外观 / 服务
                         model: page.ulincoreMode
                             ? [
-                                { label: "提供商", icon: "server" },
-                                { label: "模型", icon: "model" },
+                                { label: "模型列表", icon: "model" },
                                 { label: "运行时", icon: "theme" },
                                 { label: "数据", icon: "server" },
                                 { label: "Agent", icon: "bot" },
@@ -181,54 +182,46 @@ Item {
                     anchors.fill: parent
                     visible: Hub.settings.page === 0
                     source: page.ulincoreMode
-                        ? Style.url("basic/settings/UlinCoreProvidersPage.qml")
-                        : Style.url("basic/settings/ModelListPage.qml")
+                        ? Style.url("basic/settings/ulincore/ModelsPage.qml")
+                        : Style.url("basic/settings/dsh/ModelListPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 1
                     source: page.ulincoreMode
-                        ? Style.url("basic/settings/UlinCoreModelsPage.qml")
-                        : Style.url("basic/settings/AgentPresetPage.qml")
+                        ? Style.url("basic/settings/ulincore/RuntimePage.qml")
+                        : Style.url("basic/settings/dsh/AgentPresetPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 2
                     source: page.ulincoreMode
-                        ? Style.url("basic/settings/UlinCoreRuntimePage.qml")
-                        : Style.url("basic/settings/ServerPage.qml")
+                        ? Style.url("basic/settings/ulincore/DataPage.qml")
+                        : Style.url("basic/settings/dsh/ServerPage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 3
                     source: page.ulincoreMode
-                        ? Style.url("basic/settings/UlinCoreDataPage.qml")
+                        ? Style.url("basic/settings/dsh/AgentPresetPage.qml")
                         : Style.url("basic/settings/AppearancePage.qml")
                 }
 
-                // ulincore 专属的后三页：原客户端的 Agent / 外观 / 服务设置保留
                 Loader {
                     anchors.fill: parent
                     active: page.ulincoreMode && Hub.settings.page === 4
                     visible: page.ulincoreMode && Hub.settings.page === 4
-                    source: Style.url("basic/settings/AgentPresetPage.qml")
+                    source: Style.url("basic/settings/AppearancePage.qml")
                 }
 
                 Loader {
                     anchors.fill: parent
                     active: page.ulincoreMode && Hub.settings.page === 5
                     visible: page.ulincoreMode && Hub.settings.page === 5
-                    source: Style.url("basic/settings/AppearancePage.qml")
-                }
-
-                Loader {
-                    anchors.fill: parent
-                    active: page.ulincoreMode && Hub.settings.page === 6
-                    visible: page.ulincoreMode && Hub.settings.page === 6
-                    source: Style.url("basic/settings/ServerPage.qml")
+                    source: Style.url("basic/settings/dsh/ServerPage.qml")
                 }
 
             }

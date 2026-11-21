@@ -31,6 +31,8 @@
 #include <QString>
 #include <QVariantList>
 
+#include "common/terminal/TerminalProtocolState.h"
+
 class DshApiClient;
 class QJsonObject;
 class QTimer;
@@ -189,6 +191,7 @@ private:
 	int m_uplinkSequence = 0;
 	bool m_awaitSnapshot = false;
 	int m_retryCount = 0;
+	TerminalProtocolState m_protocol;
 
 	QQueue<PendingFrame> m_frames;
 	qint64 m_pendingBytes = 0;

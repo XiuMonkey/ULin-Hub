@@ -155,34 +155,10 @@ Item {
     // 纯视觉可用状态：按钮仍可点，空文本由宿主静默丢弃。
     readonly property bool canSend: streaming || editor.text.trim().length > 0
 
-    // 当前会话的权限预设（来自 Hub.permissionPreset，投影未到/不支持时为空）。
-    readonly property string permissionLabel: {
-        if (Hub.permissionPreset === "read-only")
-            return qsTrId("permission_read_only")
-        if (Hub.permissionPreset === "workspace-write")
-            return qsTrId("permission_workspace_write")
-        if (Hub.permissionPreset === "danger-full-access")
-            return qsTrId("permission_full_access")
-        return qsTrId("permission_title")
-    }
-    readonly property bool permissionIsFull: Hub.permissionPreset === "danger-full-access"
-    readonly property var permissionOptions: [
-        {
-            id: "read-only",
-            label: qsTrId("permission_read_only"),
-            description: qsTrId("permission_read_only_desc")
-        },
-        {
-            id: "workspace-write",
-            label: qsTrId("permission_workspace_write"),
-            description: qsTrId("permission_workspace_write_desc")
-        },
-        {
-            id: "danger-full-access",
-            label: qsTrId("permission_full_access"),
-            description: qsTrId("permission_full_access_desc")
-        }
-    ]
+    // 权限状态与选项语义都由 Hub 提供；QML 不解释预设字符串。
+    readonly property string permissionLabel: Hub.permissionLabel
+    readonly property bool permissionIsFull: Hub.permissionIsFull
+    readonly property var permissionOptions: Hub.permissionOptions
 
     implicitHeight: shadowHost.height + Theme.size.statsLineHeight
     function submit() {
@@ -933,11 +909,7 @@ Item {
         readonly property var items: Hub.sessions ? Hub.sessions.workspaceItems() : []
 
         function activate(item) {
-            const first = Hub.sessions.firstSessionForWorkspace(item.workspaceId)
-            if (first.length > 0)
-                Hub.selectSession(first)
-            else
-                Hub.createSession(item.ungrouped ? "" : item.workspaceId)
+            Hub.sessions.activateWorkspace(item.workspaceId)
             close()
         }
 
@@ -1773,7 +1745,7 @@ Item {
 
                         Text {
                             text: modelData.label
-                            color: modelData.id === "danger-full-access"
+                            color: Hub.permissionOptionIsFull(modelData.id)
                                 ? Theme.color.danger : Theme.color.textSecondary
                             font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.caption
@@ -1793,7 +1765,7 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
-                        visible: Hub.permissionPreset === modelData.id
+                        visible: Hub.permissionOptionActive(modelData.id)
                         size: 12
                         color: Theme.color.accent
                     }
@@ -1805,7 +1777,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             permissionMenu.close()
-                            if (modelData.id === "danger-full-access")
+                            if (Hub.permissionOptionIsFull(modelData.id))
                                 permissionConfirm.open()
                             else
                                 Hub.setPermissionPreset(modelData.id)
@@ -1884,7 +1856,7 @@ Item {
                     text: qsTrId("permission_confirm_ack")
                     variant: "primary"
                     onClicked: {
-                        Hub.setPermissionPreset("danger-full-access")
+                        Hub.setFullAccessPermission()
                         permissionConfirm.close()
                     }
                 }

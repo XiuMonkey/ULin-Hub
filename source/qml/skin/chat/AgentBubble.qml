@@ -23,7 +23,8 @@ Item {
         var index = -1
         var segs = root.segments || []
         for (var i = 0; i < segs.length; ++i) {
-            if (segs[i].type === "reply")
+            if (segs[i].type === "reply"
+                    && String(segs[i].text || "").length > 0)
                 index = i
         }
         return index
@@ -42,6 +43,28 @@ Item {
         return bs.length > 0 && bs[bs.length - 1].kind === "process"
     }
     property var deliverables: []
+    property var usage: ({})
+    readonly property int actionBarHeight: 26
+
+    readonly property bool hasCopyText: {
+        var segs = root.segments || []
+        for (var i = 0; i < segs.length; ++i) {
+            if (segs[i] && segs[i].type === "reply"
+                && segs[i].text && String(segs[i].text).length > 0)
+                return true
+        }
+        return root.replyTail.length > 0
+    }
+
+    readonly property bool hasUsage: {
+        var u = root.usage || ({})
+        return Number(u.inputTokens || 0) + Number(u.outputTokens || 0)
+            + Number(u.cacheReadTokens || 0) + Number(u.cacheWriteTokens || 0)
+            + Number(u.reasoningTokens || 0) > 0
+    }
+
+    readonly property bool actionsVisible: !root.streaming
+        && (root.hasCopyText || root.hasUsage)
 
     // 复制全文优先取 reply 段，没有 reply 时退回所有段。
     // 按需拼一次，不做成绑定：流式期间 replyTail 每 33ms 变一次，绑定会把整段文本反复重建。
@@ -70,6 +93,49 @@ Item {
         clipboardHelper.selectAll()
         clipboardHelper.copy()
         clipboardHelper.deselect()
+    }
+
+    // 底部按钮只复制正文（reply 段），不把思考/工具过程带出去。
+    function copyReplyOnly() {
+        var replies = []
+        var segs = root.segments || []
+        for (var i = 0; i < segs.length; ++i) {
+            if (!segs[i] || segs[i].type !== "reply")
+                continue
+            var text = (i === root.finalReplyIndex && root.replyTail.length > 0)
+                ? root.replyTail
+                : (segs[i].text ? String(segs[i].text) : "")
+            if (text.length > 0)
+                replies.push(text)
+        }
+        if (replies.length === 0)
+            return
+        clipboardHelper.text = replies.join("\n\n")
+        clipboardHelper.selectAll()
+        clipboardHelper.copy()
+        clipboardHelper.deselect()
+    }
+
+    function usageNumber(key) {
+        var u = root.usage || ({})
+        return Math.max(0, Number(u[key] || 0))
+    }
+
+    function formatCompact(n) {
+        var value = Math.max(0, Math.round(Number(n) || 0))
+        if (value >= 1000000000)
+            return (value / 1000000000).toFixed(1).replace(/\.0$/, "") + "B"
+        if (value >= 1000000)
+            return (value / 1000000).toFixed(1).replace(/\.0$/, "") + "M"
+        if (value >= 1000)
+            return (value / 1000).toFixed(1).replace(/\.0$/, "") + "k"
+        return String(value)
+    }
+
+    function formatFull(n) {
+        // 不用 toLocaleString：部分 Qt QML 环境会把大数渲染成 1e+06。
+        var text = Math.max(0, Math.round(Number(n) || 0)).toFixed(0)
+        return text.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
     }
 
     // 右键菜单「复制」：把拖选中的文字写进剪贴板（与 Ctrl+C 同一份内容）。
@@ -115,12 +181,16 @@ Item {
     // 宿主没有该属性（独立使用或旧风格包）时视为 false。
     property bool widthAnimating: parent ? parent.widthAnimating === true : false
 
-    implicitHeight: bubble.implicitHeight + (root.showStreamingHint ? 29 : 0)
+    implicitHeight: bubble.implicitHeight
+        + (root.actionsVisible ? root.actionBarHeight : 0)
+        + (root.showStreamingHint ? 29 : 0)
 
     // 展开态必须外提：Repeater 在 segments 变化时会重建全部 delegate，存在 Collapsible 内部会被
     // 下一个流式 chunk 冲掉。Collapsible 走受控模式；key 约定为成员 `type:toolName:index`、
     // 过程组 `group:start`、整轮 `turn`。
     property var expandedKeys: ({})
+    // 展开/收起前通知列表：先锚定当前视口，避免列表的贴底逻辑把刚展开的内容滚走。
+    signal layoutToggled()
 
     function segmentKey(segment, index) {
         return (segment.type || "") + ":" + (segment.toolName || "") + ":" + index
@@ -143,6 +213,7 @@ Item {
     }
 
     function toggleKey(key) {
+        root.layoutToggled()
         var next = {}
         for (var k in root.expandedKeys)
             next[k] = root.expandedKeys[k]
@@ -171,6 +242,11 @@ Item {
         var i = 0
         while (i < segs.length) {
             if (segs[i].type === "reply") {
+                // 空 reply 是流式占位/收尾残留，不构成正文，也不能切断过程组。
+                if (String(segs[i].text || "").length === 0) {
+                    i += 1
+                    continue
+                }
                 // 按真实 segment 顺序排列；最终 reply 不压到底部，否则“正文 → 思考/工具”
                 // 会被重排成“思考/工具 → 正文”，与流式输出顺序不一致。
                 out.push({ kind: "reply", part: segs[i], start: i, count: 1, members: [],
@@ -343,8 +419,10 @@ Item {
 
                     // 中间输出（非最终 reply）收进「已完成」：只有最后一段输出常显，
                     // 其余跟随整轮行展开/折叠；过程组有自己的显隐绑定，不受这里影响。
-                    // 最终正文无条件常显；只有中间 reply 收束在「已完成」里，不单独露到过程组外。
+                    // 流式期间必须让中间 reply 也可见：后一步 thinking/tool 到来会把前一段
+                    // reply 从 final 变成非 final，如果这里仍只认 final，刚输出的正文会瞬间消失。
                     visible: blockData.kind !== "reply" || blockData.final
+                        || root.streaming || root.turnExpanded
 
                     // 过程组：一组连续的思考/工具，收起只剩一行“图标 + 动作短语”。
                     Collapsible {
@@ -496,6 +574,164 @@ Item {
                 // 产物只在整轮输出结束后出现：present 是在回合中间调用的，事件会先到；
                 // 流式期间先压住，避免卡片抢在正文/流式尾巴前面。
                 visible: !root.streaming && root.deliverables.length > 0
+            }
+        }
+    }
+
+    // 气泡下方的轻量操作条：复制正文 / 本轮用量。背景保持透明，只在悬停时出现淡底。
+    Item {
+        id: actionBar
+        visible: root.actionsVisible
+        anchors.top: bubble.bottom
+        anchors.left: bubble.left
+        anchors.leftMargin: Theme.spacing.cardPadding
+        width: Math.max(0, bubble.width - 2 * Theme.spacing.cardPadding)
+        height: root.actionBarHeight
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+
+            Item {
+                id: copyAction
+                visible: root.hasCopyText
+                width: 24
+                height: 24
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 5
+                    color: actionCopyMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                }
+
+                LineIcon {
+                    anchors.centerIn: parent
+                    name: "copy"
+                    size: 14
+                    color: Theme.color.textTertiary
+                }
+
+                MouseArea {
+                    id: actionCopyMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.copyReplyOnly()
+                }
+
+                ToolTip.visible: actionCopyMouse.containsMouse
+                ToolTip.text: "复制正文"
+            }
+
+            Item {
+                id: usageAction
+                visible: root.hasUsage
+                width: usageRow.implicitWidth + 12
+                height: 24
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 5
+                    color: usageMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                }
+
+                Row {
+                    id: usageRow
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    LineIcon {
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "usage"
+                        size: 14
+                        color: Theme.color.textTertiary
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "↑" + root.formatCompact(root.usageNumber("inputTokens"))
+                            + "  ↓" + root.formatCompact(root.usageNumber("outputTokens"))
+                        color: Theme.color.textTertiary
+                        font.family: Theme.font.uiFamily
+                        font.pixelSize: Theme.font.small
+                    }
+                }
+
+                MouseArea {
+                    id: usageMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: usagePopup.open()
+                }
+            }
+        }
+    }
+
+    Popup {
+        id: usagePopup
+        parent: root
+        width: 208
+        padding: 10
+        modal: false
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        x: Math.max(8, Math.min(root.width - width - 8, actionBar.x + usageAction.x))
+        y: Math.max(8, actionBar.y - height - 6)
+
+        background: Rectangle {
+            radius: 8
+            color: Theme.color.menuBg
+            border.width: 1
+            border.color: Theme.color.menuBorder
+        }
+
+        contentItem: Column {
+            width: usagePopup.width - 20
+            spacing: 5
+
+            Text {
+                text: "本轮用量"
+                color: Theme.color.textPrimary
+                font.family: Theme.font.uiFamily
+                font.pixelSize: Theme.font.caption
+                font.weight: Theme.font.weightMedium
+                bottomPadding: 2
+            }
+
+            Repeater {
+                model: [
+                    { label: "输入", key: "inputTokens" },
+                    { label: "输出", key: "outputTokens" },
+                    { label: "缓存读取", key: "cacheReadTokens" },
+                    { label: "缓存写入", key: "cacheWriteTokens" },
+                    { label: "推理", key: "reasoningTokens" },
+                    { label: "合计", key: "totalTokens" }
+                ]
+
+                delegate: Item {
+                    required property var modelData
+                    width: parent.width
+                    height: 18
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.label
+                        color: Theme.color.textTertiary
+                        font.family: Theme.font.uiFamily
+                        font.pixelSize: Theme.font.small
+                    }
+
+                    Text {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.formatFull(root.usageNumber(modelData.key))
+                        color: Theme.color.textSecondary
+                        font.family: Theme.font.monoFamily || Theme.font.uiFamily
+                        font.pixelSize: Theme.font.small
+                    }
+                }
             }
         }
     }

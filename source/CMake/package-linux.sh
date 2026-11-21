@@ -20,6 +20,16 @@ QT_LIBEXECS="$(qtpaths6 --query QT_INSTALL_LIBEXECS)"
 QT_DATA="$(qtpaths6 --query QT_INSTALL_DATA)"
 QT_TRANSLATIONS="$(qtpaths6 --query QT_INSTALL_TRANSLATIONS)"
 
+# 编译产物/链接阶段会由 stage-runtime 删除此 stamp；没有新链接时直接复用已打包的 Qt。
+PKG_STAMP="$APP_DIR/.package-linux.stamp"
+if [ -f "$PKG_STAMP" ] \
+	&& [ -x "$APP_DIR/libexec/QtWebEngineProcess" ] \
+	&& [ -d "$APP_DIR/lib" ] && [ -d "$APP_DIR/qml" ] \
+	&& [ -d "$APP_DIR/plugins" ] && [ -d "$APP_DIR/resources/webengine" ]; then
+	echo "==> Qt 运行库未变化，跳过重复打包"
+	exit 0
+fi
+
 echo "==> Qt libs: $QT_LIBS"
 echo "==> Qt QML:  $QT_QML"
 echo "==> Qt plugins: $QT_PLUGINS"
@@ -120,4 +130,5 @@ RUN
 chmod +x "$APP_DIR/run.sh"
 
 echo "==> 运行库打包完成：$APP_DIR"
+touch "$PKG_STAMP"
 echo "    lib=$(find "$APP_DIR/lib" -type f | wc -l) files, qml=$(du -sh "$APP_DIR/qml" | cut -f1), plugins=$(du -sh "$APP_DIR/plugins" | cut -f1)"

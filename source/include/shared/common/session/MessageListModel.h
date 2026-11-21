@@ -9,6 +9,7 @@
 #include <QAbstractListModel>
 #include <QByteArray>
 #include <QHash>
+#include <QJsonObject>
 #include <QString>
 #include <QVariantList>
 #include <QVector>
@@ -28,7 +29,8 @@ public:
 		ReplyTailRole,                 // 仅流式期间最终 reply 的完整尾文本；稳定段不变
 		ReplyTailPartsRole,            // 流式尾部按 Markdown part 切分，代码块可实时渲染
 		StreamingRole,
-		DeliverablesRole               // Agent 回合的交付文件 [{ path, name, suffix, description }]
+		DeliverablesRole,              // Agent 回合的交付文件 [{ path, name, suffix, description }]
+		UsageRole                      // Agent 回合累计用量 { inputTokens, outputTokens, ... }
 	};
 
 	enum Kind
@@ -79,6 +81,8 @@ public:
 	void appendToolResult(int row, const QString& text);
 	void setStreaming(int row, bool streaming);
 	void appendDeliverables(int row, const QVector<DeliverableRef>& files);
+	// 累加一轮里多个模型步骤的 usage。字段缺失时按 0 处理。
+	void addUsage(int row, const QJsonObject& usage);
 
 	// 最后一行是不是 Agent（历史回放时"工具事件接在上一气泡后面"要靠它）
 	int lastAgentRow() const;
@@ -117,6 +121,7 @@ private:
 		QVector<Segment> segments;
 		QVector<ImageRef> images;   // 仅用户行
 		QVector<DeliverableRef> deliverables;   // 仅 Agent 行
+		QJsonObject usage;          // 仅 Agent 行：本轮累计 token 用量
 		QString replyTail;           // 仅流式期间：当前最终 reply 的完整尾文本；收尾时落回稳定段
 		// 流式尾部 part 缓存：避免 data() 被 QML 反复读取时每次重切全文。
 		mutable QVariantList tailParts;

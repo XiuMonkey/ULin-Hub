@@ -4,6 +4,7 @@
 #include "common/util/HostIndex.h"
 #include "common/util/ConnectionManager.h"
 #include "common/util/CommonRegistry.h"
+#include "common/util/Thread.h"
 #include "ExtensionSystem/HostUi.h"
 #include "VirtualClass/VirtualApiTakeover.h"
 
@@ -27,12 +28,6 @@ namespace ClientExtension
 		const char* const kPendingRemovalMarker = ".pending-removal";  // 卸载时删不掉的目录留此标记，下次启动由 sweepPendingRemovals() 清掉
 		const char* const kDetachSlot = "detachHost()";  // 插件可选槽"我要退场了"：元对象层字符串契约（非接口方法），invoke 后宿主不再用插件的任何对象；老插件没有它也不踩空 vtable 槽位
 		const char* const kIdentitySlot = "setHostIdentity(QString)";  // 可选槽：attachHost() 之前推一次本扩展的安装目录名；架空舞台要求 owner 等于安装名才能校验所有权、卸载时收回它占的台，插件不必硬编码名字
-
-		bool onGuiThread()
-		{
-			const QCoreApplication* app = QCoreApplication::instance();
-			return app && QThread::currentThread() == app->thread();
-		}
 
 		// 身份文件 = <dir>/info.json5（老扩展是 regulation.json5）。规则归 ExtensionLoader 所有：
 		// "已安装"的判据、残留判定、启动扫描都走它，免得三处各写一个文件名。

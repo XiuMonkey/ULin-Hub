@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Effects
+import QtQml
 import ULinHub 1.0
 import "../../widgets"
 import "../../skin/chat"
@@ -10,10 +11,19 @@ import "../../skin/chat"
 Item {
     id: root
 
-    readonly property var cfg: Hub.settings.ulincore
+    readonly property var cfg: Hub.settings.ulincoreBridge
     readonly property int textInset: 8
 
-    visible: Hub.settings.masterBackend === "ulincore"
+    // 设置页写入 API Key 后，模型列表可能从“无可用模型”变成“有模型”。
+    // providers 的 changed 通知之外再加一个本地 revision，强制 Repeater 重建；
+    // 否则部分会话里的 chip 要等切会话才刷新。
+    property int modelRefreshToken: 0
+    Connections {
+        target: root.cfg
+        function onChanged() { root.modelRefreshToken++ }
+    }
+
+    visible: Hub.settings.ulincoreMode
     width: visible ? chipRow.implicitWidth + 2 * Theme.spacing.labelGap : 0
     height: Theme.size.selectorChipHeight
 
@@ -174,7 +184,10 @@ Item {
                 }
 
                 Repeater {
-                    model: root.cfg.providers
+                    model: {
+                        root.modelRefreshToken
+                        return root.cfg.providers
+                    }
 
                     delegate: Column {
                         id: providerGroup

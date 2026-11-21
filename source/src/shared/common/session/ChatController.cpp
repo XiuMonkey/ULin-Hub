@@ -1,5 +1,7 @@
-// 见 ChatController.h：事件流 -> 消息模型。
 #include "common/util/Debugger.h"
+#include "common/util/Format.h"
+#include "common/util/Json.h"
+#include "common/session/EventRecord.h"
 #include "common/session/ChatController.h"
 #include "common/session/MessageListModel.h"
 #include "common/agent/AgentSessionClient.h"
@@ -78,15 +80,6 @@ namespace
 		return isPeerRelayUserMessage(event);
 	}
 
-	// 历史记录可能包一层 { event: {...} }
-	QJsonObject unwrapRecord(const QJsonValue& value)
-	{
-		QJsonObject event = value.toObject();
-		if (event.value(QStringLiteral("event")).isObject())
-			event = event.value(QStringLiteral("event")).toObject();
-		return event;
-	}
-
 	int recordSeq(const QJsonValue& value)
 	{
 		const QJsonObject record = value.toObject();
@@ -94,11 +87,6 @@ namespace
 		if (seq <= 0 && record.value(QStringLiteral("event")).isObject())
 			seq = record.value(QStringLiteral("event")).toObject().value(QStringLiteral("seq")).toInt();
 		return seq;
-	}
-
-	QString prettyArguments(const QJsonObject& arguments)
-	{
-		return QString::fromUtf8(QJsonDocument(arguments).toJson(QJsonDocument::Indented));
 	}
 
 	// 表示"回合真的在推进"的事件类型（看门狗只认这些续期）；刻意不含会话生命周期/投影/标题/命令变更 —— 它们会周期性推来。
@@ -114,28 +102,7 @@ namespace
 			|| type == QLatin1String("turn/start");
 	}
 
-	// ---- 统计行的四个格式化函数 ----
-
-	QString formatDuration(qint64 ms)
-	{
-		if (ms <= 0)
-			return QString();
-
-		if (ms < 60000)
-			return QString::number(ms / 1000.0, 'f', 1) + QStringLiteral("s");
-
-		const qint64 seconds = ms / 1000;
-		return QStringLiteral("%1m%2s").arg(seconds / 60).arg(seconds % 60);
-	}
-
-	QString formatTokens(qint64 value)
-	{
-		if (value < 1000)
-			return QString::number(value);
-		if (value < 1000000)
-			return QString::number(value / 1000.0, 'f', value >= 100000 ? 0 : 1) + QStringLiteral("K");
-		return QString::number(value / 1000000.0, 'f', value >= 100000000 ? 0 : 1) + QStringLiteral("M");
-	}
+	// ---- 统计行剩余的两个格式化函数（duration/tokens 的实现在 util/Format.h） ----
 
 	QString formatThroughput(double value)
 	{
@@ -339,14 +306,6 @@ QString iconForSuffix(const QString& suffix)
 	return QStringLiteral("file-generic");
 }
 
-QString sizeLabelFor(qint64 bytes)
-{
-	if (bytes >= 1024LL * 1024LL)
-		return QString::number(bytes / (1024.0 * 1024.0), 'f', 1) + QStringLiteral(" MB");
-	if (bytes >= 1024)
-		return QString::number(bytes / 1024.0, 'f', 1) + QStringLiteral(" KB");
-	return QString::number(bytes) + QStringLiteral(" B");
-}
 } // namespace
 
 void ChatController::addImageFiles(const QVariantList& urls)
@@ -406,7 +365,7 @@ void ChatController::addFiles(const QVariantList& urls)
 		entry.insert(QStringLiteral("path"), path);
 		entry.insert(QStringLiteral("suffix"), suffix);
 		entry.insert(QStringLiteral("size"), info.size());
-		entry.insert(QStringLiteral("sizeLabel"), sizeLabelFor(info.size()));
+		entry.insert(QStringLiteral("sizeLabel"), formatByteSize(info.size()));
 		entry.insert(QStringLiteral("icon"), iconForSuffix(suffix));
 
 		if (isImage) {
@@ -1067,7 +1026,20 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 
 	if (type == QStringLiteral("turn/start") || type == QStringLiteral("turn/end")) {
 		// 回合边界：下一个 assistant/message 开新气泡（一轮的典型事件序：turn/start → user → steps → turn/end）
-		m_turnRow = -1;
+		if (type == QStringLiteral("turn/end")) {
+			const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
+				.value(QStringLiteral("usage")).toObject();
+			if (!usage.isEmpty()) {
+				const int row = (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+					? m_turnRow : m_messages->lastAgentRow();
+				if (row >= 0)
+					m_messages->addUsage(row, usage);
+			}
+		}
+		if (type == QStringLiteral("turn/start"))
+			m_turnRow = -1;
+		// turn/end 保留行号：历史里偶尔会在 turn/end 后补最后一条
+		// assistant/message；下一轮 turn/start / user 会重置。
 		return;
 	}
 
@@ -1076,10 +1048,14 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 		// assistant/message，同一 turn 的多条续写到 m_turnRow 指向的那一行，段顺序不变。
 		const QString thinking = extractThinking(event);
 		const QString reply = extractReply(event);
-		if (thinking.isEmpty() && reply.isEmpty())
+		const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
+			.value(QStringLiteral("usage")).toObject();
+		if (thinking.isEmpty() && reply.isEmpty() && usage.isEmpty())
 			return;
 
 		const int row = agentRowForTurn();
+		if (!usage.isEmpty())
+			m_messages->addUsage(row, usage);
 		if (!thinking.isEmpty())
 			m_messages->appendChunk(row, QStringLiteral("thinking"), thinking);
 		if (!reply.isEmpty())
@@ -1091,7 +1067,7 @@ void ChatController::applyHistoryEvent(const QJsonObject& event)
 		const ToolCallInfo tool = extractToolCall(event);
 		if (tool.valid)
 			m_messages->appendChunk(agentRowForTurn(), QStringLiteral("toolCall"),
-				prettyArguments(tool.arguments), tool.name);
+				jsonIndented(tool.arguments), tool.name);
 		return;
 	}
 
@@ -1366,8 +1342,18 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 	}
 
 	if (type == QStringLiteral("turn/end")) {
-		// 回合真正的收尾点。
-		m_turnRow = -1;
+		// 回合真正的收尾点。先把 turn/end 自带的 usage 归到当前气泡。
+		// 刻意不在这里清 m_turnRow：服务端有时在 turn/end 之后才补最后一条
+		// assistant/message 快照；清掉后再来会新建一个气泡，整段回复重复。
+		// 下一轮 turn/start / user/message / beginTurn 会重置它。
+		const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
+			.value(QStringLiteral("usage")).toObject();
+		if (!usage.isEmpty()) {
+			const int row = (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+				? m_turnRow : m_messages->lastAgentRow();
+			if (row >= 0)
+				m_messages->addUsage(row, usage);
+		}
 		flushPending();
 		// 无条件关流式态：哪怕这一轮早已被本地判死（残留态），turn/end 也是官方给的"可以收手了"信号。
 		setStreaming(false);
@@ -1382,14 +1368,18 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		// 收尾：已流式显示过就不重复追加，只把最后一段封存
 		const QString thinking = extractThinking(event);
 		const QString reply = extractReply(event);
+		const QJsonObject usage = event.value(QStringLiteral("data")).toObject()
+			.value(QStringLiteral("usage")).toObject();
 		// 先把流式残余结算掉：否则整段快照会被 bufferChunk 并进同一条 Pending，
 		// appendChunk 收到的是 "残余+全文"，与已画出的正文不满足相等/前缀/累积关系，
 		// MessageListModel 的去重失效，正文会被当成增量再追加一遍。
 		flushPending();
-		if (!thinking.isEmpty() || !reply.isEmpty()) {
+		if (!thinking.isEmpty() || !reply.isEmpty() || !usage.isEmpty()) {
 			// ⚠️ 用 agentRowForTurn()（本轮那一行）：一轮里会来**多条** assistant/message
 			//    （每次工具调用前后各一条），它们属于同一个气泡。
 			const int row = agentRowForTurn();
+			if (!usage.isEmpty())
+				m_messages->addUsage(row, usage);
 			bufferChunk(row, QStringLiteral("thinking"), thinking);
 			bufferChunk(row, QStringLiteral("reply"), reply);
 			m_turnHadOutput = true;
@@ -1440,7 +1430,7 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 		const ToolCallInfo tool = extractToolCall(event);
 		if (tool.valid) {
 			bufferChunk(agentRowForTurn(), QStringLiteral("toolCall"),
-				prettyArguments(tool.arguments), tool.name);
+				jsonIndented(tool.arguments), tool.name);
 			m_turnHadOutput = true;
 			setStreaming(true);
 		}
@@ -1704,7 +1694,7 @@ void ChatController::applyProjections(int asOfSeq, const QJsonObject& values)
 			groups << qtTrId("chat_cache_hit_fmt").arg(percent);
 	}
 
-	groups << qtTrId("chat_token_usage_fmt").arg(formatTokens(billedInput)).arg(formatTokens(m_usage.outputTokens));
+	groups << qtTrId("chat_token_usage_fmt").arg(formatTokenCount(billedInput)).arg(formatTokenCount(m_usage.outputTokens));
 
 	const QString line = groups.join(QStringLiteral(" | "));
 	if (m_statsLine == line)

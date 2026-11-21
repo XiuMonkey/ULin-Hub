@@ -1,4 +1,4 @@
-// 见 core/ClientRuntime.h：服务端 + 出站客户端 + 会话目录的生命周期与 RPC 业务。
+﻿// 见 core/ClientRuntime.h：服务端 + 出站客户端 + 会话目录的生命周期与 RPC 业务。
 
 #include "core/ClientRuntime.h"
 
@@ -7,11 +7,12 @@
 #include "common/session/SessionService.h"
 #include "common/util/Logger.h"
 #include "common/util/CommonRegistry.h"
+#include "common/util/Json.h"
 #include "common/util/HostIndex.h"
 #include "core/ServerManager.h"
 #include "common/agent/dsh/DshApiClient.h"
 #include "common/agent/AgentSessionClient.h"
-#include "common/agent/ulincore/UlinCoreMasterAgent.h"
+#include "common/agent/ulincore/core/UlinCoreMasterAgent.h"
 #include "ExtensionSystem/ExtensionToolHost.h"
 
 #include <QCoreApplication>
@@ -28,20 +29,6 @@
 
 namespace
 {
-	// workspace/follow 的 archivedSessionIds / pinnedSessionIds 都是 JSON 字符串数组：统一转成 id 列表，
-	// 顺手丢掉空串（catalog 的 setter 还会再校验/去重，这里只做形状转换，不重复业务口径）。
-	QStringList idListFromJsonArray(const QJsonArray& values)
-	{
-		QStringList ids;
-		ids.reserve(values.size());
-		for (const QJsonValue& value : values) {
-			const QString id = value.toString();
-			if (!id.isEmpty())
-				ids.append(id);
-		}
-		return ids;
-	}
-
 	QSet<QString> idSetFromJsonArray(const QJsonArray& values)   // 同上，给归档集合用（QSet 无序，去重交给 set）
 	{
 		QSet<QString> ids;

@@ -397,9 +397,7 @@ void TerminalSession::attach()   // DSH 0.2.1：terminal/attach 流，不再有 
 		return;
 	}
 
-	m_uplinkSequence = 0;
-	m_sequence = -1;
-	m_awaitSnapshot = true;      // 新的一代：第一帧必须是 snapshot
+	m_protocol.beginAttachment();  // 新的一代：第一帧必须是 snapshot
 	m_frames.clear();
 	m_pendingBytes = 0;
 	m_frameInFlight = false;
@@ -415,7 +413,7 @@ void TerminalSession::attach()   // DSH 0.2.1：terminal/attach 流，不再有 
 		m_snapshotWatchdog = new QTimer(this);
 		m_snapshotWatchdog->setSingleShot(true);
 		connect(m_snapshotWatchdog, &QTimer::timeout, this, [this]() {
-			if (!m_awaitSnapshot)
+			if (!m_protocol.awaitSnapshot())
 				return;   // snapshot 已经到了：这是迟到的铃声，别动
 			qWarning().noquote() << "[Terminal] 附着后" << kSnapshotWatchdogMs
 				<< "ms 没等到 snapshot，重新附着 block=" << m_blockId;
@@ -430,8 +428,7 @@ void TerminalSession::attach()   // DSH 0.2.1：terminal/attach 流，不再有 
 
 void TerminalSession::detachStream()
 {
-	m_awaitSnapshot = false;
-	m_sequence = -1;
+	m_protocol.markDetached();
 	m_streamId.clear();
 	m_frames.clear();
 	m_pendingBytes = 0;
@@ -536,6 +533,7 @@ void TerminalSession::attachBackend(QObject* backend)
 			m_byteFace = true;
 			m_cols = 0;   // 换后端了：镜像尺寸清零，保证下面第一次 hostResize 真的发出去（扩展靠它起 PTY）
 			m_rows = 0;
+			m_protocol.resetKnownGrid();
 			qInfo().noquote() << "[Terminal] 选了字节面 block=" << m_blockId << "后端=" << className
 				<< "apiVersion=" << apiVersion << "（薄契约：4 槽 + 3 信号）";
 			setAttachState(QStringLiteral("attached"));
@@ -670,10 +668,10 @@ void TerminalSession::pushByteFaceGrid()
 {
 	// 视图还没量出网格时**不要**推 80x24：一推 PTY 就会按 80 列起 shell，之后缩到真实列宽
 	// 时已经输出的长行不会重排 => 画面上就是"不换行、被切掉"。等视图量出来再推（会走下面那次）。
-	if (m_wantCols <= 0 || m_wantRows <= 0)
+	if (m_protocol.wantedCols() <= 0 || m_protocol.wantedRows() <= 0)
 	    return;
-	const int cols = m_wantCols;
-	const int rows = m_wantRows;
+	const int cols = m_protocol.wantedCols();
+	const int rows = m_protocol.wantedRows();
 	if (cols < 2 || rows < 1)
 		return;
 	if (cols == m_cols && rows == m_rows)
@@ -799,11 +797,11 @@ void TerminalSession::onFrame(const QString& streamId, const QJsonObject& frame)
 	const QString type = frame.value(QStringLiteral("type")).toString();
 
 	if (type == QStringLiteral("snapshot")) {
-		if (!m_awaitSnapshot)   // 同一代里又来一份快照：按协议不该发生，重新同步
+		const int snapshotSequence = frame.value(QStringLiteral("sequence")).toInt();
+		const auto status = m_protocol.acceptFrame(snapshotSequence, true);
+		if (status == TerminalProtocolState::FrameStatus::UnexpectedSnapshot)
 			return resetForNewAttachment(QStringLiteral("画面重复同步"));
 
-		m_awaitSnapshot = false;
-		m_sequence = frame.value(QStringLiteral("sequence")).toInt();
 		if (m_snapshotWatchdog)
 			m_snapshotWatchdog->stop();   // 首帧到了：附着这条链通了，撤掉看门狗
 		applyInfo(frame.value(QStringLiteral("info")).toObject());
@@ -818,22 +816,21 @@ void TerminalSession::onFrame(const QString& streamId, const QJsonObject& frame)
 		if (m_vt)   // 画面：自绘视图直接把重放串喂进本地 VT（快照 = 整屏重来）；只有扩展后端那条路才排队等 ack
 			feedViewModel(QStringLiteral("snapshot"), frame.value(QStringLiteral("screen")).toString());
 		else
-			enqueueFrame(QStringLiteral("snapshot"), m_sequence, frame.value(QStringLiteral("screen")).toString());
+			enqueueFrame(QStringLiteral("snapshot"), m_protocol.sequence(), frame.value(QStringLiteral("screen")).toString());
 		pushResize();   // 附着已被引擎认下：这时才把视图量出来的尺寸推过去
 		return;
 	}
 
 	if (type == QStringLiteral("output")) {
-		if (m_awaitSnapshot)   // 首帧不是 snapshot ⇒ 一定丢了开场画面，重连取新的
-			return resetForNewAttachment(QStringLiteral("画面数据异常"));
-
 		const int sequence = frame.value(QStringLiteral("sequence")).toInt();
-		if (sequence != m_sequence + 1) {
-			return resetForNewAttachment(QStringLiteral("画面数据不连续（%1 → %2）")   // gap：VT 流不能跳帧（官方客户端也当致命）⇒ 重连拿一份完整快照
-				.arg(m_sequence).arg(sequence));
+		const auto status = m_protocol.acceptFrame(sequence, false);
+		if (status == TerminalProtocolState::FrameStatus::NeedSnapshot)
+			return resetForNewAttachment(QStringLiteral("画面数据异常"));   // 首帧不是 snapshot
+		if (status == TerminalProtocolState::FrameStatus::Gap) {
+			return resetForNewAttachment(QStringLiteral("画面数据不连续（%1 → %2）")
+				.arg(m_protocol.sequence()).arg(sequence));
 		}
 
-		m_sequence = sequence;
 		if (m_vt)
 			feedViewModel(QStringLiteral("output"), frame.value(QStringLiteral("data")).toString());
 		else
@@ -871,7 +868,7 @@ void TerminalSession::onStreamEnded(const QString& streamId)
 	if (m_attachState == QStringLiteral("closed"))   // 终端进程没了：不再附着
 		return;
 
-	m_awaitSnapshot = false;   // 附着断了（mux 重连也会走到这里）：等 DshApiClient::connected 后由 TerminalBridge 重新 start()
+	m_protocol.markDetached();   // 附着断了（mux 重连也会走到这里）：等 DshApiClient::connected 后由 TerminalBridge 重新 start()
 	setAttachState(QStringLiteral("reconnecting"));
 	setStatusText(QStringLiteral("终端连接断开，等待重连…"));
 }
@@ -1072,7 +1069,7 @@ void TerminalSession::pumpWrites()
 	while (!m_writes.isEmpty()) {
 		QJsonObject item;
 		item.insert(QStringLiteral("type"), QStringLiteral("write"));
-		item.insert(QStringLiteral("sequence"), ++m_uplinkSequence);
+		item.insert(QStringLiteral("sequence"), m_protocol.nextUplinkSequence());
 		item.insert(QStringLiteral("data"), QString::fromUtf8(m_writes.dequeue()));
 		m_api->sendTerminalUplink(item);
 	}
@@ -1080,8 +1077,7 @@ void TerminalSession::pumpWrites()
 
 void TerminalSession::resize(int cols, int rows)
 {
-	m_wantCols = qBound(2, cols, qMax(2, m_maxCols));
-	m_wantRows = qBound(1, rows, qMax(1, m_maxRows));
+	m_protocol.requestGrid(cols, rows);
 
 	// 扩展后端在场：尺寸交给它，不走引擎。
 	// 字节面 hostResize(blockId, cols, rows)（它靠第一次尺寸起 PTY）/ 页面面 resize(blockId, cols, rows)。
@@ -1089,7 +1085,7 @@ void TerminalSession::resize(int cols, int rows)
 		if (m_byteFace)
 			pushByteFaceGrid();
 		else
-			invokeBackend("resize", { m_wantCols, m_wantRows });
+			invokeBackend("resize", { m_protocol.wantedCols(), m_protocol.wantedRows() });
 	}
 	pushResize();
 }
@@ -1098,19 +1094,19 @@ void TerminalSession::resize(int cols, int rows)
 // 刚 attach 时不能马上发（引擎还没认下这个 attachmentId），所以 snapshot 到达后也会再调一次。
 void TerminalSession::pushResize()
 {
-	if (m_wantCols <= 0 || m_wantRows <= 0)
-		return;
-	if (m_wantCols == m_cols && m_wantRows == m_rows)
-		return;   // 同尺寸不发（官方客户端也这样省 RPC）
 	if (!m_api || m_terminalId.isEmpty() || m_streamId.isEmpty())
 		return;
+	int cols = 0;
+	int rows = 0;
+	if (!m_protocol.takeGridChange(&cols, &rows))
+		return;
 
-	m_cols = m_wantCols;
-	m_rows = m_wantRows;
+	m_cols = cols;
+	m_rows = rows;
 
 	QJsonObject item;
 	item.insert(QStringLiteral("type"), QStringLiteral("resize"));
-	item.insert(QStringLiteral("sequence"), ++m_uplinkSequence);
+	item.insert(QStringLiteral("sequence"), m_protocol.nextUplinkSequence());
 	item.insert(QStringLiteral("cols"), m_cols);
 	item.insert(QStringLiteral("rows"), m_rows);
 	m_api->sendTerminalUplink(item);

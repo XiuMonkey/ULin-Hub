@@ -28,6 +28,7 @@
 #include <QObject>
 #include <QPalette>
 #include <QRegularExpression>
+#include <QTimer>
 #include <QResource>
 #include <QScreen>
 #include <QScrollBar>
@@ -397,6 +398,29 @@ void ThemeManager::setMode(Mode mode)
 	activate(mode);
 	installPaletteFor(m_palette);
 	qInfo().noquote() << "[Theme] set mode:" << (m_mode == Mode::Dark ? "Dark" : "Light");
+	emit themeChanged();
+}
+
+void ThemeManager::toggleTheme()
+{
+	const Mode next = isDark() ? Mode::Light : Mode::Dark;
+	AppearanceSetting::setThemeMode(next == Mode::Dark ? AppearanceSetting::ThemeMode::Dark
+		: AppearanceSetting::ThemeMode::Light);
+
+	m_themeSwitching = true;
+	emit themeSwitchingChanged();
+	setMode(next);
+
+	if (!m_switchingTimer) {
+		m_switchingTimer = new QTimer(this);
+		m_switchingTimer->setSingleShot(true);
+		m_switchingTimer->setInterval(120);
+		connect(m_switchingTimer, &QTimer::timeout, this, [this]() {
+			m_themeSwitching = false;
+			emit themeSwitchingChanged();
+		});
+	}
+	m_switchingTimer->start();
 }
 
 void ThemeManager::reload()   // 把合成样式表装到单个窗口及其子树；各顶层窗口自行调用

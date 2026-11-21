@@ -1,9 +1,12 @@
-// 顺序：日志 → 外观设置 → 翻译 → 主题（释放风格包 + 读 palette）→ 原生窗口过滤器 →
+﻿// 顺序：日志 → 外观设置 → 翻译 → 主题（释放风格包 + 读 palette）→ 原生窗口过滤器 →
 // 风格包/QML token → 会话数据面 → 注册 QML 单例 → 装载 qrc:/qml/Main.qml。
 
 #include "common/settings/ClientSettings.h"
 #include "common/ClientInfo.h"
 #include "common/util/Logger.h"
+#include "common/util/EnvPath.h"
+#include "common/util/RuntimeDirs.h"
+#include "common/util/WebEngineEnv.h"
 #include "common/appearance/ThemeManager.h"
 #include "common/util/ConnectionManager.h"
 #include "common/util/CommonRegistry.h"
@@ -12,7 +15,7 @@
 #include "ExtensionSystem/ClientExtension.h"
 #include "common/appearance/TranslationManager.h"
 #include "common/platform/win/NativeWindowFilter.h"
-#include "common/pluginmarket/PluginMarketController.h"
+#include "common/agent/dsh/pluginmarket/PluginMarketController.h"
 #include "common/appearance/StyleResolver.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
@@ -27,14 +30,12 @@
 #include "qmlbridge/WindowBridge.h"
 
 #include <QCoreApplication>
-#include <QDir>
 #include <QFileInfo>
 #include <QFont>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QStyleHints>
 #include <QUrl>
-#include <QUuid>
 #include <QtQml/qqml.h>
 #include <QtWebEngineQuick/QtWebEngineQuick>
 #include <QtWidgets/QApplication>
@@ -48,23 +49,9 @@ int main(int argc, char* argv[])
 	// 1) QApplication 之前：applicationDirPath() 还不能用，先按 argv[0] 推一次（explorer / 快捷方式
 	// 启动给的是完整路径，够用）；
 	// 2) QApplication 之后：按 applicationDirPath() 再设一次兜底（相对 argv[0] 之类的异常情况）。
-	// 目录不存在就不设，让 Qt 回落到默认的 <exe>\resources\。
-	const auto bundledWebEngineResources = [](const QString& appDir) {
-		if (appDir.isEmpty())
-			return QString();
-		const QString dir = appDir + QStringLiteral("/resources/webengine");
-		return QFileInfo::exists(dir + QStringLiteral("/qtwebengine_resources.pak")) ? dir : QString();
-		};
-	if (argc > 0) {
-		const QString webEngineResources = bundledWebEngineResources(
-			QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath());
-		if (!webEngineResources.isEmpty()) {
-			qputenv("QTWEBENGINE_RESOURCES_PATH", QDir::toNativeSeparators(webEngineResources).toUtf8());
-			const QString locales = webEngineResources + QStringLiteral("/locales");
-			if (QFileInfo::exists(locales))
-				qputenv("QTWEBENGINE_LOCALES_PATH", QDir::toNativeSeparators(locales).toUtf8());
-		}
-	}
+	// 目录不存在就不设，让 Qt 回落到默认的 <exe>\resources\。两处都走 util/WebEngineEnv.h。
+	if (argc > 0)
+		applyBundledWebEngineEnv(QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath());
 
 	// ⚠️ 必须在 QApplication **之前**：WebEngine 要在这里设置与主上下文共享的 OpenGL 上下文，
 	// 放到后面（或漏掉）会在运行期报 "WebEngineContext used before initialize" 并直接崩。
@@ -74,27 +61,9 @@ int main(int argc, char* argv[])
 
 	// 版本号收口到 common/ClientInfo.h（与发布包名对得上）。此前整个客户端没有任何地方
 	// 登记过版本 —— 日志头、崩溃报告、helpdesk 对版本只能靠猜。
-	// 本地数据契约：<exe>/data 持久化，<exe>/temp/run-<uuid> 临时化。
-	// 这两处不再依赖 %LOCALAPPDATA% / %TEMP%，避免沙箱下不可写或数据分裂。
-	{
-		const QString dataRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/data");
-		QDir().mkpath(dataRoot + QStringLiteral("/client"));
-		QDir().mkpath(dataRoot + QStringLiteral("/ulincore"));
-		const QString tempRoot = QCoreApplication::applicationDirPath() + QStringLiteral("/temp");
-		QDir().mkpath(tempRoot);
-		const QString runDir = tempRoot + QStringLiteral("/run-")
-			+ QUuid::createUuid().toString(QUuid::WithoutBraces);
-		QDir().mkpath(runDir);
-		qputenv("ULINHUB_TEMP_RUN", QDir::toNativeSeparators(runDir).toUtf8());
-		// 只清理由宿主创建的旧 run-*；data/ 永远不碰。
-		const QFileInfoList stale = QDir(tempRoot).entryInfoList(
-			{ QStringLiteral("run-*") }, QDir::Dirs | QDir::NoDotAndDotDot);
-		const QString currentRun = QDir(runDir).absolutePath();
-		for (const QFileInfo& info : stale) {
-			if (info.absoluteFilePath() != currentRun)
-				QDir(info.absoluteFilePath()).removeRecursively();
-		}
-	}
+	// 本地数据契约（<exe>/data 持久化、<exe>/temp/run-<uuid> 临时化）已收进 util/RuntimeDirs.h，
+	// 两个平台入口共用，顺带把上一次进程遗留的 run-* 清掉。
+	(void)prepareRuntimeDirs();
 
 	QCoreApplication::setApplicationVersion(ClientInfo::kVersion);
 
@@ -107,17 +76,11 @@ int main(int argc, char* argv[])
 		const QString bundledProcess = QCoreApplication::applicationDirPath()
 			+ QStringLiteral("/dependence/QtWebEngineProcess.exe");
 		if (QFileInfo::exists(bundledProcess))
-			qputenv("QTWEBENGINEPROCESS_PATH", QDir::toNativeSeparators(bundledProcess).toUtf8());
+			setEnvPath("QTWEBENGINEPROCESS_PATH", bundledProcess);
 
 		// 资源目录兜底：上面按 argv[0] 设过一次，这里按真实 exe 目录再设一次（同一个值就无害），
 		// 覆盖"argv[0] 是相对路径 / 从别的目录启动"这些推不准的情况。
-		const QString webEngineResources = bundledWebEngineResources(QCoreApplication::applicationDirPath());
-		if (!webEngineResources.isEmpty()) {
-			qputenv("QTWEBENGINE_RESOURCES_PATH", QDir::toNativeSeparators(webEngineResources).toUtf8());
-			const QString locales = webEngineResources + QStringLiteral("/locales");
-			if (QFileInfo::exists(locales))
-				qputenv("QTWEBENGINE_LOCALES_PATH", QDir::toNativeSeparators(locales).toUtf8());
-		}
+		applyBundledWebEngineEnv(QCoreApplication::applicationDirPath());
 	}
 
 	Logger::init();
@@ -162,21 +125,21 @@ int main(int argc, char* argv[])
 
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "WindowBridge", &WindowBridge::instance());
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Theme", &ThemeBridge::instance());
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Style", &StyleResolver::instance());
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Style", &StyleBridge::instance());
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Hub", &QmlBridge::instance());   // QML 单例名仍是 Hub（契约）
 
 	// 统一连接登记表：QML 侧用 HostConnections.RegisterConnection 由宿主建连（不用自己写 Connections）
 	// 名字不叫 Connections —— 那是 QtQuick 里的类型名，会撞。
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostConnections", &ConnectionManager::instance());
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostConnections", &HostConnectionsBridge::instance());
 
 	// 扩展 UI 宿主（QML 面）：HostUi.registerItem / item / mountInto / unmountOwner
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostUi", &HostUi::instance());
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostUi", &HostUiBridge::instance());
 
 	// 地址栏输入规范化（纯字符串规则在 common/util/UrlInput）：QML 侧 UrlInput.normalize(text)
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "UrlInput", &UrlInputBridge::instance());
 
 	// 右栏面板坞的块（页签）列表：QML 侧 PanelBarDock.open/close/activate/showHome + Repeater { model: PanelBarDock }
-	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarDock", &PanelBarDockModel::instance());
+	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarDock", &PanelBarDockBridge::instance());
 
 	// 同一个实例也登记给插件（kPanelBarDock，"对象直给"那条）：插件可以直接用模型的方法与信号，
 	// 与 VirtualBlockBackendHost 那两条虚接口并存（见 HostIndex.h 的说明）。
@@ -195,15 +158,19 @@ int main(int argc, char* argv[])
 	// 视图（TerminalView.qml）只读它的属性/调它的 INvokable —— 登记类型是为了属性有静态类型可查。
 	qmlRegisterUncreatableType<TerminalVtModel>("ULinHub", 1, 0, "TerminalVtModel",
 		QStringLiteral("由 Terminal.bindView(blockId) 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<ToolsFilter>("ULinHub", 1, 0, "ToolsFilter",   // 工具过滤器（data + 摊平的行模型）：QML 侧 Hub.toolsFilter 就是这个对象
+	qmlRegisterUncreatableType<ToolsFilterBridge>("ULinHub", 1, 0, "ToolsFilterBridge",
 		QStringLiteral("由 Hub.toolsFilter 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<SessionListModel>("ULinHub", 1, 0, "SessionListModel",
+	qmlRegisterUncreatableType<SessionsBridge>("ULinHub", 1, 0, "SessionsBridge",
 		QStringLiteral("由 Hub.sessions 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<SettingsController>("ULinHub", 1, 0, "SettingsController",
+	qmlRegisterUncreatableType<SettingsBridge>("ULinHub", 1, 0, "SettingsBridge",
 		QStringLiteral("由 Hub.settings 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<PluginMarketController>("ULinHub", 1, 0, "PluginMarketController",
+	qmlRegisterUncreatableType<UlinCoreSettingsBridge>("ULinHub", 1, 0, "UlinCoreSettingsBridge",
+		QStringLiteral("由 Hub.settings.ulincoreBridge 提供，不要在 QML 里创建"));
+	qmlRegisterUncreatableType<PluginMarketBridge>("ULinHub", 1, 0, "PluginMarketBridge",
 		QStringLiteral("由 Hub.plugins 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<ExtensionManagerController>("ULinHub", 1, 0, "ExtensionManagerController",
+	qmlRegisterUncreatableType<CommandBridge>("ULinHub", 1, 0, "CommandBridge",
+		QStringLiteral("由 Hub.commands 提供，不要在 QML 里创建"));
+	qmlRegisterUncreatableType<ExtensionsBridge>("ULinHub", 1, 0, "ExtensionsBridge",
 		QStringLiteral("由 Hub.extensions 提供，不要在 QML 里创建"));
 
 	const QString mainQml = StyleResolver::instance().url(QStringLiteral("Main.qml"));

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 扩展 UI 宿主（QML 单例 `HostUi` / 插件侧 index `kUiHost`）
 // 职责（不做槽位、不做贡献清单、不做 mount 编排 —— 见 VirtualCommon.h 的 VirtualUiHost / VirtualBlockBackendHost）：
@@ -69,22 +69,22 @@ public:
 
 	QStringList names() const;
 	QString accountEntryOwner() const { return m_accountEntryOwner; }
-	Q_INVOKABLE bool claimAccountEntry(const QString& owner);
-	Q_INVOKABLE void releaseAccountEntry(const QString& owner);
+	bool claimAccountEntry(const QString& owner);
+	void releaseAccountEntry(const QString& owner);
 	// 宿主 QML 根自己登记（重复登记同一个对象是幂等的）
-	Q_INVOKABLE bool registerItem(const QString& name, QObject* item);
-	Q_INVOKABLE QObject* item(const QString& name) const;
+	bool registerItem(const QString& name, QObject* item);
+	QObject* item(const QString& name) const;
 	// url 必须是绝对路径或 file:/qrc: URL（扩展自己知道自己在哪；宿主不猜）
-	Q_INVOKABLE QString mountInto(const QString& owner, const QString& hostItem, const QString& url, QObject* context = nullptr);
-	Q_INVOKABLE int unmountOwner(const QString& owner);
-	Q_INVOKABLE int unmountAll();
+	QString mountInto(const QString& owner, const QString& hostItem, const QString& url, QObject* context = nullptr);
+	int unmountOwner(const QString& owner);
+	int unmountAll();
 	// 诊断：当前挂了哪些（id / owner / 宿主 / 对象名）
-	Q_INVOKABLE QVariantList mounted() const;
+	QVariantList mounted() const;
 
 	// 顶替的后端（见 VirtualBlockBackendHost）：TerminalPanel 在建 QWebChannel 时取一次；空 = 用内置桥。
-	Q_INVOKABLE QObject* blockBackend(const QString& kind) const;
+	QObject* blockBackend(const QString& kind) const;
 	// 卸载扩展时整批撤（ClientExtension::remove 那条路上调，与 ReleaseTakeoversFor 并列）
-	Q_INVOKABLE int releaseBlockBackends(const QString& owner);
+	int releaseBlockBackends(const QString& owner);
 
 signals:
 	// 扩展把产物交给输入框：QmlBridge 收到后转给 ChatController 的待发附件列表

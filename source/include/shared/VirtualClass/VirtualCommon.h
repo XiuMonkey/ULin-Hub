@@ -10,6 +10,7 @@
 //   VirtualTranslation.h        多语言
 //   VirtualUiHost.h             UI 注入 / 账户入口
 //   VirtualBlockBackendHost.h   面板块后端替换
+//   VirtualHostServices.h       会话 / 设置 / 命令 / 文件浏览 / 插件市场业务对象
 
 #include "VirtualClass/VirtualTheme.h"
 #include "VirtualClass/VirtualMain.h"
@@ -17,3 +18,4 @@
 #include "VirtualClass/VirtualTranslation.h"
 #include "VirtualClass/VirtualUiHost.h"
 #include "VirtualClass/VirtualBlockBackendHost.h"
+#include "VirtualClass/VirtualHostServices.h"

@@ -11,7 +11,10 @@
 #include "common/session/TraceModel.h"   // trace() 把 TraceModel* 当 QAbstractItemModel* 返回，需要完整类型
 #include "common/agent/ToolsFilter.h"
 #include "common/util/CodeHighlighter.h"
+#include "common/util/CommonRegistry.h"
+#include "common/util/ConnectionManager.h"
 #include "common/util/Debugger.h"
+#include "common/util/HostIndex.h"
 #include "common/util/MarkdownSegmenter.h"
 #include "common/ClientInfo.h"   // kPlatform：少量运行期平台分支（打开路径等）
 #include "core/ClientRuntime.h"
@@ -110,6 +113,8 @@ void QmlBridge::init()
 		FileBrowserBridge::instance().setOfficeBackend(HostUi::instance().blockBackend(QStringLiteral("files")));
 	};
 	refreshOfficeBackend();
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kFileBrowser,
+		&FileBrowserBridge::instance());
 	connect(&HostUi::instance(), &HostUi::blockBackendChanged, this, [refreshOfficeBackend](const QString& kind) {
 		if (kind == QStringLiteral("files"))
 			refreshOfficeBackend();
@@ -123,11 +128,17 @@ void QmlBridge::init()
 
 	// 侧栏列表模型只读 core 的目录（数据不归它所有，见 SessionListModel.h）
 	m_sessions = new SessionListModel(m_runtime->catalog(), this);
+	m_sessionsBridge = new SessionsBridge(m_sessions,
+		[this](const QString& id) { selectSession(id); },
+		[this](const QString& id) { createSession(id); }, this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kSessionList, m_sessions);
 
 	DshApiClient* api = m_runtime->apiClient();
 
 	// 设置页（模型 / API key），侧栏 ⚙ 打开；必须在 api 之后（它要拿 api 发 RPC）
 	m_settings = new SettingsController(api, this);
+	m_settingsBridge = new SettingsBridge(m_settings, this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kSettingsController, m_settings);
 	// 扩展注册 Master Agent 后刷新设置页；如果本地选中的是已注册后端，自动激活它。
 	connect(api, &DshApiClient::masterAgentsChanged, this, [this, api]() {
 		if (m_settings)
@@ -143,12 +154,19 @@ void QmlBridge::init()
 	});
 	// 插件市场：HTTP 与解析走 PluginMarketClient / PluginMarketModel
 	m_plugins = new PluginMarketController(api, this);
-	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerController 里合成
-	m_extensions = new ExtensionManagerController(m_runtime->server(), m_runtime->toolHost(), this);
+	m_pluginsBridge = new PluginMarketBridge(m_plugins, this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kPluginMarket, m_plugins);
+	// 扩展管理：工具扩展 / 客户端扩展两种来源在 ExtensionManagerPage 里合成
+	m_extensions = new ExtensionManagerPage(m_runtime->server(), m_runtime->toolHost(), this);
+	m_extensionsBridge = new ExtensionsBridge(m_extensions, this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kExtensionManager, m_extensions);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
 	m_commands = new CommandController(api, this);
+	m_commandsBridge = new CommandBridge(m_commands, this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kCommandController, m_commands);
 	// /permission 切完权限后重读一次投影；命令本身是异步的，等一个小延迟让服务端先落事件。
-	connect(m_commands, &CommandController::executionFinished, this, [this](bool ok, const QString&) {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.commands.executionFinished"),
+		m_commands, &CommandController::executionFinished, this, [this](bool ok, const QString&) {
 		if (ok)
 			QTimer::singleShot(180, this, &QmlBridge::refreshPermissionPreset);
 	});
@@ -156,7 +174,8 @@ void QmlBridge::init()
 	TerminalBridge::instance().init(api);
 
 	// 用户保存服务器地址后重启内置服务端
-	connect(m_settings, &SettingsController::serverRestartRequested, this, [this]() {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.serverRestart"),
+		m_settings, &SettingsController::serverRestartRequested, this, [this]() {
 		m_runtime->restartServer();
 		});
 	// Master 切换：切到扩展先停内置 DSH；切回 dsh 复位接管标记并重新拉起内置服务端。
@@ -198,23 +217,33 @@ void QmlBridge::init()
 
 	// 风格包重置后热重载 QML 侧 token：SettingsController 在领域层，不许反向 include qmlbridge，
 	// 于是由它发信号、这里落地。
-	connect(m_settings, &SettingsController::stylesReset, this, []() {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.stylesReset"),
+		m_settings, &SettingsController::stylesReset, this, []() {
 		ThemeBridge::instance().reload();
 		});
 	// 插件市场装完市场包也要重启内置服务端（新插件才会被加载）：PluginMarketController 在领域层，
 	// 不许反向 include core，于是由它发信号、这里落地。
-	connect(m_plugins, &PluginMarketController::serverRestartRequested, this, [this]() {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.plugins.serverRestart"),
+		m_plugins, &PluginMarketController::serverRestartRequested, this, [this]() {
 		m_runtime->restartServer();
 		});
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----
 	m_chat = new ChatController(api, m_runtime->agentSession(), this);
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kChatController, m_chat);
 	// 新增/更新模型后目录会变：输入区的模型选择器必须跟着刷新，否则新模型要等换会话才出现。
-	connect(m_settings, &SettingsController::modelAdded, this, [this](const QString&, const QString&) {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.modelAdded"),
+		m_settings, &SettingsController::modelAdded, this, [this](const QString&, const QString&) {
+		m_chat->refreshModelCatalog();
+	});
+	// 凭据变化也会改变模型目录的可见性（缺 Key 的模型变可用），同样立即刷新。
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.modelCatalogChanged"),
+		m_settings, &SettingsController::modelCatalogChanged, this, [this]() {
 		m_chat->refreshModelCatalog();
 	});
 	// 命令注册表变了（插件运行期注册/注销命令）⇒ 重拉当前会话的命令表
-	connect(m_chat, &ChatController::commandRegistryChanged, this, [this]() {
+	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.chat.commandRegistryChanged"),
+		m_chat, &ChatController::commandRegistryChanged, this, [this]() {
 		if (!m_currentSessionId.isEmpty())
 			m_commands->refresh(m_currentSessionId);
 	});
@@ -222,6 +251,7 @@ void QmlBridge::init()
 	m_theme = new ThemeController(this);
 	// ---- 工具过滤器：数据层与形状（含摊平的行模型）都在它自己身上，桥只负责开关面板 ----
 	m_toolsFilter = new ToolsFilter(this);
+	m_toolsFilterBridge = new ToolsFilterBridge(m_toolsFilter, this);
 	// 基地址跟着服务端走：每次拿到 baseUrl 就同步给过滤器（它只借 scheme/host/port）
 	connect(m_runtime, &ClientRuntime::serverStateChanged, this, [this, api]() {
 		m_toolsFilter->setBaseUrl(api->baseUrl());
@@ -505,6 +535,53 @@ void QmlBridge::setPermissionPreset(const QString& preset)
 
 	// 引擎的官方写路径：/permission <preset>。成功后 executionFinished 会触发重读投影。
 	m_commands->execute(m_currentSessionId, QStringLiteral("/permission ") + preset);
+}
+
+bool QmlBridge::permissionOptionActive(const QString& preset) const
+{
+	return !preset.isEmpty() && m_permissionPreset == preset;
+}
+
+bool QmlBridge::permissionOptionIsFull(const QString& preset) const
+{
+	return preset == QLatin1String("danger-full-access");
+}
+
+void QmlBridge::setFullAccessPermission()
+{
+	setPermissionPreset(QStringLiteral("danger-full-access"));
+}
+
+QString QmlBridge::permissionLabel() const
+{
+	if (m_permissionPreset == QLatin1String("read-only"))
+		return qtTrId("permission_read_only");
+	if (m_permissionPreset == QLatin1String("workspace-write"))
+		return qtTrId("permission_workspace_write");
+	if (m_permissionPreset == QLatin1String("danger-full-access"))
+		return qtTrId("permission_full_access");
+	return qtTrId("permission_title");
+}
+
+bool QmlBridge::permissionIsFull() const
+{
+	return m_permissionPreset == QLatin1String("danger-full-access");
+}
+
+QVariantList QmlBridge::permissionOptions() const
+{
+	auto option = [](const char* id, const char* label, const char* description) {
+		QVariantMap row;
+		row.insert(QStringLiteral("id"), QString::fromLatin1(id));
+		row.insert(QStringLiteral("label"), qtTrId(label));
+		row.insert(QStringLiteral("description"), qtTrId(description));
+		return row;
+	};
+	return {
+		option("read-only", "permission_read_only", "permission_read_only_desc"),
+		option("workspace-write", "permission_workspace_write", "permission_workspace_write_desc"),
+		option("danger-full-access", "permission_full_access", "permission_full_access_desc")
+	};
 }
 
 void QmlBridge::createSession(const QString& workspaceId)

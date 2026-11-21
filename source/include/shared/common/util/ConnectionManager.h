@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // 信号槽登记表：按 index 管理 connect，支持取消 / 挂起 / 重连 / 接管 / 交还。
 // QObject 必须是第一个基类（moc 假定首个基类即 QObject 基类）；文末 dshRegister 是宿主内部短接入口。
@@ -25,15 +25,58 @@ class ConnectionManager : public QObject, public VirtualConnectionManager
 	Q_INTERFACES(VirtualConnectionManager)
 
 		// 插件被允许新增订阅的信号（QMetaObject 规范化签名）。加条目 = 承诺该信号名稳定。
-		std::vector<QByteArray> m_publicSignals = { QByteArrayLiteral("2takeoverChanged(bool)") };
+		// 顺序：连接基础 → 会话/聊天 → 设置 → 命令/文件/市场 → 会话列表；新增只追加。
+		std::vector<QByteArray> m_publicSignals = {
+			QByteArrayLiteral("2takeoverChanged(bool)"),
+			QByteArrayLiteral("2blockBackendChanged(QString)"),
+			QByteArrayLiteral("2namesChanged()"),
+			QByteArrayLiteral("2accountEntryOwnerChanged()"),
+			QByteArrayLiteral("2composerFilesRequested(QStringList)"),
+			QByteArrayLiteral("2countChanged()"),
+			QByteArrayLiteral("2activeIndexChanged()"),
+			QByteArrayLiteral("2homeVisibleChanged()"),
+			QByteArrayLiteral("2activeChanged()"),
+			QByteArrayLiteral("2activeViewChanged()"),
+			QByteArrayLiteral("2launcherItemsChanged()"),
+			QByteArrayLiteral("2detachedBlocksChanged()"),
+			QByteArrayLiteral("2catalogChanged()"),
+			QByteArrayLiteral("2streamingChanged()"),
+			QByteArrayLiteral("2turnFinished()"),
+			QByteArrayLiteral("2messagesChanged()"),
+			QByteArrayLiteral("2jobsChanged()"),
+			QByteArrayLiteral("2commandRegistryChanged()"),
+			QByteArrayLiteral("2sessionLoadingChanged()"),
+			QByteArrayLiteral("2masterBackendChanged()"),
+			QByteArrayLiteral("2viewChanged()"),
+			QByteArrayLiteral("2modelCatalogChanged()"),
+			QByteArrayLiteral("2accountChanged()"),
+			QByteArrayLiteral("2languageChanged()"),
+			QByteArrayLiteral("2serverUrlChanged()"),
+			QByteArrayLiteral("2stylesReset()"),
+			QByteArrayLiteral("2itemsChanged()"),
+			QByteArrayLiteral("2executionFinished(bool,QString)"),
+			QByteArrayLiteral("2rootPathChanged()"),
+			QByteArrayLiteral("2currentPathChanged()"),
+			QByteArrayLiteral("2entriesChanged()"),
+			QByteArrayLiteral("2fileChanged()"),
+			QByteArrayLiteral("2errorChanged()"),
+			QByteArrayLiteral("2openChanged()"),
+			QByteArrayLiteral("2installChanged()"),
+			QByteArrayLiteral("2progressChanged()"),
+			QByteArrayLiteral("2statusChanged()"),
+			QByteArrayLiteral("2busyChanged()"),
+			QByteArrayLiteral("2selectedIndexChanged()"),
+			QByteArrayLiteral("2restartHintChanged()"),
+			QByteArrayLiteral("2rebuilt()")
+		};
 
 public:
 	static ConnectionManager& instance();
 	~ConnectionManager() override;
 
-	Q_INVOKABLE void TakeoverConnection(QString index, QObject* receiver, const QString& slot) { TakeoverConnection(index, receiver, slot.toUtf8()); }  // QML 适配重载
+	void TakeoverConnection(QString index, QObject* receiver, const QString& slot) { TakeoverConnection(index, receiver, slot.toUtf8()); }  // QML 适配重载
 
-	Q_INVOKABLE void ProtectedRegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)  // QML 适配重载
+	void ProtectedRegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)  // QML 适配重载
 	{
 		const QByteArray sig = signal.toUtf8(), sl = slot.toUtf8();
 		ProtectedRegisterConnection(index, sender, sig, receiver, sl.constData());  // constData() 只喂给这次同步调用，不存下来
@@ -50,7 +93,7 @@ public:
 		RegisterConnection(index, sender, signalName, receiver, slotName.constData());
 	}
 
-	Q_INVOKABLE void PublicRemoveConnection(QString index) override
+	void PublicRemoveConnection(QString index) override
 	{
 		const auto found = ConnectionRegistry.find(index);
 		if (found == ConnectionRegistry.end())
@@ -65,7 +108,7 @@ public:
 		ConnectionRegistry.remove(index);
 	}
 
-	Q_INVOKABLE void SuspendConnection(QString index) override  // 挂起：disconnect 但不删表
+	void SuspendConnection(QString index) override  // 挂起：disconnect 但不删表
 	{
 		const auto found = ConnectionRegistry.find(index);  // 非 const：挂起后要清 HasHandle，让"没有活连接"成为明确状态
 		if (found == ConnectionRegistry.end())
@@ -80,7 +123,7 @@ public:
 		found.value().HasHandle = false;
 	}
 
-	Q_INVOKABLE void Reconnect(QString index) override
+	void Reconnect(QString index) override
 	{
 		const auto found = ConnectionRegistry.find(index);
 		if (found == ConnectionRegistry.end() || found.value().Slot == "Lambda")
@@ -116,7 +159,7 @@ public:
 				  after.value().Prev ? "已留底，可 ReleaseTakeover 交还" : "是 Lambda 槽、留不了底，交还不了");
 	}
 
-	Q_INVOKABLE bool ReleaseTakeover(QString index) override
+	bool ReleaseTakeover(QString index) override
 	{
 		const auto found = ConnectionRegistry.find(index);
 		if (found == ConnectionRegistry.end()) {
@@ -154,8 +197,8 @@ public:
 
 	// QML 可调：签名由 QML **手写**（前缀 '2'/'1' 不用写）。⚠️ 槽的参数必须带类型标注 —— 未标注的参数在元对象里
 	// 是 QVariant，接不上 QString 信号（报 Incompatible sender/receiver arguments）。
-	// 之所以只能是这样一个非模板重载：moc 不支持函数模板（标 Q_INVOKABLE 也是空操作），且 QML 构造不出 ConnectionGroup。
-	Q_INVOKABLE void RegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)
+	// 之所以只能是这样一个非模板重载：moc 不支持函数模板（标 也是空操作），且 QML 构造不出 ConnectionGroup。
+	void RegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)
 	{
 		if (index.isEmpty() || !sender || !receiver || signal.isEmpty() || slot.isEmpty()) {
 			qWarning("RegisterConnection(): 有空值，拒绝");
