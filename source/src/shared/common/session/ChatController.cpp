@@ -854,8 +854,12 @@ void ChatController::connectApi()
 
 void ChatController::onFollowSnapshot(const QString& sessionId, int cursor, const QJsonArray& records, bool hasMore)
 {
-	if (sessionId != m_sessionId)
+	if (sessionId != m_sessionId) {
+		qWarning().noquote() << "[Chat] follow snapshot ignored:"
+			<< "snapshotSession=" << sessionId << "currentSession=" << m_sessionId
+			<< "records=" << records.size();
 		return;   // 迟到的帧：只画当前会话
+	}
 
 	// 首帧已经到达（即使内容为空）⇒ 不再是“加载中”，QML 可以决定显示空状态还是消息。
 	if (m_sessionLoading) {
@@ -1007,6 +1011,8 @@ void ChatController::rebuildFromRecords(const QJsonArray& records)
 
 	qInfo().noquote() << "[Chat] follow snapshot records=" << records.size()
 		<< "types=" << types.join(QLatin1Char(','))
+		<< "rows=" << m_messages->rowCount()
+		<< "session=" << m_sessionId
 		<< "turnOpen=" << turnOpen;
 
 	// 账本显示最后一个回合还没到 turn/end ⇒ 这轮仍在跑。setSession() 已把 m_turnActive / m_streaming

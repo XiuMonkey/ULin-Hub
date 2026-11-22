@@ -1,9 +1,25 @@
-﻿// DSH Mux 流 JSON 解析接口实现；不依赖任何 UI 类，可单独复用。
+// DSH Mux 流 JSON 解析接口实现；不依赖任何 UI 类，可单独复用。
 
 #include "common/agent/AgentEventParser.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
+
+namespace
+{
+// ULinCore 落盘事件把 message 放在事件顶层；DSH 流式事件放在 data.message。
+// 两种形状都要接受，否则历史快照会被解析成空消息。
+QJsonObject messageObject(const QJsonObject& event)
+{
+	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
+	QJsonObject message = data.value(QStringLiteral("message")).toObject();
+	if (message.isEmpty())
+		message = event.value(QStringLiteral("message")).toObject();
+	if (message.isEmpty())
+		message = data;
+	return message;
+}
+} // namespace
 
 QString extractEventText(const QJsonObject& event)
 {
@@ -12,9 +28,7 @@ QString extractEventText(const QJsonObject& event)
 
 	if (type == QStringLiteral("assistant/message")
 		|| type == QStringLiteral("user/message")) {
-		QJsonObject message = data.value(QStringLiteral("message")).toObject();
-		if (message.isEmpty())
-			message = data;
+		const QJsonObject message = messageObject(event);
 		const QJsonValue content = message.value(QStringLiteral("content"));
 
 		if (content.isString())
@@ -66,10 +80,7 @@ QString extractChunkType(const QJsonObject& event)
 
 QString extractThinking(const QJsonObject& event)
 {
-	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
-	QJsonObject message = data.value(QStringLiteral("message")).toObject();
-	if (message.isEmpty())
-		message = data;
+	const QJsonObject message = messageObject(event);
 	const QJsonValue content = message.value(QStringLiteral("content"));
 
 	if (!content.isArray())
@@ -91,10 +102,7 @@ QString extractThinking(const QJsonObject& event)
 
 QString extractReply(const QJsonObject& event)
 {
-	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
-	QJsonObject message = data.value(QStringLiteral("message")).toObject();
-	if (message.isEmpty())
-		message = data;
+	const QJsonObject message = messageObject(event);
 	const QJsonValue content = message.value(QStringLiteral("content"));
 
 	if (content.isString())
