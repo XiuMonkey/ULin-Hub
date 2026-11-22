@@ -1056,10 +1056,14 @@ void QmlBridge::sendPrompt(const QString& text)
 	// 用户消息不会进 session/prompt，聊天记录里也看不到。
 	const QString trimmed = text.trimmed();
 	const bool isIntentCommand = trimmed.startsWith(QStringLiteral("/it"));
+	// DSH 命令层只属于 DSH 后端。ULinCore 后端没有 DSH commands，
+	// 任何 `/...` 都应该作为 Prompt 进入 ULinCore，而不是先交给 commands/execute。
+	const bool useDshCommands = !m_settings
+		|| m_settings->masterBackend().compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0;
 
 	// 斜杠命令**不进模型**：形如 `/name …` 的行交给命令处理器（解析/执行/报结果全在它那边）。
 	// 判定用引擎同一条文法（`^/[a-z][a-z0-9_-]*(\s|$)`），不满足就当普通提示发；命令名认不认识由引擎裁定。
-	if (!isIntentCommand && m_commands && !m_currentSessionId.isEmpty()
+	if (useDshCommands && !isIntentCommand && m_commands && !m_currentSessionId.isEmpty()
 			&& CommandController::looksLikeCommand(text)) {
 		m_commands->execute(m_currentSessionId, text);
 		return;
