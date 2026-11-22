@@ -9,6 +9,7 @@
 
 #include "common/agent/dsh/DshApiClient.h"
 #include "common/agent/AgentEventParser.h"
+#include "common/util/ConnectionManager.h"
 #include "network/SessionCommands.h"
 
 #include <QCoreApplication>
@@ -155,6 +156,11 @@ ChatController::ChatController(DshApiClient* api, AgentSessionClient* agentSessi
 		.removeRecursively();
 	connect(m_messages, &QAbstractItemModel::modelReset, this, &ChatController::messagesChanged);
 	connect(m_messages, &QAbstractItemModel::rowsInserted, this, &ChatController::messagesChanged);
+
+	// 输入默认接收者：没有后端接管时，原始 Prompt 由本类发送。
+	dshRegister("agent.prompt",
+		this, &ChatController::promptRequested,
+		this, &ChatController::sendRawPrompt);
 
 	m_flushTimer = new QTimer(this);
 	m_flushTimer->setInterval(kStreamFlushMs);
@@ -472,9 +478,16 @@ QString ChatController::attachmentSource(const QString& attachmentId)
 	return QString();
 }
 
-void ChatController::sendPrompt(const QString& sessionId, const QString& text,
+void ChatController::submitPrompt(const QString& sessionId, const QString& text,
 	const std::function<void()>& restartServer,
 	const std::function<void(const QString&)>& setStatusLine)
+{
+	m_restartServer = restartServer;
+	m_setStatusLine = setStatusLine;
+	emit promptRequested(sessionId, text);
+}
+
+void ChatController::sendRawPrompt(const QString& sessionId, const QString& text)
 {
 	const QString trimmed = text.trimmed();
 	if ((trimmed.isEmpty() && m_pendingImages.isEmpty()) || sessionId.isEmpty() || !m_api)
@@ -484,11 +497,6 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	// 正常情况下宿主先 selectSession() 再 sendPrompt()，这里只是兜底（同一会话时 setSession 会早退）。
 	if (m_sessionId != sessionId)
 		setSession(sessionId);
-
-	// 当前 Agent 的前端客户端可以在进入 session/prompt 前接管输入（DSH 命令）。
-	// ULinCore 不设置客户端，因此 /it 会作为原始文本进入 Kernel。
-	if (m_promptClient && m_promptClient->submit(sessionId, trimmed))
-		return;
 
 	// 服务端明确没有可用模型时拦下来并说明（chat_no_model_hint）；目录未加载（未知）不拦。
 	if (modelCatalogMissing()) {
@@ -588,7 +596,7 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	m_api->callMethod(QStringLiteral("session/prompt"),
 		SessionCommands::sessionPrompt(sessionId, promptText, imageParts),
 		[](const QJsonObject&) {},
-		[this, promptText, sessionId, imageParts, restartServer, setStatusLine](const DshApiClient::RpcError& error) {
+		[this, promptText, sessionId, imageParts](const DshApiClient::RpcError& error) {
 			// 失败文案用 chat_send_failed_fmt；同时记一行，便于看清服务端拒绝的原因
 			qWarning().noquote() << "[Chat] session/prompt failed:" << error.code << error.message;
 
@@ -596,7 +604,7 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 			// 重启内置服务端清掉占用，随后把这条消息补发一次，否则永远发不出消息。
 			const bool busy = error.message.contains(QLatin1String("already owned"))
 				|| error.message.contains(QLatin1String("resume failed"));
-			if (busy && !m_pendingRetry && restartServer) {
+			if (busy && !m_pendingRetry && m_restartServer) {
 				m_pendingRetry = true;
 				m_retryText = promptText;
 				m_retrySessionId = sessionId;
@@ -604,18 +612,28 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 				if (m_messages) {
 					m_messages->appendSystem(qtTrId("chat_session_busy_restarting"));
 				}
-				if (setStatusLine)
-					setStatusLine(qtTrId("chat_session_busy_status"));
-				restartServer();
+				if (m_setStatusLine)
+					m_setStatusLine(qtTrId("chat_session_busy_status"));
+				m_restartServer();
 				return;
 			}
 
 			const QString text = qtTrId("chat_send_failed_fmt").arg(error.code, error.message);
-			if (setStatusLine)
-				setStatusLine(text);
+			if (m_setStatusLine)
+				m_setStatusLine(text);
 			if (m_messages)
 				m_messages->appendSystem(text);
 		});
+}
+
+void ChatController::appendSystemNotice(const QString& text, bool error)
+{
+	if (!m_messages || text.trimmed().isEmpty())
+		return;
+	flushPending();
+	m_messages->appendSystem(error
+		? qtTrId("chat_command_failed_fmt").arg(text)
+		: text);
 }
 
 void ChatController::sendPromptAgain()

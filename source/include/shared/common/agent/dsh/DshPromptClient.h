@@ -1,17 +1,25 @@
 ﻿#pragma once
 
-#include "common/agent/AgentPromptClient.h"
+#include <QObject>
+#include <QString>
 
+class ChatController;
 class CommandController;
 
-// DSH 专属前端客户端：命令走 commands/execute，普通文本交给 ChatController。
-class DshPromptClient : public AgentPromptClient
+// DSH 专属输入客户端：QObject + 槽，不继承虚基类。
+class DshPromptClient : public QObject
 {
-public:
-	explicit DshPromptClient(CommandController* commands);
+	Q_OBJECT
 
-	bool submit(const QString& sessionId, const QString& text) override;
+public:
+	explicit DshPromptClient(CommandController* commands, ChatController* chat,
+		QObject* parent = nullptr);
+
+public slots:
+	void handlePrompt(const QString& sessionId, const QString& text);
+	void onCommandFinished(bool ok, const QString& message);
 
 private:
 	CommandController* m_commands = nullptr;
+	ChatController* m_chat = nullptr;
 };

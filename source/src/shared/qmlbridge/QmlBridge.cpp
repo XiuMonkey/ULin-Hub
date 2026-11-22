@@ -162,7 +162,6 @@ void QmlBridge::init()
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kExtensionManager, m_extensions);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
 	m_commands = new CommandController(api, this);
-	m_dshPromptClient = new DshPromptClient(m_commands);
 	m_commandsBridge = new CommandBridge(m_commands, this);
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kCommandController, m_commands);
 	// /permission 切完权限后重读一次投影；命令本身是异步的，等一个小延迟让服务端先落事件。
@@ -231,6 +230,7 @@ void QmlBridge::init()
 
 	// ---- 业务层：消息区（follow 快照 + mux 事件 -> 消息模型）+ 发送/自愈 ----
 	m_chat = new ChatController(api, m_runtime->agentSession(), this);
+	m_dshPromptClient = new DshPromptClient(m_commands, m_chat, this);
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kChatController, m_chat);
 	// 新增/更新模型后目录会变：输入区的模型选择器必须跟着刷新，否则新模型要等换会话才出现。
 	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.modelAdded"),
@@ -1052,14 +1052,22 @@ void QmlBridge::sendPrompt(const QString& text)
 	if (!m_chat)
 		return;
 
-	// 输入语义由当前 Agent 的前端客户端接管：
-	//  · DSH：命令 -> commands/execute；普通文本继续 session/prompt
-	//  · ULinCore：不设置客户端，原始文本直接进 Kernel 的二次解析
-	const bool useDshClient = !m_settings
+	// 输入连接由 ConnectionManager 接管：
+	//  · DSH：TakeoverConnection -> DshPromptClient::handlePrompt
+	//  · ULinCore：ReleaseTakeover -> 默认 ChatController::sendRawPrompt
+	const bool useDsh = !m_settings
 		|| m_settings->masterBackend().compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0;
-	m_chat->setPromptClient(useDshClient ? m_dshPromptClient : nullptr);
+	if (useDsh && !m_dshPromptTaken && m_dshPromptClient) {
+		ConnectionManager::instance().TakeoverConnection(
+			QStringLiteral("agent.prompt"), m_dshPromptClient,
+			QStringLiteral("handlePrompt"));
+		m_dshPromptTaken = true;
+	} else if (!useDsh && m_dshPromptTaken) {
+		ConnectionManager::instance().ReleaseTakeover(QStringLiteral("agent.prompt"));
+		m_dshPromptTaken = false;
+	}
 
-	m_chat->sendPrompt(m_currentSessionId, text,
+	m_chat->submitPrompt(m_currentSessionId, text,
 		[this]() { m_runtime->restartServer(); },
 		[this](const QString& line) {
 			if (m_runtime->setStatus(line))

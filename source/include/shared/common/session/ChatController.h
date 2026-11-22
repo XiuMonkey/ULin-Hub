@@ -10,7 +10,6 @@
 // 还没做（M4b）：向上翻页（session/page + beforeSeq）、预取、锚点不跳、提问/审批面板。
 
 #include "common/agent/ModelSelectionService.h"
-#include "common/agent/AgentPromptClient.h"
 #include "common/session/MessageListModel.h"
 #include "VirtualClass/VirtualHostServices.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
@@ -96,10 +95,8 @@ public:
 	//  请宿主重启服务端（`restartServer` 回调）→ 只重试一次，宿主在重连后调 sendPromptAgain。
 	// `restartServer` / `setStatusLine` 由宿主注入：本类不认识 ServerManager，也不认识 QML。
 	// ⚠️ 会话 id 是**入参**（不是本类自己记的）：当前会话归宿主（qmlbridge）所有，这里只负责"往哪个会话发"。
-	// 由当前 Agent 的前端客户端接管命令等 prompt 前语义；普通文本仍走 sendPrompt。
-	void setPromptClient(AgentPromptClient* client) { m_promptClient = client; }
-
-	void sendPrompt(const QString& sessionId, const QString& text,
+	// QmlBridge 的输入入口：保存回调后发 promptRequested，不直接发 RPC。
+	void submitPrompt(const QString& sessionId, const QString& text,
 		const std::function<void()>& restartServer,
 		const std::function<void(const QString&)>& setStatusLine);
 	// 自愈补发（宿主在"服务端重连"之后调）。没攒着待补发的就什么都不做。
@@ -184,6 +181,10 @@ public:
 	void loadOlder();
 
 public slots:
+	// 默认输入接收者；也供 DSH 客户端在非命令时直接调用。
+	void sendRawPrompt(const QString& sessionId, const QString& text);
+	// 命令/发送错误统一落系统提示行。
+	void appendSystemNotice(const QString& text, bool error = true);
 	// follow 首帧快照（session/follow）：历史 + 游标 + 是否还有更早内容
 	void onFollowSnapshot(const QString& sessionId, int cursor, const QJsonArray& records, bool hasMore);
 	// mux 帧：payload.type == "session/event" 时取出 event 交给流式处理
@@ -192,6 +193,7 @@ public slots:
 	void onJobRoster(const QJsonArray& jobs);
 
 signals:
+	void promptRequested(const QString& sessionId, const QString& text);
 	void messagesChanged();
 	void pendingAttachmentsChanged();
 	void attachmentSourceReady(const QString& attachmentId);
@@ -261,7 +263,8 @@ private:
 	QSet<QString> m_attachmentInFlight;
 
 	DshApiClient* m_api = nullptr;
-	AgentPromptClient* m_promptClient = nullptr;
+	std::function<void()> m_restartServer;
+	std::function<void(const QString&)> m_setStatusLine;
 	AgentSessionClient* m_agentSession = nullptr;
 	MessageListModel* m_messages = nullptr;
 	TraceModel* m_trace = nullptr;

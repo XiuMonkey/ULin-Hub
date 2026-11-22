@@ -356,6 +356,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClInclude Include="include\shared\common\agent\AgentPresetService.h" />
     <QtMoc Include="include\shared\common\agent\AgentSessionClient.h" />
     <QtMoc Include="include\shared\common\agent\dsh\DshMasterAgent.h" />
+    <QtMoc Include="include\shared\common\agent\dsh\DshPromptClient.h" />
     <QtMoc Include="include\shared\common\agent\AgentManager.h" />
     <ClInclude Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketModel.h" />
     <ClInclude Include="include\shared\common\agent\ModelSelectionService.h" />

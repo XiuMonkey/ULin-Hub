@@ -1,18 +1,35 @@
 ﻿#include "common/agent/dsh/DshPromptClient.h"
 
+#include "common/session/ChatController.h"
 #include "common/session/CommandController.h"
+#include "common/util/ConnectionManager.h"
 
-DshPromptClient::DshPromptClient(CommandController* commands)
-	: m_commands(commands)
+DshPromptClient::DshPromptClient(CommandController* commands, ChatController* chat,
+	QObject* parent)
+	: QObject(parent)
+	, m_commands(commands)
+	, m_chat(chat)
 {
+	if (m_commands) {
+		dshRegister("agent.dsh.command.result",
+			m_commands, &CommandController::executionFinished,
+			this, &DshPromptClient::onCommandFinished);
+	}
 }
 
-bool DshPromptClient::submit(const QString& sessionId, const QString& text)
+void DshPromptClient::handlePrompt(const QString& sessionId, const QString& text)
 {
-	if (!m_commands || sessionId.isEmpty())
-		return false;
-	if (!CommandController::looksLikeCommand(text))
-		return false;
-	m_commands->execute(sessionId, text);
-	return true;
+	if (m_commands && CommandController::looksLikeCommand(text)) {
+		m_commands->execute(sessionId, text);
+		return;
+	}
+	if (m_chat)
+		m_chat->sendRawPrompt(sessionId, text);
+}
+
+void DshPromptClient::onCommandFinished(bool ok, const QString& message)
+{
+	if (ok || !m_chat)
+		return;
+	m_chat->appendSystemNotice(message, true);
 }

@@ -387,6 +387,7 @@ private:
 	ExtensionsBridge* m_extensionsBridge = nullptr;
 	CommandController* m_commands = nullptr;
 	DshPromptClient* m_dshPromptClient = nullptr;
+	bool m_dshPromptTaken = false;
 	CommandBridge* m_commandsBridge = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	QString m_permissionPreset;   // 当前会话权限预设；空 = 还没读到投影
