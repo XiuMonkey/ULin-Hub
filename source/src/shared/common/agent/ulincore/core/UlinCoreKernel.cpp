@@ -144,13 +144,12 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
-		if (invocation.asSkill() || invocation.withSkill()) {
-			if (invocation.asSkill() && invocation.asPrompt()) {
-				emit errorOccurred(QStringLiteral("asPrompt and asSkill cannot both be set"));
+		if (invocation.asSkill()) {
+			if (!invocation.hasPromptOverride) {
+				emit errorOccurred(QStringLiteral("intent %1 asSkill requires an explicit prompt").arg(name));
 				return;
 			}
-			const QString prompt = invocation.hasPromptOverride
-				? invocation.promptOverride : intent.prompt;
+			const QString prompt = invocation.promptOverride;
 			const QString method = invocation.hasSkillOverride
 				? invocation.skillOverride : intent.skill;
 			if (prompt.trimmed().isEmpty() || method.trimmed().isEmpty()) {
@@ -160,6 +159,21 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 			runPromptText(invocation.rawText,
 				expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n")
 					+ expandPromptTemplate(method, params));
+			return;
+		}
+
+		if (invocation.withSkill()) {
+			if (invocation.hasPromptOverride) {
+				emit errorOccurred(QStringLiteral("intent %1 withSkill does not accept prompt override").arg(name));
+				return;
+			}
+			if (intent.prompt.trimmed().isEmpty() || intent.skill.trimmed().isEmpty()) {
+				emit errorOccurred(QStringLiteral("intent %1 needs built-in prompt and skill").arg(name));
+				return;
+			}
+			runPromptText(invocation.rawText,
+				expandPromptTemplate(intent.prompt, params) + QStringLiteral("\n\n[Skill]\n")
+					+ expandPromptTemplate(intent.skill, params));
 			return;
 		}
 
@@ -650,8 +664,29 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	if (asPrompt || asSkill || withSkill) {
 		const QJsonObject params = effectiveParameters(intent, call.arguments);
 		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
-		if (prompt.isEmpty())
+		QString skill = call.metadata.value(QStringLiteral("skill")).toString();
+		if (withSkill) {
+			if (!prompt.isEmpty()) {
+				completeIntentCall(generation, calls, index, call,
+					IntentResult::failure(QStringLiteral("withSkill does not accept prompt override")));
+				return;
+			}
 			prompt = intent.prompt;
+			skill = intent.skill;
+		} else if (asSkill) {
+			if (prompt.trimmed().isEmpty()) {
+				completeIntentCall(generation, calls, index, call,
+					IntentResult::failure(QStringLiteral("asSkill requires an explicit prompt")));
+				return;
+			}
+			if (skill.isEmpty())
+				skill = intent.skill;
+		} else {
+			if (prompt.isEmpty())
+				prompt = intent.prompt;
+			skill.clear();   // asPrompt 永远忽略 skill
+		}
+
 		if (prompt.trimmed().isEmpty()) {
 			completeIntentCall(generation, calls, index, call,
 				IntentResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
@@ -659,9 +694,6 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		}
 		QString content = expandPromptTemplate(prompt, params);
 		if (asSkill || withSkill) {
-			QString skill = call.metadata.value(QStringLiteral("skill")).toString();
-			if (skill.isEmpty())
-				skill = intent.skill;
 			if (skill.trimmed().isEmpty()) {
 				completeIntentCall(generation, calls, index, call,
 					IntentResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));

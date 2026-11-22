@@ -405,6 +405,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		}
 		const bool tagAsPrompt = tags.contains(QStringLiteral("asPrompt"));
 		const bool tagAsSkill = tags.contains(QStringLiteral("asSkill"));
+		const bool tagWithSkill = tags.contains(QStringLiteral("withSkill"));
 		const bool tagSave = tags.contains(QStringLiteral("save"));
 		const bool tagAgent = tags.contains(QStringLiteral("agentEngaged"));
 		const bool tagSkill = tags.contains(QStringLiteral("skillRequired"));
@@ -412,6 +413,16 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		if (tagAsPrompt && tagAsSkill) {
 			invocation.kind = InvocationKind::Error;
 			invocation.error = QStringLiteral("asPrompt and asSkill cannot both be set");
+			return invocation;
+		}
+		if (tagAsSkill && tagWithSkill) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("asSkill and withSkill cannot both be set");
+			return invocation;
+		}
+		if (tagAsSkill && !invocation.hasPromptOverride) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("asSkill requires an explicit prompt");
 			return invocation;
 		}
 		if (tagSave && (tagAsPrompt || tagAsSkill)) {
