@@ -115,6 +115,9 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	}
 
 	const QString name = invocation.intentName;
+	IntentMode mode = invocation.mode;
+	if (invocation.hasDefinition)
+		mode = IntentMode::Definition;
 	if (!invocation.execute && !invocation.hasDefinition) {
 		emit errorOccurred(QStringLiteral("definition payload required for defineOnly"));
 		return;
@@ -131,7 +134,7 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 			emit errorOccurred(QStringLiteral("intent %1 definition is empty").arg(name));
 			return;
 		}
-		addIntent(definition);
+		addIntent(definition, invocation.save());
 		if (!invocation.execute)
 			return;
 		if (!definition.hasChain() && !definition.hasNative()) {
@@ -141,6 +144,21 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	}
 
 	const bool known = m_intents.contains(name);
+	if (mode == IntentMode::Undetermined) {
+		if (known)
+			mode = IntentMode::Execution;
+		else if (invocation.hasPromptOverride
+				&& (invocation.save() || invocation.agentEngaged()
+					|| invocation.generateOnly() || invocation.skillRequired()))
+			mode = IntentMode::Generation;
+		else
+			mode = IntentMode::Execution;
+	}
+	qInfo().noquote() << "[UlinCore] intent mode="
+		<< (mode == IntentMode::Definition ? "definition"
+			: mode == IntentMode::Generation ? "generation"
+			: mode == IntentMode::Execution ? "execution" : "undetermined")
+		<< "name=" << name;
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
@@ -163,17 +181,19 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		}
 
 		if (invocation.withSkill()) {
-			if (invocation.hasPromptOverride || invocation.hasSkillOverride) {
-				emit errorOccurred(QStringLiteral("intent %1 withSkill uses built-in prompt and skill only").arg(name));
+			if (invocation.hasPromptOverride) {
+				emit errorOccurred(QStringLiteral("intent %1 withSkill rejects external prompt").arg(name));
 				return;
 			}
-			if (intent.prompt.trimmed().isEmpty() || intent.skill.trimmed().isEmpty()) {
+			const QString method = invocation.hasSkillOverride
+				? invocation.skillOverride : intent.skill;
+			if (intent.prompt.trimmed().isEmpty() || method.trimmed().isEmpty()) {
 				emit errorOccurred(QStringLiteral("intent %1 needs built-in prompt and skill").arg(name));
 				return;
 			}
 			runPromptText(invocation.rawText,
 				expandPromptTemplate(intent.prompt, params) + QStringLiteral("\n\n[Skill]\n")
-					+ expandPromptTemplate(intent.skill, params));
+					+ expandPromptTemplate(method, params));
 			return;
 		}
 
@@ -409,12 +429,12 @@ void UlinCoreKernel::saveLiteralIntent(const Intent& intent)
 	addIntent(intent);
 }
 
-void UlinCoreKernel::addIntent(const Intent& intent)
+void UlinCoreKernel::addIntent(const Intent& intent, bool persist)
 {
 	if (intent.name.trimmed().isEmpty())
 		return;
 	m_intents.add(intent);
-	if (!m_intentsPath.isEmpty()) {
+	if (persist && !m_intentsPath.isEmpty()) {
 		QString error;
 		if (!m_intents.save(&error))
 			qWarning().noquote() << "[UlinCore] intent store save failed:" << error;
@@ -597,9 +617,11 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	const bool asPrompt = tags.contains(QStringLiteral("asPrompt"));
 	const bool asSkill = tags.contains(QStringLiteral("asSkill"));
 	const bool withSkill = tags.contains(QStringLiteral("withSkill"));
+	const bool generateOnly = tags.contains(QStringLiteral("generateOnly"));
 	const bool hasSaveTag = tags.contains(QStringLiteral("save"));
 	const bool agentTag = tags.contains(QStringLiteral("agentEngaged"))
-		|| tags.contains(QStringLiteral("skillRequired"));
+		|| tags.contains(QStringLiteral("skillRequired"))
+		|| generateOnly;
 	if (agentTag) {
 		completeIntentCall(generation, calls, index, call,
 			IntentResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
@@ -636,7 +658,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 				IntentResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
 			return;
 		}
-		addIntent(intent);
+		addIntent(intent, hasSaveTag);
 		if (defineOnly) {
 			completeIntentCall(generation, calls, index, call,
 				IntentResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
@@ -666,13 +688,14 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
 		QString skill = call.metadata.value(QStringLiteral("skill")).toString();
 		if (withSkill) {
-			if (!prompt.isEmpty() || !skill.isEmpty()) {
+			if (!prompt.isEmpty()) {
 				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("withSkill uses built-in prompt and skill only")));
+					IntentResult::failure(QStringLiteral("withSkill rejects external prompt")));
 				return;
 			}
 			prompt = intent.prompt;
-			skill = intent.skill;
+			if (skill.isEmpty())
+				skill = intent.skill;
 		} else if (asSkill) {
 			if (prompt.trimmed().isEmpty()) {
 				completeIntentCall(generation, calls, index, call,

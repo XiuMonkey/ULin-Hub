@@ -83,7 +83,7 @@ Intent
 ```text
 asPrompt    拒绝外部 prompt / skill
 asSkill     必须提供外部 prompt；skill 可选
-withSkill   拒绝外部 prompt / skill
+withSkill   拒绝外部 prompt；外部 skill 可覆盖内置
 ```
 
 ### 3.2 单数组标签
@@ -428,19 +428,20 @@ Intent.skill 内置
 
 | 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | generateOnly | agentEngaged | skillRequired |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置 | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 |
+| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 |
 | **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt | ✓ 生<br>需 prompt | ✗ 禁 skill |
-| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 可 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
-| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
-| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
-| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
-| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 可 | ✓ 生 | ✓ 生 | ✓ 生<br>AE 必 |
+| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 必 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
+| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生 | ✓ 生 | ✓ 生<br>AE 必 |
 | **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
 | **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>可共存 | ✓ 生<br>AE 必 |
 | **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>prompt 必 |
 | **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
 
 > `AE` = `agentEngaged`；`必` = 该元数据/标签是此组合的必需项。
+> `withSkill` 单独用于 Native/Chain Intent 时，必须叠加 `asPrompt`；只有没有内置工具链、默认走 prompt 的 Intent 才能省略 `asPrompt`。
 > `generateOnly` 和 `skillRequired` 仍是规范设计，当前代码未实现。
 
 ### 5.1 矩阵说明
@@ -577,16 +578,17 @@ skillRequired + save 必需
 ```text
 校验 Intent
 → addIntent() 内存安装
-→ 有 save 才写 intents.json
+→ defineOnly 必须带 save
+→ 写 intents.json
 → 不执行
 → 不发给 Agent
 ```
 
-`save` 可选：
+`save` 规则：
 
 ```text
 defineOnly + save      定义并落盘
-defineOnly 不带 save   只定义在内存
+defineOnly 不带 save   拒绝（没有可消费结果）
 ```
 
 `name` 由 `/it name` 提供，不在 `Intent` 块里重复。
@@ -863,13 +865,12 @@ IntentStore.save()
 generateOnly 未实现
 agentEngaged / skillRequired 没有自动泛化
 save + prompt 当前仍创建 PromptIntent（旧定义型路径），目标是生成型
-Intent + prompt / skill 当前被忽略，目标应直接拒绝
-Intent 定义块当前总是 addIntent() 保存；目标是只有 save 才落盘
-defineOnly 当前强制 save；目标是 save 可选
-asPrompt + withSkill 当前被拒绝；目标允许
-withSkill 当前拒绝外部 skill；目标允许外部 skill 覆盖
-skillRequired 当前允许外部 skill；目标禁止，必须由 Agent 生成
-skillRequired 当前不要求 prompt；目标要求 prompt
+Intent 定义块当前已按 save 决定是否落盘
+defineOnly 当前强制 save；这是当前规范
+asPrompt + withSkill 已允许
+withSkill 已允许外部 skill 覆盖
+skillRequired 已禁止外部 skill，并要求 prompt
+生成型/执行型的模式已写入 UlinCoreInvocation::mode
 Prompt-only Intent 不在 executableToolSchemas() 中，模型不能自动发现
 Intent 定义块是严格 JSON，不支持 JSON5
 模型 metadata 依赖模型填写 __ulincore_meta

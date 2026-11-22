@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "common/agent/ulincore/executor/UlinCoreNativeExecutor.h"
 #include "common/agent/ulincore/intent/UlinCoreIntentCaller.h"
@@ -91,7 +91,7 @@ private:
 	void finishEmptyTurn(const QString& rawText);
 	void savePromptIntent(const UlinCoreInvocation& invocation, const QString& prompt);
 	void saveLiteralIntent(const Intent& intent);
-	void addIntent(const Intent& intent);
+	void addIntent(const Intent& intent, bool persist = true);
 	void installBuiltinIntents();
 	QJsonArray executableToolSchemas() const;
 	QJsonObject effectiveParameters(const Intent& intent, const QJsonObject& args) const;

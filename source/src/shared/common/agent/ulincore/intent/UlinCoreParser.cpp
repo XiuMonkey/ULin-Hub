@@ -385,7 +385,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		// 标签先做最小合法性校验；具体 Intent 是否存在/可执行由 Kernel 校验。
 		static const QStringList knownTags{
 			QStringLiteral("asPrompt"), QStringLiteral("asSkill"),
-			QStringLiteral("withSkill"),
+			QStringLiteral("withSkill"), QStringLiteral("generateOnly"),
 			QStringLiteral("save"), QStringLiteral("agentEngaged"),
 			QStringLiteral("skillRequired"), QStringLiteral("defineOnly")
 		};
@@ -406,6 +406,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		const bool tagAsPrompt = tags.contains(QStringLiteral("asPrompt"));
 		const bool tagAsSkill = tags.contains(QStringLiteral("asSkill"));
 		const bool tagWithSkill = tags.contains(QStringLiteral("withSkill"));
+		const bool tagGenerateOnly = tags.contains(QStringLiteral("generateOnly"));
 		const bool tagSave = tags.contains(QStringLiteral("save"));
 		const bool tagAgent = tags.contains(QStringLiteral("agentEngaged"));
 		const bool tagSkill = tags.contains(QStringLiteral("skillRequired"));
@@ -420,14 +421,15 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("asSkill and withSkill cannot both be set");
 			return invocation;
 		}
-		if (tagAsPrompt && tagWithSkill) {
+		// asPrompt + withSkill 合法：内置 prompt + 内置/外部 skill。
+		if (tagAsPrompt && invocation.hasPromptOverride) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("asPrompt and withSkill cannot both be set");
+			invocation.error = QStringLiteral("asPrompt rejects external prompt");
 			return invocation;
 		}
-		if (tagAsPrompt && (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+		if (tagAsPrompt && invocation.hasSkillOverride && !tagWithSkill) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("asPrompt rejects external prompt/skill");
+			invocation.error = QStringLiteral("asPrompt rejects external skill unless withSkill is set");
 			return invocation;
 		}
 		if (tagAsSkill && !invocation.hasPromptOverride) {
@@ -435,9 +437,9 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("asSkill requires an external prompt");
 			return invocation;
 		}
-		if (tagWithSkill && (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+		if (tagWithSkill && invocation.hasPromptOverride) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("withSkill uses built-in prompt and skill only");
+			invocation.error = QStringLiteral("withSkill rejects external prompt");
 			return invocation;
 		}
 		if (tagSave && (tagAsPrompt || tagAsSkill || tagWithSkill)) {
@@ -450,9 +452,43 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("skillRequired requires agentEngaged");
 			return invocation;
 		}
+		if (tagSkill && !invocation.hasPromptOverride) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("skillRequired requires prompt");
+			return invocation;
+		}
+		if (tagSkill && invocation.hasSkillOverride) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("skillRequired forbids external skill");
+			return invocation;
+		}
 		if ((tagAgent || tagSkill) && !tagSave) {
 			invocation.kind = InvocationKind::Error;
 			invocation.error = QStringLiteral("agentEngaged/skillRequired requires save");
+			return invocation;
+		}
+		if (tagGenerateOnly) {
+			if (!invocation.hasPromptOverride) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("generateOnly requires prompt");
+				return invocation;
+			}
+			if (!tagSave) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("generateOnly requires save");
+				return invocation;
+			}
+			if (invocation.hasDefinition || tagDefineOnly
+					|| tagAsPrompt || tagAsSkill || tagWithSkill) {
+				invocation.kind = InvocationKind::Error;
+				invocation.error = QStringLiteral("generateOnly cannot be combined with definition/execution");
+				return invocation;
+			}
+		}
+		if (invocation.hasDefinition
+				&& (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("Intent definition rejects external prompt/skill");
 			return invocation;
 		}
 		if (tagDefineOnly) {
@@ -466,16 +502,16 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 				invocation.error = QStringLiteral("defineOnly requires save");
 				return invocation;
 			}
-			if (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill) {
+			if (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill || tagGenerateOnly) {
 				invocation.kind = InvocationKind::Error;
-				invocation.error = QStringLiteral("defineOnly cannot be combined with execution/agent tags");
+				invocation.error = QStringLiteral("defineOnly cannot be combined with execution/agent/generation tags");
 				return invocation;
 			}
 		}
 		if (invocation.hasDefinition
-				&& (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill)) {
+				&& (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill || tagGenerateOnly)) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("Intent definition cannot be combined with execution/agent tags");
+			invocation.error = QStringLiteral("Intent definition cannot be combined with execution/agent/generation tags");
 			return invocation;
 		}
 	}
@@ -484,6 +520,12 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 	const QString tail = rest.mid(pos).trimmed();
 	invocation.promptText = tail.isEmpty() ? originalRest : tail;
 	invocation.kind = InvocationKind::Intent;
+	if (invocation.hasDefinition)
+		invocation.mode = IntentMode::Definition;
+	else if (invocation.hasPromptOverride
+			&& (invocation.save() || invocation.agentEngaged()
+				|| invocation.generateOnly() || invocation.skillRequired()))
+		invocation.mode = IntentMode::Generation;
 	return invocation;
 }
 } // namespace UlinCore

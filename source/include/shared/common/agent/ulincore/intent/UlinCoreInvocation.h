@@ -16,10 +16,20 @@ enum class InvocationKind
 	Error
 };
 
+// 三种语义类型：不是 wire 字段，而是解析/分流结果。
+enum class IntentMode
+{
+	Undetermined,
+	Definition,   // 有 Intent 元数据
+	Generation,   // 无 Intent，靠 prompt/skill + Agent 行为链生成
+	Execution     // 消费已有 Intent
+};
+
 // ULinCore 二次解析后的输入。原始文本始终保留。
 struct UlinCoreInvocation
 {
 	InvocationKind kind = InvocationKind::Prompt;
+	IntentMode mode = IntentMode::Undetermined;
 	QString rawText;
 	QString intentName;
 	QString promptText;       // Prompt fallback 时真正发给模型的文本
@@ -42,6 +52,7 @@ struct UlinCoreInvocation
 	bool agentEngaged() const { return hasTag(QStringLiteral("agentEngaged")); }
 	bool skillRequired() const { return hasTag(QStringLiteral("skillRequired")); }
 	bool withSkill() const { return hasTag(QStringLiteral("withSkill")); }
+	bool generateOnly() const { return hasTag(QStringLiteral("generateOnly")); }
 	bool defineOnly() const { return hasTag(QStringLiteral("defineOnly")); }
 
 	QString error;
