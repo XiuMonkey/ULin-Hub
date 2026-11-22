@@ -466,13 +466,14 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 				invocation.error = QStringLiteral("defineOnly requires save");
 				return invocation;
 			}
-			if (tagAsPrompt || tagAsSkill || tagAgent || tagSkill) {
+			if (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill) {
 				invocation.kind = InvocationKind::Error;
 				invocation.error = QStringLiteral("defineOnly cannot be combined with execution/agent tags");
 				return invocation;
 			}
 		}
-		if (invocation.hasDefinition && (tagAsPrompt || tagAsSkill || tagAgent || tagSkill)) {
+		if (invocation.hasDefinition
+				&& (tagAsPrompt || tagAsSkill || tagWithSkill || tagAgent || tagSkill)) {
 			invocation.kind = InvocationKind::Error;
 			invocation.error = QStringLiteral("Intent definition cannot be combined with execution/agent tags");
 			return invocation;
