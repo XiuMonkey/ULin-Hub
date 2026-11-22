@@ -1,4 +1,4 @@
-﻿#include "common/util/Debugger.h"
+#include "common/util/Debugger.h"
 #include "common/util/Format.h"
 #include "common/util/Json.h"
 #include "common/session/EventRecord.h"
@@ -484,6 +484,11 @@ void ChatController::sendPrompt(const QString& sessionId, const QString& text,
 	// 正常情况下宿主先 selectSession() 再 sendPrompt()，这里只是兜底（同一会话时 setSession 会早退）。
 	if (m_sessionId != sessionId)
 		setSession(sessionId);
+
+	// 当前 Agent 的前端客户端可以在进入 session/prompt 前接管输入（DSH 命令）。
+	// ULinCore 不设置客户端，因此 /it 会作为原始文本进入 Kernel。
+	if (m_promptClient && m_promptClient->submit(sessionId, trimmed))
+		return;
 
 	// 服务端明确没有可用模型时拦下来并说明（chat_no_model_hint）；目录未加载（未知）不拦。
 	if (modelCatalogMissing()) {

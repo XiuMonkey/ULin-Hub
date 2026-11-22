@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // QmlBridge —— **QML 唯一的门**（QML 单例名 `Hub`）。
 // 分层规矩：
@@ -21,6 +21,7 @@
 // 分层依赖方向（自上而下，不许反向）：
 //  qmlbridge → core / common/session / common/appearance → common/util / network
 
+#include "common/agent/dsh/DshPromptClient.h"
 #include "common/agent/dsh/pluginmarket/PluginMarketController.h"
 #include "common/session/CommandController.h"
 #include "common/session/SessionListModel.h"
@@ -385,6 +386,7 @@ private:
 	ExtensionManagerPage* m_extensions = nullptr;
 	ExtensionsBridge* m_extensionsBridge = nullptr;
 	CommandController* m_commands = nullptr;
+	DshPromptClient* m_dshPromptClient = nullptr;
 	CommandBridge* m_commandsBridge = nullptr;
 	QString m_currentSessionId;   // 纯界面状态：当前会话（消息区/跟随流都按它走）
 	QString m_permissionPreset;   // 当前会话权限预设；空 = 还没读到投影

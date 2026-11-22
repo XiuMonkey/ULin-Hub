@@ -120,7 +120,24 @@ Item {
         }
     }
 
-    Component.onCompleted: HostUi.registerItem("composer", this)   // 扩展注入点
+    // 扩展 UI 插槽：命令按钮区 / 命令面板区。
+    // 扩展通过 HostUi.item("composer.commandButton") 取得 Row 后追加自己的按钮；
+    // 通过 HostUi.item("composer.commandPanel") 取得浮层容器后注入自己的 Popup/面板。
+    property alias commandButtonSlotItem: commandButtonSlot
+    property alias commandPanelSlotItem: commandPanelSlot
+
+    Component.onCompleted: {
+        HostUi.registerItem("composer", this)
+        HostUi.registerItem("composer.commandButton", commandButtonSlot)
+        HostUi.registerItem("composer.commandPanel", commandPanelSlot)
+    }   // 扩展注入点
+
+    // 命令面板扩展位：不画任何东西，只提供坐标/父对象；扩展注入 Popup 或 Item。
+    Item {
+        id: commandPanelSlot
+        anchors.fill: parent
+        z: 100
+    }
 
     // 拖入图片附件；addImageFiles 会按扩展名筛选
     DropArea {
@@ -743,10 +760,19 @@ Item {
                     }
                 }
 
+                // 命令按钮扩展位：扩展按钮追加在这里，保持和内置按钮同高同间距。
+                Row {
+                    id: commandButtonSlot
+                    anchors.left: commandButton.right
+                    anchors.leftMargin: 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+                }
+
                 // 上下文：插入 “@” 供后续引用
                 CompactToolButton {
                     id: contextButton
-                    anchors.left: commandButton.right
+                    anchors.left: commandButtonSlot.right
                     anchors.leftMargin: 2
                     anchors.verticalCenter: parent.verticalCenter
                     prefix: "@"

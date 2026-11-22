@@ -20,6 +20,10 @@ namespace DshHostIndex
 	inline constexpr const char* kTopBar = "topBar";
 	inline constexpr const char* kSessionBar = "sessionBar";
 	inline constexpr const char* kComposer = "composer";
+	// Composer 的命令 UI 扩展位：
+	//  commandButton 是 Row（追加按钮），commandPanel 是自由 Item（注入 Popup/面板）。
+	inline constexpr const char* kComposerCommandButton = "composer.commandButton";
+	inline constexpr const char* kComposerCommandPanel = "composer.commandPanel";
 	// 消息区 / 设置页 / 右栏根：与上面同级的 QML 宿主对象，扩展可直接注入。
 	inline constexpr const char* kMessageList = "messageList";
 	inline constexpr const char* kSettingsPage = "settingsPage";

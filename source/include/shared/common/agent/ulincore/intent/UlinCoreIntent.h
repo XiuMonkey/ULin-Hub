@@ -22,7 +22,7 @@ struct IntentParameter
 
 struct IntentStep
 {
-	QString intent;        // 引用另一个 Intent；旧字段名 tool 仍兼容读取
+	QString intent;        // 引用另一个 Intent
 	QJsonObject arguments; // 可包含 {"$param":"name"} 引用
 
 	QJsonObject toJson() const;

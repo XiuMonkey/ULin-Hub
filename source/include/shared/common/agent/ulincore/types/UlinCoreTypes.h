@@ -40,7 +40,7 @@ struct Message
 	Role role = Role::User;
 	QString text;
 	QString thinking;
-	QList<IntentCall> intentCalls;   // Assistant 消息里的工具调用
+	QList<IntentCall> intentCalls;   // Assistant 消息里的 Intent 调用
 	QString intentCallId;          // Tool 消息对应哪次调用
 	QString intentName;
 	bool isError = false;

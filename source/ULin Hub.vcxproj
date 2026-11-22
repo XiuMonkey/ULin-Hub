@@ -256,6 +256,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\settings\ClientSettings.cpp" />
     <ClCompile Include="src\shared\common\agent\AgentPresetService.cpp" />
     <ClCompile Include="src\shared\common\agent\dsh\DshMasterAgent.cpp" />
+    <ClCompile Include="src\shared\common\agent\dsh\DshPromptClient.cpp" />
     <ClCompile Include="src\shared\common\agent\AgentManager.cpp" />
     <ClCompile Include="src\shared\common\agent\AgentSessionClient.cpp" />
     <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketClient.cpp" />

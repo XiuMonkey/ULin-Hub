@@ -162,6 +162,7 @@ void QmlBridge::init()
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kExtensionManager, m_extensions);
 	// 斜杠命令（发现/过滤/执行）：命令不进模型历史，单独一层；发送分支在 sendPrompt()
 	m_commands = new CommandController(api, this);
+	m_dshPromptClient = new DshPromptClient(m_commands);
 	m_commandsBridge = new CommandBridge(m_commands, this);
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kCommandController, m_commands);
 	// /permission 切完权限后重读一次投影；命令本身是异步的，等一个小延迟让服务端先落事件。
@@ -1051,23 +1052,12 @@ void QmlBridge::sendPrompt(const QString& text)
 	if (!m_chat)
 		return;
 
-	// `/it` 是 ULinCore 的 Intent 入口，不是 DSH 斜杠命令。
-	// 必须绕过 commands/execute，否则它会被未知命令分支吞掉：
-	// 用户消息不会进 session/prompt，聊天记录里也看不到。
-	const QString trimmed = text.trimmed();
-	const bool isIntentCommand = trimmed.startsWith(QStringLiteral("/it"));
-	// DSH 命令层只属于 DSH 后端。ULinCore 后端没有 DSH commands，
-	// 任何 `/...` 都应该作为 Prompt 进入 ULinCore，而不是先交给 commands/execute。
-	const bool useDshCommands = !m_settings
+	// 输入语义由当前 Agent 的前端客户端接管：
+	//  · DSH：命令 -> commands/execute；普通文本继续 session/prompt
+	//  · ULinCore：不设置客户端，原始文本直接进 Kernel 的二次解析
+	const bool useDshClient = !m_settings
 		|| m_settings->masterBackend().compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0;
-
-	// 斜杠命令**不进模型**：形如 `/name …` 的行交给命令处理器（解析/执行/报结果全在它那边）。
-	// 判定用引擎同一条文法（`^/[a-z][a-z0-9_-]*(\s|$)`），不满足就当普通提示发；命令名认不认识由引擎裁定。
-	if (useDshCommands && !isIntentCommand && m_commands && !m_currentSessionId.isEmpty()
-			&& CommandController::looksLikeCommand(text)) {
-		m_commands->execute(m_currentSessionId, text);
-		return;
-	}
+	m_chat->setPromptClient(useDshClient ? m_dshPromptClient : nullptr);
 
 	m_chat->sendPrompt(m_currentSessionId, text,
 		[this]() { m_runtime->restartServer(); },

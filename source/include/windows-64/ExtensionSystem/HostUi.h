@@ -12,7 +12,7 @@
 //  界面仍是宿主的 —— 终端块照旧由 TerminalPanel 渲染，只是页面接上的对象换了。按 kind 只记一份，
 //  卸载时 releaseBlockBackends 撤。
 // 名字契约（稳定，加名字要跟版本一起发）：shell / titleBar / topBar / sessionBar / sessionBar.extDock /
-//  panelBarDock.extDock / composer
+//  panelBarDock.extDock / composer / composer.commandButton / composer.commandPanel
 // · topBar 的根是 Row（位置器）⇒ 注入进去**自动排在末尾**
 //  · sessionBar.extDock（左栏底部图标行）与 panelBarDock.extDock（右栏标题行）都是 Row（位置器）
 //  ⇒ 扩展的入口按钮自动排在末尾；"功能面"类入口用右栏那个，会话级才用左栏那个

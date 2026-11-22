@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
@@ -10,6 +10,7 @@
 // 还没做（M4b）：向上翻页（session/page + beforeSeq）、预取、锚点不跳、提问/审批面板。
 
 #include "common/agent/ModelSelectionService.h"
+#include "common/agent/AgentPromptClient.h"
 #include "common/session/MessageListModel.h"
 #include "VirtualClass/VirtualHostServices.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
@@ -95,6 +96,9 @@ public:
 	//  请宿主重启服务端（`restartServer` 回调）→ 只重试一次，宿主在重连后调 sendPromptAgain。
 	// `restartServer` / `setStatusLine` 由宿主注入：本类不认识 ServerManager，也不认识 QML。
 	// ⚠️ 会话 id 是**入参**（不是本类自己记的）：当前会话归宿主（qmlbridge）所有，这里只负责"往哪个会话发"。
+	// 由当前 Agent 的前端客户端接管命令等 prompt 前语义；普通文本仍走 sendPrompt。
+	void setPromptClient(AgentPromptClient* client) { m_promptClient = client; }
+
 	void sendPrompt(const QString& sessionId, const QString& text,
 		const std::function<void()>& restartServer,
 		const std::function<void(const QString&)>& setStatusLine);
@@ -257,6 +261,7 @@ private:
 	QSet<QString> m_attachmentInFlight;
 
 	DshApiClient* m_api = nullptr;
+	AgentPromptClient* m_promptClient = nullptr;
 	AgentSessionClient* m_agentSession = nullptr;
 	MessageListModel* m_messages = nullptr;
 	TraceModel* m_trace = nullptr;
