@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/intent/UlinCoreParser.h"
+#include "common/agent/ulincore/intent/UlinCoreParser.h"
 
 #include <QChar>
 #include <QJsonArray>
@@ -358,6 +358,11 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.promptOverride = prompt.toString();
 			invocation.hasPromptOverride = true;
 		}
+		const QJsonValue skill = metadata.value(QStringLiteral("skill"));
+		if (skill.isString()) {
+			invocation.skillOverride = skill.toString();
+			invocation.hasSkillOverride = true;
+		}
 
 		const QJsonValue tagsValue = valueIgnoreCase(metadata, QStringLiteral("tags"));
 		if (tagsValue.isArray()) {
@@ -380,6 +385,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		// 标签先做最小合法性校验；具体 Intent 是否存在/可执行由 Kernel 校验。
 		static const QStringList knownTags{
 			QStringLiteral("asPrompt"), QStringLiteral("asSkill"),
+			QStringLiteral("withSkill"),
 			QStringLiteral("save"), QStringLiteral("agentEngaged"),
 			QStringLiteral("skillRequired"), QStringLiteral("defineOnly")
 		};

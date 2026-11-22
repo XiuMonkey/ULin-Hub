@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "common/agent/ulincore/intent/UlinCoreIntent.h"
 
@@ -32,6 +32,8 @@ struct UlinCoreInvocation
 
 	QString promptOverride;   // 元数据里的 prompt，可覆盖本次 Intent.prompt
 	bool hasPromptOverride = false;
+	QString skillOverride;    // 元数据里的 skill，可覆盖本次 Intent.skill
+	bool hasSkillOverride = false;
 
 	bool hasTag(const QString& tag) const { return tags.contains(tag); }
 	bool asPrompt() const { return hasTag(QStringLiteral("asPrompt")); }
@@ -39,6 +41,7 @@ struct UlinCoreInvocation
 	bool save() const { return hasTag(QStringLiteral("save")); }
 	bool agentEngaged() const { return hasTag(QStringLiteral("agentEngaged")); }
 	bool skillRequired() const { return hasTag(QStringLiteral("skillRequired")); }
+	bool withSkill() const { return hasTag(QStringLiteral("withSkill")); }
 	bool defineOnly() const { return hasTag(QStringLiteral("defineOnly")); }
 
 	QString error;

@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/core/UlinCoreKernel.h"
+#include "common/agent/ulincore/core/UlinCoreKernel.h"
 
 #include "common/agent/ulincore/intent/UlinCoreBinding.h"
 #include "common/agent/ulincore/intent/UlinCoreIntentStore.h"
@@ -144,20 +144,22 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
-		if (invocation.asSkill()) {
-			if (invocation.asPrompt()) {
+		if (invocation.asSkill() || invocation.withSkill()) {
+			if (invocation.asSkill() && invocation.asPrompt()) {
 				emit errorOccurred(QStringLiteral("asPrompt and asSkill cannot both be set"));
 				return;
 			}
 			const QString prompt = invocation.hasPromptOverride
 				? invocation.promptOverride : intent.prompt;
-			if (prompt.trimmed().isEmpty() || !intent.hasSkill()) {
-				emit errorOccurred(QStringLiteral("intent %1 needs both prompt and skill for asSkill").arg(name));
+			const QString method = invocation.hasSkillOverride
+				? invocation.skillOverride : intent.skill;
+			if (prompt.trimmed().isEmpty() || method.trimmed().isEmpty()) {
+				emit errorOccurred(QStringLiteral("intent %1 needs both prompt and skill").arg(name));
 				return;
 			}
-			const QString method = expandPromptTemplate(intent.skill, params);
 			runPromptText(invocation.rawText,
-				expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n") + method);
+				expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n")
+					+ expandPromptTemplate(method, params));
 			return;
 		}
 
@@ -196,13 +198,18 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		promptIntent.name = name;
 		promptIntent.description = QStringLiteral("Saved prompt intent");
 		promptIntent.prompt = invocation.promptOverride;
+		if (invocation.hasSkillOverride)
+			promptIntent.skill = invocation.skillOverride;
 		promptIntent.parameters = inferParameters(invocation.args);
 		const bool persist = invocation.save();
 		if (persist)
 			addIntent(promptIntent);
 
-		runPromptText(invocation.rawText,
-			expandPromptTemplate(promptIntent.prompt, invocation.args));
+		QString text = expandPromptTemplate(promptIntent.prompt, invocation.args);
+		if (invocation.withSkill() && !promptIntent.skill.trimmed().isEmpty())
+			text += QStringLiteral("\n\n[Skill]\n")
+				+ expandPromptTemplate(promptIntent.skill, invocation.args);
+		runPromptText(invocation.rawText, text);
 		return;
 	}
 
@@ -575,6 +582,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	const bool defineOnly = tags.contains(QStringLiteral("defineOnly"));
 	const bool asPrompt = tags.contains(QStringLiteral("asPrompt"));
 	const bool asSkill = tags.contains(QStringLiteral("asSkill"));
+	const bool withSkill = tags.contains(QStringLiteral("withSkill"));
 	const bool hasSaveTag = tags.contains(QStringLiteral("save"));
 	const bool agentTag = tags.contains(QStringLiteral("agentEngaged"))
 		|| tags.contains(QStringLiteral("skillRequired"));
@@ -583,9 +591,9 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 			IntentResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
 		return;
 	}
-	if ((asPrompt || asSkill) && hasSaveTag) {
+	if ((asPrompt || asSkill || withSkill) && hasSaveTag) {
 		completeIntentCall(generation, calls, index, call,
-			IntentResult::failure(QStringLiteral("save cannot be combined with asPrompt/asSkill")));
+			IntentResult::failure(QStringLiteral("save cannot be combined with execution tags")));
 		return;
 	}
 	if (defineOnly && !hasSaveTag) {
@@ -597,9 +605,9 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	Intent intent;
 	const QJsonValue definitionValue = call.metadata.value(QStringLiteral("Intent"));
 	if (definitionValue.isObject()) {
-		if (asPrompt || asSkill) {
+		if (asPrompt || asSkill || withSkill) {
 			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("Intent definition cannot use asPrompt/asSkill")));
+				IntentResult::failure(QStringLiteral("Intent definition cannot use execution tags")));
 			return;
 		}
 		intent = Intent::fromJson(definitionValue.toObject());
@@ -639,7 +647,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		return;
 	}
 
-	if (asPrompt || asSkill) {
+	if (asPrompt || asSkill || withSkill) {
 		const QJsonObject params = effectiveParameters(intent, call.arguments);
 		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
 		if (prompt.isEmpty())
@@ -650,13 +658,16 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 			return;
 		}
 		QString content = expandPromptTemplate(prompt, params);
-		if (asSkill) {
-			if (!intent.hasSkill()) {
+		if (asSkill || withSkill) {
+			QString skill = call.metadata.value(QStringLiteral("skill")).toString();
+			if (skill.isEmpty())
+				skill = intent.skill;
+			if (skill.trimmed().isEmpty()) {
 				completeIntentCall(generation, calls, index, call,
 					IntentResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
 				return;
 			}
-			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(intent.skill, params);
+			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(skill, params);
 		}
 		completeIntentCall(generation, calls, index, call, IntentResult::success(content));
 		return;
