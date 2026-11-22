@@ -144,9 +144,27 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
-		if (invocation.asSkill() || invocation.withSkill()) {
+		if (invocation.asSkill()) {
+			if (!invocation.hasPromptOverride) {
+				emit errorOccurred(QStringLiteral("intent %1 asSkill requires an external prompt").arg(name));
+				return;
+			}
+			const QString prompt = invocation.promptOverride;
+			const QString method = invocation.hasSkillOverride
+				? invocation.skillOverride : intent.skill;
+			if (prompt.trimmed().isEmpty() || method.trimmed().isEmpty()) {
+				emit errorOccurred(QStringLiteral("intent %1 needs external prompt and skill").arg(name));
+				return;
+			}
+			runPromptText(invocation.rawText,
+				expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n")
+					+ expandPromptTemplate(method, params));
+			return;
+		}
+
+		if (invocation.withSkill()) {
 			if (invocation.hasPromptOverride || invocation.hasSkillOverride) {
-				emit errorOccurred(QStringLiteral("intent %1 asSkill/withSkill use built-in prompt and skill only").arg(name));
+				emit errorOccurred(QStringLiteral("intent %1 withSkill uses built-in prompt and skill only").arg(name));
 				return;
 			}
 			if (intent.prompt.trimmed().isEmpty() || intent.skill.trimmed().isEmpty()) {
@@ -647,14 +665,22 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		const QJsonObject params = effectiveParameters(intent, call.arguments);
 		QString prompt = call.metadata.value(QStringLiteral("prompt")).toString();
 		QString skill = call.metadata.value(QStringLiteral("skill")).toString();
-		if (asSkill || withSkill) {
+		if (withSkill) {
 			if (!prompt.isEmpty() || !skill.isEmpty()) {
 				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("asSkill/withSkill use built-in prompt and skill only")));
+					IntentResult::failure(QStringLiteral("withSkill uses built-in prompt and skill only")));
 				return;
 			}
 			prompt = intent.prompt;
 			skill = intent.skill;
+		} else if (asSkill) {
+			if (prompt.trimmed().isEmpty()) {
+				completeIntentCall(generation, calls, index, call,
+					IntentResult::failure(QStringLiteral("asSkill requires an external prompt")));
+				return;
+			}
+			if (skill.isEmpty())
+				skill = intent.skill;
 		} else {
 			if (!prompt.isEmpty() || !skill.isEmpty()) {
 				completeIntentCall(generation, calls, index, call,

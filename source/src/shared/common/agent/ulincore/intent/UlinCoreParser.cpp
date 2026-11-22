@@ -430,10 +430,14 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("asPrompt rejects external prompt/skill");
 			return invocation;
 		}
-		if ((tagAsSkill || tagWithSkill)
-				&& (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+		if (tagAsSkill && !invocation.hasPromptOverride) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("asSkill/withSkill use built-in prompt and skill only");
+			invocation.error = QStringLiteral("asSkill requires an external prompt");
+			return invocation;
+		}
+		if (tagWithSkill && (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("withSkill uses built-in prompt and skill only");
 			return invocation;
 		}
 		if (tagSave && (tagAsPrompt || tagAsSkill || tagWithSkill)) {
