@@ -1,7 +1,6 @@
 # ULinCore Intent / `/it` 规格
 
-> 状态：与当前实现同步。
-> 本文只描述已实现行为；未实现能力单独列在“当前限制”。
+> 状态：本文描述目标规范；当前实现差异见“当前限制”。
 
 ## 1. 核心模型
 
@@ -158,33 +157,38 @@ Prompt-only 的 defineAndRun 拒绝
 ```text
 1. 元数据：prompt / skill
 2. Agent 行为链：实际 tool calls / steps
-3. 可选 Agent 参与：agentEngaged，让 Agent 优化或补全定义
+3. 可选 Agent 参与：agentEngaged
 ```
 
 `agentEngaged` 不是生成型的必要条件。  
 没有 `agentEngaged` 时，也可以直接把“元数据 + Agent 行为链”记录成 Intent。
 
-两种执行策略：
+生成型的执行策略：
 
 ```text
 默认        执行 seed，记录 Agent 行为链，再生成 Intent
 generateOnly 不执行 seed，只生成 Intent
+agentEngaged 让 Agent 制定 Intent，不执行
 ```
 
-`generateOnly` 是规划中的标签，当前未实现。
-
-特点：
+`agentEngaged` 与 `generateOnly` 不冲突：
 
 ```text
-prompt 是生成种子
-skill 可选，作为生成约束
-Agent 行为链生成 steps
-生成结果需要 save 落盘
-生成完成前不能直接执行
+generateOnly + agentEngaged
+  = 让 Agent 制定 Intent，不执行 seed
 ```
 
-生成型不是“硬写定义”，而是从行为/元数据中固化能力。  
-生成完成并保存后，才转为定义型/执行型。
+`skillRequired` 是生成型约束：
+
+```text
+必须提供 prompt
+必须带 agentEngaged
+禁止外部 skill 元数据
+生成结果必须包含 skill
+```
+
+生成结果需要 `save` 落盘。  
+生成完成前不能直接执行。
 
 #### 执行型
 
@@ -206,19 +210,34 @@ Intent 已存在
 | 字段 / 标签 | 定义型 | 生成型 | 执行型 |
 |---|---|---|---|
 | `Intent` | 必需 | 禁止 | 禁止 |
-| `prompt` | 定义内容 | 生成 seed，必需 | 仅 `asSkill` 外部 prompt |
-| `skill` | 定义内容 | 生成约束，可选 | 仅 `asSkill` 外部 skill |
+| `prompt` | 禁止；写在 `Intent.prompt` 内 | 生成 seed，必需 | `asSkill` 外部 prompt；其他模式用内置 |
+| `skill` | 禁止；写在 `Intent.skill` 内 | 可选；`skillRequired` 时禁止 | `asSkill`/`withSkill` 可外部覆盖 |
 | `steps` / `executor` | 在 `Intent` 内 | 禁止 | 禁止（来自已存 Intent） |
-| `save` | 可选；当前定义块总是保存 | 必需，保存生成结果 | 禁止 |
+| `save` | 可选；不写不落盘 | 必需，保存生成结果 | 禁止 |
 | `defineOnly` | 可选：只定义 | 禁止 | 禁止 |
-| `generateOnly` | 禁止 | 可选：只生成不执行 | 禁止 |
-| `agentEngaged` | 禁止 | 可选：允许 Agent 参与设计定义 | 禁止 |
-| `skillRequired` | 禁止 | 可选：生成结果必须含 skill | 禁止 |
+| `generateOnly` | 禁止 | 可选：只生成，不执行 seed | 禁止 |
+| `agentEngaged` | 禁止 | 可选：Agent 制定 Intent，不执行 | 禁止 |
+| `skillRequired` | 禁止 | 可选约束：必须 `prompt + agentEngaged`，禁止外部 `skill` | 禁止 |
 | `asPrompt` | 禁止 | 禁止 | 可选 |
 | `asSkill` | 禁止 | 禁止 | 可选 |
 | `withSkill` | 禁止 | 禁止 | 可选 |
 | 参数 | 定义参数 / 执行参数 | 生成 seed 参数 | 调用参数 |
 | 调用方 | 用户 / Agent | 用户 / 宿主；Agent 不能调用 | 用户 / Agent |
+
+#### 必需 / 禁止关系
+
+| 模式 / 标签 | 必需 | 禁止 |
+|---|---|---|
+| `asPrompt` | `Intent.prompt` | 外部 `prompt` / `skill` |
+| `asSkill` | 外部 `prompt` | 外部 `Intent` |
+| `withSkill` | `Intent.prompt` + `Intent.skill` | 外部 `prompt` |
+| `asPrompt + withSkill` | `Intent.prompt` + `Intent.skill` | 外部 `prompt` |
+| `asPrompt + withSkill + skill` | `Intent.prompt` + 外部 `skill` 覆盖 | 外部 `prompt` |
+| `skillRequired` | `prompt` + `agentEngaged` | 外部 `skill` |
+| `generateOnly` | `prompt` + `save` | `Intent` / 执行标签 |
+| `agentEngaged` | `prompt` + `save` | `Intent` / 执行标签 |
+| `defineOnly` | `Intent` | 执行标签 / 生成标签 |
+| `Intent` 定义 | 完整 `Intent` | 顶层 `prompt` / `skill` |
 
 #### 调用方边界
 
@@ -277,7 +296,9 @@ prompt 非空   -> Prompt
 ```text
 只发 Intent 内置 prompt
 忽略 skill / steps / executor
-不接受外部 prompt / skill
+不接受外部 prompt
+单独使用时也不接受外部 skill
+和 withSkill 组合时例外：见 4.5
 ```
 
 要求：
@@ -324,8 +345,10 @@ prompt 或 skill 为空则失败
 ### 4.4 `withSkill`
 
 ```text
-只使用 Intent 内置 prompt + 内置 skill
-不接受外部 prompt / skill
+只使用 Intent 内置 prompt
+默认使用 Intent 内置 skill
+不接受外部 prompt
+可接受外部 skill 覆盖内置 skill
 不执行 steps / executor
 ```
 
@@ -333,22 +356,56 @@ prompt 或 skill 为空则失败
 
 ```text
 Intent.prompt 非空
-Intent.skill  非空
+Intent.skill 或外部 skill 非空
+```
+
+### 4.5 `asPrompt + withSkill`
+
+```text
+Intent.prompt + Intent.skill
+不执行 steps / executor
+```
+
+允许：
+
+```text
+Intent.prompt 内置
+Intent.skill 内置
+外部 skill 覆盖内置 skill
+```
+
+禁止：
+
+```text
+外部 prompt
 ```
 
 示例：
 
 ```text
-/it demo.explain2 {topic:"deepseek"} -> {tags:["withSkill"]}
+/it demo.explain2 {topic:"deepseek"} -> {
+  skill:"用更口语的方式说明。",
+  tags:["asPrompt","withSkill"]
+}
 ```
 
-### 4.5 三者的核心区别
+实际发送：
 
-| 标签 | prompt | skill |
+```text
+<Intent.prompt>
+
+[Skill]
+<外部 skill 或 Intent.skill>
+```
+
+### 4.6 核心区别
+
+| 标签组合 | prompt | skill |
 |---|---|---|
 | `asPrompt` | 内置 | 忽略 |
 | `asSkill` | **必须外部** | 外部优先，否则内置 |
-| `withSkill` | 内置 | 内置 |
+| `withSkill` | 内置 | 内置；外部可覆盖 |
+| `asPrompt + withSkill` | 内置 | 内置；外部可覆盖 |
 
 ## 5. 标签冲突
 
@@ -360,6 +417,7 @@ Intent.skill  非空
 ✓定   定义型：有完整 Intent / 直接定义
 ✓生   生成型：由元数据 + Agent 行为链生成
 ✓执   执行型：消费已有 Intent
+✓生/执 同一组合可作为生成型或执行型
 ✓定/生 同一组合在“直接定义”和“记录行为生成”两种上下文下都成立
 △无   可解析，但被忽略/不构成完整类型
 ✗     拒绝
@@ -370,54 +428,55 @@ Intent.skill  非空
 
 | 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | generateOnly | agentEngaged | skillRequired |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **prompt** | — | ✓ 定/生<br>定义或生成 seed | △ 定<br>定义时忽略 prompt | ✗ 禁止外置 | ✓ 执<br>外部 prompt | ✗ 禁止外置 | ✓ 定<br>创建并保存 | ✗ 需要 Intent | ✓ 生<br>seed + 只生成 | ✓ 生<br>可选 AI 参与 | ✗ 需要生成模式 |
-| **skill** | ↔ | — | △ 定<br>定义时忽略 skill | ✗ 禁止外置 | ✓ 执<br>覆盖内置 skill | ✗ 禁止外置 | △ 无<br>单独 skill 不创建 | ✗ 需要 Intent | ✓ 生<br>生成 seed 约束 | ✓ 生<br>需 prompt/save | ✗ 需要生成模式 |
-| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>可保存；当前总保存 | ✓ 定<br>只定义并保存 | ✗ 定义 + 生成冲突 | ✗ 定义块禁止泛化 | ✗ 定义块禁止泛化 |
-| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ agent 需要 save，冲突 | ✗ 需要生成模式 |
-| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ save 冲突 | ✗ save 冲突 |
-| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ save 冲突 | ✗ save 冲突 |
-| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>defineOnly 必需 | ✓ 生<br>保存生成结果 | ✓ 生<br>可选 AI 参与 | ✓ 生<br>需生成模式 |
-| **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义块禁止泛化 | ✗ 定义块禁止泛化 |
-| **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 两种生成策略冲突 | ✓ 生<br>生成约束（规） |
-| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>生成约束；需 save |
+| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置 | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 |
+| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt | ✓ 生<br>需 prompt | ✗ 禁 skill |
+| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 可 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
+| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
+| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
+| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 需要 agent |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 可 | ✓ 生 | ✓ 生 | ✓ 生<br>AE 必 |
+| **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
+| **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>可共存 | ✓ 生<br>AE 必 |
+| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>prompt 必 |
 | **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
+
+> `AE` = `agentEngaged`；`必` = 该元数据/标签是此组合的必需项。
+> `generateOnly` 和 `skillRequired` 仍是规范设计，当前代码未实现。
 
 ### 5.1 矩阵说明
 
 ```text
 prompt + skill
-  直接定义 -> PromptIntent（定义型）
-  记录 Agent 行为链 -> 生成型 seed
-  两者都成立，所以标 定/生。
+  有已存在 Intent + asSkill -> 执行型
+  没有 Intent + save -> 生成型
+  不再作为“定义型”：定义必须有 Intent 元数据。
 
 prompt + Intent
-  当前定义路径忽略 prompt override，实际使用 Intent.prompt；
-  如果要覆盖 prompt，应使用 asSkill 的外部 prompt。
+  拒绝：定义型不允许顶层 prompt/skill。
+  定义内容必须写在 Intent.prompt / Intent.skill 内。
 
 skill + Intent
-  当前定义路径忽略外部 skill，实际使用 Intent.skill；
-  如果要覆盖 skill，应使用 asSkill 的外部 skill。
+  拒绝：定义型不允许顶层 prompt/skill。
 
 skill + save
-  单独 skill 不能创建 PromptIntent；没有 prompt 时不会保存。
-  当前会退化为原始 Prompt fallback，skill 被忽略。
+  单独 skill 没有 prompt，不能生成/保存。
+  会退化为普通 Prompt fallback，skill 被忽略。
 
 prompt + generateOnly
-  生成型的只生成模式：prompt 作为 seed，不执行 seed。
-  当前未实现 generateOnly。
+  生成型：prompt 是 seed，不执行 seed，只生成 Intent。
+  需要 save；当前未实现 generateOnly。
 
 prompt + agentEngaged
-  Agent 参与生成定义；不是生成型的必要条件。
-  没有 agentEngaged 时，仍然可以记录“元数据 + Agent 行为链”生成。
+  生成型：Agent 制定 Intent，不执行。
+  需要 save；skillRequired 还要求 prompt + agentEngaged。
 
-save + generateOnly
-  生成结果落盘；不执行 seed。
+save + prompt
+  生成型，不是定义型。
+  只有带 Intent 元数据才是定义型。
 
-save + agentEngaged
-  可选 AI 参与生成；当前未实现自动泛化。
-
-skillRequired + generateOnly
-  生成结果必须包含 skill；规划中。
+skillRequired
+  必须 prompt + agentEngaged。
+  禁止外部 skill，因为 skill 要由 Agent 生成。
 ```
 
 ### 5.2 单字段类型速查
@@ -425,23 +484,29 @@ skillRequired + generateOnly
 | 单独出现 | 类型 | 含义 |
 |---|---|---|
 | `Intent` | 定 | 直接硬写完整定义 |
-| `prompt` | 定 / 生 | 可创建 PromptIntent，也可作为生成 seed |
-| `skill` | 定 / 生 | 可写入 PromptIntent，也可作为生成约束 |
-| `asPrompt` | 执 | 执行已有 Intent 的内置 prompt |
+| `prompt` | 生 / 执 | 生成 seed；或执行时的外部 prompt |
+| `skill` | 生 / 执 | 生成 seed；或执行时的外部 skill |
+| `asPrompt` | 执 | 内置 prompt |
 | `asSkill` | 执 | 外部 prompt + skill |
-| `withSkill` | 执 | 内置 prompt + 内置 skill |
-| `defineOnly` | 定 | 只定义 |
+| `withSkill` | 执 | 内置 prompt + 内置 skill；外部 skill 可覆盖 |
+| `asPrompt + withSkill` | 执 | 内置 prompt + 内置 skill；外部 skill 可覆盖 |
+| `defineOnly` | 定 | 只定义；save 可选 |
 | `generateOnly` | 生 | 只生成（规划） |
-| `agentEngaged` | 生 | 可选 Agent 参与生成（规划） |
-| `skillRequired` | 生 | 生成结果必须含 skill（规划） |
+| `agentEngaged` | 生 | Agent 制定 Intent，不执行（规划） |
+| `skillRequired` | 生 | 必须 prompt + agentEngaged；禁止外部 skill（规划） |
 | `save` | 修饰 | 保存定义/生成结果 |
 
 ### 执行标签互斥
 
 ```text
 asPrompt + asSkill     拒绝
-asPrompt + withSkill   拒绝
 asSkill + withSkill    拒绝
+```
+
+允许：
+
+```text
+asPrompt + withSkill
 ```
 
 ### 与 save 冲突
@@ -457,6 +522,8 @@ save + withSkill       拒绝
 ### 与 Intent 定义块冲突
 
 ```text
+Intent + prompt        拒绝
+Intent + skill         拒绝
 Intent + asPrompt      拒绝
 Intent + asSkill       拒绝
 Intent + withSkill     拒绝
@@ -466,7 +533,7 @@ Intent + withSkill     拒绝
 
 ```text
 defineOnly 必须有 Intent:{...}
-defineOnly 必须带 save
+defineOnly + save 可选；不带 save 只定义在内存，不落盘
 defineOnly + asPrompt      拒绝
 defineOnly + asSkill       拒绝
 defineOnly + withSkill     拒绝
@@ -474,13 +541,16 @@ defineOnly + agentEngaged  拒绝
 defineOnly + skillRequired 拒绝
 ```
 
-### agentEngaged / skillRequired
+### 生成型
 
 ```text
-agentEngaged 必须带 save
-skillRequired 必须带 agentEngaged
-skillRequired 必须带 save
-二者不能和 Intent 定义块同用
+agentEngaged 需要 prompt + save
+generateOnly 需要 prompt + save
+agentEngaged + generateOnly 允许：让 Agent 制定 Intent，不执行
+skillRequired 需要 prompt + agentEngaged
+skillRequired 禁止外部 skill
+skillRequired + save 必需
+生成型不能和 Intent 定义块同用
 ```
 
 ## 6. 只定义
@@ -506,10 +576,17 @@ skillRequired 必须带 save
 
 ```text
 校验 Intent
-→ addIntent()
-→ 写 intents.json
+→ addIntent() 内存安装
+→ 有 save 才写 intents.json
 → 不执行
 → 不发给 Agent
+```
+
+`save` 可选：
+
+```text
+defineOnly + save      定义并落盘
+defineOnly 不带 save   只定义在内存
 ```
 
 `name` 由 `/it name` 提供，不在 `Intent` 块里重复。
@@ -528,7 +605,8 @@ skillRequired 必须带 save
 
 ```text
 校验 Intent
-→ addIntent()
+→ addIntent() 内存安装
+→ 有 save 才写 intents.json
 → 执行
 ```
 
@@ -537,6 +615,7 @@ skillRequired 必须带 save
 ```text
 只允许 Native / Chain
 Prompt-only 拒绝
+不能叠加顶层 prompt / skill
 不能叠加 as* / withSkill / agentEngaged / skillRequired
 ```
 
@@ -551,9 +630,9 @@ Prompt-only 拒绝的原因：
 
 Prompt-only 应保存，之后由用户执行；Agent 调用同一 Intent 时只拿渲染结果，不递归起模型回合。
 
-## 8. 通过 prompt 新建 Intent
+## 8. 生成型：prompt + save
 
-这是最常用的动态创建形式：
+没有 `Intent` 元数据，只有 `prompt` / `skill` 和 `save` 时，属于**生成型**，不是定义型。
 
 ```text
 /it demo.explain2 {topic:"deepseek"} -> {
@@ -563,24 +642,38 @@ Prompt-only 应保存，之后由用户执行；Agent 调用同一 Intent 时只
 }
 ```
 
-行为：
+目标语义：
 
 ```text
 名称 demo.explain2 不存在
-→ 有 prompt
-→ 创建 PromptIntent
-→ 保存 prompt + skill
-→ 立即执行一次
+→ 没有 Intent 元数据
+→ 识别为生成型
+→ 执行 seed，或按 generateOnly 不执行
+→ 记录 Agent 行为链
+→ 生成 Intent 定义
+→ save 落盘
+→ 生成完成前不能作为执行型
 ```
 
-注意：
+生成策略：
 
 ```text
-PromptIntent 创建路径只受 save 控制
-asPrompt / asSkill / withSkill 不能用于这次创建
+默认              执行 seed，记录行为链，生成并保存
+generateOnly      不执行 seed，只生成
+agentEngaged      Agent 制定 Intent，不执行
+skillRequired     必须由 Agent 生成 skill；禁止外部 skill
 ```
 
-创建后调用：
+生成结果至少包含：
+
+```text
+name
+prompt
+可选 skill
+由行为链生成的 steps
+```
+
+生成完成后，它才变成定义型/执行型：
 
 ```text
 /it demo.explain2 {topic:"deepseek"} -> {tags:["asPrompt"]}
@@ -588,7 +681,18 @@ asPrompt / asSkill / withSkill 不能用于这次创建
   prompt:"用中文解释 [topic]。",
   tags:["asSkill"]
 }
-/it demo.explain2 {topic:"deepseek"} -> {tags:["withSkill"]}
+/it demo.explain2 {topic:"deepseek"} -> {
+  skill:"用更口语的方式说明。",
+  tags:["withSkill"]
+}
+```
+
+注意：
+
+```text
+定义型 = 有 Intent 元数据
+生成型 = 没有 Intent 元数据，通过 prompt/skill + 行为链生成
+执行型 = Intent 已存在
 ```
 
 ## 9. 用户与 Agent
@@ -700,11 +804,14 @@ Agent 直接调用 Intent，不使用包装 API。
 
 ```text
 agentEngaged
-  执行成功后允许 Agent 设计处理方案
+  让 Agent 制定 Intent，不执行
+  生成型的可选策略
 
 skillRequired
   是 agentEngaged 的约束
-  要求方案必须包含非空 skill
+  必须提供 prompt
+  禁止外部 skill
+  生成结果必须包含非空 skill
 ```
 
 当前只有解析和校验，没有自动泛化。
@@ -755,7 +862,14 @@ IntentStore.save()
 生成型整体未实现：不会自动记录 Agent 行为链并生成 Intent
 generateOnly 未实现
 agentEngaged / skillRequired 没有自动泛化
-Intent 定义块当前总是 addIntent() 保存；save 标签主要影响 PromptIntent 创建
+save + prompt 当前仍创建 PromptIntent（旧定义型路径），目标是生成型
+Intent + prompt / skill 当前被忽略，目标应直接拒绝
+Intent 定义块当前总是 addIntent() 保存；目标是只有 save 才落盘
+defineOnly 当前强制 save；目标是 save 可选
+asPrompt + withSkill 当前被拒绝；目标允许
+withSkill 当前拒绝外部 skill；目标允许外部 skill 覆盖
+skillRequired 当前允许外部 skill；目标禁止，必须由 Agent 生成
+skillRequired 当前不要求 prompt；目标要求 prompt
 Prompt-only Intent 不在 executableToolSchemas() 中，模型不能自动发现
 Intent 定义块是严格 JSON，不支持 JSON5
 模型 metadata 依赖模型填写 __ulincore_meta
@@ -772,11 +886,15 @@ Intent 定义块是严格 JSON，不支持 JSON5
 ```
 
 ```text
-asPrompt   内置 prompt，忽略 skill
-asSkill    外部 prompt 必须，skill 可选
-withSkill  内置 prompt + 内置 skill
-save       保存，不能和执行标签同用
-defineOnly 只定义，必须 Intent + save
+asPrompt            内置 prompt，忽略 skill
+asSkill             外部 prompt 必须，skill 可选
+withSkill           内置 prompt + 内置 skill；外部 skill 可覆盖
+asPrompt + withSkill 内置 prompt + 内置 skill；外部 skill 可覆盖
+save + prompt       生成型，不是定义型
+定义型               必须有 Intent 元数据
+生成型               没有 Intent，靠 prompt/skill + Agent 行为链
+执行型               Intent 已存在
+skillRequired       必须 prompt + agentEngaged；禁止外部 skill
 ```
 
 ```text
