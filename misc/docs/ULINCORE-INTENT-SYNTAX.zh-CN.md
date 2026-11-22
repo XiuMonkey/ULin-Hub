@@ -208,6 +208,51 @@ Intent.skill  非空
 
 ## 5. 标签冲突
 
+### 5.0 完整冲突矩阵
+
+图例：
+
+```text
+✓  可同时出现，组合有意义
+△  可解析，但当前被忽略/无实际效果，或需要额外条件
+✗  拒绝
+—  不适用；同一行/列是自身，重复标签本身也会被拒绝
+↔  与上三角对称，见对应格子
+```
+
+| 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | agentEngaged | skillRequired |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **prompt** | — | ✓ 可共存 | △ 定义时忽略 prompt | ✗ 禁止外置 | ✓ asSkill 必需 | ✗ 禁止外置 | ✓ 创建并保存 | ✗ 需要 Intent | △ 需 save，暂无泛化 | ✗ 需要 agentEngaged |
+| **skill** | ↔ | — | △ 定义时忽略 skill | ✗ 禁止外置 | ✓ 外部 skill 覆盖 | ✗ 禁止外置 | △ 单独 skill 无创建路径 | ✗ 需要 Intent | △ 需 prompt/save | ✗ 需要 agentEngaged |
+| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 可保存；当前定义总是保存 | ✓ 只定义并保存 | ✗ 定义块禁止泛化 | ✗ 定义块禁止泛化 |
+| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ agent 需要 save，冲突 | ✗ 需要 agent + save |
+| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ save 冲突 | ✗ save 冲突 |
+| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ save 冲突 | ✗ save 冲突 |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ defineOnly 必需 | ✓ agentEngaged 必需 | ✓ 经 agent 要求；需 agentEngaged |
+| **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义块禁止泛化 | ✗ 定义块禁止泛化 |
+| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ skillRequired 依赖 agentEngaged；需 save |
+| **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
+
+### 5.1 矩阵说明
+
+```text
+prompt + Intent
+  当前定义路径忽略 prompt override，实际使用 Intent.prompt；
+  如果要覆盖 prompt，应使用 asSkill 的外部 prompt。
+
+skill + Intent
+  当前定义路径忽略外部 skill，实际使用 Intent.skill；
+  如果要覆盖 skill，应使用 asSkill 的外部 skill。
+
+skill + save
+  单独 skill 不能创建 PromptIntent；没有 prompt 时不会保存。
+  当前会退化为原始 Prompt fallback，skill 被忽略。
+
+prompt + agentEngaged / skillRequired
+  解析可通过，但当前没有自动泛化实现；
+  实际效果仍需后续补全。
+```
+
 ### 执行标签互斥
 
 ```text
