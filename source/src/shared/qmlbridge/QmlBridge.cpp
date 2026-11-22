@@ -1051,9 +1051,16 @@ void QmlBridge::sendPrompt(const QString& text)
 	if (!m_chat)
 		return;
 
+	// `/it` 是 ULinCore 的 Intent 入口，不是 DSH 斜杠命令。
+	// 必须绕过 commands/execute，否则它会被未知命令分支吞掉：
+	// 用户消息不会进 session/prompt，聊天记录里也看不到。
+	const QString trimmed = text.trimmed();
+	const bool isIntentCommand = trimmed.startsWith(QStringLiteral("/it"));
+
 	// 斜杠命令**不进模型**：形如 `/name …` 的行交给命令处理器（解析/执行/报结果全在它那边）。
 	// 判定用引擎同一条文法（`^/[a-z][a-z0-9_-]*(\s|$)`），不满足就当普通提示发；命令名认不认识由引擎裁定。
-	if (m_commands && !m_currentSessionId.isEmpty() && CommandController::looksLikeCommand(text)) {
+	if (!isIntentCommand && m_commands && !m_currentSessionId.isEmpty()
+			&& CommandController::looksLikeCommand(text)) {
 		m_commands->execute(m_currentSessionId, text);
 		return;
 	}
