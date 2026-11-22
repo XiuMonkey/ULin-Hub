@@ -420,14 +420,25 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("asSkill and withSkill cannot both be set");
 			return invocation;
 		}
-		if (tagAsSkill && !invocation.hasPromptOverride) {
+		if (tagAsPrompt && tagWithSkill) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("asSkill requires an explicit prompt");
+			invocation.error = QStringLiteral("asPrompt and withSkill cannot both be set");
 			return invocation;
 		}
-		if (tagSave && (tagAsPrompt || tagAsSkill)) {
+		if (tagAsPrompt && (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("save cannot be combined with asPrompt/asSkill");
+			invocation.error = QStringLiteral("asPrompt rejects external prompt/skill");
+			return invocation;
+		}
+		if ((tagAsSkill || tagWithSkill)
+				&& (invocation.hasPromptOverride || invocation.hasSkillOverride)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("asSkill/withSkill use built-in prompt and skill only");
+			return invocation;
+		}
+		if (tagSave && (tagAsPrompt || tagAsSkill || tagWithSkill)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("save cannot be combined with execution tags");
 			return invocation;
 		}
 		if (tagSkill && !tagAgent) {
