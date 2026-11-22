@@ -116,6 +116,135 @@ define = 有 Intent -> defineAndRun
          无 Intent -> 执行已有
 ```
 
+### 3.4 三类 `/it` 语义
+
+这三类不是代码里的 `enum`，而是由元数据组合自然形成的语义类型。
+
+#### 定义型
+
+```text
+有完整 Intent 定义
+定义是硬写的
+默认：定义 + 执行
+defineOnly：只定义，不执行
+```
+
+```text
+/it demo {args} -> { Intent:{...} }
+/it demo {args} -> { Intent:{...}, tags:["defineOnly","save"] }
+```
+
+特点：
+
+```text
+定义完整
+定义后即可作为执行型使用
+只能执行 Native / Chain
+Prompt-only 的 defineAndRun 拒绝
+```
+
+#### 生成型
+
+```text
+没有完整 Intent
+先有 seed prompt / skill
+由 Agent 的操作链或 Agent 参与生成 Intent
+生成前不能当作执行型
+不能使用执行型字段/标签
+```
+
+两种模式：
+
+```text
+agentEngaged   先执行 seed，再根据执行结果生成 Intent
+generateOnly    不执行 seed，只生成 Intent
+```
+
+`generateOnly` 是规划中的标签，当前未实现。
+
+特点：
+
+```text
+prompt 是生成种子
+skill 可选，作为生成约束
+生成结果需要 save 落盘
+生成完成前不能直接执行
+```
+
+#### 执行型
+
+```text
+Intent 已存在
+只提供参数
+可选 asPrompt / asSkill / withSkill
+```
+
+```text
+/it demo {args}
+/it demo {args} -> {tags:["asPrompt"]}
+/it demo {args} -> {prompt:"...", tags:["asSkill"]}
+/it demo {args} -> {tags:["withSkill"]}
+```
+
+#### 三类对照
+
+| 字段 / 标签 | 定义型 | 生成型 | 执行型 |
+|---|---|---|---|
+| `Intent` | 必需 | 禁止 | 禁止 |
+| `prompt` | 定义内容 | 生成 seed，必需 | 仅 `asSkill` 外部 prompt |
+| `skill` | 定义内容 | 生成约束，可选 | 仅 `asSkill` 外部 skill |
+| `steps` / `executor` | 在 `Intent` 内 | 禁止 | 禁止（来自已存 Intent） |
+| `save` | 可选；当前定义块总是保存 | 必需，保存生成结果 | 禁止 |
+| `defineOnly` | 可选：只定义 | 禁止 | 禁止 |
+| `generateOnly` | 禁止 | 可选：只生成不执行 | 禁止 |
+| `agentEngaged` | 禁止 | 默认模式：先执行再生成 | 禁止 |
+| `skillRequired` | 禁止 | 可选：生成结果必须含 skill | 禁止 |
+| `asPrompt` | 禁止 | 禁止 | 可选 |
+| `asSkill` | 禁止 | 禁止 | 可选 |
+| `withSkill` | 禁止 | 禁止 | 可选 |
+| 参数 | 定义参数 / 执行参数 | 生成 seed 参数 | 调用参数 |
+| 调用方 | 用户 / Agent | 用户 / 宿主；Agent 不能调用 | 用户 / Agent |
+
+#### 调用方边界
+
+```text
+用户 / 宿主：
+  定义型、生成型、执行型
+
+Agent：
+  定义型、执行型
+  不能调用生成型
+```
+
+原因：
+
+```text
+生成型本身就是 Agent 参与生成的行为
+Agent 不能再把“生成”委托给另一个 Agent
+以后有子代理时再单独定义委派规则
+```
+
+#### 关键边界
+
+```text
+定义型完整 -> 可以立即执行
+生成型不完整 -> 生成前不能执行
+执行型只消费已存在的 Intent
+```
+
+生成型不能使用：
+
+```text
+Intent
+asPrompt
+asSkill
+withSkill
+steps
+executor
+```
+
+这些都属于“已经定义完成”的语义。
+
 ## 4. 执行模式
 
 ### 4.1 默认 `auto`
