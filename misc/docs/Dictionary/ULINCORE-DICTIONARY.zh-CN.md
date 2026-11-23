@@ -245,13 +245,16 @@ Execution    执行型
 - 定义：生成型标签；要求 Agent 生成 `skill`。
 - 必需：`prompt` + `agentEngaged`。
 - 禁止：外部 `skill`。
+- 保存：只有叠加 `generateOnly` 时才必须 `save`。
 - 边界：属于生成型，不能与执行型标签混用。
 
 ### agentEngaged
 
-- 定义：生成型标签；允许 Agent 制定 Intent，不执行 seed。
-- 必需：`prompt` + `save`。
-- 边界：不是执行型标签，不代表“执行后泛化”。
+- 定义：生成型标签；由 Agent 制定 Intent，然后执行生成的 Intent。
+- 必需：`prompt`。
+- 保存：`save` 可选；与执行无关。
+- 叠加：`agentEngaged + generateOnly` 时只生成，不执行。
+- 边界：不是“执行后泛化”；它不先执行 seed。
 
 ### generateOnly
 
@@ -267,13 +270,13 @@ Execution    执行型
 ```text
 定义并执行       可选
 默认生成         可选
+agentEngaged     可选
 defineOnly       必需
 generateOnly     必需
-agentEngaged     必需
 执行已有 Intent  禁止
 ```
 
-- 边界：`save` 不决定 IntentMode，只决定是否落盘。
+- 边界：`save` 不决定 IntentMode，也不决定是否执行；只决定是否落盘。
 
 ### defineOnly
 
@@ -474,5 +477,6 @@ generateOnly
 skillRequired
   必须 prompt + agentEngaged
   禁止外部 skill；由 Agent 生成
+  只有叠加 generateOnly 时才必须 save
 ```
 

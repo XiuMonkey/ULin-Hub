@@ -467,6 +467,12 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("agentEngaged requires prompt");
 			return invocation;
 		}
+		if ((tagAgent || tagSkill)
+				&& (tagAsPrompt || tagAsSkill || tagWithSkill)) {
+			invocation.kind = InvocationKind::Error;
+			invocation.error = QStringLiteral("generation tags cannot be combined with execution tags");
+			return invocation;
+		}
 		if (tagGenerateOnly) {
 			if (!invocation.hasPromptOverride) {
 				invocation.kind = InvocationKind::Error;
