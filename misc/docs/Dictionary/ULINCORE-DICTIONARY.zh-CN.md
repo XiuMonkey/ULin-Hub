@@ -194,6 +194,11 @@ Execution    执行型
 - 定义：无 `Intent` 元数据，但同名 Intent 已存在。
 - 行为：调用已有 Intent；可用 `asPrompt` / `asSkill` / `withSkill`。
 - 边界：不能同时定义新 Intent。
+- 判定注意：`无 Intent 元数据`只是必要条件，不充分。  
+  还必须满足“同名 Intent 已存在”；否则是生成型。  
+  普通文本也没有 Intent 元数据，但它是 Prompt，不是执行型。
+- 与定义型的区别：定义型携带 `Intent` 元数据，默认可以 `defineAndRun`；  
+  即使它执行了 Intent，本次调用的语义类型仍是定义型。
 
 ---
 
