@@ -162,7 +162,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <ClCompile Include="src\shared\common\util\MarkdownSegmenter.cpp" />
     <ClCompile Include="src\shared\common\settings\SettingsController.cpp" />
     <ClCompile Include="src\shared\common\agent\dsh\pluginmarket\PluginMarketController.cpp" />
-    <ClCompile Include="src\shared\common\session\CommandController.cpp" />
+    <ClCompile Include="src\shared\common\agent\dsh\CommandController.cpp" />
     <ClCompile Include="src\shared\ExtensionSystem\ExtensionManagerPage.cpp" />
     <ClCompile Include="src\shared\qmlbridge\ExtensionsBridge.cpp" />
     <ClCompile Include="src\shared\common\util\UrlInput.cpp" />
@@ -402,7 +402,7 @@ if exist "$(ProjectDir)..\assets\resources\office-viewer" xcopy /E /I /Y "$(Proj
     <QtMoc Include="include\shared\common\agent\ulincore\settings\UlinCoreSettings.h" />
     <QtMoc Include="include\shared\common\settings\SettingsController.h" />
     <QtMoc Include="include\shared\common\agent\dsh\pluginmarket\PluginMarketController.h" />
-    <QtMoc Include="include\shared\common\session\CommandController.h" />
+    <QtMoc Include="include\shared\common\agent\dsh\CommandController.h" />
     <QtMoc Include="include\shared\ExtensionSystem\ExtensionManagerPage.h" />
     <QtMoc Include="include\shared\qmlbridge\ExtensionsBridge.h" />
     <!-- 面板坞块列表 / 地址栏规范化：QML 单例注册都要 moc -->

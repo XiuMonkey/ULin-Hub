@@ -6,7 +6,7 @@
 #include "common/agent/ulincore/settings/UlinCoreSettings.h"
 #include "common/appearance/StyleResolver.h"
 #include "common/agent/dsh/pluginmarket/PluginMarketController.h"
-#include "common/session/CommandController.h"
+#include "common/agent/dsh/CommandController.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
 #include "common/shell/PanelBarDockModel.h"

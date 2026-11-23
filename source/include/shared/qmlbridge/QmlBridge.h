@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // QmlBridge —— **QML 唯一的门**（QML 单例名 `Hub`）。
 // 分层规矩：
@@ -23,7 +23,7 @@
 
 #include "common/agent/dsh/DshPromptClient.h"
 #include "common/agent/dsh/pluginmarket/PluginMarketController.h"
-#include "common/session/CommandController.h"
+#include "common/agent/dsh/CommandController.h"
 #include "common/session/SessionListModel.h"
 #include "common/settings/SettingsController.h"
 #include "qmlbridge/BridgeControllers.h"
@@ -344,6 +344,7 @@ void attachmentRevisionChanged();
 	void operationFailed(const QString& message);
 
 private:
+	void syncPromptTakeover(bool dsh);
 	explicit QmlBridge(QObject* parent = nullptr);
 	QmlBridge(const QmlBridge&) = delete;
 	QmlBridge& operator=(const QmlBridge&) = delete;

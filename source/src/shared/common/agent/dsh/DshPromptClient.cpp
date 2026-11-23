@@ -1,7 +1,7 @@
 ﻿#include "common/agent/dsh/DshPromptClient.h"
 
 #include "common/session/ChatController.h"
-#include "common/session/CommandController.h"
+#include "common/agent/dsh/CommandController.h"
 #include "common/util/ConnectionManager.h"
 
 DshPromptClient::DshPromptClient(CommandController* commands, ChatController* chat,

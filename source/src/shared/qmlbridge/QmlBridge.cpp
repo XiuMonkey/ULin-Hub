@@ -232,6 +232,12 @@ void QmlBridge::init()
 	m_chat = new ChatController(api, m_runtime->agentSession(), this);
 	m_dshPromptClient = new DshPromptClient(m_commands, m_chat, this);
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kChatController, m_chat);
+	syncPromptTakeover(!m_settings
+		|| m_settings->masterBackend().compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0);
+	connect(api, &DshApiClient::masterAgentActivated, this,
+		[this](const QString& backendId) {
+			syncPromptTakeover(backendId.compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0);
+		});
 	// 新增/更新模型后目录会变：输入区的模型选择器必须跟着刷新，否则新模型要等换会话才出现。
 	ConnectionManager::instance().RegisterConnection(QStringLiteral("host.settings.modelAdded"),
 		m_settings, &SettingsController::modelAdded, this, [this](const QString&, const QString&) {
@@ -1052,27 +1058,25 @@ void QmlBridge::sendPrompt(const QString& text)
 	if (!m_chat)
 		return;
 
-	// 输入连接由 ConnectionManager 接管：
-	//  · DSH：TakeoverConnection -> DshPromptClient::handlePrompt
-	//  · ULinCore：ReleaseTakeover -> 默认 ChatController::sendRawPrompt
-	const bool useDsh = !m_settings
-		|| m_settings->masterBackend().compare(QLatin1String("dsh"), Qt::CaseInsensitive) == 0;
-	if (useDsh && !m_dshPromptTaken && m_dshPromptClient) {
-		ConnectionManager::instance().TakeoverConnection(
-			QStringLiteral("agent.prompt"), m_dshPromptClient,
-			QStringLiteral("handlePrompt"));
-		m_dshPromptTaken = true;
-	} else if (!useDsh && m_dshPromptTaken) {
-		ConnectionManager::instance().ReleaseTakeover(QStringLiteral("agent.prompt"));
-		m_dshPromptTaken = false;
-	}
-
 	m_chat->submitPrompt(m_currentSessionId, text,
 		[this]() { m_runtime->restartServer(); },
 		[this](const QString& line) {
 			if (m_runtime->setStatus(line))
 				emit statusTextChanged();
 		});
+}
+
+void QmlBridge::syncPromptTakeover(bool dsh)
+{
+	if (dsh && !m_dshPromptTaken && m_dshPromptClient) {
+		ConnectionManager::instance().TakeoverConnection(
+			QStringLiteral("agent.prompt"), m_dshPromptClient,
+			QStringLiteral("handlePrompt"));
+		m_dshPromptTaken = true;
+	} else if (!dsh && m_dshPromptTaken) {
+		ConnectionManager::instance().ReleaseTakeover(QStringLiteral("agent.prompt"));
+		m_dshPromptTaken = false;
+	}
 }
 
 void QmlBridge::cancelPrompt()

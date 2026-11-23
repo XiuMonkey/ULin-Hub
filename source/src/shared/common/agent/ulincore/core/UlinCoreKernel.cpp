@@ -193,6 +193,10 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 				emit errorOccurred(QStringLiteral("intent %1 withSkill rejects external prompt").arg(name));
 				return;
 			}
+			if (!invocation.asPrompt() && (intent.hasChain() || intent.hasNative())) {
+				emit errorOccurred(QStringLiteral("intent %1 withSkill needs asPrompt for chain/native").arg(name));
+				return;
+			}
 			const QString method = invocation.hasSkillOverride
 				? invocation.skillOverride : intent.skill;
 			if (intent.prompt.trimmed().isEmpty() || method.trimmed().isEmpty()) {
@@ -520,7 +524,7 @@ QJsonArray UlinCoreKernel::executableToolSchemas() const
 {
 	QJsonArray tools;
 	for (const Intent& intent : m_intents.all()) {
-		if (!intent.hasNative() && !intent.hasChain())
+		if (!intent.hasNative() && !intent.hasChain() && !intent.hasPrompt())
 			continue;
 		QJsonObject function{
 			{ QStringLiteral("name"), intent.name },
@@ -762,6 +766,11 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 					IntentResult::failure(QStringLiteral("withSkill rejects external prompt")));
 				return;
 			}
+			if (!asPrompt && (intent.hasChain() || intent.hasNative())) {
+				completeIntentCall(generation, calls, index, call,
+					IntentResult::failure(QStringLiteral("withSkill needs asPrompt for chain/native")));
+				return;
+			}
 			prompt = intent.prompt;
 			if (skill.isEmpty())
 				skill = intent.skill;
@@ -798,6 +807,13 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(skill, params);
 		}
 		completeIntentCall(generation, calls, index, call, IntentResult::success(content));
+		return;
+	}
+
+	if (!intent.hasChain() && !intent.hasNative() && intent.hasPrompt()) {
+		const QJsonObject params = effectiveParameters(intent, call.arguments);
+		completeIntentCall(generation, calls, index, call,
+			IntentResult::success(expandPromptTemplate(intent.prompt, params)));
 		return;
 	}
 
