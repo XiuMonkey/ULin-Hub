@@ -14,6 +14,7 @@ IntentParameter param(const QString& name, const QString& type, const QJsonValue
 }
 }
 
+// 内置命令的 Intent 定义：schema 在这里，执行体由 builtin.* 执行器提供。
 QList<Intent> builtinIntents()
 {
 	Intent read;
@@ -38,8 +39,7 @@ QList<Intent> builtinIntents()
 	search.name = QStringLiteral("search_text");
 	search.description = QStringLiteral("Search text files under a workspace directory.");
 	search.executor = QStringLiteral("builtin.search_text");
-	search.parameters = { param("path", "string", "."), param("query", "string"),
-		param("caseSensitive", "boolean", false), param("maxResults", "number", 50) };
+	search.parameters = { param("path", "string", "."), param("query", "string"), param("caseSensitive", "boolean", false), param("maxResults", "number", 50) };
 
 	return { read, list, write, search };
 }

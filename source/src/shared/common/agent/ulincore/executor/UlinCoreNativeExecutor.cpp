@@ -1,6 +1,6 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreNativeExecutor.h"
+#include "common/agent/ulincore/executor/UlinCoreNativeExecutor.h"
 
-#include "common/agent/ulincore/executor/UlinCoreBuiltinNativeExecutors.h"
+#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutors.h"
 
 namespace UlinCore
 {
@@ -12,7 +12,7 @@ void UlinCoreNativeRegistry::add(const QString& id, std::shared_ptr<UlinCoreNati
 
 void UlinCoreNativeRegistry::addBuiltins()
 {
-	registerBuiltinNativeExecutors(*this);
+	registerBuiltinExecutors(*this);
 }
 
 std::shared_ptr<UlinCoreNativeExecutor> UlinCoreNativeRegistry::findShared(const QString& id) const

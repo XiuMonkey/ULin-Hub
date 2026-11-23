@@ -1,6 +1,6 @@
-﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinNativeImplementations.h"
+﻿#include "common/agent/ulincore/executor/UlinCoreBuiltinExecutors.h"
 
-#include "common/agent/ulincore/executor/UlinCoreNativeImplementation.h"
+#include "common/agent/ulincore/executor/UlinCoreNativeExecutor.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -19,6 +19,7 @@ namespace
 	constexpr qint64 kMaxReadBytes = 1024 * 1024;
 	constexpr qint64 kMaxSearchFileBytes = 1024 * 1024;
 
+	// 工作区根目录取 canonical 路径，失败时退化为 clean 后的绝对路径。
 	QString cleanRoot(const QString& root)
 	{
 		if (root.trimmed().isEmpty())
@@ -27,7 +28,7 @@ namespace
 		return canonical.isEmpty() ? QDir::cleanPath(QDir(root).absolutePath()) : canonical;
 	}
 
-	// 把路径钉死在 workspaceRoot 里；越界或绝对路径一律拒绝。
+	// 把路径钉死在 workspaceRoot 里：越界路径一律拒绝（绝对路径落在根内时仍接受）。
 	QString resolveInside(const QString& root, const QString& raw, QString* error)
 	{
 		const QString value = raw.trimmed().isEmpty() ? QStringLiteral(".") : raw.trimmed();
@@ -64,6 +65,7 @@ namespace
 		return QDir(root).relativeFilePath(path);
 	}
 
+	// 搜索时跳过版本库、依赖与构建目录，减少无关命中。
 	bool isInsideSkippedDir(const QString& path)
 	{
 		const QString normalized = QDir::fromNativeSeparators(path);
@@ -81,32 +83,11 @@ namespace
 		return false;
 	}
 
-	class ReadFileTool : public UlinCoreNativeImplementation
+	// read_file：只读文本，二进制文件直接拒绝。
+	class ReadFileExecutor : public UlinCoreNativeExecutor
 	{
 	public:
-		QString name() const override { return QStringLiteral("read_file"); }
-		QString description() const override
-		{
-			return QStringLiteral("Read a UTF-8 text file inside the workspace. Returns at most maxBytes bytes.");
-		}
-		QJsonObject parametersSchema() const override
-		{
-			return QJsonObject{
-				{ QStringLiteral("type"), QStringLiteral("object") },
-				{ QStringLiteral("properties"), QJsonObject{
-					{ QStringLiteral("path"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("string") },
-						{ QStringLiteral("description"), QStringLiteral("Relative path from the workspace root.") }
-					} },
-					{ QStringLiteral("maxBytes"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("integer") },
-						{ QStringLiteral("description"), QStringLiteral("Maximum bytes to read (default 65536, cap 1048576).") }
-					} }
-				} },
-				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("path") } }
-			};
-		}
-		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const ExecutorContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
@@ -116,8 +97,7 @@ namespace
 
 			QFile file(path);
 			if (!file.open(QIODevice::ReadOnly))
-				return ExecuteResult::failure(QStringLiteral("cannot open %1: %2")
-					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
+				return ExecuteResult::failure(QStringLiteral("cannot open %1: %2").arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 requested = static_cast<qint64>(args.value(QStringLiteral("maxBytes")).toInt(65536));
 			const qint64 limit = qBound<qint64>(1, requested, kMaxReadBytes);
@@ -128,31 +108,11 @@ namespace
 		}
 	};
 
-	class ListDirTool : public UlinCoreNativeImplementation
+	// list_dir：目录名带 / 后缀，条目超出上限时追加截断标记。
+	class ListDirExecutor : public UlinCoreNativeExecutor
 	{
 	public:
-		QString name() const override { return QStringLiteral("list_dir"); }
-		QString description() const override
-		{
-			return QStringLiteral("List entries of a directory inside the workspace.");
-		}
-		QJsonObject parametersSchema() const override
-		{
-			return QJsonObject{
-				{ QStringLiteral("type"), QStringLiteral("object") },
-				{ QStringLiteral("properties"), QJsonObject{
-					{ QStringLiteral("path"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("string") },
-						{ QStringLiteral("description"), QStringLiteral("Relative directory path, default '.'.") }
-					} },
-					{ QStringLiteral("maxEntries"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("integer") },
-						{ QStringLiteral("description"), QStringLiteral("Default 200, cap 2000.") }
-					} }
-				} }
-			};
-		}
-		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const ExecutorContext& ctx) override
 		{
 			const QString root = cleanRoot(ctx.workspaceRoot);
 			QString error;
@@ -162,12 +122,10 @@ namespace
 
 			const QDir dir(path);
 			if (!dir.exists())
-				return ExecuteResult::failure(QStringLiteral("not a directory: ")
-					+ args.value(QStringLiteral("path")).toString());
+				return ExecuteResult::failure(QStringLiteral("not a directory: ") + args.value(QStringLiteral("path")).toString());
 
 			const int maxEntries = qBound(1, args.value(QStringLiteral("maxEntries")).toInt(200), 2000);
-			const QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot,
-				QDir::DirsFirst | QDir::Name);
+			const QFileInfoList entries = dir.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
 
 			QStringList lines;
 			int count = 0;
@@ -185,35 +143,11 @@ namespace
 		}
 	};
 
-	class WriteFileTool : public UlinCoreNativeImplementation
+	// write_file：受 allowWrites 控制，写入前自动建父目录。
+	class WriteFileExecutor : public UlinCoreNativeExecutor
 	{
 	public:
-		QString name() const override { return QStringLiteral("write_file"); }
-		QString description() const override
-		{
-			return QStringLiteral("Write a UTF-8 text file inside the workspace. Disabled unless the host allows writes.");
-		}
-		QJsonObject parametersSchema() const override
-		{
-			return QJsonObject{
-				{ QStringLiteral("type"), QStringLiteral("object") },
-				{ QStringLiteral("properties"), QJsonObject{
-					{ QStringLiteral("path"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("string") },
-						{ QStringLiteral("description"), QStringLiteral("Relative path from the workspace root.") }
-					} },
-					{ QStringLiteral("content"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("string") },
-						{ QStringLiteral("description"), QStringLiteral("Full file content, UTF-8.") }
-					} }
-				} },
-				{ QStringLiteral("required"), QJsonArray{
-					QStringLiteral("path"),
-					QStringLiteral("content")
-				} }
-			};
-		}
-		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const ExecutorContext& ctx) override
 		{
 			if (!ctx.allowWrites)
 				return ExecuteResult::failure(QStringLiteral("write_file is disabled (allowWrites=false)"));
@@ -228,8 +162,7 @@ namespace
 			const QByteArray bytes = args.value(QStringLiteral("content")).toString().toUtf8();
 			QFile file(path);
 			if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-				return ExecuteResult::failure(QStringLiteral("cannot write %1: %2")
-					.arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
+				return ExecuteResult::failure(QStringLiteral("cannot write %1: %2").arg(args.value(QStringLiteral("path")).toString(), file.errorString()));
 
 			const qint64 written = file.write(bytes);
 			file.close();
@@ -245,31 +178,11 @@ namespace
 		}
 	};
 
-	class SearchTextTool : public UlinCoreNativeImplementation
+	// search_text：按字面量搜索，跳过 .git/node_modules 等目录与二进制文件。
+	class SearchTextExecutor : public UlinCoreNativeExecutor
 	{
 	public:
-		QString name() const override { return QStringLiteral("search_text"); }
-		QString description() const override
-		{
-			return QStringLiteral("Search a literal string in text files inside the workspace.");
-		}
-		QJsonObject parametersSchema() const override
-		{
-			return QJsonObject{
-				{ QStringLiteral("type"), QStringLiteral("object") },
-				{ QStringLiteral("properties"), QJsonObject{
-					{ QStringLiteral("query"), QJsonObject{ { QStringLiteral("type"), QStringLiteral("string") } } },
-					{ QStringLiteral("path"), QJsonObject{
-						{ QStringLiteral("type"), QStringLiteral("string") },
-						{ QStringLiteral("description"), QStringLiteral("Relative directory, default '.'.") }
-					} },
-					{ QStringLiteral("caseSensitive"), QJsonObject{ { QStringLiteral("type"), QStringLiteral("boolean") } } },
-					{ QStringLiteral("maxResults"), QJsonObject{ { QStringLiteral("type"), QStringLiteral("integer") } } }
-				} },
-				{ QStringLiteral("required"), QJsonArray{ QStringLiteral("query") } }
-			};
-		}
-		ExecuteResult execute(const QJsonObject& args, const NativeContext& ctx) override
+		ExecuteResult execute(const QJsonObject& args, const ExecutorContext& ctx) override
 		{
 			const QString query = args.value(QStringLiteral("query")).toString();
 			if (query.isEmpty())
@@ -303,10 +216,7 @@ namespace
 				const QStringList lines = QString::fromUtf8(raw).split(QLatin1Char('\n'));
 				for (int i = 0; i < lines.size() && hits.size() < maxResults; ++i) {
 					if (lines.at(i).contains(query, cs)) {
-						hits.append(QStringLiteral("%1:%2: %3")
-							.arg(relativeToRoot(root, path))
-							.arg(i + 1)
-							.arg(lines.at(i).trimmed()));
+						hits.append(QStringLiteral("%1:%2: %3").arg(relativeToRoot(root, path)).arg(i + 1).arg(lines.at(i).trimmed()));
 					}
 				}
 			}
@@ -317,11 +227,11 @@ namespace
 	};
 } // namespace
 
-void registerBuiltinNativeImplementations(UlinCoreNativeImplementationRegistry& registry)
+void registerBuiltinExecutors(UlinCoreNativeRegistry& registry)
 {
-	registry.add(std::make_shared<ReadFileTool>());
-	registry.add(std::make_shared<ListDirTool>());
-	registry.add(std::make_shared<WriteFileTool>());
-	registry.add(std::make_shared<SearchTextTool>());
+	registry.add(QStringLiteral("builtin.read_file"), std::make_shared<ReadFileExecutor>());
+	registry.add(QStringLiteral("builtin.list_dir"), std::make_shared<ListDirExecutor>());
+	registry.add(QStringLiteral("builtin.write_file"), std::make_shared<WriteFileExecutor>());
+	registry.add(QStringLiteral("builtin.search_text"), std::make_shared<SearchTextExecutor>());
 }
 } // namespace UlinCore
