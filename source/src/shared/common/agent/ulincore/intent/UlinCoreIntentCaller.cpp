@@ -30,14 +30,19 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 		return IntentResult::failure(QStringLiteral("intent executor has no executor registry"));
 
 	if (m_intent.hasNative()) {
-		QString id = m_intent.executor;
+		const QString original = m_intent.executor;
 		// 只有 executor 原文等于 Intent 名时才视为自执行；
-		// builtin.xxx 是独立的执行器命名空间，不能在去前缀后误判。
-		if (id == m_intent.name)
+		// builtin.xxx 是独立执行器命名空间。
+		if (original == m_intent.name)
 			return IntentResult::failure(QStringLiteral("intent %1 cannot execute itself").arg(m_intent.name));
-		if (id.startsWith(QStringLiteral("builtin.")))
-			id = id.mid(8);
-		const auto executor = m_executors->findShared(id);
+
+		// 注册表键是完整 executor ID（如 builtin.list_dir）；先查原文，再兼容无前缀别名。
+		auto executor = m_executors->findShared(original);
+		if (!executor && original.startsWith(QStringLiteral("builtin.")))
+			executor = m_executors->findShared(original.mid(8));
+		if (!executor)
+			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
+				.arg(m_intent.name, m_intent.executor));
 		if (!executor)
 			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
 				.arg(m_intent.name, m_intent.executor));
