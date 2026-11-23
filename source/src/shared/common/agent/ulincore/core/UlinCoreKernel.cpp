@@ -7,6 +7,7 @@
 #include "common/agent/ulincore/intent/UlinCoreParser.h"
 
 #include <QDebug>
+#include <QDateTime>
 #include <QJsonDocument>
 #include <QMetaObject>
 #include <QPointer>
@@ -159,6 +160,12 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 			: mode == IntentMode::Generation ? "generation"
 			: mode == IntentMode::Execution ? "execution" : "undetermined")
 		<< "name=" << name;
+
+	if (mode == IntentMode::Generation && !known) {
+		runGeneration(invocation);
+		return;
+	}
+
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
@@ -406,6 +413,58 @@ QJsonObject UlinCoreKernel::effectiveParameters(const Intent& intent, const QJso
 	for (auto it = args.constBegin(); it != args.constEnd(); ++it)
 		params.insert(it.key(), it.value());
 	return params;
+}
+
+void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
+{
+	Intent generated;
+	generated.name = invocation.intentName;
+	generated.description = QStringLiteral("Generated intent");
+	generated.prompt = invocation.promptOverride;
+	generated.skill = invocation.hasSkillOverride ? invocation.skillOverride : QString();
+	generated.parameters = inferParameters(invocation.args);
+
+	if (invocation.skillRequired() && generated.skill.trimmed().isEmpty()) {
+		emit errorOccurred(QStringLiteral("intent %1 skillRequired needs Agent-generated skill")
+			.arg(generated.name));
+		return;
+	}
+
+	addIntent(generated, invocation.save());
+
+	if (invocation.generateOnly() || invocation.agentEngaged()) {
+		finishGeneratedTurn(invocation.rawText,
+			QStringLiteral("intent %1 generated").arg(generated.name));
+		return;
+	}
+
+	// 默认生成：先执行 seed，后续再接入“行为链 -> steps”的固化。
+	runPromptText(invocation.rawText,
+		expandPromptTemplate(generated.prompt, invocation.args));
+}
+
+void UlinCoreKernel::finishGeneratedTurn(const QString& rawText, const QString& text)
+{
+	m_session->appendUserText(rawText);
+	m_running = true;
+	m_cancelled = false;
+	m_steps = 0;
+	m_turnUsage = Usage();
+	m_turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	++m_generation;
+	journal(QStringLiteral("turn/start"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("text"), rawText }
+	});
+	emit turnStarted(m_turnId);
+
+	Message message;
+	message.role = Role::Assistant;
+	message.text = text;
+	message.createdAt = QDateTime::currentMSecsSinceEpoch();
+	m_session->append(message);
+	emit assistantMessage(message);
+	finishTurn(m_generation, true, QString(), text, false);
 }
 
 void UlinCoreKernel::savePromptIntent(const UlinCoreInvocation& invocation, const QString& prompt)

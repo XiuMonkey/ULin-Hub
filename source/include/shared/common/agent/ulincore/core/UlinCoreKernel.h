@@ -83,6 +83,8 @@ private:
 
 	// Intent 入口
 	void runParsed(const UlinCoreInvocation& invocation);
+	void runGeneration(const UlinCoreInvocation& invocation);
+	void finishGeneratedTurn(const QString& rawText, const QString& text);
 	void runPromptText(const QString& rawText, const QString& promptText);
 	void runRecipeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
 	void runNativeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
