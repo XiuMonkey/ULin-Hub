@@ -1,5 +1,9 @@
 # ULinCore 名词字典
 
+> 本字典是 ULinCore 术语的唯一规范来源。
+> 旧版 ULinCore 设计文档已移入 `misc/docs/Archive/`，仅作历史参考。
+> 矩阵见第 8 节。
+
 > 用途：统一 ULinCore 术语，区分容易混淆的概念。
 > 原则：一个词只表达一个概念；与代码冲突时，先修正本字典或代码，不允许两套说法并存。
 
@@ -396,3 +400,79 @@ agentEngaged     必需
 
 - 状态：仅用于 DSH 的 `/command`。
 - 边界：ULinCore 的 `/it` 不是 DSH 命令；不要混称。
+
+---
+
+## 8. 标签兼容矩阵
+
+图例：
+
+```text
+✓定    定义型
+✓生    生成型
+✓执    执行型
+✓生/执 可作为生成型或执行型
+△无    可解析但不构成完整类型
+✗      拒绝
+—      自身/不适用
+↔      与上三角对称
+必      该元数据/标签是此组合的必需项
+AE      agentEngaged
+```
+
+| 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | generateOnly | agentEngaged | skillRequired |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 可 | ✓ 生<br>AE 必 |
+| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt/save 必 | ✓ 生<br>需 prompt | ✗ 禁 skill |
+| **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 必 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
+| **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 可 | ✓ 生<br>AE 必 |
+| **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
+| **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>save 必 | ✓ 生<br>save 必 / AE 必 |
+| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>prompt 必 |
+| **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
+
+矩阵说明：
+
+```text
+prompt + skill
+  已存在 Intent + asSkill -> 执行型
+  无 Intent + save        -> 生成型
+  不再作为定义型；定义必须有 Intent 元数据
+
+Intent + prompt / skill
+  拒绝；定义内容只能写在 Intent.prompt / Intent.skill 内
+
+asPrompt
+  只用内置 prompt；单独使用禁止外部 skill
+  asPrompt + withSkill 例外：允许外部 skill 覆盖
+
+asSkill
+  必须外部 prompt；skill 外部优先，否则内置
+
+withSkill
+  内置 prompt + 内置/外部 skill
+  Native/Chain 必须叠加 asPrompt；Prompt-only 可省略
+
+save
+  只控制落盘：
+    defineOnly    必须
+    generateOnly  必须
+    agentEngaged  可选
+    其他生成      可选
+    执行          禁止
+
+agentEngaged
+  生成后执行；叠加 generateOnly 才只生成
+  save 与执行无关
+
+generateOnly
+  只生成，不执行；必须 save
+
+skillRequired
+  必须 prompt + agentEngaged
+  禁止外部 skill；由 Agent 生成
+```
+

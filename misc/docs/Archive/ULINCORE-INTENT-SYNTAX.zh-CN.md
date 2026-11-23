@@ -457,7 +457,7 @@ Intent.skill 内置
 
 > `AE` = `agentEngaged`；`必` = 该元数据/标签是此组合的必需项。
 > `withSkill` 单独用于 Native/Chain Intent 时，必须叠加 `asPrompt`；只有没有内置工具链、默认走 prompt 的 Intent 才能省略 `asPrompt`。
-> `generateOnly` 和 `skillRequired` 仍是规范设计，当前代码未实现。
+> `generateOnly` / `skillRequired` 已实现。
 
 ### 5.1 矩阵说明
 
