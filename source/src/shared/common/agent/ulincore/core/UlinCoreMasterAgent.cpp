@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/core/UlinCoreMasterAgent.h"
+#include "common/agent/ulincore/core/UlinCoreMasterAgent.h"
 
 #include "common/agent/ulincore/model/UlinCoreEchoModel.h"
 #include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
@@ -29,6 +29,38 @@ UlinCoreMasterAgent::UlinCoreMasterAgent(VirtualApiHost* host, VirtualMain* main
 
 UlinCoreMasterAgent::~UlinCoreMasterAgent() = default;
 
+bool UlinCoreMasterAgent::RegisterExecutor(const char* id, UlinCoreNativeExecutor* executor)
+{
+	if (!id || !*id || !executor)
+		return false;
+	const QString executorId = QString::fromUtf8(id);
+	// 内置 ID 不允许被扩展覆盖。
+	if (executorId.startsWith(QStringLiteral("builtin.")))
+		return false;
+	ensureKernel();
+	if (m_kernel->executors().contains(executorId))
+		return false;
+	m_kernel->executors().add(executorId,
+		std::shared_ptr<UlinCoreNativeExecutor>(executor));
+	return true;
+}
+
+void UlinCoreMasterAgent::UnregisterExecutor(const char* id)
+{
+	if (!id || !*id || !m_kernel)
+		return;
+	m_kernel->executors().remove(QString::fromUtf8(id));
+}
+
+bool UlinCoreMasterAgent::HasExecutor(const char* id) const
+{
+	if (!id || !*id)
+		return false;
+	if (!m_kernel)
+		const_cast<UlinCoreMasterAgent*>(this)->ensureKernel();
+	return m_kernel && m_kernel->executors().contains(QString::fromUtf8(id));
+}
+
 void UlinCoreMasterAgent::setModel(std::shared_ptr<UlinCoreModel> model)
 {
 	m_modelExplicit = true;
@@ -46,6 +78,7 @@ void UlinCoreMasterAgent::setDataDir(const QString& dir)
 {
 	m_dataDir = dir;
 	if (!m_dataDir.isEmpty()) {
+		// dataDir 决定设置文件、会话索引与默认工作区的位置。
 		QDir().mkpath(m_dataDir);
 		QDir().mkpath(m_dataDir + QStringLiteral("/sessions"));
 		if (m_workspaceRoot.isEmpty())
@@ -84,6 +117,7 @@ void UlinCoreMasterAgent::loadSettings()
 	if (m_modelExplicit)
 		return;
 
+	// 未显式注入模型时按设置构建 OpenAI 兼容模型；缺模型名或 key 就退回 echo。
 	m_model.reset();
 	OpenAiModelConfig config;
 	config.baseUrl = settings.selectedBaseUrl().trimmed();
@@ -115,6 +149,7 @@ void UlinCoreMasterAgent::loadSettings()
 
 void UlinCoreMasterAgent::reloadSettings()
 {
+	// 设置变更：取消在跑的回合，重建模型与 Options。
 	if (m_kernel && m_kernel->running())
 		m_kernel->cancel();
 
@@ -172,6 +207,7 @@ void UlinCoreMasterAgent::ensureKernel()
 	if (!m_dataDir.isEmpty())
 		m_kernel->setIntentsPath(m_dataDir + QStringLiteral("/intents.json"));
 
+	// 内核懒创建：设置里的线程数、步数、写权限在这里落到 Options。
 	UlinCoreKernel::Options options;
 	options.systemPrompt = m_systemPrompt.isEmpty()
 		? QStringLiteral("You are ULin Core, a concise coding agent. Use the provided tools when they help.")
@@ -255,6 +291,7 @@ void UlinCoreMasterAgent::OnOutboundRequest(const char* rpcId, const char* metho
 	const QString name = QString::fromUtf8(method ? method : "");
 	const QJsonObject args = QJsonDocument::fromJson(QByteArray(argsJson ? argsJson : "")).object();
 
+	// 接管 DSH 的 outbound RPC：按 method 分发，未实现的显式失败。
 	if (name == QStringLiteral("session/prompt")) {
 		// 真实 wire 形状：{ request: { sessionId, content: [{type:"text", text}, ...] } }
 		const QJsonObject request = args.value(QStringLiteral("request")).toObject();
@@ -466,8 +503,7 @@ void UlinCoreMasterAgent::OnOutboundRequest(const char* rpcId, const char* metho
 
 	if (m_host) {
 		const QByteArray code = QByteArrayLiteral("ulincore-unsupported");
-		const QByteArray message = QStringLiteral("ulincore backend does not implement %1 yet")
-			.arg(name).toUtf8();
+		const QByteArray message = QStringLiteral("ulincore backend does not implement %1 yet").arg(name).toUtf8();
 		qWarning().noquote() << "[UlinCore] unsupported outbound:" << name;
 		m_host->FailCall(rpcId, code.constData(), message.constData());
 	}
@@ -478,6 +514,7 @@ void UlinCoreMasterAgent::forwardEvent(const QString& type, const QJsonObject& d
 	if (!m_main || m_sessionId.isEmpty())
 		return;
 
+	// 所有事件统一包成 session/event 帧，前端按 sessionId 过滤。
 	const QJsonObject frame{
 		{ QStringLiteral("payload"), QJsonObject{
 			{ QStringLiteral("type"), QStringLiteral("session/event") },
@@ -493,6 +530,7 @@ void UlinCoreMasterAgent::forwardEvent(const QString& type, const QJsonObject& d
 
 void UlinCoreMasterAgent::forwardText(const QString& text, const QString& thinking)
 {
+	// reasoning 与正文分成不同 chunk 类型下发，前端各自渲染。
 	if (!thinking.isEmpty()) {
 		forwardEvent(QStringLiteral("assistant/chunk"), QJsonObject{
 			{ QStringLiteral("chunk"), QJsonObject{
@@ -576,6 +614,7 @@ void UlinCoreMasterAgent::loadSessionLog(SessionRecord& record) const
 		return;
 
 	const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+	// 事件日志只存 events 数组，nextSeq 由最大 seq 推回。
 	record.events = root.value(QStringLiteral("events")).toArray();
 	int maxSeq = 0;
 	for (const QJsonValue& value : record.events)
@@ -589,6 +628,7 @@ void UlinCoreMasterAgent::saveSessionLog(const SessionRecord& record) const
 	if (path.isEmpty())
 		return;
 
+	// 事件日志按会话落到 <dataDir>/sessions/<sessionId>.json，索引另存 sessions.json。
 	QDir().mkpath(QFileInfo(path).absolutePath());
 	QSaveFile file(path);
 	if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -608,6 +648,7 @@ void UlinCoreMasterAgent::appendSessionEvent(const QString& type, const QJsonObj
 	if (it == m_sessions.end())
 		return;
 
+	// 事件按 seq 单调递增追加，随后立即落盘。
 	QJsonObject event = data;
 	event.insert(QStringLiteral("type"), type);
 	event.insert(QStringLiteral("seq"), it->nextSeq++);
@@ -662,6 +703,7 @@ void UlinCoreMasterAgent::saveState() const
 	if (m_dataDir.isEmpty())
 		return;
 
+	// 索引只存工作区与会话元数据，事件正文在各自的日志里。
 	QJsonArray workspaces;
 	for (const WorkspaceRecord& workspace : m_workspaces) {
 		workspaces.append(QJsonObject{
@@ -706,6 +748,7 @@ QString UlinCoreMasterAgent::createSessionRecord(const QString& workspaceId, con
 		record.cwd = m_workspaceRoot.isEmpty() ? QDir::currentPath() : m_workspaceRoot;
 	record.createdAt = record.updatedAt = QDateTime::currentMSecsSinceEpoch();
 	m_sessions.insert(record.id, record);
+	// 新会话同时写索引与一条空事件日志。
 	saveSessionLog(record);
 	saveState();
 	qInfo().noquote() << "[UlinCore] session created:" << record.id
@@ -716,6 +759,7 @@ QString UlinCoreMasterAgent::createSessionRecord(const QString& workspaceId, con
 QJsonObject UlinCoreMasterAgent::sessionListResult() const
 {
 	QList<SessionRecord> records = m_sessions.values();
+	// 会话列表按 updatedAt 倒序，最近活动的排最前。
 	std::sort(records.begin(), records.end(), [](const SessionRecord& a, const SessionRecord& b) {
 		return a.updatedAt > b.updatedAt;
 	});
@@ -739,6 +783,7 @@ void UlinCoreMasterAgent::forwardWorkspaceSnapshot()
 	if (!m_main)
 		return;
 
+	// workspace/follow 打开时先推一份完整工作区快照。
 	QJsonArray items;
 	for (const WorkspaceRecord& workspace : m_workspaces) {
 		items.append(QJsonObject{

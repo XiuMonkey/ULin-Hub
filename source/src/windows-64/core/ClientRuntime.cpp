@@ -29,7 +29,7 @@
 
 namespace
 {
-	QSet<QString> idSetFromJsonArray(const QJsonArray& values)   // 同上，给归档集合用（QSet 无序，去重交给 set）
+	QSet<QString> idSetFromJsonArray(const QJsonArray& values)   // JSON id 数组 → QSet，供归档集合去重使用
 	{
 		QSet<QString> ids;
 		for (const QString& id : idListFromJsonArray(values))
@@ -56,11 +56,12 @@ void ClientRuntime::start()
 		+ QStringLiteral("/data/ulincore"));
 	if (!m_api->RegisterMasterAgent("ulincore", m_ulinCoreAgent))
 		qWarning().noquote() << "[UlinCore] failed to register master agent";
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kUlinCoreExecutorHost, m_ulinCoreAgent);
 
-	// findObject(kApiClient) 取出站客户端；此前这个 index 从没登记过 ⇒ 扩展只拿到 null 并静默退化成"没接管"。
+	// 登记出站客户端（findObject(kApiClient)）；不登记的话扩展只拿到 null 并静默退化成"没接管"。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiClient, m_api);
 
-	// DshApiClient 既有信号一一对应（见 DshApiClient.h）—— 扩展灌进来的数据因此走与真服务端完全相同的路。
+	// 与 DshApiClient 的信号一一对应（见 DshApiClient.h）：扩展灌进来的数据走与真服务端完全相同的路。
 	CommonRegistry::instance().AddToRegistry(DshHostIndex::kMainWindow, m_api);
 
 	// 退出时关闭 API 流：服务端据此释放会话写句柄。缺了这一步，下一次启动用同一会话发消息
@@ -132,7 +133,7 @@ void ClientRuntime::start()
 			if (m_catalog.applyProjectionChange(sessionId, key, value))
 				emit peerCatalogChanged();
 		});
-	// follow snapshot projections now come from AgentSessionClient
+	// follow 快照的投影改由 AgentSessionClient 提供
 	connect(m_agentSession, &AgentSessionClient::sessionProjectionsReady, this,
 		[this](const QString& sessionId, int, const QJsonObject& values) {
 			if (m_catalog.applyFollowProjections(sessionId, values))
@@ -165,8 +166,8 @@ void ClientRuntime::start()
 			emit catalogChanged();
 		});
 
-	// workspace/follow 的分组增量帧（upserted / removed / reordered）。**这三条此前一条都没接**：
-	// 缺 reordered ⇒ 拖拽后的顺序不生效。三条共用一份 catalog 基线，改完就通知侧栏重建。
+	// workspace/follow 的分组增量帧（upserted / removed / reordered）：共用一份 catalog 基线，
+	// 缺 reordered 时拖拽后的顺序不生效，所以三条都要接；改完通知侧栏重建。
 	connect(m_api, &DshApiClient::workspaceUpserted, this, [this](const QJsonObject& workspace) {
 		m_catalog.upsertWorkspace(workspace);
 		emit catalogChanged();
@@ -549,8 +550,7 @@ void ClientRuntime::deleteWorkspace(const QString& workspaceId)
 
 // 删除工作区前把组内会话逐条归档：服务端 workspace/delete 不会顺带删会话，
 // 不归档的话它们会变成"无归属"，在侧栏里全堆进删不掉的"未分组"。
-void ClientRuntime::archiveSessionsThen(const QStringList& sessionIds, const std::function<void()>& onDone,
-	bool notifyHost)
+void ClientRuntime::archiveSessionsThen(const QStringList& sessionIds, const std::function<void()>& onDone, bool notifyHost)
 {
 	if (sessionIds.isEmpty() || !m_api) {
 		onDone();
@@ -615,8 +615,8 @@ void ClientRuntime::createWorkspace(const QString& path)
 				return;
 			}
 
-			// 本地先补一条分组：侧栏的分组来自 catalog，而 workspace/follow 的 upsert 帧是异步的
-			// 那条路径同一做法，也正是 SessionCatalog::upsertWorkspace 注释里要求的。
+			// 本地先补一条分组：侧栏的分组来自 catalog，而 workspace/follow 的 upsert 帧是异步的，
+			// 等它到就晚了（与补建默认分组同一做法）。
 			QJsonObject local = workspace;
 			if (local.value(QStringLiteral("title")).toString().isEmpty())
 				local.insert(QStringLiteral("title"), QDir(path).dirName());
@@ -653,7 +653,7 @@ void ClientRuntime::followSession(const QString& sessionId)
 	if (!m_api)
 		return;
 	if (sessionId.isEmpty()) {
-		// 清空视图时也要清掉 follow 愿望账：否则切回 dsh 后点回原会话，
+		// 清空视图时也要清掉 follow 意图，否则切回 dsh 后点回原会话，
 		// AgentSessionClient 会因为“同 id”直接 return，首帧快照永远不会再来。
 		m_agentSession->unfollowSession();
 		return;

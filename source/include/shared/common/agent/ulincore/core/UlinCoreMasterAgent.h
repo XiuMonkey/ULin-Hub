@@ -1,9 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "common/agent/ulincore/core/UlinCoreKernel.h"
 
 #include "VirtualClass/VirtualApiTakeover.h"
 #include "VirtualClass/VirtualMasterAgent.h"
+#include "VirtualClass/VirtualUlinCoreExecutorHost.h"
 
 #include <QHash>
 #include <QJsonArray>
@@ -21,10 +22,11 @@ namespace UlinCore
 //   · 内核信号翻成宿主认识的 session/event 帧（assistant/chunk、tool/call…）。
 //
 // 这是 DSH 协议适配层，不是内核本身：内核仍然只认 UlinCore::Message / IntentCall。
-class UlinCoreMasterAgent : public QObject, public VirtualMasterAgent, public VirtualApiSink
+class UlinCoreMasterAgent : public QObject, public VirtualMasterAgent, public VirtualApiSink,
+	public VirtualUlinCoreExecutorHost
 {
 	Q_OBJECT
-	Q_INTERFACES(VirtualMasterAgent VirtualApiSink)
+	Q_INTERFACES(VirtualMasterAgent VirtualApiSink VirtualUlinCoreExecutorHost)
 
 public:
 	UlinCoreMasterAgent(VirtualApiHost* host, VirtualMain* main, QObject* parent = nullptr);
@@ -46,6 +48,11 @@ public:
 	void ActivateMasterAgent() override;
 	void DeactivateMasterAgent() override;
 	void OnOutboundRequest(const char* rpcId, const char* method, const char* argsJson) override;
+
+	// VirtualUlinCoreExecutorHost：扩展注册原生执行器，宿主接管所有权。
+	bool RegisterExecutor(const char* id, UlinCoreNativeExecutor* executor) override;
+	void UnregisterExecutor(const char* id) override;
+	bool HasExecutor(const char* id) const override;
 
 private:
 	struct SessionRecord

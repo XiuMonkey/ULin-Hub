@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "common/agent/ulincore/types/UlinCoreTypes.h"
 
@@ -29,6 +29,8 @@ class UlinCoreNativeRegistry
 {
 public:
 	void add(const QString& id, std::shared_ptr<UlinCoreNativeExecutor> executor);
+	void remove(const QString& id);
+	bool contains(const QString& id) const;
 	void addBuiltins();
 	std::shared_ptr<UlinCoreNativeExecutor> findShared(const QString& id) const;
 

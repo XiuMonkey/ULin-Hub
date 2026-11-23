@@ -10,6 +10,16 @@ void UlinCoreNativeRegistry::add(const QString& id, std::shared_ptr<UlinCoreNati
 		m_executors.insert(id, std::move(executor));
 }
 
+void UlinCoreNativeRegistry::remove(const QString& id)
+{
+	m_executors.remove(id);
+}
+
+bool UlinCoreNativeRegistry::contains(const QString& id) const
+{
+	return m_executors.contains(id);
+}
+
 void UlinCoreNativeRegistry::addBuiltins()
 {
 	registerBuiltinExecutors(*this);

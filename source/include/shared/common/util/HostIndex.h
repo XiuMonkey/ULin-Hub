@@ -1,27 +1,20 @@
 #pragma once
 
-// 宿主登记名（DshHostIndex）的**中性词汇表**：宿主侧"要登记自己的类"与插件侧"查询"必须用同一份。
-// 单独成文件是为了分层 —— network / common/appearance 这些**下层**也要用它，若留在
-// ExtensionSystem/HostExports.h 里，下层就会被迫反向依赖 ExtensionSystem（见那边的"取址"半）。
-
-// index 常量：宿主登记与插件查询必须用同一份 —— 纯字符串无编译期检查，拼错只会静默拿到空对象
-// （与"没登记""不在主线程"无从区分）。
+// 宿主登记名（DshHostIndex）的中性词汇表：宿主登记与插件查询必须用同一份。
+// 单独成文件是为了分层 —— network / common/appearance 这些下层也要用它，若留在
+// ExtensionSystem/HostExports.h 里，下层就会反向依赖 ExtensionSystem。
+// 纯字符串无编译期检查，拼错只会静默拿到空对象（与"没登记"无从区分）。
 namespace DshHostIndex
 {
 	inline constexpr const char* kMainWindow = "mainWindow";
-	// 删过一批：左/顶栏与消息区的 index。
-	//  **恢复 + 扩容**：QML 时代的做法确定为"不做槽位，拿到宿主对象直接注入"
-	// （见 VirtualCommon.h 的 VirtualUiHost）—— 所以这几个名字回来了，含义变成**宿主 QML 对象的登记名**，
-	// 由对应的 QML 根在 Component.onCompleted 里用 HostUi.registerItem(名字, this) 登记：
-	//  topBar 的根是 Row（位置器）⇒ 扩展注入进去自动排在末尾；其余是自由 Item ⇒ 位置由扩展自己写 anchors。
-	// 这些是**稳定契约**（字符串无编译期检查，拼错只会静默拿到空对象）；加名字要跟版本一起发。
+	// 左/顶栏与消息区的宿主 QML 对象登记名：由 QML 根在 Component.onCompleted 里调
+	// HostUi.registerItem(名字, this) 登记；topBar 的根是 Row（注入即排末尾），其余位置由扩展自己 anchors。
 	inline constexpr const char* kShell = "shell";
 	inline constexpr const char* kTitleBar = "titleBar";
 	inline constexpr const char* kTopBar = "topBar";
 	inline constexpr const char* kSessionBar = "sessionBar";
 	inline constexpr const char* kComposer = "composer";
-	// Composer 的命令 UI 扩展位：
-	//  commandButton 是 Row（追加按钮），commandPanel 是自由 Item（注入 Popup/面板）。
+	// Composer 的命令 UI 扩展位：commandButton 是 Row（追加按钮），commandPanel 是自由 Item（注入 Popup/面板）。
 	inline constexpr const char* kComposerCommandButton = "composer.commandButton";
 	inline constexpr const char* kComposerCommandPanel = "composer.commandPanel";
 	// 消息区 / 设置页 / 右栏根：与上面同级的 QML 宿主对象，扩展可直接注入。
@@ -29,37 +22,31 @@ namespace DshHostIndex
 	inline constexpr const char* kSettingsPage = "settingsPage";
 	inline constexpr const char* kPanelBar = "panelBar";
 	// 扩展 UI 宿主单例（HostUi）：转成 VirtualUiHost* 拿上面这些对象、挂载/卸载扩展自己的 QML；
-	// 同一个单例也实现 VirtualBlockBackendHost*（**顶替**面板坞某个块的**后端**，与"追加"相对），所以不再单列 index。
+	// 同一个单例也实现 VirtualBlockBackendHost*（顶替面板坞某个块的后端），所以不再单列 index。
 	inline constexpr const char* kUiHost = "uiHost";
 	// 样式表管理单例（ThemeManager），init 末尾登记；插件转成 VirtualTheme* 调
-	// ExternalApplyToWindow / ExternalReloadStyles，以及末尾追加的 ExternalIsDarkMode /
-	// ExternalSwitchTheme（后者与侧栏主题按钮同一条路：只切模式 + token 热重载，不重建窗口）。
+	// ExternalApplyToWindow / ExternalReloadStyles / ExternalIsDarkMode / ExternalSwitchTheme（切换免重启）。
 	inline constexpr const char* kThemeManager = "themeManager";
-	// 多语言单例（TranslationNotifier），Translation::init 里登记；插件转成 VirtualTranslation*
-	// 读/改当前语言（与宿主设置窗口「外观」页那个语言下拉框同一套实现，切换免重启）。
+	// 多语言单例（TranslationNotifier），Translation::init 里登记；插件转成 VirtualTranslation* 读/改当前语言。
 	inline constexpr const char* kTranslationNotifier = "translationNotifier";
-	// 信号槽登记表单例（ConnectionManager），启动期登记；插件只能匿名接管（TakeoverConnection）
-	// 或订阅白名单内信号（ProtectedRegisterConnection），宿主内部的 RegisterConnection 不在其上。
+	// 信号槽登记表单例（ConnectionManager）：插件只能匿名接管或订阅白名单内信号，宿主的 RegisterConnection 不在其上。
 	inline constexpr const char* kConnectionManager = "connectionManager";
-	// DSH API 客户端（DshApiClient），随 ClientRuntime 创建、与进程同寿（切主题不重建窗口 ⇒ 不换对象）；
-	// 后端接管的宿主侧接口就在它上面 —— 插件转成 VirtualClass/VirtualApiTakeover.h 的 VirtualApiHost* 调
-	// Takenover / CompleteCall / FailCall。每次 attachHost 里仍建议重新取（旧 QPointer 只会变空，不会变野）。
+	// DSH API 客户端（DshApiClient），随 ClientRuntime 创建、与进程同寿；插件转成 VirtualApiHost* 调
+	// Takenover / CompleteCall / FailCall。每次 attachHost 仍建议重新取（旧 QPointer 只会变空，不会变野）。
 	inline constexpr const char* kApiClient = "apiClient";
 	inline constexpr const char* kApiSink = "apiSink";
-	// 右栏面板坞的**块模型本体**（PanelBarDockModel；QML 里的 `PanelBarDock` 是同一个实例）。
-	// 这是"对象直接提供出去"那一条（三条合法方式里的第 1 条）：登记一次，插件拿到的就是模型本身 ——
-	// 能调它所有 Q_INVOKABLE（open / openUrl / closeBlock / blockIds / close / activate / showHome），
-	// 也能直接 connect 它的信号（countChanged / activeChanged / activeViewChanged）。
-	// 与 VirtualBlockBackendHost 的 OpenBlockUrl / CloseBlock 并存：那两条是"给函数套虚接口层"（第 2 条），
-	// 适合只要稳定 ABI、不想依赖模型类布局的扩展；需要看更多状态时直取模型即可。
+	// 右栏面板坞的块模型本体（PanelBarDockModel；QML 里的 `PanelBarDock` 是同一实例）：登记一次即可调它的
+	// 全部 Q_INVOKABLE（open / openUrl / closeBlock / blockIds / close / activate / showHome）并直接 connect 其信号；
+	// 与 VirtualBlockBackendHost 的 OpenBlockUrl / CloseBlock 并存，那条适合只要稳定 ABI 的扩展。
 	inline constexpr const char* kPanelBarDock = "panelBarDock";
 
-	// 业务对象：与 apiClient / themeManager / panelBarDock 同级的单例。
-	// 顺序固定，新增只追加；扩展侧按同一份 HostIndex 查询。
+	// 业务对象：与上面同级的单例；顺序固定，新增只追加，扩展侧按同一份 HostIndex 查询。
 	inline constexpr const char* kSessionList = "sessionList";
 	inline constexpr const char* kSettingsController = "settingsController";
 	inline constexpr const char* kChatController = "chatController";
 	inline constexpr const char* kCommandController = "commandController";
+	// ULinCore 执行器注册宿主（UlinCoreMasterAgent）。
+	inline constexpr const char* kUlinCoreExecutorHost = "ulincoreExecutorHost";
 	inline constexpr const char* kPluginMarket = "pluginMarket";
 	inline constexpr const char* kFileBrowser = "fileBrowser";
 	inline constexpr const char* kExtensionManager = "extensionManager";
