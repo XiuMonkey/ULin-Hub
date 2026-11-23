@@ -36,10 +36,9 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 		if (original == m_intent.name)
 			return IntentResult::failure(QStringLiteral("intent %1 cannot execute itself").arg(m_intent.name));
 
-		// 注册表键是完整 executor ID（如 builtin.list_dir）；先查原文，再兼容无前缀别名。
-		auto executor = m_executors->findShared(original);
-		if (!executor && original.startsWith(QStringLiteral("builtin.")))
-			executor = m_executors->findShared(original.mid(8));
+		// 注册表只接受完整 executor ID（内置为 builtin.xxx）。
+		// 不做去前缀回退：拼错或注册错误必须立即暴露，避免与同名用户执行器混淆。
+		const auto executor = m_executors->findShared(original);
 		if (!executor)
 			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
 				.arg(m_intent.name, m_intent.executor));
