@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
+#include "common/agent/ulincore/model/UlinCoreOpenAiModel.h"
 
 #include "common/agent/ulincore/model/protocol/UlinCoreModelProtocol.h"
 
@@ -49,7 +49,7 @@ QJsonObject messageToJson(const Message& message)
 					{ QStringLiteral("id"), call.id },
 					{ QStringLiteral("type"), QStringLiteral("function") },
 					{ QStringLiteral("function"), QJsonObject{
-						{ QStringLiteral("name"), call.name },
+						{ QStringLiteral("name"), Protocol::wireName(call.name) },
 						{ QStringLiteral("arguments"), QString::fromUtf8(
 							QJsonDocument(Protocol::encodeToolArguments(call.arguments, call.metadata))
 								.toJson(QJsonDocument::Compact)) }
@@ -200,7 +200,8 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 
 		const QJsonObject function = call.value(QStringLiteral("function")).toObject();
 		if (function.contains(QStringLiteral("name")))
-			target.name = function.value(QStringLiteral("name")).toString();
+			target.name = Protocol::intentNameFromWire(
+				function.value(QStringLiteral("name")).toString());
 		if (function.value(QStringLiteral("metadata")).isObject())
 			target.metadata = function.value(QStringLiteral("metadata")).toObject();
 		const QJsonValue arguments = function.value(QStringLiteral("arguments"));

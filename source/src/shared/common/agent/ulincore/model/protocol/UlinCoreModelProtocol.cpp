@@ -1,7 +1,25 @@
-﻿#include "common/agent/ulincore/model/protocol/UlinCoreModelProtocol.h"
+#include "common/agent/ulincore/model/protocol/UlinCoreModelProtocol.h"
+
+#include <QByteArray>
 
 namespace UlinCore::Protocol
 {
+QString wireName(const QString& intentName)
+{
+	return QStringLiteral("intent_")
+		+ QString::fromLatin1(intentName.toUtf8().toBase64(
+			QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+}
+
+QString intentNameFromWire(const QString& wire)
+{
+	if (!wire.startsWith(QStringLiteral("intent_")))
+		return wire;
+	const QByteArray bytes = QByteArray::fromBase64(
+		wire.mid(7).toLatin1(), QByteArray::Base64UrlEncoding);
+	return bytes.isEmpty() ? wire : QString::fromUtf8(bytes);
+}
+
 QJsonObject metadataSchema()
 {
 	return QJsonObject{
@@ -28,6 +46,9 @@ QJsonArray encodeToolSchemas(const QJsonArray& tools)
 	for (const QJsonValue& value : tools) {
 		QJsonObject tool = value.toObject();
 		QJsonObject function = tool.value(QStringLiteral("function")).toObject();
+		const QString rawName = function.value(QStringLiteral("name")).toString();
+		if (!rawName.isEmpty())
+			function.insert(QStringLiteral("name"), wireName(rawName));
 		QJsonObject parameters = function.value(QStringLiteral("parameters")).toObject();
 		QJsonObject properties = parameters.value(QStringLiteral("properties")).toObject();
 		if (!properties.contains(QString::fromLatin1(kMetadataKey))) {

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -9,6 +9,10 @@ namespace UlinCore::Protocol
 // ULin 自有模型边界的保留参数。它只存在于“发给模型/从模型返回”的线上格式，
 // Kernel 内部仍然使用 IntentCall.metadata，不把协议字段泄漏到 Intent/Executor。
 inline constexpr char kMetadataKey[] = "__ulincore_meta";
+
+// 模型 function name 只允许 [A-Za-z0-9_-]；Intent 名允许点号。
+QString wireName(const QString& intentName);
+QString intentNameFromWire(const QString& wireName);
 
 // 给每个 function tool 的 parameters 注入可选的 __ulincore_meta。
 QJsonArray encodeToolSchemas(const QJsonArray& tools);
