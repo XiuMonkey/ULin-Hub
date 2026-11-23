@@ -683,8 +683,8 @@ prompt
 由行为链生成的 steps
 ```
 
-当前实现只生成 `name + prompt + skill`，`steps` 仍为空；行为链固化尚未接入。  
-`skillRequired` 目前也没有 AI 生成 skill 的实现，会直接报错。
+当前实现会生成 `name + prompt + skill`，并把本轮 Agent 的 IntentCall 固化为 `steps`。  
+`skillRequired` 会调用模型生成 skill，不再直接报错。
 
 生成完成后，它才变成定义型/执行型：
 
@@ -872,16 +872,16 @@ IntentStore.save()
 ## 12. 当前限制
 
 ```text
-生成型骨架已实现：prompt/skill -> Intent
+生成型骨架已实现：prompt/skill -> Intent，行为链 -> steps
 generateOnly / agentEngaged 已实现“不执行、只生成”
-未实现：Agent 行为链 -> steps 的固化
-未实现：skillRequired 由 Agent 生成 skill（当前无外部 skill 时直接报错）
+skillRequired 已接入模型生成 skill
 save + prompt 已走生成型，不再创建旧 PromptIntent
 Intent 定义块已按 save 决定是否落盘
 asPrompt + withSkill 已允许
 withSkill 已允许外部 skill 覆盖
+withSkill 在 chain/native 上强制 asPrompt
 skillRequired 已禁止外部 skill，并要求 prompt
-Prompt-only Intent 不在 executableToolSchemas() 中，模型不能自动发现
+Prompt-only Intent 已进入模型工具表
 Intent 定义块是严格 JSON，不支持 JSON5
 模型 metadata 依赖模型填写 __ulincore_meta
 没有 Intent 版本 / 来源 / 时间 / 修改历史

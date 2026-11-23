@@ -439,22 +439,91 @@ void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 	generated.parameters = inferParameters(invocation.args);
 
 	if (invocation.skillRequired() && generated.skill.trimmed().isEmpty()) {
-		emit errorOccurred(QStringLiteral("intent %1 skillRequired needs Agent-generated skill")
-			.arg(generated.name));
+		runSkillAuthoring(invocation);
 		return;
 	}
 
-	addIntent(generated, invocation.save());
-
 	if (invocation.generateOnly() || invocation.agentEngaged()) {
+		addIntent(generated, invocation.save());
 		finishGeneratedTurn(invocation.rawText,
 			QStringLiteral("intent %1 generated").arg(generated.name));
 		return;
 	}
 
-	// 默认生成：先执行 seed，后续再接入“行为链 -> steps”的固化。
+	// 默认生成：先执行 seed，行为链在 finishTurn 时固化成 steps。
+	m_generationPending = true;
+	m_generationSave = invocation.save();
+	m_generationName = generated.name;
+	m_generationPrompt = generated.prompt;
+	m_generationSkill = generated.skill;
+	m_generationCalls.clear();
 	runPromptText(invocation.rawText,
 		expandPromptTemplate(generated.prompt, invocation.args));
+}
+
+void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
+{
+	if (!m_model) {
+		emit errorOccurred(QStringLiteral("skillRequired needs a model"));
+		return;
+	}
+
+	m_session->appendUserText(invocation.rawText);
+	m_running = true;
+	m_cancelled = false;
+	m_steps = 0;
+	m_turnUsage = Usage();
+	m_turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+	++m_generation;
+	const int generation = m_generation;
+	journal(QStringLiteral("turn/start"), QJsonObject{
+		{ QStringLiteral("turnId"), m_turnId },
+		{ QStringLiteral("text"), invocation.rawText }
+	});
+	emit turnStarted(m_turnId);
+
+	ModelRequest request;
+	request.systemPrompt = QStringLiteral(
+		"You author reusable Intent skills. Return only the skill text, no markdown.");
+	request.temperature = 0.2;
+	request.maxTokens = 512;
+	Message user;
+	user.role = Role::User;
+	user.text = QStringLiteral("Create a concise reusable skill for this goal:\n")
+		+ invocation.promptOverride;
+	request.messages.append(user);
+
+	ModelCallbacks callbacks;
+	callbacks.onDelta = [](const QString&, const QString&) {};
+	callbacks.onComplete = [this, generation, invocation](const QList<IntentCall>&,
+		const QString& text, const QString&, const Usage& usage, const QString&) {
+		if (generation != m_generation || !m_running)
+			return;
+		m_turnUsage.add(usage);
+		m_session->addUsage(usage);
+		const QString skill = text.trimmed();
+		if (skill.isEmpty()) {
+			finishTurn(generation, false, QStringLiteral("skill generation returned empty"), QString(), false);
+			return;
+		}
+		Intent generated;
+		generated.name = invocation.intentName;
+		generated.description = QStringLiteral("Generated intent");
+		generated.prompt = invocation.promptOverride;
+		generated.skill = skill;
+		generated.parameters = inferParameters(invocation.args);
+		addIntent(generated, invocation.save());
+
+		Message assistant = Message::assistant(
+			QStringLiteral("intent %1 generated").arg(generated.name));
+		m_session->append(assistant);
+		emit assistantMessage(assistant);
+		finishTurn(generation, true, QString(), assistant.text, false);
+	};
+	callbacks.onError = [this, generation](const QString& error) {
+		finishTurn(generation, false, error, QString(), false);
+	};
+	m_model->start(request, callbacks);
 }
 
 void UlinCoreKernel::finishGeneratedTurn(const QString& rawText, const QString& text)
@@ -629,6 +698,9 @@ void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& cal
 	m_turnUsage.add(usage);
 	m_session->addUsage(usage);
 	emit usageChanged(m_turnUsage);
+
+	if (m_generationPending)
+		m_generationCalls.append(calls);
 
 	const QString fullText = text.isEmpty() ? m_pendingText : text;
 	const QString fullThinking = thinking.isEmpty() ? m_pendingThinking : thinking;
@@ -866,11 +938,47 @@ void UlinCoreKernel::completeIntentCall(int generation, const QList<IntentCall>&
 	callIntent(generation, calls, index + 1);
 }
 
+void UlinCoreKernel::finishPendingGeneration(bool ok)
+{
+	if (!m_generationPending)
+		return;
+	m_generationPending = false;
+	const bool save = m_generationSave;
+	const QString name = m_generationName;
+	const QString prompt = m_generationPrompt;
+	const QString skill = m_generationSkill;
+	const QList<IntentCall> calls = m_generationCalls;
+	m_generationSave = false;
+	m_generationName.clear();
+	m_generationPrompt.clear();
+	m_generationSkill.clear();
+	m_generationCalls.clear();
+
+	if (!ok || name.trimmed().isEmpty())
+		return;
+
+	Intent generated;
+	generated.name = name;
+	generated.description = QStringLiteral("Generated intent");
+	generated.prompt = prompt;
+	generated.skill = skill;
+	for (const IntentCall& call : calls) {
+		if (call.name.trimmed().isEmpty())
+			continue;
+		IntentStep step;
+		step.intent = call.name;
+		step.arguments = call.arguments;
+		generated.steps.append(step);
+	}
+	addIntent(generated, save);
+}
+
 void UlinCoreKernel::finishTurn(int generation, bool ok, const QString& error,
 	const QString& finalText, bool cancelled)
 {
 	if (generation != m_generation)
 		return;
+	finishPendingGeneration(ok && error.isEmpty() && !cancelled);
 	++m_generation;
 	emitTurnFinished(ok, error, finalText, cancelled);
 }

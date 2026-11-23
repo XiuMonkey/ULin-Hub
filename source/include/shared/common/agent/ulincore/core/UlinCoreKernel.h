@@ -84,7 +84,9 @@ private:
 	// Intent 入口
 	void runParsed(const UlinCoreInvocation& invocation);
 	void runGeneration(const UlinCoreInvocation& invocation);
+	void runSkillAuthoring(const UlinCoreInvocation& invocation);
 	void finishGeneratedTurn(const QString& rawText, const QString& text);
+	void finishPendingGeneration(bool ok);
 	void runPromptText(const QString& rawText, const QString& promptText);
 	void runRecipeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
 	void runNativeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText);
@@ -115,5 +117,12 @@ private:
 	QString m_pendingText;
 	QString m_pendingThinking;
 	Usage m_turnUsage;
+
+	bool m_generationPending = false;
+	bool m_generationSave = false;
+	QString m_generationName;
+	QString m_generationPrompt;
+	QString m_generationSkill;
+	QList<IntentCall> m_generationCalls;
 };
 } // namespace UlinCore
