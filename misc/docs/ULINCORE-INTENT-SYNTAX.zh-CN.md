@@ -117,7 +117,15 @@ define = 有 Intent -> defineAndRun
 
 ### 3.4 三类 `/it` 语义
 
-这三类不是代码里的 `enum`，而是由元数据组合自然形成的语义类型。
+这三类不是代码里的 `enum`，而是由 IntentStore 状态直接决定：
+
+```text
+有 Intent 元数据              -> 定义型
+无 Intent + 无同名 Intent     -> 生成型
+无 Intent + 有同名 Intent     -> 执行型
+```
+
+普通文本不参与这三类，仍是 Prompt。
 
 #### 定义型
 
@@ -187,7 +195,7 @@ generateOnly + agentEngaged
 生成结果必须包含 skill
 ```
 
-生成结果需要 `save` 落盘。  
+默认生成可以执行 seed 后丢弃，不强制 `save`；`generateOnly` / `agentEngaged` 需要 `save`。  
 生成完成前不能直接执行。
 
 #### 执行型
@@ -213,7 +221,7 @@ Intent 已存在
 | `prompt` | 禁止；写在 `Intent.prompt` 内 | 生成 seed，必需 | `asSkill` 外部 prompt；其他模式用内置 |
 | `skill` | 禁止；写在 `Intent.skill` 内 | 可选；`skillRequired` 时禁止 | `asSkill`/`withSkill` 可外部覆盖 |
 | `steps` / `executor` | 在 `Intent` 内 | 禁止 | 禁止（来自已存 Intent） |
-| `save` | 可选；不写不落盘 | 必需，保存生成结果 | 禁止 |
+| `save` | 可选；不写不落盘 | 默认生成可选；`generateOnly` / `agentEngaged` 必需 | 禁止 |
 | `defineOnly` | 可选：只定义 | 禁止 | 禁止 |
 | `generateOnly` | 禁止 | 可选：只生成，不执行 seed | 禁止 |
 | `agentEngaged` | 禁止 | 可选：Agent 制定 Intent，不执行 | 禁止 |

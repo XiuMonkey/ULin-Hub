@@ -145,24 +145,25 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 	}
 
 	const bool known = m_intents.contains(name);
-	if (mode == IntentMode::Undetermined) {
-		if (known)
-			mode = IntentMode::Execution;
-		else if (invocation.hasPromptOverride
-				&& (invocation.save() || invocation.agentEngaged()
-					|| invocation.generateOnly() || invocation.skillRequired()))
-			mode = IntentMode::Generation;
-		else
-			mode = IntentMode::Execution;
-	}
+	if (invocation.hasDefinition)
+		mode = IntentMode::Definition;
+	else if (known)
+		mode = IntentMode::Execution;
+	else
+		mode = IntentMode::Generation;
 	qInfo().noquote() << "[UlinCore] intent mode="
 		<< (mode == IntentMode::Definition ? "definition"
 			: mode == IntentMode::Generation ? "generation"
 			: mode == IntentMode::Execution ? "execution" : "undetermined")
 		<< "name=" << name;
 
-	if (mode == IntentMode::Generation && !known) {
+	if (mode == IntentMode::Generation) {
 		runGeneration(invocation);
+		return;
+	}
+
+	if (mode == IntentMode::Execution && invocation.save()) {
+		emit errorOccurred(QStringLiteral("intent %1 already exists; save requires definition/generation mode").arg(name));
 		return;
 	}
 
@@ -417,6 +418,15 @@ QJsonObject UlinCoreKernel::effectiveParameters(const Intent& intent, const QJso
 
 void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 {
+	if (invocation.promptOverride.trimmed().isEmpty()) {
+		emit errorOccurred(QStringLiteral("generation requires prompt"));
+		return;
+	}
+	if (invocation.asPrompt() || invocation.asSkill() || invocation.withSkill()) {
+		emit errorOccurred(QStringLiteral("generation mode cannot use execution tags"));
+		return;
+	}
+
 	Intent generated;
 	generated.name = invocation.intentName;
 	generated.description = QStringLiteral("Generated intent");

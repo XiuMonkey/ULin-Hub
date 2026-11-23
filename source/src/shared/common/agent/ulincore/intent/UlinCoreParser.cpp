@@ -522,10 +522,6 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 	invocation.kind = InvocationKind::Intent;
 	if (invocation.hasDefinition)
 		invocation.mode = IntentMode::Definition;
-	else if (invocation.hasPromptOverride
-			&& (invocation.save() || invocation.agentEngaged()
-				|| invocation.generateOnly() || invocation.skillRequired()))
-		invocation.mode = IntentMode::Generation;
 	return invocation;
 }
 } // namespace UlinCore
