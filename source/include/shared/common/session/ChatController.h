@@ -56,9 +56,15 @@ class ChatController : public QObject, public VirtualChatHost
 	Q_PROPERTY(bool loadingOlder READ loadingOlder NOTIFY olderChanged)
 	// 已切到某个会话、但首帧 follow 快照还没到：QML 用它在会话没加载出来时保持空白。
 	Q_PROPERTY(bool sessionLoading READ sessionLoading NOTIFY sessionLoadingChanged)
+	// 本轮实时耗时（1s 刷新）；流式提示在动画后显示它。
+	Q_PROPERTY(QString turnElapsedText READ turnElapsedText NOTIFY turnElapsedChanged)
 	// 后台任务名册（顶栏"后台任务"入口）：行来自引擎 job/list 流，活的任务在前、已结束的按结束时间倒序。
 	// 与会话同生命周期（换会话即清空）；网络细节仍在 DshApiClient。
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
+	// 会话任务清单（todo 投影）：DSH Web 在输入框上方显示的任务卡片；每项 { content, status }。
+	Q_PROPERTY(QVariantList todos READ todos NOTIFY todosChanged)
+	// 会话长程目标（goal 投影）：输入框上方的目标条；空 map = 当前会话没有目标。
+	Q_PROPERTY(QVariantMap goal READ goal NOTIFY goalChanged)
 
 	// VirtualChatHost：只转调真实函数，扩展不直接持有本类。
 	QString ChatSessionId() const override { return sessionId(); }
@@ -111,6 +117,8 @@ public:
 
 	QVariantList jobs() const { return m_jobs; }
 	int jobCount() const { return m_jobs.size(); }
+	QVariantList todos() const { return m_todos; }
+	QVariantMap goal() const { return m_goal; }
 	// 有没有在跑（running / stopping）的任务：顶栏那颗状态点用它
 	bool jobRunning() const;
 
@@ -167,6 +175,7 @@ public:
 	bool olderAvailable() const { return m_hasOlder; }
 	bool loadingOlder() const { return m_loadingOlder; }
 	bool sessionLoading() const { return m_sessionLoading; }
+	QString turnElapsedText() const { return m_turnElapsedText; }
 	// 拉更早的一页（session/page + beforeSeq）：插到内容头部，QML 侧用 olderPrepended 补偿锚点
 	void loadOlder();
 
@@ -188,6 +197,8 @@ signals:
 	void pendingAttachmentsChanged();
 	void attachmentSourceReady(const QString& attachmentId);
 	void streamingChanged();
+	// 本轮实时耗时文本变化（1s 一次）
+	void turnElapsedChanged();
 	// "正在中止"的进出（与 streamingChanged 分开：QML 只重绘按钮态，不必重排消息区）
 	void cancellingChanged();
 	void turnFinished();
@@ -208,6 +219,10 @@ signals:
 	void commandRegistryChanged();
 	// 后台任务名册变了（整表替换，含清空）
 	void jobsChanged();
+	// 会话任务清单变了（todo 投影整表替换）
+	void todosChanged();
+	// 会话目标变了（goal 投影整表替换；空 map 表示清除）
+	void goalChanged();
 
 private:
 	// question/requested：payload.questions 翻成 QML 好用的列表并记住 rpcId/sessionId
@@ -240,6 +255,7 @@ private:
 	void setStreaming(bool streaming);
 	// 清掉"正在中止"状态（turn/end 到达、中止看门狗超时、换会话时都走这里）
 	void clearCancelPending();
+	void updateTurnElapsed();
 
 	struct Pending
 	{
@@ -264,7 +280,11 @@ private:
 	// 回合看门狗（单次）：本会话迟迟一条事件都没有就补兜底提示。后端异常时 `api-session/error` 走
 	// DshApiClient 的 `$events` type=="emit" 分支、不转发负载，收不到内容只能靠这里兜底。
 	QTimer* m_turnWatchdog = nullptr;
+	QTimer* m_turnElapsedTimer = nullptr;   // 本轮耗时 1s 刷新，仅 turn 活跃期间运行
 	bool m_turnActive = false;
+	qint64 m_turnStartedAtMs = 0;
+	qint64 m_turnElapsedMs = 0;
+	QString m_turnElapsedText;
 	// 本轮 Agent 行号（-1 = 本轮还没建）：一轮的所有内容都落这一行 ⇒ 一个气泡。
 	// 不能只靠 lastAgentRow：它只看"最后一行是不是 agent"，中间插进系统提示（command/done）就会断。
 	int m_turnRow = -1;
@@ -307,6 +327,10 @@ private:
 	QSet<QString> m_loggedEventTypes;
 	// 后台任务名册（每行 { id, kind, label, status, progress, detail, live, startedAt, finishedAt }）
 	QVariantList m_jobs;
+	// 会话任务清单（todo 投影整表；每行 { content, status }）
+	QVariantList m_todos;
+	// 会话目标（goal 投影拍平；空 map = 无目标）
+	QVariantMap m_goal;
 	QVector<Pending> m_pending;
 	QString m_questionRpcId;
 	QString m_questionSessionId;

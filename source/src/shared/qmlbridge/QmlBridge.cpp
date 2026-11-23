@@ -412,6 +412,7 @@ void QmlBridge::wireChat()
 
 	connect(m_chat, &ChatController::messagesChanged, this, &QmlBridge::messageCountChanged);
 	connect(m_chat, &ChatController::streamingChanged, this, &QmlBridge::streamingChanged);
+	connect(m_chat, &ChatController::turnElapsedChanged, this, &QmlBridge::turnElapsedChanged);
 	connect(m_chat, &ChatController::cancellingChanged, this, &QmlBridge::cancellingChanged);
 	connect(m_chat, &ChatController::turnFinished, this, &QmlBridge::lastTurnEmptyChanged);
 	connect(m_chat, &ChatController::statsLineChanged, this, &QmlBridge::statsLineChanged);
@@ -437,6 +438,8 @@ void QmlBridge::wireChat()
 	connect(m_chat, &ChatController::catalogChanged, this, &QmlBridge::modelCatalogChanged);
 	// 后台任务名册（引擎 job/list 流 → ChatController → QML）
 	connect(m_chat, &ChatController::jobsChanged, this, &QmlBridge::jobsChanged);
+	connect(m_chat, &ChatController::todosChanged, this, &QmlBridge::todosChanged);
+	connect(m_chat, &ChatController::goalChanged, this, &QmlBridge::goalChanged);
 	// 扩展把产物（如截图）交给输入框：HostUi 只发信号，落到这里的待发附件列表
 	connect(&HostUi::instance(), &HostUi::composerFilesRequested, this, [this](const QStringList& paths) {
 		if (!m_chat || paths.isEmpty())
@@ -867,6 +870,16 @@ bool QmlBridge::jobRunning() const
 	return m_chat && m_chat->jobRunning();
 }
 
+QVariantList QmlBridge::todos() const
+{
+	return m_chat ? m_chat->todos() : QVariantList();
+}
+
+QVariantMap QmlBridge::goal() const
+{
+	return m_chat ? m_chat->goal() : QVariantMap();
+}
+
 QString QmlBridge::currentSessionTitle() const
 {
 	if (m_currentSessionId.isEmpty() || !m_sessions)
@@ -1107,6 +1120,7 @@ void QmlBridge::setTracePaused(bool paused)
 }
 int QmlBridge::messageCount() const { return m_chat ? m_chat->messageCount() : 0; }
 bool QmlBridge::streaming() const { return m_chat && m_chat->streaming(); }
+QString QmlBridge::turnElapsedText() const { return m_chat ? m_chat->turnElapsedText() : QString(); }
 bool QmlBridge::cancelling() const { return m_chat && m_chat->cancelling(); }
 bool QmlBridge::lastTurnEmpty() const { return m_chat && !m_chat->lastTurnHadOutput(); }
 

@@ -46,6 +46,10 @@ Item {
     }
     property var deliverables: []
     property var usage: ({})
+    // 整轮耗时（turn 结束后由 C++ 写入 model 的 durationText）；空串时操作条只显示复制/用量。
+    property string durationText: ""
+    // 流式期间的实时耗时（来自 Hub.turnElapsedText），仅当前最后一条流式消息显示。
+    property string liveElapsedText: ""
     readonly property int actionBarHeight: 26
 
     readonly property bool hasCopyText: {
@@ -66,7 +70,7 @@ Item {
     }
 
     readonly property bool actionsVisible: !root.streaming
-        && (root.hasCopyText || root.hasUsage)
+        && (root.hasCopyText || root.hasUsage || root.durationText.length > 0)
 
     // 复制全文优先取 reply 段，没有 reply 时退回所有段。
     // 按需拼一次，不做成绑定：流式期间 replyTail 每 33ms 变一次，绑定会把整段文本反复重建。
@@ -668,6 +672,16 @@ Item {
                     onClicked: usagePopup.open()
                 }
             }
+
+            // 输出用时放在两个操作按钮之后；流式期间不显示（由气泡下方实时计时接管）。
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.durationText.length > 0
+                text: qsTrId("trace_summary_time") + " " + root.durationText
+                color: Theme.color.textTertiary
+                font.family: Theme.font.uiFamily
+                font.pixelSize: Theme.font.small
+            }
         }
     }
 
@@ -777,6 +791,16 @@ Item {
                 color: Theme.color.textPrimary
                 font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
+            }
+
+            // 小动画后面的实时计时；C++ 每秒刷新一次，空串时自然隐藏。
+            Text {
+                visible: root.liveElapsedText.length > 0
+                text: "· " + root.liveElapsedText
+                color: Theme.color.textTertiary
+                font.family: Theme.font.uiFamily
+                font.pixelSize: Theme.font.small
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 

@@ -1233,5 +1233,29 @@ Click “New chat” above to start</translation>
     <message id="ulincore_save_hint">
         <translation>Applies to the next turn; Echo is used when the key is empty.</translation>
     </message>
+    <message id="chat_todos_title">
+        <translation>Tasks</translation>
+    </message>
+    <message id="chat_todos_done_fmt">
+        <translation>%1 completed</translation>
+    </message>
+    <message id="chat_todos_active_fmt">
+        <translation>%1 in progress</translation>
+    </message>
+    <message id="chat_todos_pending_fmt">
+        <translation>%1 pending</translation>
+    </message>
+    <message id="chat_goal_phase_active">
+        <translation>Ongoing Goal</translation>
+    </message>
+    <message id="chat_goal_phase_paused">
+        <translation>Paused</translation>
+    </message>
+    <message id="chat_goal_phase_blocked">
+        <translation>Blocked</translation>
+    </message>
+    <message id="chat_goal_rounds_fmt">
+        <translation>Round %1/%2</translation>
+    </message>
 </context>
 </TS>

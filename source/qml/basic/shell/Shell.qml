@@ -481,12 +481,36 @@ Item {
                 source: Style.url("skin/chat/InteractionPanel.qml")
             }
 
+            // 会话目标条（goal 投影）：与 DSH Web 一致，贴在任务清单/输入框上方。
+            Loader {
+                id: goalLoader
+                width: composerLoader.width
+                x: composerLoader.x
+                anchors.bottom: todoLoader.top
+                anchors.bottomMargin: 0
+                height: item ? item.implicitHeight : 0
+                active: Hub.goal.phase !== undefined && Hub.goal.phase !== "complete"
+                source: Style.url("skin/chat/GoalDock.qml")
+            }
+
+            // 会话任务清单（todo 投影）：跟 DSH Web 一样贴在输入框上方；有任务时才创建。
+            Loader {
+                id: todoLoader
+                width: composerLoader.width
+                x: composerLoader.x
+                anchors.bottom: interactionLoader.top
+                anchors.bottomMargin: 0
+                height: item ? item.implicitHeight : 0
+                active: Hub.todos.length > 0
+                source: Style.url("skin/chat/TodoDock.qml")
+            }
+
             Loader {
                 id: messageLoader
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.bottom: interactionLoader.top
+                anchors.bottom: goalLoader.top
                 anchors.bottomMargin: 0
                 // 切到轨迹时用 visible 让位，而不是销毁列表，保留各自滚动位置。
                 visible: Hub.currentSessionId.length > 0 && topBar.activeView !== "trace"

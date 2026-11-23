@@ -261,6 +261,8 @@ void ChatController::rebuildFromRecords(const QJsonArray& records, bool enforceC
 	bool turnOpen = false;
 	bool turnHadOutput = false;
 	int lastRowSeq = 0;
+	qint64 turnStartMs = 0;      // 当前 turn 的 start 事件时间；用于给历史 Agent 行写耗时
+	qint64 lastTurnStartMs = 0;  // 最近一次 turn/start 的时间；快照恢复仍在跑的回合时用它续计时
 	for (const QJsonValue& value : records) {
 		const int seq = recordSeq(value);
 		if (seq > 0) {
@@ -271,10 +273,14 @@ void ChatController::rebuildFromRecords(const QJsonArray& records, bool enforceC
 		}
 		const QJsonObject event = unwrapRecord(value);
 		const QString type = event.value(QStringLiteral("type")).toString();
+		const qint64 eventMs = static_cast<qint64>(event.value(QStringLiteral("time")).toDouble());
 		types << type;
 		if (type == QStringLiteral("turn/start")) {
 			turnOpen = true;
 			turnHadOutput = false;
+			turnStartMs = eventMs;
+			if (eventMs > 0)
+				lastTurnStartMs = eventMs;
 		} else if (type == QStringLiteral("turn/end")) {
 			turnOpen = false;
 		} else if (turnOpen
@@ -288,6 +294,13 @@ void ChatController::rebuildFromRecords(const QJsonArray& records, bool enforceC
 		const int added = m_messages->rowCount() - before;
 		for (int i = 0; i < added; ++i)
 			m_rowSeqs.append(lastRowSeq);
+		if (type == QStringLiteral("turn/end") && turnStartMs > 0 && eventMs > turnStartMs) {
+			const int row = (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+				? m_turnRow : m_messages->lastAgentRow();
+			if (row >= 0)
+				m_messages->setDurationText(row, formatDuration(eventMs - turnStartMs));
+			turnStartMs = 0;
+		}
 	}
 	// 批量重建期间直接收束（此时还没有 reset 信号，QML 最终只看到 <=60 行，避免一次建 77 条重气泡）。
 	if (enforceCap)
@@ -331,6 +344,19 @@ void ChatController::rebuildFromRecords(const QJsonArray& records, bool enforceC
 			? m_turnRow : m_messages->lastAgentRow();
 		if (row >= 0)
 			m_messages->setStreaming(row, true);
+	}
+	// 快照里最后一轮还在跑：用 turn/start 的事件时间续计时；否则停表并收起等待提示。
+	if (turnOpen && lastTurnStartMs > 0) {
+		m_turnStartedAtMs = lastTurnStartMs;
+		m_turnElapsedMs = qMax<qint64>(1, QDateTime::currentMSecsSinceEpoch() - m_turnStartedAtMs);
+		m_turnElapsedText = formatDuration(m_turnElapsedMs);
+		m_turnElapsedTimer->start();
+		emit turnElapsedChanged();
+	} else {
+		m_turnElapsedTimer->stop();
+		m_turnStartedAtMs = 0;
+		m_turnElapsedMs = 0;
+		emit turnElapsedChanged();
 	}
 	emit streamingChanged();
 	emit messagesChanged();
@@ -437,6 +463,53 @@ void ChatController::applyProjections(int asOfSeq, const QJsonObject& values)
 	if (asOfSeq < m_projectionSeq)
 		return;
 	m_projectionSeq = asOfSeq;
+
+	// todo 投影：null = 清空；数组 = 整表替换。DSH Web 的 TodoPanel 就是吃这份数据。
+	const QJsonValue todosValue = values.value(QStringLiteral("todos"));
+	if (!todosValue.isUndefined()) {
+		QVariantList list;
+		const QJsonArray items = todosValue.toArray();
+		for (const QJsonValue& value : items) {
+			const QJsonObject item = value.toObject();
+			const QString content = item.value(QStringLiteral("content")).toString();
+			if (content.isEmpty())
+				continue;
+			QString status = item.value(QStringLiteral("status")).toString();
+			if (status != QLatin1String("completed") && status != QLatin1String("in_progress"))
+				status = QStringLiteral("pending");
+			QVariantMap row;
+			row.insert(QStringLiteral("content"), content);
+			row.insert(QStringLiteral("status"), status);
+			list.append(row);
+		}
+		if (m_todos != list) {
+			m_todos = list;
+			emit todosChanged();
+		}
+	}
+
+	// goal 投影：absent = 不变；null = 清除；对象 = 当前目标快照。
+	const QJsonValue goalValue = values.value(QStringLiteral("goal"));
+	if (!goalValue.isUndefined()) {
+		QVariantMap map;
+		const QJsonObject outer = goalValue.toObject();
+		const QJsonObject goal = outer.value(QStringLiteral("goal")).toObject();
+		if (!goal.isEmpty()) {
+			map.insert(QStringLiteral("id"), goal.value(QStringLiteral("id")).toString());
+			map.insert(QStringLiteral("revision"), goal.value(QStringLiteral("revision")).toInt());
+			map.insert(QStringLiteral("objective"), goal.value(QStringLiteral("objective")).toString());
+			map.insert(QStringLiteral("phase"), goal.value(QStringLiteral("phase")).toString());
+			map.insert(QStringLiteral("maxGoalRounds"), goal.value(QStringLiteral("maxGoalRounds")).toInt());
+			map.insert(QStringLiteral("roundsStarted"), outer.value(QStringLiteral("roundsStarted")).toInt());
+			map.insert(QStringLiteral("blockedReason"),
+				goal.value(QStringLiteral("blockedReason")).toObject()
+					.value(QStringLiteral("message")).toString());
+		}
+		if (m_goal != map) {
+			m_goal = map;
+			emit goalChanged();
+		}
+	}
 
 	const QJsonObject stats = values.value(QStringLiteral("sessionStats")).toObject();
 	if (!stats.isEmpty()) {

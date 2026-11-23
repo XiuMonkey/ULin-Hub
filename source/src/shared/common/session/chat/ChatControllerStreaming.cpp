@@ -73,6 +73,17 @@ void ChatController::onMuxFrame(const QJsonObject& frame)
 	// 收束只在用户发消息时做一次；流式 chunk / turn 事件不再触发行数判断。
 }
 
+void ChatController::updateTurnElapsed()
+{
+	if (!m_turnActive || m_turnStartedAtMs <= 0) {
+		m_turnElapsedTimer->stop();
+		return;
+	}
+	m_turnElapsedMs = qMax<qint64>(1, QDateTime::currentMSecsSinceEpoch() - m_turnStartedAtMs);
+	m_turnElapsedText = formatDuration(m_turnElapsedMs);
+	emit turnElapsedChanged();
+}
+
 void ChatController::beginTurn()
 {
 	m_turnRow = -1;   // 新一轮 = 新气泡（上一轮那行不再被续写）
@@ -80,6 +91,11 @@ void ChatController::beginTurn()
 	m_pendingDeliverablesRow = -1;
 	m_turnHadOutput = false;
 	m_turnActive = true;
+	m_turnStartedAtMs = QDateTime::currentMSecsSinceEpoch();
+	m_turnElapsedMs = 1;
+	m_turnElapsedText = formatDuration(m_turnElapsedMs);
+	m_turnElapsedTimer->start();
+	emit turnElapsedChanged();
 	clearCancelPending();   // 新一轮开始 ⇒ 上一轮的中止状态作废（否则按钮一直停在"停止中"）
 	m_turnWatchdog->start();
 }
@@ -153,7 +169,9 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			if (!thinking.isEmpty())
 				m_messages->replaceThinkingSnapshot(row, thinking);
 			bufferChunk(row, QStringLiteral("reply"), reply);
-			m_turnHadOutput = true;
+			// 只有实际有 thinking/reply 才算可见输出；纯 usage 快照不能让等待提示提前消失。
+			if (!thinking.isEmpty() || !reply.isEmpty())
+				m_turnHadOutput = true;
 		}
 		flushPending();
 		// 这里刻意不 setStreaming(false) + finishTurn()：一条 assistant/message 只代表"这一段说完了"，
@@ -200,8 +218,10 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 			bufferChunk(row, thinking ? QStringLiteral("thinking") : QStringLiteral("reply"), chunk);
 			appended = true;
 		}
-		if (appended)
+		if (appended) {
+			m_turnHadOutput = true;   // 成串文本也是可见输出；否则等待提示会一直不消失
 			setStreaming(true);
+		}
 		return;
 	}
 
@@ -301,6 +321,20 @@ void ChatController::applyStreamEvent(const QJsonObject& event)
 void ChatController::finishTurn()
 {
 	m_turnActive = false;
+	// 先结算耗时并写回本轮 Agent 行；流式态结束后 QML 会从 actionBar 读 durationText。
+	m_turnElapsedTimer->stop();
+	if (m_turnStartedAtMs > 0)
+		m_turnElapsedMs = qMax<qint64>(0, QDateTime::currentMSecsSinceEpoch() - m_turnStartedAtMs);
+	m_turnElapsedText = formatDuration(m_turnElapsedMs);
+	if (m_messages && m_turnElapsedMs > 0) {
+		const int row = (m_turnRow >= 0 && m_turnRow < m_messages->rowCount())
+			? m_turnRow : m_messages->lastAgentRow();
+		if (row >= 0)
+			m_messages->setDurationText(row, m_turnElapsedText);
+	}
+	m_turnStartedAtMs = 0;
+	m_turnElapsedMs = 0;
+	emit turnElapsedChanged();
 	if (!m_pendingDeliverables.isEmpty() && m_messages) {
 		const int row = (m_pendingDeliverablesRow >= 0
 			&& m_pendingDeliverablesRow < m_messages->rowCount())

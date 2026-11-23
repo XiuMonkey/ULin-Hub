@@ -218,6 +218,20 @@ void MessageListModel::addUsage(int row, const QJsonObject& usage)
 	}
 }
 
+void MessageListModel::setDurationText(int row, const QString& text)
+{
+	if (row < 0 || row >= m_rows.size())
+		return;
+	Row& target = m_rows[row];
+	if (target.durationText == text)
+		return;
+	target.durationText = text;
+	if (!m_batchRebuild) {
+		const QModelIndex idx = index(row, 0);
+		emit dataChanged(idx, idx, { DurationTextRole });
+	}
+}
+
 // 上面三个的公共动作：占行号 → beginInsertRows → 追加 → endInsertRows → 报数
 int MessageListModel::appendRow(int kind, const QString& text)
 {
@@ -676,6 +690,8 @@ QVariant MessageListModel::data(const QModelIndex& index, int role) const
 		return row.streaming;
 	case UsageRole:
 		return row.usage.toVariantMap();
+	case DurationTextRole:
+		return row.durationText;
 	default:
 		return QVariant();
 	}
@@ -693,5 +709,6 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 	names.insert(StreamingRole, "streaming");
 	names.insert(DeliverablesRole, "deliverables");
 	names.insert(UsageRole, "usage");
+	names.insert(DurationTextRole, "durationText");
 	return names;
 }

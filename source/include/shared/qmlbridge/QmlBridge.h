@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // QmlBridge —— QML 唯一的门（QML 单例名 `Hub`）。
 // 分层规矩：common/** 放领域与纯逻辑（不 import QML 概念，可脱离引擎单测）；qmlbridge/** 只做接线
@@ -59,6 +59,8 @@ class QmlBridge : public QObject
 	Q_PROPERTY(QVariantMap traceSummary READ traceSummary NOTIFY traceSummaryChanged)
 	Q_PROPERTY(int messageCount READ messageCount NOTIFY messageCountChanged)
 	Q_PROPERTY(bool streaming READ streaming NOTIFY streamingChanged)
+	// 本轮实时耗时（流式期间每秒刷新）
+	Q_PROPERTY(QString turnElapsedText READ turnElapsedText NOTIFY turnElapsedChanged)
 	// 已发出中止、正在等回合收尾（输入区的停止键据此显示"停止中"）
 	Q_PROPERTY(bool cancelling READ cancelling NOTIFY cancellingChanged)
 	Q_PROPERTY(bool lastTurnEmpty READ lastTurnEmpty NOTIFY lastTurnEmptyChanged)
@@ -110,6 +112,10 @@ class QmlBridge : public QObject
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
 	Q_PROPERTY(int jobCount READ jobCount NOTIFY jobsChanged)
 	Q_PROPERTY(bool jobRunning READ jobRunning NOTIFY jobsChanged)
+	// 会话任务清单（todo 投影）：输入框上方的任务卡片
+	Q_PROPERTY(QVariantList todos READ todos NOTIFY todosChanged)
+	// 会话目标（goal 投影）：输入框上方的目标条
+	Q_PROPERTY(QVariantMap goal READ goal NOTIFY goalChanged)
 	// 自动化任务（DSH Schedule）：整壳页的数据面；删除走 schedule/delete，打开原会话走 selectSession。
 	Q_PROPERTY(QVariantList scheduleTasks READ scheduleTasks NOTIFY scheduleChanged)
 	Q_PROPERTY(bool scheduleBusy READ scheduleBusy NOTIFY scheduleChanged)
@@ -147,6 +153,7 @@ public:
 	QVariantMap traceSummary() const;
 	int messageCount() const;
 	bool streaming() const;
+	QString turnElapsedText() const;
 	bool cancelling() const;
 	bool lastTurnEmpty() const;
 	QString statsLine() const;
@@ -244,6 +251,8 @@ public:
 	QVariantList jobs() const;
 	int jobCount() const;
 	bool jobRunning() const;
+	QVariantList todos() const;
+	QVariantMap goal() const;
 	// 自动化任务（自动化任务页）：catalog 列出全部任务，delete 删除，open 到原会话。
 	Q_INVOKABLE void openSchedulePage();
 	Q_INVOKABLE void closeSchedulePage();
@@ -300,6 +309,7 @@ signals:
 	void messageCountChanged();
 	void traceSummaryChanged();
 	void streamingChanged();
+	void turnElapsedChanged();
 	void cancellingChanged();
 	void lastTurnEmptyChanged();
 	void statsLineChanged();
@@ -315,6 +325,8 @@ signals:
 	void peerTabsChanged();
 	// 后台任务名册变化（整表替换）
 	void jobsChanged();
+	void todosChanged();
+	void goalChanged();
 	void scheduleChanged();
 	void scheduleOpenChanged();
 	void interactionChanged();

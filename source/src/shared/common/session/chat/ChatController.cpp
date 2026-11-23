@@ -65,6 +65,11 @@ ChatController::ChatController(DshApiClient* api, AgentSessionClient* agentSessi
 		emit sessionLoadingChanged();
 	});
 
+	// 本轮耗时：等待/流式期间每秒刷新一次；turn 结束后停止，最终值写进对应 Agent 行。
+	m_turnElapsedTimer = new QTimer(this);
+	m_turnElapsedTimer->setInterval(1000);
+	connect(m_turnElapsedTimer, &QTimer::timeout, this, &ChatController::updateTurnElapsed);
+
 	m_turnWatchdog = new QTimer(this);
 	m_turnWatchdog->setSingleShot(true);
 	m_turnWatchdog->setInterval(kTurnWatchdogMs);
@@ -383,6 +388,14 @@ void ChatController::setSession(const QString& sessionId)
 	if (!m_jobs.isEmpty()) {
 		m_jobs.clear();
 		emit jobsChanged();
+	}
+	if (!m_todos.isEmpty()) {
+		m_todos.clear();
+		emit todosChanged();
+	}
+	if (!m_goal.isEmpty()) {
+		m_goal.clear();
+		emit goalChanged();
 	}
 	emit streamingChanged();
 	emit messagesChanged();

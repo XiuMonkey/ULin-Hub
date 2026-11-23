@@ -30,7 +30,8 @@ public:
 		ReplyTailPartsRole,            // 流式尾部按 Markdown part 切分，代码块可实时渲染
 		StreamingRole,
 		DeliverablesRole,              // Agent 回合的交付文件 [{ path, name, suffix, description }]
-		UsageRole                      // Agent 回合累计用量 { inputTokens, outputTokens, ... }
+		UsageRole,                     // Agent 回合累计用量 { inputTokens, outputTokens, ... }
+		DurationTextRole               // 回合耗时（"12.4s"）；流式期间为空，finish 时写入
 	};
 
 	enum Kind
@@ -89,6 +90,8 @@ public:
 	void appendDeliverables(int row, const QVector<DeliverableRef>& files);
 	// 累加一轮里多个模型步骤的 usage。字段缺失时按 0 处理。
 	void addUsage(int row, const QJsonObject& usage);
+	// 回合结束写入耗时文本（"12.4s"）；空串表示未知，QML 据此隐藏。
+	void setDurationText(int row, const QString& text);
 
 	// 最后一行是不是 Agent（历史回放时"工具事件接在上一气泡后面"要靠它）
 	int lastAgentRow() const;
@@ -128,6 +131,7 @@ private:
 		QVector<ImageRef> images;   // 仅用户行
 		QVector<DeliverableRef> deliverables;   // 仅 Agent 行
 		QJsonObject usage;          // 仅 Agent 行：本轮累计 token 用量
+		QString durationText;        // 仅 Agent 行：整轮耗时，turn 结束后写入
 		QString replyTail;           // 仅流式期间：当前最终 reply 的完整尾文本；收尾时落回稳定段
 		// 流式尾部 part 缓存：避免 data() 被 QML 反复读取时每次重切全文。
 		mutable QVariantList tailParts;

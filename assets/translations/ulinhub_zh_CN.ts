@@ -1233,5 +1233,29 @@
     <message id="ulincore_save_hint">
         <translation>保存后下一轮生效；Key 为空时使用 Echo 模型。</translation>
     </message>
+    <message id="chat_todos_title">
+        <translation>任务</translation>
+    </message>
+    <message id="chat_todos_done_fmt">
+        <translation>%1 已完成</translation>
+    </message>
+    <message id="chat_todos_active_fmt">
+        <translation>%1 进行中</translation>
+    </message>
+    <message id="chat_todos_pending_fmt">
+        <translation>%1 待处理</translation>
+    </message>
+    <message id="chat_goal_phase_active">
+        <translation>进行中的目标</translation>
+    </message>
+    <message id="chat_goal_phase_paused">
+        <translation>已暂停</translation>
+    </message>
+    <message id="chat_goal_phase_blocked">
+        <translation>受阻</translation>
+    </message>
+    <message id="chat_goal_rounds_fmt">
+        <translation>第 %1/%2 轮</translation>
+    </message>
 </context>
 </TS>

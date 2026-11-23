@@ -595,7 +595,6 @@ ListView {
         }
     }
 
-    // 顶部「加载更多」：只显示最近一页，不自动翻页；更早的内容由用户显式拉取。
     header: Item {
         id: olderHeader
         width: list.width
@@ -639,6 +638,7 @@ ListView {
         required property var images
         required property var deliverables
         required property var usage
+        required property string durationText
         required property bool streaming
         required property int index
 
@@ -691,6 +691,9 @@ ListView {
             replyTailParts: rowRoot.replyTailParts
             deliverables: rowRoot.deliverables
             usage: rowRoot.usage
+            durationText: rowRoot.durationText
+            liveElapsedText: (rowRoot.streaming || (Hub.streaming && rowRoot.index === list.count - 1))
+                ? Hub.turnElapsedText : ""
             // 行级标志优先；控制器仍在跑且这是最后一条 agent 时也视为流式。
             streaming: rowRoot.streaming
                 || (Hub.streaming && rowRoot.kind === "agent" && rowRoot.index === list.count - 1)

@@ -1,4 +1,4 @@
-<RCC>
+﻿<RCC>
     <!-- QML 壳的资源 = 内置风格包（见 docs/ui-qml-migration-plan.md §2.4）。
          目录：basic/（结构，引用 Hub.settings 等）、skin/（纯视觉，原 appearance/）、
          widgets/（通用控件）；包根只留入口 Main.qml 与清单 pack.json / metrics.json。
@@ -54,6 +54,8 @@
         <file>metrics.json</file>
         <file>pack.json</file>
         <file>skin/chat/AgentBubble.qml</file>
+        <file>skin/chat/TodoDock.qml</file>
+        <file>skin/chat/GoalDock.qml</file>
         <!-- 提问 / 审批面板：纯视觉件（被 Shell 经 Style.url 装载，风格包可整件遮蔽） -->
         <file>skin/chat/InteractionPanel.qml</file>
         <file>skin/chat/CrawlMark.qml</file>

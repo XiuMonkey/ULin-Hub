@@ -1,4 +1,4 @@
-<RCC>
+﻿<RCC>
     <qresource prefix="ULinHub">
         <!-- 顶层素材按用途分了目录：icons/（图标与标识；icons/ui/ = 单色线性 SVG 图标集）、buttons/（发送/停止圆钮）、
              config/（highlight-rules.json）。prefix 仍是 ULinHub，resource 路径即"目录/文件名"
@@ -37,6 +37,8 @@
         <file>icons/ui/browser.svg</file>
         <file>icons/ui/camera.svg</file>
         <file>icons/ui/changes.svg</file>
+        <file>icons/ui/checklist.svg</file>
+        <file>icons/ui/goal.svg</file>
         <file>icons/ui/chat.svg</file>
         <file>icons/ui/close.svg</file>
         <file>icons/ui/file.svg</file>

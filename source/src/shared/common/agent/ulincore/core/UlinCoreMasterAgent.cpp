@@ -652,6 +652,8 @@ void UlinCoreMasterAgent::appendSessionEvent(const QString& type, const QJsonObj
 	QJsonObject event = data;
 	event.insert(QStringLiteral("type"), type);
 	event.insert(QStringLiteral("seq"), it->nextSeq++);
+	// 供历史回放计算 turn 耗时；旧事件没有该字段时按未知处理。
+	event.insert(QStringLiteral("time"), QDateTime::currentMSecsSinceEpoch());
 	it->events.append(event);
 	it->updatedAt = QDateTime::currentMSecsSinceEpoch();
 	saveSessionLog(*it);
