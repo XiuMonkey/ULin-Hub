@@ -13,6 +13,8 @@
 #include <QUrl>
 #include <QVariantMap>
 
+// 进程内单例：QML 侧以 `HostUi` 单例名访问，DLL 侧由 kUiHost 取到同一个实例，
+// 两边共用同一份登记表与注入记账。
 HostUi& HostUi::instance()
 {
 	static HostUi ui;
@@ -29,6 +31,8 @@ void HostUi::ReleaseAccountEntry(const char* owner)
 	releaseAccountEntry(QString::fromUtf8(owner ? owner : ""));
 }
 
+// 账户入口接管（accountEntryOwner）：非空即表示宿主不再开内置账户页，改由该扩展自己开窗。
+// 后登记的 owner 直接覆盖前一个；空名不生效。
 bool HostUi::claimAccountEntry(const QString& owner)
 {
 	const QString clean = owner.trimmed();
@@ -40,6 +44,7 @@ bool HostUi::claimAccountEntry(const QString& owner)
 	return true;
 }
 
+// 只释放自己那份接管：owner 不匹配说明入口已被别的扩展顶替，保留当前接管者。
 void HostUi::releaseAccountEntry(const QString& owner)
 {
 	if (m_accountEntryOwner != owner)
@@ -48,6 +53,7 @@ void HostUi::releaseAccountEntry(const QString& owner)
 	emit accountEntryOwnerChanged();
 }
 
+// 已登记宿主对象名的排序副本：诊断与日志用，顺序与登记先后无关。
 QStringList HostUi::names() const
 {
 	QStringList out = m_items.keys();
@@ -55,11 +61,13 @@ QStringList HostUi::names() const
 	return out;
 }
 
+// VirtualUiHost 的 C ABI 版本：DLL 侧按 UTF-8 名字枚举宿主对象清单。
 QStringList HostUi::HostItemNames()
 {
 	return names();
 }
 
+// C ABI 版本：按 UTF-8 名字取宿主对象，找不到返回 nullptr。
 QObject* HostUi::HostItem(const char* name)
 {
 	if (!name || !*name)
@@ -67,6 +75,8 @@ QObject* HostUi::HostItem(const char* name)
 	return m_items.value(QString::fromUtf8(name)).data();
 }
 
+// 宿主 QML 根在 Component.onCompleted 里登记自己；名字是稳定契约（见 HostUi.h 的名字清单）。
+// 重复登记同一个对象算成功，方便 QML 重载时再登记一次。
 bool HostUi::registerItem(const QString& name, QObject* item)
 {
 	if (name.isEmpty() || !item) {
@@ -92,9 +102,7 @@ QObject* HostUi::item(const QString& name) const
 
 QString HostUi::MountInto(const char* owner, const char* hostItem, const char* qmlUrl, QObject* context)
 {
-	return mountIntoImpl(QString::fromUtf8(owner ? owner : ""),
-						 QString::fromUtf8(hostItem ? hostItem : ""),
-						 QString::fromUtf8(qmlUrl ? qmlUrl : ""), context);
+	return mountIntoImpl(QString::fromUtf8(owner ? owner : ""), QString::fromUtf8(hostItem ? hostItem : ""), QString::fromUtf8(qmlUrl ? qmlUrl : ""), context);
 }
 
 QString HostUi::mountInto(const QString& owner, const QString& hostItem, const QString& url, QObject* context)
@@ -102,6 +110,8 @@ QString HostUi::mountInto(const QString& owner, const QString& hostItem, const Q
 	return mountIntoImpl(owner, hostItem, url, context);
 }
 
+// 注入实现：查宿主对象 → 校验 URL → 建组件 → 建子上下文 → 实例化 → setParentItem → 记账。
+// 任一步失败都回收已建对象并返回空 id；成功返回记账 id（owner#序号）。
 QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, const QString& url, QObject* context)
 {
 	if (owner.isEmpty() || hostItem.isEmpty() || url.isEmpty()) {
@@ -109,10 +119,9 @@ QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, con
 		return QString();
 	}
 
-	auto* host = qobject_cast<QQuickItem*>(m_items.value(hostItem).data());
+	auto* host = qobject_cast<QQuickItem*>(m_items.value(hostItem).data()); // 必须是 Item：注入靠 setParentItem
 	if (!host) {
-		qWarning().noquote() << QStringLiteral("[HostUi] mountInto(%1): 宿主对象 %2 不存在（没登记或名字拼错；"
-											  "现有：%3）").arg(owner, hostItem, names().join(QLatin1Char(',')));
+		qWarning().noquote() << QStringLiteral("[HostUi] mountInto(%1): 宿主对象 %2 不存在（没登记或名字拼错；现有：%3）").arg(owner, hostItem, names().join(QLatin1Char(',')));
 		return QString();
 	}
 
@@ -127,7 +136,7 @@ QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, con
 		? QUrl(url)
 		: QUrl::fromLocalFile(QFileInfo(url).absoluteFilePath());
 
-	auto* component = new QQmlComponent(engine, source, this);
+	auto* component = new QQmlComponent(engine, source, this); // 组件挂宿主：实例化完即可 deleteLater
 	if (component->isError()) {
 		qWarning().noquote() << QStringLiteral("[HostUi] mountInto(%1): 载入失败 %2\n%3")
 			.arg(owner, source.toString(), component->errorString());
@@ -140,9 +149,9 @@ QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, con
 	QVariantMap initial;
 	if (context)
 		initial.insert(QStringLiteral("context"), QVariant::fromValue(context));
-	QObject* created = initial.isEmpty() ? component->create(qmlContext)
+	QObject* created = initial.isEmpty() ? component->create(qmlContext) // 没有 required 属性就走普通 create
 										 : component->createWithInitialProperties(initial, qmlContext);
-	component->deleteLater();
+	component->deleteLater(); // 组件只用于实例化，创建完即可回收
 
 	auto* injected = qobject_cast<QQuickItem*>(created);
 	if (!injected) {
@@ -156,7 +165,7 @@ QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, con
 		return QString();
 	}
 
-	injected->setParentItem(host);
+	injected->setParentItem(host); // 注入点：位置/排序交给扩展 QML 自己处理（位置器里自动排末尾）
 	if (!injected->parentItem()) {
 		qWarning().noquote() << QStringLiteral("[HostUi] mountInto(%1): setParentItem(%2) 失败").arg(owner, hostItem);
 		injected->deleteLater();
@@ -164,7 +173,7 @@ QString HostUi::mountIntoImpl(const QString& owner, const QString& hostItem, con
 		return QString();
 	}
 
-	Mounted entry;
+	Mounted entry; // id 只用于诊断/日志；卸载按 owner 整批摘，不依赖 id
 	entry.id = QStringLiteral("%1#%2").arg(owner).arg(m_nextId++);
 	entry.owner = owner;
 	entry.hostName = hostItem;
@@ -182,6 +191,7 @@ int HostUi::UnmountOwner(const char* owner)
 	return owner ? unmountOwner(QString::fromUtf8(owner)) : 0;
 }
 
+// 从记账里移除并销毁一个注入项；item/context 都可能是空（对象已被 QML 先销毁）。
 void HostUi::dropAt(int index)
 {
 	const Mounted entry = m_mounted.at(index);
@@ -194,9 +204,11 @@ void HostUi::dropAt(int index)
 		delete entry.context;
 }
 
+// 按 owner 整批摘：扩展卸载/退出时调用，其它 owner 的注入不受影响。
 int HostUi::unmountOwner(const QString& owner)
 {
 	int removed = 0;
+	// 倒序遍历：dropAt 用 removeAt 收缩数组，正序会跳过相邻项
 	for (int i = m_mounted.size() - 1; i >= 0; --i) {
 		if (m_mounted.at(i).owner != owner)
 			continue;
@@ -208,6 +220,7 @@ int HostUi::unmountOwner(const QString& owner)
 	return removed;
 }
 
+// 退出清理：全量摘下注入项，避免 QML 引擎析构顺序造成悬空引用。
 int HostUi::unmountAll()
 {
 	const int total = m_mounted.size();
@@ -218,6 +231,7 @@ int HostUi::unmountAll()
 	return total;
 }
 
+// 诊断快照：每项给出 id / owner / 宿主名 / 对象名，供调试面板直接展示。
 QVariantList HostUi::mounted() const
 {
 	QVariantList rows;
@@ -232,6 +246,7 @@ QVariantList HostUi::mounted() const
 	return rows;
 }
 
+// 顶替某个块的后端（kind 如 "terminal"）：空 backend 等于撤销；按 kind 只留一份，后登记者顶掉前一个。
 bool HostUi::SetBlockBackend(const QString& owner, const QString& kind, QObject* backend)
 {
 	if (kind.isEmpty())
@@ -246,7 +261,7 @@ bool HostUi::SetBlockBackend(const QString& owner, const QString& kind, QObject*
 	entry.backend = backend;
 	qInfo().noquote() << QStringLiteral("[HostUi] %1: %2 块的后端改由扩展提供（%3）")
 		.arg(owner, kind, QString::fromLatin1(backend->metaObject()->className()));
-	emit blockBackendChanged(kind);
+	emit blockBackendChanged(kind); // 通知已建好的面板重新取后端
 	return true;
 }
 
@@ -260,17 +275,20 @@ void HostUi::ClearBlockBackend(const QString& owner, const QString& kind)
 	emit blockBackendChanged(kind);
 }
 
+// 面板建 QWebChannel 前先问有没有扩展顶替的后端。
 bool HostUi::HasBlockBackend(const QString& kind)
 {
 	return m_blockBackends.constFind(kind) != m_blockBackends.constEnd();
 }
 
+// 取顶替后端：QPointer 弱引用，后端对象先死则自动置空，面板读到空就回内置桥。
 QObject* HostUi::blockBackend(const QString& kind) const
 {
 	const auto found = m_blockBackends.constFind(kind);
 	return found == m_blockBackends.constEnd() ? nullptr : found.value().backend.data();
 }
 
+// 卸载扩展时整批撤：一个扩展可能顶替多个 kind，按 owner 扫描。
 int HostUi::releaseBlockBackends(const QString& owner)
 {
 	int removed = 0;
@@ -287,12 +305,11 @@ int HostUi::releaseBlockBackends(const QString& owner)
 	return removed;
 }
 
+// 以下三个是扩展侧入口的薄转发：真实状态在 PanelBarDockModel，这里不改语义。
+// launcher = 面板栏上的入口按钮（kind 唯一，label/hint 是显示文案），由扩展注册、卸载时反注册。
 void HostUi::RegisterLauncher(const char* kind, const char* label, const char* hint)
 {
-	PanelBarDockModel::instance().registerLauncher(
-		QString::fromUtf8(kind ? kind : ""),
-		QString::fromUtf8(label ? label : ""),
-		QString::fromUtf8(hint ? hint : ""));
+	PanelBarDockModel::instance().registerLauncher(QString::fromUtf8(kind ? kind : ""), QString::fromUtf8(label ? label : ""), QString::fromUtf8(hint ? hint : ""));
 }
 
 void HostUi::UnregisterLauncher(const char* kind)
@@ -302,9 +319,10 @@ void HostUi::UnregisterLauncher(const char* kind)
 
 void HostUi::OpenBlock(const char* kind)
 {
-	PanelBarDockModel::instance().open(QString::fromUtf8(kind ? kind : ""));
+	PanelBarDockModel::instance().open(QString::fromUtf8(kind ? kind : "")); // 打开已注册的块（拉起面板）
 }
 
+// 把扩展给的产物路径交给输入框：不存在的路径直接丢弃，返回实际转交的数量。
 int HostUi::AttachFilesToComposer(const char* const* paths, int count)
 {
 	if (!paths || count <= 0)
@@ -318,12 +336,13 @@ int HostUi::AttachFilesToComposer(const char* const* paths, int count)
 	if (list.isEmpty())
 		return 0;
 	qInfo().noquote() << QStringLiteral("[HostUi] AttachFilesToComposer -> %1 个文件").arg(list.size());
-	emit composerFilesRequested(list);
+	emit composerFilesRequested(list); // 宿主 QML 侧转给 ChatController 的待发附件列表
 	return list.size();
 }
 
 QString HostUi::OpenBlockUrl(const QString& url, const QString& title)
 {
+	// 返回空 blockId 表示被模型拒绝（url 为空），调用方不用再判空
 	const QString blockId = PanelBarDockModel::instance().openUrl(url, title);
 	if (blockId.isEmpty()) {
 		qWarning().noquote() << QStringLiteral("[HostUi] OpenBlockUrl 拒绝：url 为空");
@@ -335,12 +354,13 @@ QString HostUi::OpenBlockUrl(const QString& url, const QString& title)
 
 bool HostUi::CloseBlock(const QString& blockId)
 {
-	const bool closed = PanelBarDockModel::instance().closeBlock(blockId);
+	const bool closed = PanelBarDockModel::instance().closeBlock(blockId); // false = 块不存在或已关闭
 	if (closed)
 		qInfo().noquote() << QStringLiteral("[HostUi] CloseBlock: 已关块 %1").arg(blockId);
 	return closed;
 }
 
+// 借一个 QML 引擎：宿主对象都挂在同一个引擎上，扩展窗口/组件必须建在同一引擎里。
 QQmlEngine* HostUi::anyEngine() const
 {
 	for (auto it = m_items.constBegin(); it != m_items.constEnd(); ++it) {
@@ -352,6 +372,7 @@ QQmlEngine* HostUi::anyEngine() const
 	return nullptr;
 }
 
+// 主窗口：从任一已登记 item 的 window() 取；用于给扩展窗口设 transient parent 与联动关闭。
 QWindow* HostUi::mainWindow() const
 {
 	for (auto it = m_items.constBegin(); it != m_items.constEnd(); ++it) {
@@ -363,6 +384,8 @@ QWindow* HostUi::mainWindow() const
 	return nullptr;
 }
 
+// 开窗实现：借引擎 → 同一 owner 先关旧窗 → 建组件/子上下文 → 实例化 QQuickWindow → 记账 →
+// 挂到主窗口（transient parent + 主窗关闭联动）→ 显示并返回记账 id。
 QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const QVariantMap& initialProps, const QString& title)
 {
 	if (owner.isEmpty() || source.isEmpty()) {
@@ -378,7 +401,7 @@ QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const Q
 
 	CloseWindow(owner.toUtf8().constData());   // 同一 owner 只留一个窗口
 
-	auto* component = new QQmlComponent(engine, source, this);
+	auto* component = new QQmlComponent(engine, source, this); // 组件归宿主：载入失败就 deleteLater 丢掉
 	if (component->isError()) {
 		qWarning().noquote() << QStringLiteral("[HostUi] openWindow(%1): 载入失败 %2\n%3")
 			.arg(owner, source.fileName(), component->errorString());
@@ -386,13 +409,13 @@ QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const Q
 		return QString();
 	}
 
-	auto* windowContext = new QQmlContext(engine->rootContext(), this);
+	auto* windowContext = new QQmlContext(engine->rootContext(), this); // 每个窗口一个子上下文：context 只对本次窗口可见
 	if (initialProps.contains(QStringLiteral("context")))
 		windowContext->setContextProperty(QStringLiteral("context"), initialProps.value(QStringLiteral("context")));
 
 	QObject* created = initialProps.isEmpty() ? component->create(windowContext)
 	                                          : component->createWithInitialProperties(initialProps, windowContext);
-	auto* window = qobject_cast<QQuickWindow*>(created);
+	auto* window = qobject_cast<QQuickWindow*>(created); // 根必须是 Window/ApplicationWindow，否则按失败回收
 	if (!window) {
 		qWarning().noquote() << QStringLiteral("[HostUi] openWindow(%1): %2 载入/构造失败：%3")
 			.arg(owner, source.fileName(), component->errorString());
@@ -441,13 +464,14 @@ QString HostUi::openWindowImpl(const QString& owner, const QUrl& source, const Q
 	});
 
 	window->show();
-	window->raise();
+	window->raise(); // 三步组合：确保扩展窗口一出现就在最前并获得焦点
 	window->requestActivate();
 	qInfo().noquote() << QStringLiteral("[HostUi] %1: 已开窗口 %2（%3）")
 		.arg(owner, entry.id, source.fileName());
 	return entry.id;
 }
 
+// C ABI 版本（VirtualUiHost）：context 非空时作为初始属性注入，满足 QML 根上的 required property。
 QString HostUi::OpenWindow(const char* ownerC, const char* urlC, QObject* context, const char* titleC)
 {
 	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");
@@ -458,6 +482,7 @@ QString HostUi::OpenWindow(const char* ownerC, const char* urlC, QObject* contex
 	return openWindowImpl(owner, QUrl(url), initial, QString::fromUtf8(titleC ? titleC : ""));
 }
 
+// 打开宿主自带的 WebEngine 窗口（qrc 里的 WebWindow.qml）：扩展只给 URL 与标题。
 QString HostUi::OpenWebWindow(const char* ownerC, const char* urlC, const char* titleC)
 {
 	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");
@@ -472,6 +497,7 @@ QString HostUi::OpenWebWindow(const char* ownerC, const char* urlC, const char* 
 		initial, QString::fromUtf8(titleC ? titleC : ""));
 }
 
+// 关窗：只发 close 请求，窗口对象与上下文的回收统一在 visibleChanged(false) 里做。
 int HostUi::CloseWindow(const char* ownerC)
 {
 	const QString owner = QString::fromUtf8(ownerC ? ownerC : "");

@@ -25,8 +25,7 @@ bool DshNamedPipeBridge::start(const QString& pipeName)
 
 	if (!m_server->listen(m_pipeName)) {
 		m_errorString = m_server->errorString();
-		qWarning() << "[DshNamedPipeBridge] listen failed:"
-			<< m_pipeName << m_errorString;
+		qWarning() << "[DshNamedPipeBridge] listen failed:" << m_pipeName << m_errorString;
 		return false;
 	}
 
@@ -51,8 +50,7 @@ QString DshNamedPipeBridge::errorString() const
 	return m_errorString;
 }
 
-void DshNamedPipeBridge::sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result,
-	const QString& error)
+void DshNamedPipeBridge::sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result, const QString& error)
 {
 	if (!socket) {
 		return;

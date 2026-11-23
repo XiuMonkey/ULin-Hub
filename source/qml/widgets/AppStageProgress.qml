@@ -1,6 +1,5 @@
-// 阶段进度条：4 段，每段对应一个**真实阶段**（解析依赖 → 下载 → 链接依赖 → 构建）。
-// 完成段填满，当前段呼吸，未来段留空。用于"服务端只给了阶段、没给总包数"的情况：
-// 不编造百分比，但能一眼看出卡在哪一步、已经走过哪几步。
+// 阶段进度条：默认 4 段，每段对应一个真实阶段（解析依赖 → 下载 → 链接依赖 → 构建）。
+// 完成段填满、当前段呼吸、未来段留空：不编造百分比，但能一眼看出卡在哪一步。
 
 import QtQuick
 import ULinHub 1.0
@@ -25,7 +24,7 @@ Item {
             Rectangle {
                 required property int index
 
-                width: Math.max(0, (root.width - (root.count - 1) * 4) / root.count)
+                width: Math.max(0, (root.width - (root.count - 1) * 4) / root.count)   // 先扣掉段间缝（= Row.spacing）再等分
                 height: root.height
                 radius: height / 2
 

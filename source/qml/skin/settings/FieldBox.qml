@@ -1,8 +1,5 @@
-// 表单输入框皮肤：
-// panelBg + 1px 极浅描边 + radius 8 + 内边距 6/10 + 13px textPrimary，
-// 聚焦时描边转 textSecondary（中性灰，按"设置页不出蓝"）。
-// 对齐官方 DSH 的 `--dsw-alias-border-l2`(10%)，也是官方输入框的取法（官方静息根本没有 CSS border，
-// 层次靠 `--dsw-elevation-soft` 的 0.5px ring + 柔和阴影；见 build/temp/ui-texture/official/）。
+// 表单输入框皮肤：panelBg 底 + 1px 极浅描边（透明度对齐官方 DSH 的 --dsw-alias-border-l2），
+// 聚焦时描边转 textSecondary：设置页保持中性灰，不出蓝。
 
 import QtQuick
 import ULinHub 1.0

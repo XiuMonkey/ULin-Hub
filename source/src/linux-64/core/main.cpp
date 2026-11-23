@@ -1,4 +1,4 @@
-﻿// Linux 平台层：程序入口。
+// Linux 平台层：程序入口。
 // 顺序与 Windows 版一致：日志 → 外观设置 → 翻译 → 主题 → 风格包/QML token
 // → 注册 QML 单例 → 装载 qrc:/qml/Main.qml → 启动客户端扩展（.so）。
 // 差异：无 .ico/.rc、无 dependence 私有程序集、无 QtWebEngineProcess.exe 兜底、
@@ -59,17 +59,17 @@ int main(int argc, char* argv[])
 
 	QCoreApplication::setApplicationVersion(ClientInfo::kVersion);
 
-	Logger::init();
+	Logger::init();   // 日志先起：后续每一步都往时间线上打点
 	TimingLogger::mark(QStringLiteral("Logger init (baseline)"));
 
-	CommonRegistry::instance().AddToRegistry(DshHostIndex::kConnectionManager,
-		&ConnectionManager::instance());
-	CommonRegistry::instance().AddToRegistry(DshHostIndex::kUiHost,
-		&HostUi::instance());
+	// 连接层与 UI 宿主先登记进 CommonRegistry：扩展通过 HostConnections / HostUi 桥按 index 取到它们
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kConnectionManager, &ConnectionManager::instance());
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kUiHost, &HostUi::instance());
 
 	AppearanceSetting::ensureFile();
 	Translation::init();
 
+	// ThemeMode::System 时按系统配色走，其余模式按显式选择
 	const AppearanceSetting::ThemeMode savedThemeMode = AppearanceSetting::themeMode();
 	const bool dark = savedThemeMode == AppearanceSetting::ThemeMode::System
 		? app.styleHints()->colorScheme() == Qt::ColorScheme::Dark
@@ -77,8 +77,7 @@ int main(int argc, char* argv[])
 
 	const QString stylesDir = QCoreApplication::applicationDirPath()
 		+ QStringLiteral("/resources/ui");
-	ThemeManager::instance().init(stylesDir,
-		dark ? ThemeManager::Mode::Dark : ThemeManager::Mode::Light);
+	ThemeManager::instance().init(stylesDir, dark ? ThemeManager::Mode::Dark : ThemeManager::Mode::Light);
 
 	// 字体不写死：QML 侧用 Theme.font.uiFamily（运行期挑选系统 UI 字体）。
 	QObject::connect(&app, &QCoreApplication::aboutToQuit, &app, []() {
@@ -100,10 +99,9 @@ int main(int argc, char* argv[])
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "HostUi", &HostUiBridge::instance());
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "UrlInput", &UrlInputBridge::instance());
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "PanelBarDock", &PanelBarDockBridge::instance());
-	CommonRegistry::instance().AddToRegistry(DshHostIndex::kPanelBarDock,
-		&PanelBarDockModel::instance());
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kPanelBarDock, &PanelBarDockModel::instance());
 
-	PanelBarDockModel::instance().setWebEngineAvailable(true);
+	PanelBarDockModel::instance().setWebEngineAvailable(true);   // 上面已初始化 WebEngine，面板坞的网页块可用
 
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "Terminal", &TerminalBridge::instance());
 	qmlRegisterSingletonInstance("ULinHub", 1, 0, "FileBrowser", &FileBrowserBridge::instance());
@@ -122,13 +120,13 @@ int main(int argc, char* argv[])
 		QStringLiteral("由 Hub.plugins 提供，不要在 QML 里创建"));
 	qmlRegisterUncreatableType<CommandBridge>("ULinHub", 1, 0, "CommandBridge",
 		QStringLiteral("由 Hub.commands 提供，不要在 QML 里创建"));
-	qmlRegisterUncreatableType<ExtensionsBridge>("ULinHub", 1, 0,
-		"ExtensionsBridge",
+	qmlRegisterUncreatableType<ExtensionsBridge>("ULinHub", 1, 0, "ExtensionsBridge",
 		QStringLiteral("由 Hub.extensions 提供，不要在 QML 里创建"));
 
 	const QString mainQml = StyleResolver::instance().url(QStringLiteral("Main.qml"));
 	QQmlApplicationEngine engine;
 
+	// 已装扩展的 ui/ 目录加进 QML 导入路径：扩展里的 qml 模块按目录名被 Main.qml 引用
 	const QString extensionRoot = ClientExtension::extensionDirectory();
 	const QStringList installedExtensions = ClientExtension::installedNames();
 	for (const QString& name : installedExtensions)

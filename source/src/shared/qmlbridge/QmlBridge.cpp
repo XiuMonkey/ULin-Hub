@@ -113,8 +113,7 @@ void QmlBridge::init()
 		FileBrowserBridge::instance().setOfficeBackend(HostUi::instance().blockBackend(QStringLiteral("files")));
 	};
 	refreshOfficeBackend();
-	CommonRegistry::instance().AddToRegistry(DshHostIndex::kFileBrowser,
-		&FileBrowserBridge::instance());
+	CommonRegistry::instance().AddToRegistry(DshHostIndex::kFileBrowser, &FileBrowserBridge::instance());
 	connect(&HostUi::instance(), &HostUi::blockBackendChanged, this, [refreshOfficeBackend](const QString& kind) {
 		if (kind == QStringLiteral("files"))
 			refreshOfficeBackend();
@@ -267,7 +266,6 @@ void QmlBridge::init()
 
 	wireRuntime();
 	wireChat();
-
 }
 
 // 接线：core 的信号 → 本类的属性信号 / 业务层对象。**这里不写业务**。
@@ -374,17 +372,15 @@ void QmlBridge::wireRuntime()
 		}
 	});
 
-	// ⚠️ 别把 operationFailed 吞掉：新建/删除工作区失败、目录非法…… 用户端只会表现为"点了没反应"，
-	//    要原样转发给 QML 弹 Toast。
+	// operationFailed 要原样转发给 QML 弹 Toast：吞掉的话用户只看到"点了没反应"。
 	connect(m_runtime, &ClientRuntime::operationFailed, this, &QmlBridge::operationFailed);
 	connect(m_runtime, &ClientRuntime::sessionCreateFailed, this, &QmlBridge::sessionCreateFailed);
 	connect(m_runtime, &ClientRuntime::sessionCreateFailed, this, [this](const QString&) {
 		m_pendingScheduleSessionSelect = false;
 	});
 
-	// 会话被整份清空：当前会话连同消息区一起作废。
-	// ⚠️ 必须把选中态也清掉：sessionsRefreshed 的自动选中只在 `keep.isEmpty()` 时生效，
-	//    留着旧选中项就等于新会话建出来了却选不上。
+	// 会话被整份清空：当前会话连同消息区一起作废。选中态也必须清掉 ——
+	// sessionsRefreshed 的自动选中只在 keep.isEmpty() 时生效，留着旧选中项新会话就选不上。
 	connect(m_runtime, &ClientRuntime::sessionsCleared, this, [this]() {
 		m_currentSessionId.clear();
 		m_peerRootId.clear();
@@ -599,8 +595,7 @@ void QmlBridge::createSession(const QString& workspaceId)
 void QmlBridge::createWorkspace()
 {
 	// 目录选择是控件层的活（QFileDialog），RPC 交给 runtime
-	const QString path = QFileDialog::getExistingDirectory(nullptr,
-		qtTrId("sidebar_new_workspace"), QDir::homePath());
+	const QString path = QFileDialog::getExistingDirectory(nullptr, qtTrId("sidebar_new_workspace"), QDir::homePath());
 	if (path.isEmpty())
 		return;
 	m_runtime->createWorkspace(path);
@@ -732,10 +727,8 @@ void QmlBridge::selectSession(const QString& sessionId)
 	// 消息区换会话（清空 + 记住当前会话），再把跟随流切过去：首帧快照会由 ChatController 接收。
 	// 子代理的地址形状（parent + mode）由 ClientRuntime 从 catalog 解析，follow/page 都走 subagent address。
 	m_chat->setSession(sessionId);
-	// 会话记录的模型选择（session/list 行投影 modelSelection，扩展按账本回带）：
-	// 先应用到 chip 的 override 再重拉目录，chip 才按会话回显；没有记录就清掉
-	// 上一个会话的残留 override，chip 回到目录默认（ModelSelectionService 注释里
-	// "会话级的当前选择在 session/list 行投影里"说的就是这条通道）。
+	// 会话级模型选择来自 session/list 行投影 modelSelection：先应用到 chip 的 override 再重拉目录，
+	// 没有记录就清掉上一会话的残留 override，chip 回到目录默认。
 	QString selProvider, selModel, selEffort;
 	if (m_sessions && m_sessions->catalog()
 		&& m_sessions->catalog()->modelSelectionFor(sessionId, &selProvider, &selModel, &selEffort))
@@ -951,9 +944,8 @@ QVariantList QmlBridge::pendingAttachments() const
 
 void QmlBridge::chooseImageFiles()
 {
-	const QStringList files = QFileDialog::getOpenFileNames(
-		nullptr, QStringLiteral("\u9009\u62e9\u56fe\u7247"), QString(),
-		QStringLiteral("\u56fe\u7247 (*.png *.jpg *.jpeg *.webp *.gif)"));
+	const QStringList files = QFileDialog::getOpenFileNames(nullptr, QStringLiteral("\u9009\u62e9\u56fe\u7247"),
+		QString(), QStringLiteral("\u56fe\u7247 (*.png *.jpg *.jpeg *.webp *.gif)"));
 	if (files.isEmpty())
 		return;
 	QVariantList urls;
@@ -980,8 +972,7 @@ void QmlBridge::captureScreenArea(int x, int y, int width, int height)
 		return;
 
 	const QRect geometry = screen->geometry();
-	const QImage shot = screen->grabWindow(0,
-		x - geometry.x(), y - geometry.y(), width, height).toImage();
+	const QImage shot = screen->grabWindow(0, x - geometry.x(), y - geometry.y(), width, height).toImage();
 	if (shot.isNull())
 		return;
 
@@ -1069,9 +1060,7 @@ void QmlBridge::sendPrompt(const QString& text)
 void QmlBridge::syncPromptTakeover(bool dsh)
 {
 	if (dsh && !m_dshPromptTaken && m_dshPromptClient) {
-		ConnectionManager::instance().TakeoverConnection(
-			QStringLiteral("agent.prompt"), m_dshPromptClient,
-			QStringLiteral("handlePrompt"));
+		ConnectionManager::instance().TakeoverConnection(QStringLiteral("agent.prompt"), m_dshPromptClient, QStringLiteral("handlePrompt(QString,QString)"));
 		m_dshPromptTaken = true;
 	} else if (!dsh && m_dshPromptTaken) {
 		ConnectionManager::instance().ReleaseTakeover(QStringLiteral("agent.prompt"));
@@ -1156,8 +1145,7 @@ bool QmlBridge::themeSwitching() const
 // ---- 工具过滤器：桥只做"开关 + 拉一次" ----
 void QmlBridge::openToolsFilter()
 {
-	// ⚠️ 这个函数**只允许被调一次**：若两处都调，一次点击就"开→立刻收"，肉眼表现是"点了没反应"。
-	//    排查同类问题先看这行日志出现几次。
+	// 这个函数只允许被调一次：两处都调就是"开→立刻收"，表现为"点了没反应"。排查时先看这行日志打了几次。
 	qInfo().noquote() << "[Shell] openToolsFilter: open=" << m_toolsFilterOpen
 		<< "session=" << (m_currentSessionId.isEmpty() ? QStringLiteral("(空)") : m_currentSessionId);
 
@@ -1480,11 +1468,9 @@ void QmlBridge::openSkillPath(const QString& path)
 	if (path.isEmpty())
 		return;
 
-	// 不要在主线程同步走 QDesktopServices：.md 的默认处理程序可能是 Electron/DDE
-	// 应用（本机是 WorkBuddy），它若卡住，ShellExecute 会把 ULin Hub 一起拖成未响应。
-	// 交给独立的系统命令：默认程序仍按系统关联选择，但宿主立刻返回。
-	// 平台差异只有"用哪个程序打开"这一句 —— 属于运行期语义差异，按 ClientInfo::kPlatform 分支；
-	// 实现差异大的（Office 转换、解包）已经整体迁到平台目录，不在 shared 里做条件编译。
+	// 不要在主线程同步走 QDesktopServices：.md 的默认处理程序可能是 Electron/DDE 应用，
+	// 它卡住时 ShellExecute 会把 ULin Hub 一起拖成未响应。改用独立的系统命令，宿主立刻返回。
+	// 平台差异只有"用哪个程序打开"，按 ClientInfo::kPlatform 分支。
 	const QString target = QDir::toNativeSeparators(QFileInfo(path).absoluteFilePath());
 	const QString platform = QString::fromLatin1(ClientInfo::kPlatform);
 	bool launched = false;
@@ -1502,8 +1488,8 @@ void QmlBridge::openSkillPath(const QString& path)
 // ---- 右侧栏：纯界面开关（不涉及数据，也就不需要会话/服务端）----
 void QmlBridge::togglePanelBar()
 {
-	// 与 openToolsFilter 同理：**只允许被调一次**。顶栏那颗按钮只发信号，由 Shell 接到这里；
-	// 若两处都调，表现就是"点了没反应"（开→立刻收）。
+	// 与 openToolsFilter 同理：只允许被调一次。顶栏那颗按钮只发信号、由 Shell 接到这里，
+	// 两处都调就是"点了没反应"（开→立刻收）。
 	if (m_panelBarOpen)
 		closePanelBar();
 	else
@@ -1587,11 +1573,9 @@ void QmlBridge::markdownUpdate(QObject* quickDocument, const QString& markdown)
 		state.stablePos = 0;
 	}
 
-	// 纯文本尾部快路径：稳定边界没变、文本只是前缀增长，而且上一版正好停在同一段落中间
-	// （不是刚出现空行），新增内容与当前尾段都不含 Markdown 控制字符。直接 insertText，
-	// 避免每秒几十次 renderFragment + 整段 tail 重新排版（大段回复时单次可达 80–100ms）。
-	// 上一版以空行结尾时必须走 fragment：那段空行下面还没起新块，直接 append 会把新段落
-	// 拼进上一段（"标题\n\n" 后第一段正文会粘在标题块里）。
+	// 纯文本尾部快路径：稳定边界没变、文本只是前缀增长、上一版停在段落中间，且增量与尾段都不含
+	// Markdown 控制字符时直接 insertText，省掉每秒几十次 renderFragment + 整段重排（单次可达 80–100ms）。
+	// 上一版以空行结尾则必须走 fragment：直接 append 会把新段落拼进上一段（"标题\n\n" 后正文粘在标题块里）。
 	const bool continuesParagraph = state.text.size() > state.stableOffset
 		&& state.text.at(state.text.size() - 1) != QLatin1Char('\n')
 		&& state.text.at(state.text.size() - 1) != QLatin1Char('\r');

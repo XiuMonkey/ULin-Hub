@@ -2,10 +2,7 @@
 
 // 颜色文本解析：theme-*.json 里的颜色可能是 `#RRGGBB` / `#AARRGGBB` / SVG 颜色名，
 // 也可能是 `rgb()` / `rgba()` —— 后者 QColor 自己不认，这里补上。
-//
-// 原先 CardShadow::parseColor（无 ok，失败返回无效 QColor）与 ThemeBridge::parsePaletteColor
-// （有 ok，失败返回品红占位）各有一份，正则几乎相同但能力不同（前者支持百分比 alpha）。
-// 合并成一份后两者语义靠返回值区分：只关心"能不能解析"就传 ok，想要具体颜色再看 isValid()。
+// alpha 接受 0–255、0–1、百分比三种写法，统一折算成 0–255。
 
 #include <QColor>
 #include <QRegularExpression>
@@ -22,8 +19,7 @@ inline QColor parseColorText(const QString& text, bool* ok = nullptr)
 	if (trimmed.isEmpty())
 		return QColor();
 
-	static const QRegularExpression fn(QStringLiteral(
-		"^rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*"
+	static const QRegularExpression fn(QStringLiteral("^rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*"
 		"(?:,\\s*([0-9]*\\.?[0-9]+)\\s*(%)?\\s*)?\\)$"),
 		QRegularExpression::CaseInsensitiveOption);
 	const QRegularExpressionMatch m = fn.match(trimmed);

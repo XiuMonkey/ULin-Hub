@@ -1,4 +1,4 @@
-﻿// 见 SessionListModel.h：把工作区与会话摊平成一行一行的列表。
+// 见 SessionListModel.h：把工作区与会话摊平成一行一行的列表。
 
 #include "common/session/SessionListModel.h"
 
@@ -28,11 +28,9 @@ QString SessionListModel::pinnedWorkspaceKey()
 }
 
 // 整份重建：行数只有几十，全量重建比增量补丁简单也不会错（取舍见头文件）。
-// 顺序：置顶段（仅当有可见的置顶会话）→ 各工作区分组 → 未分组档。
-// 未分组档在两种情况下要给：①确有未归组的会话；②整表为空（首次使用 / 会话被清空 / 会话都被隐藏的分组挡着）。
-// ② 不能省：这一档表头右侧的 ＋ 是唯一的"新建会话"入口，少了它用户连一个能点的 ＋ 都看不到。
-// 搜索时（filterText 非空）规则稍变：只保留"有命中会话"的分组；一个都没有时列表为空（由 QML 画空状态），
-// 未分组档也不再硬塞 —— 否则搜不到东西时界面会剩下一个空表头，比空列表更费解。
+// 顺序：置顶段（仅当有可见置顶会话）→ 各工作区分组 → 未分组档；未分组档保证整表为空时
+//（首次使用 / 会话被清空 / 会话都藏在折叠分组里）仍有唯一的"新建会话"入口（表头右侧的 ＋）。
+// 搜索时（filterText 非空）只保留有命中会话的分组；一个都没有时列表为空，由 QML 画空状态。
 void SessionListModel::rebuild()
 {
 	beginResetModel();
@@ -65,7 +63,7 @@ void SessionListModel::rebuild()
 		return matched;
 	};
 
-	QHash<QString, QVector<SessionRecord>> byWorkspace;   // 先分桶：会话的归属以会话自身记录为准；visibleById 给置顶段按 id 取记录用（顺带天然滤掉已归档的）
+	QHash<QString, QVector<SessionRecord>> byWorkspace;   // 先分桶：归属以会话自身记录为准；visibleById 供置顶段按 id 取记录（顺带滤掉已归档）
 	QHash<QString, SessionRecord> visibleById;
 	for (const SessionRecord& record : sessions) {
 		byWorkspace[record.workspaceId].append(record);
@@ -102,7 +100,7 @@ void SessionListModel::rebuild()
 		if (filtering && members.isEmpty())   // 搜索时没命中的分组不占位置（否则搜出来一串只有表头的空组）
 			continue;
 
-		// ⚠️ 空工作区也必须有行：跳过它，"新建工作区"看起来永远不生效 —— 服务端确实建了、也写进了
+		// 空工作区也必须有行：跳过它，"新建工作区"看起来永远不生效 —— 服务端确实建了、也写进了
 		// harness/storages/workspace.json，界面上却只看到有会话的分组；用户也没法在里面建第一个会话。
 		const Row header = makeHeaderRow(kWorkspaceKind, workspace.workspaceId, workspace.title, members.size());
 		m_rows.append(header);
@@ -116,7 +114,7 @@ void SessionListModel::rebuild()
 
 	const QVector<SessionRecord> ungrouped = matching(byWorkspace.value(QString()));
 	const bool showUngrouped = filtering ? !ungrouped.isEmpty()
-		: (!ungrouped.isEmpty() || m_rows.isEmpty());  // ② 这一档表头的 ＋ 是唯一的"新建会话"入口，不能省
+		: (!ungrouped.isEmpty() || m_rows.isEmpty());
 	if (showUngrouped) {
 		const Row header = makeHeaderRow(kWorkspaceKind, ungroupedWorkspaceKey(),
 			qtTrId("sessionBar_ungrouped"), ungrouped.size());
@@ -132,7 +130,8 @@ void SessionListModel::rebuild()
 	emit rebuilt();
 }
 
-SessionListModel::Row SessionListModel::makeSessionRow(const SessionRecord& record) const   // 会话行内容：置顶段 / 工作区分组 / 未分组三处共用，避免同一份赋值抄三遍漏字段
+// 会话行内容：置顶段 / 工作区分组 / 未分组三处共用，避免同一份赋值抄三遍漏字段。
+SessionListModel::Row SessionListModel::makeSessionRow(const SessionRecord& record) const
 {
 	Row row;
 	row.kind = QLatin1String(kSessionKind);
@@ -147,8 +146,7 @@ SessionListModel::Row SessionListModel::makeSessionRow(const SessionRecord& reco
 
 // 表头行内容：工作区 / 置顶 / 未分组三处共用。expanded 统一按 workspaceId 查折叠状态 ——
 // 工作区的是服务端 id，置顶段与未分组档的是本模型的界面 key（见头文件），三者都只当折叠键用。
-SessionListModel::Row SessionListModel::makeHeaderRow(const char* kind, const QString& workspaceId,
-	const QString& workspaceTitle, int sessionCount) const
+SessionListModel::Row SessionListModel::makeHeaderRow(const char* kind, const QString& workspaceId, const QString& workspaceTitle, int sessionCount) const
 {
 	Row header;
 	header.kind = QLatin1String(kind);

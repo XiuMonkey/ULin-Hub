@@ -34,7 +34,7 @@ ComboBox {
         cursorShape: Qt.PointingHandCursor
     }
 
-    indicator: Text {
+    indicator: Text {   // 自绘箭头：贴右 26、宽 18，contentItem 的 rightPadding 30 就是给它留的沟
         x: control.width - 26
         y: Math.round((control.height - height) / 2)
         width: 18

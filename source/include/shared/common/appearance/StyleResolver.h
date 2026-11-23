@@ -1,21 +1,18 @@
 ﻿#pragma once
 
-// 分层：本文件在 common/appearance/ —— **领域层**（风格包目录的解析与
-// uiAbi 门控、磁盘包遮蔽/回退的判定、URL 缓存都在这里，与它下游的 ThemeManager 同层）。
-// 它不 import 任何 QML 概念（不 include QQmlEngine，只吐字符串 URL），可以脱离 QML 引擎单测。
-// QML 面（单例名 `Style`、类型注册、启动期 init）在 src/core/main.cpp，那边只接线、不放算法。
-// QML 风格包（对应 docs/ui-qml-migration-plan.md §2.4 / 决策 D4 的三层覆盖）：
+// 分层：本文件在 common/appearance/ —— **领域层**（风格包解析、uiAbi 门控、磁盘包遮蔽/回退判定、
+// URL 缓存都在这里，与下游的 ThemeManager 同层）。它不 include 任何 QML 概念（只吐字符串 URL），
+// 可脱离 QML 引擎单测；QML 面（单例名 `Style`、类型注册、启动期 init）在 src/core/main.cpp，那边只接线。
+//
+// QML 风格包的三层覆盖（见 docs/ui-qml-migration-plan.md §2.4）：
 //  A 层 token …… ThemeBridge（颜色来自 theme-*.json，尺寸/字号来自 metrics.json）
-//  B 层部件文件 … 本类：Style.url("chat/AgentBubble.qml") —— 磁盘包同名文件**遮蔽**内置文件，
-//  没覆盖的自动回退内置
+//  B 层部件文件 … 本类：Style.url("chat/AgentBubble.qml")，磁盘包同名文件**遮蔽**内置，没覆盖的回退内置
 //  C 层私有件 … 包内文件自己的相对 import 相对**包目录**解析（QML 引擎负责，本类不管）
-// 首启把内置界面树（= 内置 QML 整棵树 + pack.json + metrics.json）从 qrc 释放到 <exe>/ui/，
-// 规则是**增量同步**：
-//  包内没有 → 释放；用户改过的 → 不动；用户没改而内置更新过的 → 覆盖。
-// 基线记在同目录的 release-manifest.json（相对路径 → 上次释放时的内容哈希）。
-// 升级陈旧化：磁盘包里的 QML 会遮蔽新内置件，而 QML 陈旧（模型 role/属性改名）会运行期报错 ——
-// 所以 pack.json 带 uiAbi，与本版本的 ClientInfo::kUiAbi 不一致就**整包拒载、全部回退内置**
-// （拒载原因只留在 m_rejectReason 与警告日志里，不再往 QML 面暴露）。
+//
+// 首启把内置界面树（内置 QML 整棵树 + pack.json + metrics.json）从 qrc 增量同步到 <exe>/ui/：
+// 包内没有 → 释放；用户改过的 → 不动；用户没改而内置更新过的 → 覆盖；基线记在 release-manifest.json。
+// 升级陈旧化：磁盘包里的陈旧 QML（模型 role/属性改名）会运行期报错，所以 pack.json 带 uiAbi，与本版本
+// 的 ClientInfo::kUiAbi 不一致就**整包拒载、全部回退内置**（原因只留 m_rejectReason 与警告日志）。
 
 // QML 壳与风格包之间的契约版本定义在 common/ClientInfo.h —— 它同时被下层的
 // ThemeManager / ExtensionLoader 使用，留在桥层会让下层反向依赖 QML 桥层。
@@ -64,8 +61,7 @@ private:
 
 	QString m_stylesDir;
 	mutable QHash<QString, QString> m_urlCache;
-	// ⚠️ 下面三个是**解析期的内部状态**（inspectPack 写、url/日志读），刻意保留：
-	//  它们不是死代码，只是不再有 QML 面（Q_PROPERTY/getter 已删）。
+	// ⚠️ 以下为解析期的内部状态（inspectPack 写、url/日志读），不是死代码 —— 对应的 QML 面已删。
 	bool m_packPresent = false;
 	bool m_packAccepted = true;
 	QString m_packVersion;

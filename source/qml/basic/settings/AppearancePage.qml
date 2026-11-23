@@ -49,15 +49,10 @@ Item {
         ComboBox {
             id: languageCombo
 
-            // 只复刻原版对"关着的那个框"的定制（settings.qss#settingsLanguageCombo）：
-            // background {{inputBg}} / border 1px {{scrollbar}} / border-radius 8px
-            // padding 6px 10px / font-size 13px / min-width 200px
-            // :hover → border-color {{accent}} / ::drop-down 无边框宽 18px
-            // ⚠️ 与现有实现的两处有意偏离（都是"去蓝/现代化"要求，纯观感）：
-            // * :hover 描边：原版取 {{accent}}（强调蓝），这里取 scrollbarHover（中性灰）；
-            // * 弹出列表：原版没有 QComboBox QAbstractItemView 规则（等于走 QPalette：Highlight=强调蓝、
-            // HighlightedText=textOnAccent 白 ⇒ Basic 风格拿 palette.light 当高亮底、palette.highlightedText
-            // 日志里却一条错误都没有 —— 那个坑与 delegate/popup 无关，但记着别再踩。
+            // 原版 settings.qss#settingsLanguageCombo：inputBg 底 / 1px scrollbar 描边 / radius 8px /
+            // padding 6px 10px / 13px / min-width 200px；:hover → accent 描边 / ::drop-down 无边框宽 18px。
+            // 两处有意偏离（去蓝）：:hover 描边改用 scrollbarHover；弹出列表的高亮角色改中性 token
+            // （原版没有 QComboBox QAbstractItemView 规则，走 QPalette 的 Highlight 蓝，会蓝底白字）。
             width: Math.max(200, parent.width)       // 原版 min-width: 200px
             height: 32
             leftPadding: 10                          // 原版 padding-left: 10px（Control 的 padding 属性）
@@ -109,17 +104,15 @@ Item {
                     Hub.settings.setLanguage(rows[index].code)
             }
 
-            // （比静止态的 scrollbar 略深一档，克制）。用 HoverHandler 取悬停态并顺手设手型光标：
-            // 它是纯悬停处理器（不接按键），所以不会像铺一层 MouseArea 那样有拦点击的风险
-            // （Control/ComboBox 自身没有 cursorShape 属性，那个属性只在 MouseArea/Handler 上）。
+            // 悬停描边深一档（scrollbarHover）。用 HoverHandler 取悬停态并设手型光标：它不接按键，
+            // 不像铺一层 MouseArea 那样有拦点击的风险（ComboBox 自身没有 cursorShape）。
             HoverHandler {
                 id: comboHover
                 cursorShape: Qt.PointingHandCursor
             }
 
-            // 原版 ::drop-down { border: none; width: 18px }：右侧一个小三角、无边框。
-            // Qt Basic 默认画的是"上下双箭头"（⌃⌄），与原版不同，所以这里只覆盖 indicator；
-            // contentItem / delegate / popup 一概不碰（那三处属于"超出原版"的改动）。
+            // 原版 ::drop-down { border: none; width: 18px }：右侧一个小三角、无边框；Qt Basic 默认画
+            // 上下双箭头（⌃⌄），所以只覆盖 indicator 的形状，其余保持 Basic 结构。
             indicator: Text {
                 x: languageCombo.width - 26
                 y: Math.round((languageCombo.height - height) / 2)
@@ -132,17 +125,15 @@ Item {
 
             background: Rectangle {
                 color: Theme.color.inputBg
+                // 静息对齐官方 DSH --dsw-alias-border-l2，悬停深一档
                 border.width: 1
-
-                // 对齐官方 DSH `--dsw-alias-border-l2` 的取法；悬停仍深一档（克制的中性灰）。
                 border.color: comboHover.hovered ? Theme.color.scrollbarHover : Theme.color.inputBorder
                 radius: Theme.radius.control
             }
 
-            // 弹出列表的行：ItemDelegate 在 Basic 风格里高亮底取 palette.light、高亮字取
-            // palette.highlightedText（ThemeManager 全局装的是 Highlight=强调蓝 / HighlightedText=
-            // textOnAccent 白 ⇒ 高亮行是"浅底白字"）。这里只改这两个调色板角色为中性 token，
-            // 不动 ItemDelegate 自己的 contentItem/background 结构（结构一改就静默失效，见上面的坑）。
+            // 弹出列表的行：ItemDelegate 在 Basic 风格里高亮底取 palette.light、高亮字取 palette.highlightedText
+            // （全局装的是 Highlight=强调蓝 / HighlightedText=白，高亮行会变成浅底白字）。本页只改这两个角色为
+            // 中性 token，不动 ItemDelegate 自己的 contentItem/background 结构（结构一改就静默失效）。
             delegate: ItemDelegate {
                 id: languageOption
 
@@ -159,7 +150,7 @@ Item {
                 palette.highlightedText: Theme.color.textPrimary
             }
 
-            // 弹层：走 QPalette（方角 + 平台描边），这里给一个与设置页其它面成套的圆角中性面。
+            // 弹层：走 QPalette（方角 + 平台描边），给一个与设置页其它面成套的圆角中性面。
             // contentItem 仍照 Basic 风格那份 ListView 写（delegateModel + highlightedIndex）。
             popup: Popup {
                 y: languageCombo.height + 2
@@ -197,10 +188,8 @@ Item {
             font.pixelSize: Theme.font.caption
         }
 
-        // 原版是 QPushButton#settingsStylesResetButton（settings.qss 与 settingsServerSaveButton 同组规则）：
-        // background {{primaryButtonBg}} / color {{primaryButtonText}} / border none
-        // border-radius 8px / padding 8px 14px；:hover→primaryButtonHover、:pressed→primaryButtonPressed、
-        // :disabled→primaryButtonDisabledBg/Text；setCursor(Qt::PointingHandCursor)。
+        // 原版是 QPushButton#settingsStylesResetButton（与 settingsServerSaveButton 同组规则）：
+        // primaryButtonBg/Text、无边框、radius 8px、padding 8px 14px，hover/pressed/disabled 各一档，手型光标。
         Item { height: 2 }   // Column 的 spacing 是全列统一的，单独给主按钮让一点位
 
         ActionButton {

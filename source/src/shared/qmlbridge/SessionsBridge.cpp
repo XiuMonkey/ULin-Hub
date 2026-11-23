@@ -1,7 +1,6 @@
 #include "qmlbridge/SessionsBridge.h"
 
-SessionsBridge::SessionsBridge(SessionListModel* model, SelectSession selectSession,
-	CreateSession createSession, QObject* parent)
+SessionsBridge::SessionsBridge(SessionListModel* model, SelectSession selectSession, CreateSession createSession, QObject* parent)
 	: QAbstractListModel(parent)
 	, m_model(model)
 	, m_selectSession(std::move(selectSession))
@@ -19,6 +18,7 @@ SessionsBridge::SessionsBridge(SessionListModel* model, SelectSession selectSess
 void SessionsBridge::activateWorkspace(const QString& workspaceId)
 {
 	const QString first = m_model->firstSessionForWorkspace(workspaceId);
+	// 有会话就直接选中，没有才新建；"未分组"工作区的 key 落成空串。
 	if (!first.isEmpty()) {
 		if (m_selectSession)
 			m_selectSession(first);

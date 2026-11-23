@@ -1,4 +1,4 @@
-﻿// ULin Core · 数据：本地设置/会话/工作目录的路径与恢复默认。
+// ULin Core · 数据：本地设置/会话/工作目录的路径与恢复默认。
 import QtQuick
 import ULinHub 1.0
 import "../../../widgets"
@@ -6,7 +6,7 @@ import "../../../widgets"
 Item {
     id: page
 
-    readonly property var cfg: Hub.settings.ulincoreBridge
+    readonly property var cfg: Hub.settings.ulincoreBridge   // 自研内核配置桥：路径、状态与打开/恢复操作都从它来
 
     Column {
         anchors.fill: parent
@@ -68,6 +68,7 @@ Item {
             font.pixelSize: Theme.font.caption
         }
 
+        // 三个操作都直接调桥接，不经过本地草稿；反馈写回 cfg.status。
         Row {
             spacing: 8
 

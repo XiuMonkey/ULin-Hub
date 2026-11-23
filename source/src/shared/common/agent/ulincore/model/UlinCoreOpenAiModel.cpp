@@ -17,6 +17,7 @@ namespace UlinCore
 {
 namespace
 {
+// baseUrl 已带 /chat/completions 时不再重复拼接。
 QString endpointFor(const QString& baseUrl)
 {
 	QString base = baseUrl.trimmed();
@@ -27,6 +28,7 @@ QString endpointFor(const QString& baseUrl)
 	return base + QStringLiteral("/chat/completions");
 }
 
+// 会话消息 → OpenAI chat 消息；assistant 的工具调用按 wire 名编码。
 QJsonObject messageToJson(const Message& message)
 {
 	QJsonObject object;
@@ -50,9 +52,7 @@ QJsonObject messageToJson(const Message& message)
 					{ QStringLiteral("type"), QStringLiteral("function") },
 					{ QStringLiteral("function"), QJsonObject{
 						{ QStringLiteral("name"), Protocol::wireName(call.name) },
-						{ QStringLiteral("arguments"), QString::fromUtf8(
-							QJsonDocument(Protocol::encodeToolArguments(call.arguments, call.metadata))
-								.toJson(QJsonDocument::Compact)) }
+						{ QStringLiteral("arguments"), QString::fromUtf8(QJsonDocument(Protocol::encodeToolArguments(call.arguments, call.metadata)).toJson(QJsonDocument::Compact)) }
 					} }
 				};
 				calls.append(callObject);
@@ -120,8 +120,7 @@ void UlinCoreOpenAiModel::start(const ModelRequest& request, const ModelCallback
 	networkRequest.setRawHeader("Authorization", "Bearer " + m_config.apiKey.toUtf8());
 	networkRequest.setTransferTimeout(180000);
 
-	m_reply = m_network->post(networkRequest,
-		QJsonDocument(body).toJson(QJsonDocument::Compact));
+	m_reply = m_network->post(networkRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
 	connect(m_reply, &QNetworkReply::readyRead, this, [this, generation] {
 		if (generation == m_generation)
 			handleReadyRead();
@@ -145,6 +144,7 @@ void UlinCoreOpenAiModel::cancel()
 
 void UlinCoreOpenAiModel::handleReadyRead()
 {
+	// 按行切 SSE 缓冲，不完整的行留到下次 readyRead。
 	if (!m_reply)
 		return;
 
@@ -159,6 +159,7 @@ void UlinCoreOpenAiModel::handleReadyRead()
 	}
 }
 
+// 逐行解析 SSE：data: 负载是增量 delta，[DONE] 表示流结束。
 void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 {
 	const QByteArray trimmed = line.trimmed();
@@ -188,6 +189,7 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 			m_callbacks.onDelta(text, thinking);
 	}
 
+	// tool_calls 按 index 增量聚合，参数分片要等流结束才拼得完整。
 	const QJsonArray intentCalls = delta.value(QStringLiteral("tool_calls")).toArray();
 	for (const QJsonValue& value : intentCalls) {
 		const QJsonObject call = value.toObject();
@@ -200,16 +202,14 @@ void UlinCoreOpenAiModel::handleSseLine(const QByteArray& line)
 
 		const QJsonObject function = call.value(QStringLiteral("function")).toObject();
 		if (function.contains(QStringLiteral("name")))
-			target.name = Protocol::intentNameFromWire(
-				function.value(QStringLiteral("name")).toString());
+			target.name = Protocol::intentNameFromWire(function.value(QStringLiteral("name")).toString());
 		if (function.value(QStringLiteral("metadata")).isObject())
 			target.metadata = function.value(QStringLiteral("metadata")).toObject();
 		const QJsonValue arguments = function.value(QStringLiteral("arguments"));
 		if (arguments.isString())
 			m_callArguments[index] += arguments.toString();
 		else if (arguments.isObject())
-			m_callArguments[index] += QString::fromUtf8(
-				QJsonDocument(arguments.toObject()).toJson(QJsonDocument::Compact));
+			m_callArguments[index] += QString::fromUtf8(QJsonDocument(arguments.toObject()).toJson(QJsonDocument::Compact));
 	}
 
 	const QString finishReason = choice.value(QStringLiteral("finish_reason")).toString();
@@ -259,6 +259,7 @@ void UlinCoreOpenAiModel::complete()
 		return;
 	m_finished = true;
 
+	// 流结束：把分片参数解析成完整调用，缺 id 时补一个稳定值。
 	QList<IntentCall> calls;
 	QList<int> keys = m_calls.keys();
 	std::sort(keys.begin(), keys.end());

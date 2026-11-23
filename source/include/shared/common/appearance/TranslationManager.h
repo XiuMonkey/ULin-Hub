@@ -22,9 +22,6 @@ struct LanguageInfo
 	QString name;  // 展示名，用该语言自己的写法（"English"、"日本語"）
 };
 
-// "控件文本快照 → 就地换文案"机制已删除，随之去掉 TranslationSource / WidgetTextSnapshot /
-// snapshotWidgetTexts / applyWidgetTextSnapshot / translationSources；QML 壳的文案由绑定自动重取。
-
 // 语言切换通知：不是控件、收不到 QEvent::LanguageChange 的对象接这个信号；
 // 同时它也是插件侧的多语言入口（VirtualTranslation 的宿主实现，登记名 kTranslationNotifier）。
 class TranslationNotifier : public QObject, public VirtualTranslation

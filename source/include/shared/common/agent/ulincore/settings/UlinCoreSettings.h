@@ -59,15 +59,12 @@ public:
 	void setAllowWrites(bool value);
 
 	void addProvider(const QString& name, const QString& baseUrl, const QString& apiKey);
-	void updateProvider(const QString& id, const QString& name,
-		const QString& baseUrl, const QString& apiKey);
+	void updateProvider(const QString& id, const QString& name, const QString& baseUrl, const QString& apiKey);
 	void removeProvider(const QString& id);
 	void selectProvider(const QString& id);
 
-	void addModel(const QString& providerId, const QString& id, const QString& name,
-		int maxTokens, double temperature);
-	void updateModel(const QString& providerId, const QString& modelId, const QString& name,
-		int maxTokens, double temperature);
+	void addModel(const QString& providerId, const QString& id, const QString& name, int maxTokens, double temperature);
+	void updateModel(const QString& providerId, const QString& modelId, const QString& name, int maxTokens, double temperature);
 	void removeModel(const QString& providerId, const QString& modelId);
 	void selectModel(const QString& providerId, const QString& modelId);
 	void fetchModels(const QString& providerId);
@@ -113,8 +110,7 @@ private:
 	QList<ProviderEntry> m_providers;
 	QString m_selectedProvider;
 	QString m_selectedModel;
-	QString m_systemPrompt = QStringLiteral(
-		"You are ULin Core, a concise coding agent. Use tools when they help.");
+	QString m_systemPrompt = QStringLiteral("You are ULin Core, a concise coding agent. Use tools when they help.");
 	QString m_workspaceRoot = QStringLiteral("launch-root");
 	int m_toolThreads = 4;
 	int m_maxSteps = 24;

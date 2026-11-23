@@ -49,7 +49,7 @@ void FileBrowserService::onOfficeBackendFinished(const QString& source, const QS
 	emit fileChanged();
 }
 
-
+// 规范化后按路径前缀判断是否在根目录内，挡住 ../ 与符号链接逃逸。
 bool FileBrowserService::isInsideRoot(const QString& path) const
 {
 	if (m_rootPath.isEmpty())
@@ -70,6 +70,7 @@ void FileBrowserService::setError(const QString& text)
 	emit errorChanged();
 }
 
+// 复位所有预览状态，并清掉临时 PDF 与正在跑的转换进程。
 void FileBrowserService::clearFile()
 {
 	m_text.clear();
@@ -146,8 +147,7 @@ void FileBrowserService::refresh()
 		setError(QStringLiteral("目录不存在"));
 		return;
 	}
-	const QFileInfoList files = dir.entryInfoList(
-		QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
+	const QFileInfoList files = dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::DirsFirst | QDir::Name);
 	QVariantList rows;
 	rows.reserve(files.size());
 	for (const QFileInfo& info : files) {
@@ -224,6 +224,7 @@ bool FileBrowserService::buildLineIndexFromBuffer(const QByteArray& data)
 	return true;
 }
 
+// 只按行偏移 seek 出当前页，不把整个文件读进内存。
 void FileBrowserService::loadPage(int index)
 {
 	if (m_filePath.isEmpty() || m_lineOffsets.size() < 2)
@@ -296,9 +297,9 @@ void FileBrowserService::openFile(const QString& path)
 			QMetaObject::invokeMethod(m_officeBackend, "convertOffice", Qt::QueuedConnection,
 				Q_ARG(QString, path), Q_ARG(QString, pdfPath));
 		} else {
-		m_convertProc = OfficeConverter::startConversion(path, pdfPath, this);
-		connect(m_convertProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
-			[this, pdfPath](int exitCode, QProcess::ExitStatus status) {
+			m_convertProc = OfficeConverter::startConversion(path, pdfPath, this);
+			connect(m_convertProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+				[this, pdfPath](int exitCode, QProcess::ExitStatus status) {
 				QProcess* proc = m_convertProc;
 				m_convertProc = nullptr;
 				m_officeConverting = false;
@@ -349,6 +350,7 @@ void FileBrowserService::openFile(const QString& path)
 	loadPage(0);
 }
 
+// 与 loadPage 同一切页规则，供只读调用方直接取某一页文本。
 QString FileBrowserService::readPage(int index) const
 {
 	if (m_filePath.isEmpty() || m_lineOffsets.size() < 2)

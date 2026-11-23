@@ -45,6 +45,7 @@ void StyleResolver::ensureDefaults() const
 	ThemeManager::instance().ensureStylePack();   // 这里只转发，规则与日志都在 ThemeManager::ensureStylePack()
 }
 
+// 检查磁盘风格包：缺失即全走内置；JSON 或 uiAbi 不合格则整包拒载并记录拒载原因。
 void StyleResolver::inspectPack()
 {
 	m_packPresent = false;
@@ -97,7 +98,7 @@ QString StyleResolver::url(const QString& logicalPath) const
 	if (logicalPath.isEmpty())
 		return QString();
 
-	const auto cached = m_urlCache.constFind(logicalPath);   // QML 侧同一个路径会反复问（每个 Loader 一次），缓存掉文件系统探测
+	const auto cached = m_urlCache.constFind(logicalPath);   // 同一路径会被 QML 反复询问（每个 Loader 一次），缓存掉文件系统探测
 	if (cached != m_urlCache.constEnd())
 		return cached.value();
 
@@ -133,7 +134,8 @@ bool StyleResolver::reset()
 			qWarning().noquote() << "[Style] 重置时删不掉：" << target;
 	}
 	QFile::remove(m_stylesDir + QLatin1Char('/') + QLatin1String(kPackFileName));
-	QFile::remove(m_stylesDir + QLatin1Char('/') + QStringLiteral("release-manifest.json"));   // 释放基线也清掉：否则下次启动会拿旧基线去比，用户改过的文件会被当成"内置没变"而跳过
+	// 释放基线也清掉：否则下次启动会拿旧基线去比，用户改过的文件会被当成"内置没变"而跳过。
+	QFile::remove(m_stylesDir + QLatin1Char('/') + QStringLiteral("release-manifest.json"));
 
 	ensureDefaults();
 	inspectPack();

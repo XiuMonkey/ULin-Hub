@@ -1,4 +1,4 @@
-﻿// 见 MessageListModel.h：会话消息列表模型。
+// 见 MessageListModel.h：会话消息列表模型。
 
 #include "common/session/MessageListModel.h"
 
@@ -12,10 +12,16 @@
 
 namespace
 {
+	// 高频日志开关：会话重建/流式时每秒可打几万行，默认关；排查时设 ULIN_CHAT_TRACE=1。
+	bool chatTraceEnabled()
+	{
+		static const bool enabled = qEnvironmentVariableIsSet("ULIN_CHAT_TRACE");
+		return enabled;
+	}
+
 	QString textDigest(const QString& text)
 	{
-		return QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(),
-			QCryptographicHash::Sha1).toHex().left(12));
+		return QString::fromLatin1(QCryptographicHash::hash(text.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
 	}
 	QString normalizedForDedup(const QString& text)
 	{
@@ -28,8 +34,7 @@ namespace
 	{
 		if (text.trimmed().isEmpty())
 			return text;
-		const QStringList parts = text.split(QRegularExpression(QStringLiteral("\\n\\s*\\n")),
-			Qt::KeepEmptyParts);
+		const QStringList parts = text.split(QRegularExpression(QStringLiteral("\\n\\s*\\n")), Qt::KeepEmptyParts);
 		QStringList out;
 		QString previous;
 		for (const QString& part : parts) {
@@ -80,6 +85,21 @@ void MessageListModel::clear()
 	beginResetModel();
 	m_rows.clear();
 	endResetModel();
+	emit countChanged();
+}
+
+void MessageListModel::removeFirstRows(int count)
+{
+	if (count <= 0 || m_rows.isEmpty())
+		return;
+	count = qMin(count, m_rows.size());
+	if (m_batchRebuild) {
+		m_rows.remove(0, count);
+		return;
+	}
+	beginRemoveRows(QModelIndex(), 0, count - 1);
+	m_rows.remove(0, count);
+	endRemoveRows();
 	emit countChanged();
 }
 
@@ -163,8 +183,7 @@ void MessageListModel::addUsage(int row, const QJsonObject& usage)
 	if (row < 0 || row >= m_rows.size() || usage.isEmpty())
 		return;
 
-	auto addNumber = [&usage](QJsonObject& target, const QString& targetKey,
-		const QStringList& sourceKeys) {
+	auto addNumber = [&usage](QJsonObject& target, const QString& targetKey, const QStringList& sourceKeys) {
 		double value = target.value(targetKey).toDouble(0);
 		for (const QString& key : sourceKeys) {
 			if (usage.contains(key)) {
@@ -178,25 +197,18 @@ void MessageListModel::addUsage(int row, const QJsonObject& usage)
 
 	Row& target = m_rows[row];
 	QJsonObject merged = target.usage;
-	addNumber(merged, QStringLiteral("inputTokens"),
-		{ QStringLiteral("inputTokens"), QStringLiteral("promptTokens") });
-	addNumber(merged, QStringLiteral("outputTokens"),
-		{ QStringLiteral("outputTokens"), QStringLiteral("completionTokens") });
-	addNumber(merged, QStringLiteral("cacheReadTokens"),
-		{ QStringLiteral("cacheReadTokens"), QStringLiteral("cacheReadInputTokens") });
-	addNumber(merged, QStringLiteral("cacheWriteTokens"),
-		{ QStringLiteral("cacheWriteTokens"), QStringLiteral("cacheWriteInputTokens") });
-	addNumber(merged, QStringLiteral("reasoningTokens"),
-		{ QStringLiteral("reasoningTokens") });
-	addNumber(merged, QStringLiteral("totalTokens"),
-		{ QStringLiteral("totalTokens"), QStringLiteral("total") });
+	addNumber(merged, QStringLiteral("inputTokens"), { QStringLiteral("inputTokens"), QStringLiteral("promptTokens") });
+	addNumber(merged, QStringLiteral("outputTokens"), { QStringLiteral("outputTokens"), QStringLiteral("completionTokens") });
+	addNumber(merged, QStringLiteral("cacheReadTokens"), { QStringLiteral("cacheReadTokens"), QStringLiteral("cacheReadInputTokens") });
+	addNumber(merged, QStringLiteral("cacheWriteTokens"), { QStringLiteral("cacheWriteTokens"), QStringLiteral("cacheWriteInputTokens") });
+	addNumber(merged, QStringLiteral("reasoningTokens"), { QStringLiteral("reasoningTokens") });
+	addNumber(merged, QStringLiteral("totalTokens"), { QStringLiteral("totalTokens"), QStringLiteral("total") });
 
 	if (!merged.contains(QStringLiteral("totalTokens"))) {
 		const double input = merged.value(QStringLiteral("inputTokens")).toDouble(0)
 			+ merged.value(QStringLiteral("cacheReadTokens")).toDouble(0)
 			+ merged.value(QStringLiteral("cacheWriteTokens")).toDouble(0);
-		merged.insert(QStringLiteral("totalTokens"),
-			input + merged.value(QStringLiteral("outputTokens")).toDouble(0));
+		merged.insert(QStringLiteral("totalTokens"), input + merged.value(QStringLiteral("outputTokens")).toDouble(0));
 	}
 
 	target.usage = merged;
@@ -234,7 +246,8 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 		return;
 
 	Row& entry = m_rows[row];
-	qInfo().noquote() << "[ChatChunk] in"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ChatChunk] in"
 		<< "row=" << row << "type=" << type
 		<< "len=" << text.size() << textDigest(text)
 		<< "streaming=" << entry.streaming
@@ -265,14 +278,15 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			if (existing.type == type
 					&& (existing.text == incoming
 						|| normalizedForDedup(existing.text) == incomingNorm)) {
-				qInfo().noquote() << "[ChatChunk] drop-exact"
+				if (chatTraceEnabled())
+					qInfo().noquote() << "[ChatChunk] drop-exact"
 					<< "row=" << row << "type=" << type << textDigest(incoming);
 				return;
 			}
 		}
 	}
 
-	// 引擎的 assistant/message 有时是**整段快照**而不是增量（同一 turn 的工具前后会重复发）。
+	// 引擎的 assistant/message 有时是整段快照而不是增量（同一 turn 的工具前后会重复发）。
 	// 若本次文本与同类上一段相同/是其前缀，跳过；若是它的累积版本，直接替换，避免正文重复两遍。
 	for (int i = entry.segments.size() - 1; i >= 0; --i) {
 		Segment& previous = entry.segments[i];
@@ -283,13 +297,15 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 		const QString previousNorm = normalizedForDedup(previous.text);
 		if (previous.text == incoming || previousNorm == incomingNorm
 				|| previousNorm.startsWith(incomingNorm)) {
-			qInfo().noquote() << "[ChatChunk] drop-prefix"
+			if (chatTraceEnabled())
+				qInfo().noquote() << "[ChatChunk] drop-prefix"
 				<< "row=" << row << "type=" << type << textDigest(incoming)
 				<< "prev=" << previous.text.size() << textDigest(previous.text);
 			return;
 		}
 		if (incomingNorm.startsWith(previousNorm)) {
-			qInfo().noquote() << "[ChatChunk] replace-grow"
+			if (chatTraceEnabled())
+				qInfo().noquote() << "[ChatChunk] replace-grow"
 				<< "row=" << row << "type=" << type
 				<< "prev=" << previous.text.size() << "next=" << incoming.size();
 			previous.text = type == QLatin1String("thinking")
@@ -309,7 +325,8 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			if (type == QLatin1String("thinking")) {
 				// 同一份思考快照被重复追加，而不是真正的增量。
 				if (!incomingNorm.isEmpty() && lastNorm.endsWith(incomingNorm)) {
-					qInfo().noquote() << "[ChatChunk] drop-tail-dup"
+					if (chatTraceEnabled())
+						qInfo().noquote() << "[ChatChunk] drop-tail-dup"
 						<< "row=" << row << "type=" << type << textDigest(incoming);
 					return;
 				}
@@ -317,7 +334,8 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 			} else {
 				last.text += incoming;
 			}
-			qInfo().noquote() << "[ChatChunk] append-last"
+			if (chatTraceEnabled())
+				qInfo().noquote() << "[ChatChunk] append-last"
 				<< "row=" << row << "type=" << type
 				<< "len=" << incoming.size() << "total=" << last.text.size();
 			last.partsReady = false;  // text 变了 ⇒ 缓存的 markdown 切分作废（见 Segment::parts）
@@ -331,7 +349,8 @@ void MessageListModel::appendChunk(int row, const QString& type, const QString& 
 	segment.text = incoming;
 	segment.toolName = toolName;
 	entry.segments.append(segment);
-	qInfo().noquote() << "[ChatChunk] new-segment"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ChatChunk] new-segment"
 		<< "row=" << row << "type=" << type
 		<< "len=" << incoming.size() << "segments=" << entry.segments.size();
 	touchRow(row);
@@ -351,11 +370,13 @@ void MessageListModel::replaceThinkingSnapshot(int row, const QString& text)
 			continue;
 		if (segment.text == incoming
 				|| normalizedForDedup(segment.text) == incomingNorm) {
-			qInfo().noquote() << "[ChatChunk] drop-thinking-snapshot"
+			if (chatTraceEnabled())
+				qInfo().noquote() << "[ChatChunk] drop-thinking-snapshot"
 				<< "row=" << row << textDigest(incoming);
 			return;
 		}
-		qInfo().noquote() << "[ChatChunk] replace-thinking"
+		if (chatTraceEnabled())
+			qInfo().noquote() << "[ChatChunk] replace-thinking"
 			<< "row=" << row
 			<< "prev=" << segment.text.size() << textDigest(segment.text)
 			<< "next=" << incoming.size() << textDigest(incoming);
@@ -372,7 +393,8 @@ void MessageListModel::replaceThinkingSnapshot(int row, const QString& text)
 void MessageListModel::appendReplyTail(int row, const QString& text)
 {
 	Row& entry = m_rows[row];
-	qInfo().noquote() << "[ReplyTail] in"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ReplyTail] in"
 		<< "row=" << row
 		<< "len=" << text.size() << textDigest(text)
 		<< "streaming=" << entry.streaming
@@ -388,14 +410,16 @@ void MessageListModel::appendReplyTail(int row, const QString& text)
 		placeholder.type = QLatin1String("reply");
 		placeholder.partsReady = true;   // 空文本，避免 segmentsFor 在这里切分
 		entry.segments.append(placeholder);
-		qInfo().noquote() << "[ReplyTail] create-placeholder"
+		if (chatTraceEnabled())
+			qInfo().noquote() << "[ReplyTail] create-placeholder"
 			<< "row=" << row << "segments=" << entry.segments.size();
 	}
 
 	Segment& reply = entry.segments.last();
 	const QString base = entry.replyTail.isEmpty() ? reply.text : entry.replyTail;
 	if (base == text || base.startsWith(text)) {
-		qInfo().noquote() << "[ReplyTail] drop"
+		if (chatTraceEnabled())
+			qInfo().noquote() << "[ReplyTail] drop"
 			<< "row=" << row
 			<< "base=" << base.size() << textDigest(base)
 			<< "incoming=" << text.size() << textDigest(text);
@@ -404,7 +428,8 @@ void MessageListModel::appendReplyTail(int row, const QString& text)
 
 	const QString oldTail = entry.replyTail;
 	entry.replyTail = text.startsWith(base) ? text : (base + text);
-	qInfo().noquote() << "[ReplyTail] set"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ReplyTail] set"
 		<< "row=" << row
 		<< "old=" << oldTail.size() << textDigest(oldTail)
 		<< "base=" << base.size() << textDigest(base)
@@ -424,11 +449,13 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 		return false;
 	Row& entry = m_rows[row];
 	if (entry.replyTail.isEmpty()) {
-		qInfo().noquote() << "[ReplyTail] commit-skip"
+		if (chatTraceEnabled())
+			qInfo().noquote() << "[ReplyTail] commit-skip"
 			<< "row=" << row << "reason=empty-tail";
 		return false;
 	}
-	qInfo().noquote() << "[ReplyTail] commit-in"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ReplyTail] commit-in"
 		<< "row=" << row
 		<< "tail=" << entry.replyTail.size() << textDigest(entry.replyTail)
 		<< "segments=" << entry.segments.size();
@@ -458,7 +485,8 @@ bool MessageListModel::commitReplyTail(int row, bool notify)
 	entry.replyTail.clear();
 	entry.tailParts.clear();
 	entry.tailPartsReady = false;
-	qInfo().noquote() << "[ReplyTail] commit-done"
+	if (chatTraceEnabled())
+		qInfo().noquote() << "[ReplyTail] commit-done"
 		<< "row=" << row
 		<< "replyIndex=" << replyIndex
 		<< "prev=" << oldReplySize << oldReplyHash
@@ -486,7 +514,7 @@ void MessageListModel::appendIntentResult(int row, const QString& text)
 			if (segment.text.contains(QLatin1String("\n\n--- 结果 ---\n")))
 				segment.text += QLatin1Char('\n') + text;   // 同一调用多段结果就继续接
 			else
-				segment.text += QStringLiteral("\n\n--- 结果 ---\n") + text;   // 数据分隔符、不是界面文案：故意不进 ID-based 翻译（改了接不上历史里已存的同一标记）
+				segment.text += QStringLiteral("\n\n--- 结果 ---\n") + text;   // 数据分隔符而非界面文案：不能进 ID-based 翻译（否则接不上历史里已存的标记）
 			segment.partsReady = false;  // text 变了 ⇒ 缓存的 markdown 切分作废（见 Segment::parts）
 			touchRow(row);
 			return;
@@ -537,8 +565,8 @@ int MessageListModel::lastAgentRow() const
 }
 
 // 段的 QML 视图：正文段按代码围栏切成单元（正文与代码块按出现顺序排布）。
-// ⚠️ 切分结果**缓存**在段里（见 Segment::parts）：纯函数、只依赖 text，而 data(SegmentsRole) 会被 QML 反复取，
-// 每取一次就重切一遍全文；partsReady 被打回 false 时才在这里重算。
+// 切分结果缓存在段里（见 Segment::parts）：纯函数、只依赖 text，而 data(SegmentsRole) 会被 QML 反复取；
+// partsReady 被打回 false 时才在这里重算，避免每次都重切全文。
 QVariantList MessageListModel::segmentsFor(const Row& row) const
 {
 	QVariantList list;
@@ -587,7 +615,7 @@ void MessageListModel::invalidateSegmentParts()
 	if (!touched)
 		return;
 
-	// ⚠️ 不能 beginResetModel：本模型的更新策略是"只发 dataChanged"，reset 会丢滚动位置与 delegate。
+	// 不能 beginResetModel：本模型的更新策略是"只发 dataChanged"，reset 会丢滚动位置与 delegate。
 	emit dataChanged(index(0, 0), index(m_rows.size() - 1, 0), { SegmentsRole });
 }
 

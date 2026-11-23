@@ -92,8 +92,7 @@ Item {
                 required property var modelData
                 required property int index
 
-                // 形态与"是不是当前项"都来自数据（见 root.tabs 的说明）：**不要**在这里读 root.xxx
-                // 做绑定 —— 委托创建时外层 id 可能还没挂上，绑定会永久停在初始值。
+                // 形态与当前项都来自数据（原因见 root.tabs）；这里不要读 root.xxx 做绑定。
                 readonly property bool asTab: modelData.asTab === true
                 readonly property bool isCurrent: modelData.current === true
                 readonly property bool isTruncated: tabLabel.truncated

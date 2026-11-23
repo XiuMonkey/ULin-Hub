@@ -20,8 +20,7 @@ struct ModelRequest
 struct ModelCallbacks
 {
 	std::function<void(const QString& textDelta, const QString& thinkingDelta)> onDelta;
-	std::function<void(const QList<IntentCall>& calls, const QString& text, const QString& thinking,
-		const Usage& usage, const QString& finishReason)> onComplete;
+	std::function<void(const QList<IntentCall>& calls, const QString& text, const QString& thinking, const Usage& usage, const QString& finishReason)> onComplete;
 	std::function<void(const QString& error)> onError;
 };
 

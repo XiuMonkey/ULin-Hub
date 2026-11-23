@@ -97,9 +97,9 @@ namespace
 
 	const char* const kFactorySettingsYaml = "# ULin Hub factory settings.\n";   // 出厂 settings.yaml 留空配置，让适配器提供其自带模型目录
 
-	// 未分组会话的兜底：引擎只在 `initialized == false` 时按 session header 的 cwd 重建分组
-	// （dsh-workspace 的 bootstrap）。用户把所有工作区删光后 workspace.json 仍是 initialized=true +
-	// 让引擎自己的 bootstrap 按 cwd 重建分组：launch-root 的会话会自然落回 launch-root。
+	// 未分组会话的兜底：引擎只在 initialized == false 时按 session header 的 cwd 重建分组
+	// （dsh-workspace 的 bootstrap）。工作区被删光后 workspace.json 仍是 initialized=true 且
+	// workspaceIds 为空，这里把它改回 false，让引擎按 cwd 重建分组（launch-root 会话落回 launch-root）。
 	void reviveEmptyWorkspaceRegistry(const QString& dshHome)
 	{
 		const QString registryPath = dshHome + QStringLiteral("/storages/workspace.json");
@@ -122,9 +122,9 @@ namespace
 		if (!state.value(QStringLiteral("workspaceIds")).toArray().isEmpty())
 			return;
 
-		// 只有真的存在**可见的**已存会话才重置；没有任何会话、或全部都已归档时都返回。
-		// 后者很重要：删除最后一个工作区的默认链路是"先归档组内会话、再 workspace/delete"，
-		// 归档不会删 sessions/<project>/session-* 目录；若只看目录存在，就会每次启动都把
+		// 只有真的存在可见的已存会话才重置；没有任何会话、或全部都已归档时都返回。
+		// 删除最后一个工作区的链路是"先归档组内会话、再 workspace/delete"，归档不会删
+		// sessions/<project>/session-* 目录；若只看目录存在，每次启动都会把空注册表再重置一遍。
 		QStringList archived;
 		for (const auto& value : state.value(QStringLiteral("archivedSessionIds")).toArray())
 			archived.append(value.toString());
@@ -187,7 +187,7 @@ void ServerManager::start(const QUrl& initialBaseUrl, QProcess* initialServerPro
 	m_dshHome = appDir + QStringLiteral("/resources/server/harness");
 
 	// 接管态：不启动内置 DSH 服务端（已被扩展取代）；此段必须在 m_dshHome 赋值之后，
-	// 否则提前 return 会让 Settings / PluginsManager 拿到空 dshHome
+	// 否则提前 return 会让设置页与插件管理拿到空 dshHome
 	if (g_backendTakenover) {
 		if (initialServerProcess) {  // 接管后仍被移交本窗口的进程一并停掉，否则留下没人管的内置服务端
 			m_serverProcess = initialServerProcess;
@@ -346,8 +346,7 @@ bool ServerManager::ensureExitJob()
 #ifdef Q_OS_WIN
 	HANDLE job = ::CreateJobObjectW(nullptr, nullptr);
 	if (!job) {
-		qWarning().noquote() << QStringLiteral(
-			"[ServerManager] 建 Job Object 失败（退出时只剩 aboutToQuit 兜底）: %1")
+		qWarning().noquote() << QStringLiteral("[ServerManager] 建 Job Object 失败（退出时只剩 aboutToQuit 兜底）: %1")
 			.arg(qt_error_string(static_cast<int>(::GetLastError())));
 		return false;
 	}
@@ -355,16 +354,14 @@ bool ServerManager::ensureExitJob()
 	JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};   // KILL_ON_JOB_CLOSE：job 的最后一个句柄关闭时（= 本进程没了，句柄随之释放）终止 job 内所有进程
 	info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 	if (!::SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
-		qWarning().noquote() << QStringLiteral(
-			"[ServerManager] Job Object 设 KILL_ON_JOB_CLOSE 失败（退出时只剩 aboutToQuit 兜底）: %1")
+		qWarning().noquote() << QStringLiteral("[ServerManager] Job Object 设 KILL_ON_JOB_CLOSE 失败（退出时只剩 aboutToQuit 兜底）: %1")
 			.arg(qt_error_string(static_cast<int>(::GetLastError())));
 		::CloseHandle(job);
 		return false;
 	}
 
 	m_exitJob = job;
-	qInfo().noquote() << QStringLiteral(
-		"[ServerManager] 已建 KillOnJobClose 的 Job Object：本进程无论怎么退出（含崩溃 / 被强杀），"
+	qInfo().noquote() << QStringLiteral("[ServerManager] 已建 KillOnJobClose 的 Job Object：本进程无论怎么退出（含崩溃 / 被强杀），"
 		"内核都会连带终止内置引擎");
 	return true;
 #else
@@ -383,8 +380,7 @@ void ServerManager::adoptIntoExitJob(qint64 pid)
 	HANDLE process = ::OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
 		FALSE, static_cast<DWORD>(pid));
 	if (!process) {
-		qWarning().noquote() << QStringLiteral(
-			"[ServerManager] 打不开内置引擎进程（PID %1），它没进 job，退出时只能靠 aboutToQuit: %2")
+		qWarning().noquote() << QStringLiteral("[ServerManager] 打不开内置引擎进程（PID %1），它没进 job，退出时只能靠 aboutToQuit: %2")
 			.arg(pid).arg(qt_error_string(static_cast<int>(::GetLastError())));
 		return;
 	}
@@ -395,8 +391,7 @@ void ServerManager::adoptIntoExitJob(qint64 pid)
 	else {
 		// 常见原因：本进程已被外部塞进一个不允许嵌套的 job（Win7 / 某些 CI）。不是致命错误 ——
 		// aboutToQuit 那条照样会杀，只是崩溃/强杀时没了系统级保险。
-		qWarning().noquote() << QStringLiteral(
-			"[ServerManager] 内置引擎（PID %1）加不进 Job Object，退出时只能靠 aboutToQuit: %2")
+		qWarning().noquote() << QStringLiteral("[ServerManager] 内置引擎（PID %1）加不进 Job Object，退出时只能靠 aboutToQuit: %2")
 			.arg(pid).arg(qt_error_string(static_cast<int>(::GetLastError())));
 	}
 
@@ -509,8 +504,8 @@ void ServerManager::startBundledServer()
 
 	QString nodePath = appDir + QStringLiteral("/resources/server/node.exe");
 
-	// 入口脚本在发布目录的 resources/node/ 下：该目录结构与 assets/resources/node/ 一一对应
-	// 发布/打包时 resources 这棵树要照搬仓库里的分目录结构。
+	// 入口脚本在发布目录的 resources/node/ 下；打包时 resources 这棵树要照搬仓库
+	// assets/resources/ 的分目录结构（两边一一对应）。
 	QString entryPath = appDir + QStringLiteral("/resources/node/harness-node-entry.mjs");
 	QString dshEntry = appDir + QStringLiteral("/resources/server/node_modules/@deepseek-ai/dsh/lib/bin.js");
 	QString cwd = defaultWorkspacePath();
@@ -539,6 +534,7 @@ void ServerManager::startBundledServer()
 		const QString profileDir = dshHome + QStringLiteral("/profiles/web");
 		const QString manifestPath = profileDir + QStringLiteral("/package.json");
 
+		// profile 不存在：整份生成最小 manifest、url-printer 插件与 patch 模板。
 		if (!QFile::exists(manifestPath)) {
 			QDir().mkpath(profileDir);
 
@@ -577,6 +573,7 @@ void ServerManager::startBundledServer()
 				urlPkg.close();
 			}
 
+			// url-printer：服务端就绪后把带认证令牌的 URL 打到 stdout，客户端据此确定 baseUrl。
 			QFile urlIndex(urlPrinterDir + QStringLiteral("/index.js"));
 			if (urlIndex.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
 				urlIndex.write("import z from \"@deepseek-ai/schemastery\";\n");   // /api 需要启动令牌换来的认证 cookie，故打印机把认证 URL 打到 stdout
@@ -694,8 +691,7 @@ void ServerManager::startBundledServer()
 					+ QStringLiteral("/package.json"));
 
 			if (!statsAvailable) {
-				qWarning().noquote() << QStringLiteral(
-					"[ServerManager] 找不到 %1：输入区统计小灰字只会有 token 那一段").arg(statsName);
+				qWarning().noquote() << QStringLiteral("[ServerManager] 找不到 %1：输入区统计小灰字只会有 token 那一段").arg(statsName);
 			}
 			else {
 				QString error;
@@ -706,20 +702,17 @@ void ServerManager::startBundledServer()
 					&error);
 
 				if (row == ExtensionRegistry::PatchEntryResult::Failed)
-					qWarning().noquote() << QStringLiteral(
-						"[ServerManager] profile patch 补不上 %1: %2").arg(statsName, error);
+					qWarning().noquote() << QStringLiteral("[ServerManager] profile patch 补不上 %1: %2").arg(statsName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(statsName);
 			}
 		}
 
-		// 右栏「终端」块：交互式终端控制器（terminal/*）。包在引擎自带 node_modules 里，
-		// 但 profile 里没有挂它的行 —— 缺这一行时 /api/terminal/* 一律 404 not found。
-		// 与 session-stats 同样幂等补行：首次生成的模板已经带上它，这里兜的是"profile 早就生成好"的安装。
+		// 可选服务端组件：缺包只告警，不阻断启动。
 		{
-			// 插件市场：dshmarket 是**标准插件**，它自己注册 /dsh-market/* 那一整批路由
-			// （registry / installed / install / uninstall / backup / restore / webdav …）。
-			// 一直 404，界面只能退回内置快照，"正在等待最新数据"永远等不到）。与终端那条同样幂等补行。
+			// 插件市场：dshmarket 注册 /dsh-market/* 那一整批路由（registry / installed /
+			// install / uninstall / backup / restore / webdav …）。缺行时全部 404，界面只能
+			// 退回内置快照；与终端那条同样幂等补行。
 			{
 				const QString marketName = QStringLiteral("dshmarket");
 				const bool marketAvailable =
@@ -731,8 +724,7 @@ void ServerManager::startBundledServer()
 						+ QStringLiteral("/package.json"));
 
 				if (!marketAvailable) {
-					qWarning().noquote() << QStringLiteral(
-						"[ServerManager] 找不到 %1：插件市场只能退到快照（/dsh-market/* 全 404）。").arg(marketName);
+					qWarning().noquote() << QStringLiteral("[ServerManager] 找不到 %1：插件市场只能退到快照（/dsh-market/* 全 404）。").arg(marketName);
 				}
 				else {
 					QString marketError;
@@ -742,12 +734,13 @@ void ServerManager::startBundledServer()
 						&marketError);
 
 					if (marketRow == ExtensionRegistry::PatchEntryResult::Failed)
-						qWarning().noquote() << QStringLiteral(
-							"[ServerManager] profile patch 补不上 %1: %2").arg(marketName, marketError);
+						qWarning().noquote() << QStringLiteral("[ServerManager] profile patch 补不上 %1: %2").arg(marketName, marketError);
 					else if (marketRow == ExtensionRegistry::PatchEntryResult::Added)
 						qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(marketName);
 				}
 			}
+			// 右栏「终端」块：交互式终端控制器（terminal/*）。包在引擎自带 node_modules 里，
+			// 但 profile 里没有挂它的行 —— 缺行时 /api/terminal/* 一律 404。
 			const QString terminalName = QStringLiteral("@deepseek-ai/dsh-api-terminal-controller");
 			const bool terminalAvailable =
 				QFile::exists(profileDir + QStringLiteral("/node_modules/") + terminalName
@@ -756,8 +749,7 @@ void ServerManager::startBundledServer()
 					+ QStringLiteral("/package.json"));
 
 			if (!terminalAvailable) {
-				qWarning().noquote() << QStringLiteral(
-					"[ServerManager] 找不到 %1：右栏的终端块会打不开（terminal/* 全 404）").arg(terminalName);
+				qWarning().noquote() << QStringLiteral("[ServerManager] 找不到 %1：右栏的终端块会打不开（terminal/* 全 404）").arg(terminalName);
 			}
 			else {
 				QString error;
@@ -768,18 +760,14 @@ void ServerManager::startBundledServer()
 					&error);
 
 				if (row == ExtensionRegistry::PatchEntryResult::Failed)
-					qWarning().noquote() << QStringLiteral(
-						"[ServerManager] profile patch 补不上 %1: %2").arg(terminalName, error);
+					qWarning().noquote() << QStringLiteral("[ServerManager] profile patch 补不上 %1: %2").arg(terminalName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(terminalName);
 			}
 
-			// 顶栏"后台任务"入口：job 控制器（job/list 名册流、job/follow 输出、job/kill）。
-			// 它只挂在官方 web bundle 里，精简 API-only profile 没有这一行 —— 缺行时名册流会收到
-			// gateway/service-unavailable，顶栏计数恒为 0（与 terminal 那条同样幂等补行）。
-			// 账号管理页：account/* 路由由 @deepseek-ai/dsh-api-account-controller 提供。
-			// 它同样不挂在这个 minimal profile 里；缺行时账号页直接 /api/account/getState → 404。
-			// 与 terminal/job/market 同一条幂等补行路径，profile 被删/重建也能自动恢复。
+			// 账号管理页：account/* 路由由 @deepseek-ai/dsh-api-account-controller 提供，它同样不挂在
+			// 这个 minimal profile 里；缺行时账号页直接 /api/account/getState → 404。
+			// 与 terminal/market 同一条幂等补行路径，profile 被删/重建也能自动恢复。
 			const QString accountControllerName = QStringLiteral("@deepseek-ai/dsh-api-account-controller");
 			const bool accountControllerAvailable =
 				QFile::exists(profileDir + QStringLiteral("/node_modules/") + accountControllerName
@@ -788,8 +776,7 @@ void ServerManager::startBundledServer()
 					+ QStringLiteral("/package.json"));
 
 			if (!accountControllerAvailable) {
-				qWarning().noquote() << QStringLiteral(
-					"[ServerManager] 找不到 %1：账号管理页的 account/* 会全部 404").arg(accountControllerName);
+				qWarning().noquote() << QStringLiteral("[ServerManager] 找不到 %1：账号管理页的 account/* 会全部 404").arg(accountControllerName);
 			}
 			else {
 				QString error;
@@ -799,12 +786,14 @@ void ServerManager::startBundledServer()
 					&error);
 
 				if (row == ExtensionRegistry::PatchEntryResult::Failed)
-					qWarning().noquote() << QStringLiteral(
-						"[ServerManager] profile patch 补不上 %1: %2").arg(accountControllerName, error);
+					qWarning().noquote() << QStringLiteral("[ServerManager] profile patch 补不上 %1: %2").arg(accountControllerName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补入 %1").arg(accountControllerName);
 			}
 
+			// 顶栏"后台任务"入口：job 控制器（job/list 名册流、job/follow 输出、job/kill）。
+			// 它只挂在官方 web bundle 里，精简 API-only profile 没有这一行 —— 缺行时名册流会收到
+			// gateway/service-unavailable，顶栏计数恒为 0（与 terminal 那条同样幂等补行）。
 			const QString jobControllerName = QStringLiteral("@deepseek-ai/dsh-api-job-controller");
 			const bool jobControllerAvailable =
 				QFile::exists(profileDir + QStringLiteral("/node_modules/") + jobControllerName
@@ -813,8 +802,7 @@ void ServerManager::startBundledServer()
 					+ QStringLiteral("/package.json"));
 
 			if (!jobControllerAvailable) {
-				qWarning().noquote() << QStringLiteral(
-					"[ServerManager] 找不到 %1：顶栏的后台任务入口会一直空着（job/* 全 service-unavailable）")
+				qWarning().noquote() << QStringLiteral("[ServerManager] 找不到 %1：顶栏的后台任务入口会一直空着（job/* 全 service-unavailable）")
 					.arg(jobControllerName);
 			}
 			else {
@@ -826,8 +814,7 @@ void ServerManager::startBundledServer()
 					&error);
 
 				if (row == ExtensionRegistry::PatchEntryResult::Failed)
-					qWarning().noquote() << QStringLiteral(
-						"[ServerManager] profile patch 补不上 %1: %2").arg(jobControllerName, error);
+					qWarning().noquote() << QStringLiteral("[ServerManager] profile patch 补不上 %1: %2").arg(jobControllerName, error);
 				else if (row == ExtensionRegistry::PatchEntryResult::Added)
 					qInfo().noquote() << QStringLiteral("[ServerManager] profile patch: 已补上 %1").arg(jobControllerName);
 			}
@@ -869,8 +856,7 @@ void ServerManager::ensureAgentPresets(const QString& profileDir)
 
 	bool changed = false;
 	if (!content.contains(QStringLiteral("id: agent-preset-registry"))) {
-		content += QStringLiteral(
-			"\n- id: agent-preset-registry\n"
+		content += QStringLiteral("\n- id: agent-preset-registry\n"
 			"  name: '@deepseek-ai/dsh-agent-preset-registry'\n"
 			"  config:\n"
 			"    default: standard\n"
@@ -947,7 +933,6 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 		QStringLiteral("tools-filter-plugin") };
 
 	const QString nodeModulesPath = profileDir + QStringLiteral("/node_modules");
-	// 旧目录/旧 patch 行迁移到新名字，避免同一个插件被加载两次。
 	for (const QString& legacyName : kLegacyBuiltinPlugins) {
 		QDir legacyDir(nodeModulesPath + QLatin1Char('/') + legacyName);
 		if (legacyDir.exists())
@@ -957,8 +942,7 @@ void ServerManager::ensureBuiltinPlugins(const QString& profileDir)
 	for (const QString& pluginName : kBuiltinPlugins) {
 		const QString sourceDir = QStringLiteral(":/ULinHub/") + pluginName;
 		if (!QDir(sourceDir).exists()) {
-			qWarning().noquote() << QStringLiteral(
-				"[ServerManager] 内置插件资源缺失（qrc 未包含？）: %1").arg(sourceDir);
+			qWarning().noquote() << QStringLiteral("[ServerManager] 内置插件资源缺失（qrc 未包含？）: %1").arg(sourceDir);
 			continue;
 		}
 
@@ -1119,8 +1103,7 @@ void ServerManager::handleServerOutput()
 			const bool hasToken = QUrlQuery(parsed).hasQueryItem(QStringLiteral("token"));
 
 			if (!hasToken) {
-				qWarning().noquote() << QStringLiteral(
-					"[ServerManager] 服务端未提供认证令牌（不是 dsh 0.1.5？）: %1").arg(printed);
+				qWarning().noquote() << QStringLiteral("[ServerManager] 服务端未提供认证令牌（不是 dsh 0.1.5？）: %1").arg(printed);
 				emit errorLine(qtTrId("server_auth_token_missing"));
 				return;
 			}

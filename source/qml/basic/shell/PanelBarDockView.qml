@@ -22,8 +22,6 @@ Item {
     readonly property int activeIndex: PanelBarDock.activeIndex
     readonly property bool homeVisible: PanelBarDock.homeVisible
 
-    // （这里曾有 activeDetached：判断"当前块是否已脱离成独立窗口"，读 PanelBarDock.detachedBlocks。
-
     property real contentT: 1   // 内容出现/切换的动态：开块、切块、回主界面都重放一次（0 → 1）
 
     NumberAnimation {
@@ -88,12 +86,10 @@ Item {
                 onClicked: PanelBarDock.showHome()
             }
 
-            // 块：横向排，多了可滚动
-            // ⚠️ 这条 Flickable 锚在 `⌂` 右边 4px 且**声明在最后** —— 同 z 时后声明者在上层。
-            // （"用户看不见三点"就是这个原因，不是尺寸/颜色问题）。抓手已搬到 PanelBar.qml 的
-            // 标题行，页签条里不再有与它重叠的锚定兄弟。
-            // 横向 ListView 而不是 Row：ListView 对 rowsMoved 有 move/displaced 过渡，
-            // 拖动跨过邻居中点时直接 moveBlock，页签会平滑让位，不需要等松手。
+            // 块页签：横向排，多了可滚动。
+            // ⚠️ 这条 Flickable 锚在 `⌂` 右边 4px 且声明在按钮之后 —— 同 z 时后声明者在上层。
+            // 横向 ListView 而不是 Row：rowsMoved 有 move/displaced 过渡，拖动跨过邻居中点时
+            // 直接 moveBlock，页签会平滑让位，不需要等松手。
             ListView {
                 id: tabList
                 anchors.top: parent.top
@@ -125,7 +121,7 @@ Item {
                     required property string blockId
                     required property int index
 
-                    readonly property real closeZone: 22
+                    readonly property real closeZone: 22   // 页签右缘这 22px 是关闭热区（命中即走关闭分支）
                     readonly property bool closeHover: blockMouse.containsMouse
                                                        && blockMouse.mouseX > width - closeZone
                     readonly property bool current: !dock.homeVisible
@@ -365,17 +361,13 @@ Item {
             }
         }
 
-        // 下面 body 的高度也跟着只减 tabStrip.height。）
-
         Item {
             id: body
             width: parent.width
 
-            // ⚠️ 夹 0 下界：**首帧/尺寸未定**时父链（右栏卡片的 Column）还没有高度，直接算
-            // `parent.height - tabStrip.height - 1` 会得到负数 —— 真机日志里出现过
-            // `PanelBarDock[0,9 260x-62]`（父链 vis=0）。负高度的 Item 本身不画东西，但它的子项
-            // （启动器列、内容 Loader 都锚在它上面）会跟着变成负高；夹到 0 之后是"暂时没地方画
-            // 内容"，可见行为与负高一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
+            // ⚠️ 夹 0 下界：首帧/尺寸未定时，父链（右栏卡片的 Column）还没有高度，直接算
+            // `parent.height - tabStrip.height - 1` 会得到负数，子项（启动器列、内容 Loader）跟着变负高。
+            // 负高与 0 高的可见行为一致（都不画），所以这是纯防御，不改任何正常路径的尺寸。
             height: Math.max(0, parent.height - tabStrip.height)
 
             opacity: dock.contentT   // 出现/切换时淡入 + 轻微放大（顶栏那条块不动，只动内容区）
@@ -592,8 +584,6 @@ Item {
             }
         }
     }
-
-
 
     // 拖块时的浮层必须是独立顶层窗口：右栏 body 有 layer+mask，
     // 把 ghost 留在栏内时一旦拖出侧栏就会被裁掉，看起来像“控件消失”。

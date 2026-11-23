@@ -1,15 +1,17 @@
-﻿#include "common/agent/dsh/pluginmarket/PluginMarketModel.h"
+#include "common/agent/dsh/pluginmarket/PluginMarketModel.h"
 
 #include <QJsonObject>
 #include <algorithm>
 
 QString MarketPlugin::displayDescription() const
 {
+	// 中文描述缺失时退回英文，市场列表始终有可显示文本。
 	return !descriptionZh.isEmpty() ? descriptionZh : descriptionEn;
 }
 
 bool MarketPlugin::matches(const QString& keyword) const
 {
+	// 关键字对名称、分类、中英文描述做不区分大小写的包含匹配。
 	if (keyword.isEmpty())
 		return true;
 
@@ -26,6 +28,7 @@ namespace PluginMarketModel
 		QVector<MarketPlugin> plugins;
 		plugins.reserve(registryPlugins.size());
 
+		// registry 里没有 name 的条目视为无效，直接跳过。
 		for (const auto& value : registryPlugins) {
 			const QJsonObject object = value.toObject();
 

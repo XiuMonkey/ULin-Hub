@@ -88,14 +88,14 @@ private:
 	QString m_officeText;
 	QString m_officePdfBase64;   // Office/WPS 导出的 PDF；空 = 转换不可用
 	QString m_officeError;
-	QString m_tempPdfPath;
+	QString m_tempPdfPath;   // 扩展后端产出的临时 PDF，下次转换或关文件时删除
 	QProcess* m_convertProc = nullptr;
 	QPointer<QObject> m_officeBackend;
-	bool m_officeConverting = false;   // 办公文件完整提取文本，供 QML 做文档/表格/幻灯片排版
+	bool m_officeConverting = false;   // 扩展 office 后端正在转换（转换期间 UI 显示进度）
 	bool m_textMode = false;
 
 	QString m_filePath;
-	QByteArray m_buffer;      // 办公文件提取后的文本；非空时按内存文本分页
+	QByteArray m_buffer;      // 办公文件提取出的 UTF-8 文本；m_fromBuffer 为真时按它分页
 	bool m_fromBuffer = false;
 	QVector<qint64> m_lineOffsets;   // 每一行的起始字节偏移；末尾再加一个文件大小哨兵
 	int m_pageIndex = 0;

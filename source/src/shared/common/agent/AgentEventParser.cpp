@@ -67,6 +67,7 @@ QString extractEventText(const QJsonObject& event)
 	return QString();
 }
 
+// 流式分片只有对象时才带 type（text / reasoning），用于区分文本块与思考块。
 QString extractChunkType(const QJsonObject& event)
 {
 	const QJsonObject data = event.value(QStringLiteral("data")).toObject();
@@ -124,6 +125,7 @@ QString extractReply(const QJsonObject& event)
 	return parts.join(QLatin1Char('\n'));
 }
 
+// arguments 可能是对象，也可能是 JSON 字符串，两种形状都要接受。
 IntentCallInfo extractIntentCall(const QJsonObject& event)
 {
 	IntentCallInfo info;

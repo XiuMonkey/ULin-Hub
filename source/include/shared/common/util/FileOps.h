@@ -1,9 +1,9 @@
 #pragma once
 
-// 目录级文件操作：原先 windows-64 / linux-64 两份 ExtensionLoader.cpp 各有一份**逐字相同**的实现，
-// 提取到这里避免两份漂移（拷贝清单、BOM 处理这类细节最容易改一处漏一处）。
+// 目录级文件操作：原先各平台 ExtensionLoader.cpp 里逐字相同的实现收拢到一处，
+// 避免拷贝清单、BOM 处理这类细节改一处漏一处。
 //
-// 注意：这些是"尽力而为"的目录操作，失败时通过 error 回传原因；调用方拿 false 就别继续装。
+// 这些是"尽力而为"的目录操作，失败时通过 error 回传原因；调用方拿 false 就别继续装。
 
 #include <QDir>
 #include <QDirIterator>
@@ -53,7 +53,7 @@ inline bool copyRecursively(const QString& srcPath, const QString& dstPath, QStr
 	return true;
 }
 
-// 删除整棵目录；目录本来就不存在时 QDir::removeRecursively() 也返回 true，调用方不用先 Test-Path。
+// 删除整棵目录；目录本来就不存在时 QDir::removeRecursively() 也返回 true，调用方不用先判断存在。
 inline bool removeRecursively(const QString& path)
 {
 	QDir dir(path);

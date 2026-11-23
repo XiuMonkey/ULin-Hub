@@ -3,7 +3,7 @@
 // 侧边栏"工作区 / 会话"列表的纯逻辑模型（无 Qt Widget 依赖）：解析 session.list 回包，维护
 // sessionId 的归属/标题/归档，并派生分组与自动选中结果。工作区不随 session.list 返回，只由
 // workspace/follow 的 baseline 提供。
-// ：子代理（subagent）数据也归这里（与"会话目录"同一份语义，避免再开一份新类）：
+// 子代理（subagent）数据也归这里（与"会话目录"同一份语义，避免再开一份新类）：
 //  · 子代理会话本身（session.list 里 origin == subagent / 带 parentSessionId 的行）不进侧栏，
 //  但顶栏的"主 ↔ 子"页签要拿它们的标题与运行态 ⇒ 单独存一份 m_childSessions；
 //  · "某个会话有哪些直接子代理"来自**会话投影 subagentCatalog**（引擎 @deepseek-ai/dsh-subagent

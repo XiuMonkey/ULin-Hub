@@ -12,7 +12,7 @@ Item {
     // 扩展注入点：扩展用 HostUi.item("topBar") 拿到本对象后 setParentItem 进来（见 HostExports.h 的名字契约）
     Component.onCompleted: HostUi.registerItem("topBar", this)
 
-    signal toolsFilterRequested()   // ⚠️ 保留这个信号与 `qml.topbar.toolsFilter` 登记项：宿主侧栏/扩展里还有人用"请求打开工具过滤"
+    signal toolsFilterRequested()   // ⚠️ 保留这个信号：Shell 在 onToolsFilterRequested 里调 Hub.openToolsFilter()，删了按钮就没反应
     signal panelBarRequested()   // 右侧栏开合（面板本体在 basic/panel/PanelBar.qml，由 Shell.qml 装载；这里只发"点了一下"）
 
     // 左侧栏开合：只在侧栏**收起**时露出（展开时那颗收起键在侧栏自己右上角）。
@@ -167,8 +167,7 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: topBar.titleLeftMargin
 
-            // 右边界 = 两颗按钮里**左边那颗**（换位之后是 toolsButton）：
-            // 锚到 panelBarButton 会把标题压到工具按钮底下（那两颗现在顺序反了）。
+            // 右边界 = 两颗按钮里左边那颗（toolsButton）：锚到 panelBarButton 会把标题压到工具按钮底下。
             anchors.right: toolsButton.left
             anchors.rightMargin: Theme.spacing.columnClearance
             anchors.verticalCenter: parent.verticalCenter

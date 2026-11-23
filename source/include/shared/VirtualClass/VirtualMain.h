@@ -23,9 +23,7 @@ public:
 	virtual QNetworkAccessManager* AuthenticatedHttp() = 0;
 
 	// 通用 RPC 转发；method 形如 '<namespace>/<method>'，不带 /api 前缀。
-	virtual void CallApi(const char* owner, const QString& method, const QJsonValue& args,
-		std::function<void(const QJsonValue& value)> done,
-		std::function<void(const QString& code, const QString& message)> failed)
+	virtual void CallApi(const char* owner, const QString& method, const QJsonValue& args, std::function<void(const QJsonValue& value)> done, std::function<void(const QString& code, const QString& message)> failed)
 	{
 		Q_UNUSED(owner);
 		Q_UNUSED(method);

@@ -1,4 +1,7 @@
 // HTTP 请求 + mux WebSocket：生成 rpcId、拆信封后回调成败
+// 两条传输：RPC 走 POST /api/<method>（回包按 rpcId 匹配）；推送走 /api/remote.mux 一条 WebSocket，每条逻辑流占一个 streamId。
+// 帧类型：出站 open / cancel / item，入站 item / end / error；$events 收到 ready 帧才算真正可用。
+// 接管态（m_takenover）：内置 DSH 已被扩展顶掉，RPC 与开流全部经 VirtualApiSink 转给扩展，回调仍靠 rpcId 对回。
 
 #include "common/agent/dsh/DshApiClient.h"
 #include "common/agent/AgentManager.h"
@@ -50,15 +53,15 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 	, m_nam(new QNetworkAccessManager(this))
 	, m_stream(new QWebSocket)
 {
-	m_agentManager = new AgentManager(this);
+	m_agentManager = new AgentManager(this);   // 持有全部 MasterAgent（内置 + 扩展注册），激活/去激活都由它判定
 	// dsh 也是注册表里的真实 MasterAgent 对象：不是伪条目，也不需要 AgentManager
 	// 为它保留特殊分支。它没有 takeover sink 的语义，OnOutboundRequest 会明确失败。
 	m_dshMasterAgent = new DshMasterAgent(this, this);
 	if (!m_agentManager->registerBuiltinAgent(m_dshMasterAgent))
 		qWarning().noquote() << "[DshApi] failed to register builtin DSH master agent";
 	connect(m_agentManager, &AgentManager::registeredChanged, this, &DshApiClient::masterAgentsChanged);
-	connect(m_agentManager, &AgentManager::activeChanged, this,
-		[this](const QString& id) { if (!id.isEmpty()) emit masterAgentActivated(id); });
+	connect(m_agentManager, &AgentManager::activeChanged, this, [this](const QString& id) { if (!id.isEmpty()) emit masterAgentActivated(id); });
+	// 所有连接都用 dshRegister 具名登记：扩展接管时可凭这些固定 id 取回、替换或断开。
 	dshRegister("DshApiClient.001", m_stream, &QWebSocket::textMessageReceived, this, &DshApiClient::onStreamTextMessage);
 	dshRegister("DshApiClient.002", m_stream, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
 		emit transportError(QStringLiteral("stream"), m_stream->errorString());
@@ -69,6 +72,7 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 		m_streamConnected = true;
 		m_reconnectDelayMs = 1000; // 连上即复位退避
 		qInfo().noquote() << "[DshApi] mux connected -> opening $events + workspace/follow + session/control";
+		// 三条常驻流（事件 / 工作区 / 会话投影）各有独立 streamId，每代连接重新生成，旧 id 才能被服务端安全回收。
 		m_eventsStreamId = nextStreamId(QStringLiteral("events"));
 		m_workspaceStreamId = nextStreamId(QStringLiteral("workspace"));
 		sendStreamOpen(QStringLiteral("$events"), m_eventsStreamId);
@@ -90,6 +94,7 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 			m_terminalStreamId.clear();
 			emit terminalStreamEnded(ended);
 		}
+		// 只有"曾经连上过"才自动重连：启动阶段就连不上交给上层重试，免得空转重连刷日志。
 		if (wasConnected)  // 必须自愈：服务端遇重复 streamId 会 close(1008) 关掉整条 mux
 			scheduleReconnect();
 		});
@@ -101,6 +106,7 @@ DshApiClient::DshApiClient(QObject* parent)   // 只有 /api/remote.mux 一条 m
 
 DshApiClient::~DshApiClient()
 {
+	// 先立 m_destroyed 再拆连接：迟到的网络回调与线程池解析结果据此直接返回，不再碰本对象。
 	m_destroyed = true;
 	if (m_stream)
 		disconnect(m_stream, nullptr, this, nullptr);
@@ -144,7 +150,7 @@ void DshApiClient::setBaseUrl(const QUrl& url)   // 服务端给的是带 ?token
 		m_launchToken = query.queryItemValue(QStringLiteral("token"));
 
 	m_baseUrl = url;
-	m_baseUrl.setQuery(QString());
+	m_baseUrl.setQuery(QString());   // token 已单独取出：基础 URL 必须干净，否则拼 /api 路径会带上 query
 	m_baseUrl.setFragment(QString());
 
 	m_authCookie.clear();
@@ -182,8 +188,7 @@ void DshApiClient::startAuthHandshake()   // 用启动令牌换 cookie；必须�
 	url.setQuery(query);
 
 	QNetworkRequest request(url);
-	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-		QVariant::fromValue(QNetworkRequest::ManualRedirectPolicy));
+	request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QVariant::fromValue(QNetworkRequest::ManualRedirectPolicy));
 	request.setTransferTimeout(5000);  // 必须有超时：否则 m_authInFlight 永远为真、后续重试全被挡掉
 
 	qInfo().noquote() << "[DshApi] auth handshake ->" << url.toString(QUrl::RemoveQuery) << "(token hidden)";
@@ -210,7 +215,7 @@ void DshApiClient::startAuthHandshake()   // 用启动令牌换 cookie；必须�
 			return;
 		}
 
-		int end = header.indexOf(';');
+		int end = header.indexOf(';');   // 只取 Set-Cookie 的第一段 name=value，Path/HttpOnly 等属性不参与后续请求
 		if (end < 0)
 			end = header.size();
 		m_authCookie = QString::fromUtf8(header.left(end)).trimmed();
@@ -234,6 +239,7 @@ void DshApiClient::flushAuthQueue()   // 补发走的还是 post()，此时已�
 
 void DshApiClient::failAuthQueue(const QString& code, const QString& message)
 {
+	// 认证彻底失败：把排队的 RPC 按原顺序逐条回错，调用方才不会永久挂起。
 	if (m_authQueue.isEmpty())
 		return;
 	const QList<QueuedCall> queued = m_authQueue;
@@ -260,7 +266,7 @@ void DshApiClient::openStreams()   // 带令牌但没换到 cookie 时先握手�
 		return;
 	}
 
-	closeStreams();
+	closeStreams();   // 先清旧连接的所有账本，再按当前 cookie 开一条新的 mux
 	QNetworkRequest streamRequest(makeUrl(QStringLiteral("/api/remote.mux")));
 	if (!m_authCookie.isEmpty())
 		streamRequest.setRawHeader("Cookie", m_authCookie.toUtf8());
@@ -293,7 +299,7 @@ void DshApiClient::scheduleReconnect()
 		return;
 
 	const int delayMs = m_reconnectDelayMs;
-	m_reconnectDelayMs = qMin(m_reconnectDelayMs * 2, 8000);
+	m_reconnectDelayMs = qMin(m_reconnectDelayMs * 2, 8000);   // 指数退避，封顶 8s，避免服务端久不恢复时空转
 	qInfo().noquote() << "[DshApi] mux reconnect scheduled in" << delayMs << "ms";
 	m_reconnectTimer->start(delayMs);
 }
@@ -341,6 +347,7 @@ void DshApiClient::sendStreamOpen(const QString& endpoint, const QString& stream
 
 void DshApiClient::sendStreamCancel(const QString& streamId)
 {
+	// cancel 帧只认 streamId：服务端据此停止向该流推送并回收。
 	if (!m_streamConnected || !m_stream || streamId.isEmpty())
 		return;
 
@@ -352,9 +359,10 @@ void DshApiClient::sendStreamCancel(const QString& streamId)
 
 QString DshApiClient::openGenericStream(const QString& endpoint, const QJsonObject& args)
 {
+	// 通用流：一个 endpoint 一条流，streamId→endpoint 记在 m_genericStreams，回帧时按 id 分派。
 	if (endpoint.isEmpty())
 		return QString();
-	if (m_takenover) {
+	if (m_takenover) {   // 接管态没有宿主 mux：把开流意图包成 $takeover/stream-open 交给扩展自己开
 		QJsonObject frame;
 		frame.insert(QStringLiteral("endpoint"), endpoint);
 		frame.insert(QStringLiteral("args"), args);
@@ -372,7 +380,7 @@ void DshApiClient::closeGenericStream(const QString& streamId)
 {
 	if (streamId.isEmpty())
 		return;
-	const bool known = m_genericStreams.contains(streamId);
+	const bool known = m_genericStreams.contains(streamId);   // 未知 id 不发 cancel：扩展那边没有对应流
 	m_genericStreams.remove(streamId);
 	if (m_takenover) {
 		if (known) {
@@ -415,6 +423,7 @@ void DshApiClient::openTerminalStream(const QJsonObject& attachArgs)
 
 void DshApiClient::sendTerminalUplink(const QJsonObject& item)
 {
+	// 终端上行：用户输入、尺寸变更等作为 item 帧写回同一条终端流。
 	if (!m_streamConnected || !m_stream || m_terminalStreamId.isEmpty() || item.isEmpty())
 		return;
 
@@ -481,9 +490,7 @@ void DshApiClient::callMethodValue(const QString& method, const QJsonObject& pay
 }
 
 // 同 callMethodValue，但 args 可以是数组（RPC 位置参数，如 settings/update(ns, patch, rev)）
-void DshApiClient::callMethodArgs(const QString& method, const QJsonValue& args,
-								  std::function<void(const QJsonValue& value)> onSuccess,
-								  std::function<void(const RpcError& error)> onError)
+void DshApiClient::callMethodArgs(const QString& method, const QJsonValue& args, std::function<void(const QJsonValue& value)> onSuccess, std::function<void(const RpcError& error)> onError)
 {
 	const QString rpcId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 	QJsonObject argsPayload;
@@ -516,6 +523,7 @@ void DshApiClient::respondValue(const QString& rpcId, const QJsonValue& value, s
 		return;
 	}
 
+	// 应答信封：outcome.kind 目前只有 result；eventId 沿用请求帧里的 rpcId 命名（同一个值的两种叫法）。
 	QJsonObject outcome;
 	outcome.insert(QStringLiteral("kind"), QStringLiteral("result"));
 	outcome.insert(QStringLiteral("value"), value);
@@ -531,6 +539,7 @@ void DshApiClient::respondValue(const QString& rpcId, const QJsonValue& value, s
 
 QUrl DshApiClient::makeUrl(const QString& path) const
 {
+	// WebSocket 与 HTTP 同 host/port：https 对应 wss，其余一律 ws。
 	QUrl url = m_baseUrl;
 	url.setPath(path);
 	if (url.scheme() == QStringLiteral("https"))
@@ -547,10 +556,7 @@ void DshApiClient::post(const QString& path, const QJsonObject& body, std::funct
 	// 位置必须在认证队列之前，否则会排进 m_authQueue 等永不来的握手
 	if (m_takenover) {
 		const QJsonObject payload = body.value(QStringLiteral("payload")).toObject();
-		dispatchTakeoverCall(body.value(QStringLiteral("rpcId")).toString(),
-			body.value(QStringLiteral("method")).toString(),
-			payload.value(QStringLiteral("args")).toObject(),
-			std::move(onSuccess), std::move(onError));
+		dispatchTakeoverCall(body.value(QStringLiteral("rpcId")).toString(), body.value(QStringLiteral("method")).toString(), payload.value(QStringLiteral("args")).toObject(), std::move(onSuccess), std::move(onError));
 		return;
 	}
 
@@ -571,6 +577,7 @@ void DshApiClient::post(const QString& path, const QJsonObject& body, std::funct
 		return;
 	}
 
+	// 先登记再发出：回调靠 rpcId 从 m_pending 里取，漏登记的回包会被当成 unknown rpcId 丢掉。
 	const QString rpcId = body.value(QStringLiteral("rpcId")).toString();
 	m_pending.insert(rpcId, PendingCall{ path, std::move(onSuccess), std::move(onError), });
 
@@ -626,6 +633,7 @@ void DshApiClient::onReplyFinished()
 	const QByteArray body = reply->readAll();  // 解析挪到线程池：大回包 fromJson 会卡主线程
 	reply->deleteLater();
 
+	// 第二张表：解析在别的线程做，回调先挪到 m_parsing，解析结果回来时再按 rpcId 取。
 	m_parsing.insert(rpcId, pending);
 	auto* task = new JsonParseRunnable(this, rpcId, body);
 	QThreadPool::globalInstance()->start(task);
@@ -650,6 +658,7 @@ void DshApiClient::handleParsedResponse(const QString& rpcId, const QJsonDocumen
 	qInfo().noquote() << "[DshApi] HTTP response path=" << pending.path << " rpcId=" << rpcId;
 
 	const QJsonObject result = root.value(QStringLiteral("result")).toObject();
+	// 成功信封 { result: { ok:true, value } }，失败 { result: { ok:false, error:{ code, message } } }。
 	if (result.value(QStringLiteral("ok")).toBool()) {
 		if (pending.onSuccess)
 			pending.onSuccess(result.value(QStringLiteral("value")));
@@ -657,14 +666,14 @@ void DshApiClient::handleParsedResponse(const QString& rpcId, const QJsonDocumen
 	else {
 		const QJsonObject errorObj = result.value(QStringLiteral("error")).toObject();
 		if (pending.onError) {
-			pending.onError(RpcError{ errorObj.value(QStringLiteral("code")).toString(),
-				errorObj.value(QStringLiteral("message")).toString(), });
+			pending.onError(RpcError{ errorObj.value(QStringLiteral("code")).toString(), errorObj.value(QStringLiteral("message")).toString(), });
 		}
 	}
 }
 
 // 分工：插件 → 宿主走本类实现的 VirtualApiHost；宿主 → 插件走 VirtualApiSink::OnOutboundRequest，
 // 回填只能靠 rpcId（std::function 不是 metatype，传不出去）
+// AgentManager 是后端注册表的持有者：下面几个 getter/setter 都只做薄转发，未初始化时给安全默认值。
 
 QString DshApiClient::activeMasterAgentId() const
 {
@@ -684,13 +693,14 @@ void DshApiClient::setSelectedMasterAgentId(const QString& backendId)
 
 const char* DshApiClient::ActiveMasterAgentId() const
 {
-	static thread_local QByteArray id;
+	static thread_local QByteArray id;   // 返回的指针只在本线程本次调用内有效：扩展拿到后必须立刻拷贝
 	id = activeMasterAgentId().toUtf8();
 	return id.constData();
 }
 
 bool DshApiClient::RegisterMasterAgent(const char* owner, QObject* agent)
 {
+	// owner 用来批量注销：扩展退出时按 owner 一次摘掉它注册的所有 agent。
 	return m_agentManager && m_agentManager->registerAgent(QString::fromUtf8(owner ? owner : ""), agent);
 }
 
@@ -707,6 +717,7 @@ QVariantList DshApiClient::registeredMasterAgents() const
 
 bool DshApiClient::ActivateMasterAgent(const char* backendId)
 {
+	// 空 backendId 等价于"停用当前后端"：调用方不需要分别调两个入口。
 	const QString id = QString::fromUtf8(backendId ? backendId : "").trimmed();
 	if (id.isEmpty()) {
 		DeactivateMasterAgent();
@@ -720,11 +731,12 @@ void DshApiClient::DeactivateMasterAgent()
 	if (m_agentManager)
 		m_agentManager->deactivate();
 	if (m_takenover)
-		Takenover(false);
+		Takenover(false);   // 没有激活后端就不该继续把请求转给扩展：顺手解除接管态
 }
 
 VirtualApiSink* DshApiClient::apiSink() const
 {
+	// 优先用当前激活后端自己的 sink；没有激活后端时才退回注册表里的全局实现（兼容只注册一次的旧扩展）。
 	if (m_agentManager) {
 		if (VirtualApiSink* active = m_agentManager->activeSink())
 			return active;
@@ -758,8 +770,7 @@ void DshApiClient::dispatchTakeoverCall(const QString& rpcId, const QString& met
 	if (rpcId.isEmpty()) {
 		qWarning().noquote() << "[DshApi] 接管态出站请求缺 rpcId，已丢弃 method=" << method;
 		if (onError)
-			onError(RpcError{ QStringLiteral("takenover-no-rpcid"),
-				QStringLiteral("outbound request has no rpcId") });
+			onError(RpcError{ QStringLiteral("takenover-no-rpcid"), QStringLiteral("outbound request has no rpcId") });
 		return;
 	}
 
@@ -768,19 +779,20 @@ void DshApiClient::dispatchTakeoverCall(const QString& rpcId, const QString& met
 	pending.onSuccess = std::move(onSuccess);
 	pending.onError = std::move(onError);
 	pending.takeover = true;
+	// 超时分级：session/prompt 是整回合生成的长任务，给更宽的时限，其余用普通 RPC 的时限。
 	const qint64 timeoutMs = method == QLatin1String("session/prompt")
 		? kTakeoverPromptTimeoutMs : kTakeoverCallTimeoutMs;
 	pending.takeoverDeadlineMs = QDateTime::currentMSecsSinceEpoch() + timeoutMs;
 	m_pending.insert(rpcId, pending);
 
 	if (!sendToSink(rpcId, method, args)) {  // 没有接收端：当场用错误收尾
-		failPending(rpcId, QStringLiteral("takenover-no-sink"),
-			QStringLiteral("no client extension implements VirtualApiSink"));
+		failPending(rpcId, QStringLiteral("takenover-no-sink"), QStringLiteral("no client extension implements VirtualApiSink"));
 	}
 }
 
 bool DshApiClient::failPending(const QString& rpcId, const QString& code, const QString& message)
 {
+	// 按 rpcId 收尾：登记表里找不到说明已被超时扫描或扩展回填处理过，交给调用方判断即可。
 	const auto it = m_pending.constFind(rpcId);
 	if (it == m_pending.constEnd())
 		return false;
@@ -800,6 +812,7 @@ bool DshApiClient::failPending(const QString& rpcId, const QString& code, const 
 
 void DshApiClient::failTakeoverPending(const QString& code, const QString& message)
 {
+	// 接管释放或断链时一次性清空所有接管请求：不走这条，调用方会永远等不到回调。
 	QStringList pendingIds;
 	for (auto it = m_pending.constBegin(); it != m_pending.constEnd(); ++it) {
 		if (it.value().takeover)
@@ -828,9 +841,7 @@ void DshApiClient::sweepTakeoverTimeouts()   // 接管路径唯一的兜底：�
 		const bool isPrompt = it != m_pending.constEnd()
 			&& it->path == QLatin1String("takeover:session/prompt");
 		const qint64 timeoutMs = isPrompt ? kTakeoverPromptTimeoutMs : kTakeoverCallTimeoutMs;
-		failPending(rpcId, QStringLiteral("takenover-timeout"),
-			QStringLiteral("backend extension did not answer within %1 ms")
-			.arg(timeoutMs));
+		failPending(rpcId, QStringLiteral("takenover-timeout"), QStringLiteral("backend extension did not answer within %1 ms").arg(timeoutMs));
 	}
 }
 
@@ -858,10 +869,7 @@ void DshApiClient::enterTakenoverState()
 		qInfo().noquote() << "[DshApi] 接管态：把" << queued.size() << "条等待认证的请求改投扩展";
 		for (const QueuedCall& call : queued) {
 			const QJsonObject payload = call.body.value(QStringLiteral("payload")).toObject();
-			dispatchTakeoverCall(call.body.value(QStringLiteral("rpcId")).toString(),
-				call.body.value(QStringLiteral("method")).toString(),
-				payload.value(QStringLiteral("args")).toObject(),
-				call.onSuccess, call.onError);
+			dispatchTakeoverCall(call.body.value(QStringLiteral("rpcId")).toString(), call.body.value(QStringLiteral("method")).toString(), payload.value(QStringLiteral("args")).toObject(), call.onSuccess, call.onError);
 		}
 	}
 
@@ -874,8 +882,7 @@ void DshApiClient::leaveTakenoverState()   // 刻意不重启内置 DSH：要不
 	if (m_takeoverSweep)
 		m_takeoverSweep->stop();
 
-	failTakeoverPending(QStringLiteral("takenover-released"),
-		QStringLiteral("backend takeover released by the extension"));
+	failTakeoverPending(QStringLiteral("takenover-released"), QStringLiteral("backend takeover released by the extension"));
 
 	m_streamClosing = false;
 }
@@ -886,6 +893,7 @@ void DshApiClient::handleEventsItem(const QJsonValue& value)   // waterfall 是�
 	const QString type = item.value(QStringLiteral("type")).toString();
 
 	if (type == QStringLiteral("ready")) {
+		// ready 帧带回 clientId：respond() 的应答要带上它，且只有收到 ready 才算 isConnected()。
 		m_clientId = item.value(QStringLiteral("clientId")).toString();
 		m_eventsReady = true;
 		qInfo().noquote() << "[DshApi] $events ready, clientId=" << m_clientId;
@@ -912,8 +920,7 @@ void DshApiClient::handleEventsItem(const QJsonValue& value)   // waterfall 是�
 
 			QJsonObject payload;
 			payload.insert(QStringLiteral("type"), QStringLiteral("session/event"));
-			payload.insert(QStringLiteral("sessionId"),
-				item.value(QStringLiteral("sessionId")).toString());
+			payload.insert(QStringLiteral("sessionId"), item.value(QStringLiteral("sessionId")).toString());
 			payload.insert(QStringLiteral("event"), event);
 
 			QJsonObject frame;
@@ -958,14 +965,11 @@ void DshApiClient::handleWorkspaceItem(const QJsonValue& value)
 
 		// 三个 payload 同源同帧：items + archivedSessionIds + pinnedSessionIds（置顶集合，保序、最近置顶的在前）。
 		// ⚠️ pinnedSessionIds 必须一起转：漏掉它侧栏"置顶"段永远出不来。
-		emit workspaceSnapshotReady(
-			baseline.value(QStringLiteral("items")).toArray(),
-			baseline.value(QStringLiteral("archivedSessionIds")).toArray(),
-			baseline.value(QStringLiteral("pinnedSessionIds")).toArray());
+		emit workspaceSnapshotReady(baseline.value(QStringLiteral("items")).toArray(), baseline.value(QStringLiteral("archivedSessionIds")).toArray(), baseline.value(QStringLiteral("pinnedSessionIds")).toArray());
 		return;
 	}
 
-	if (type == QStringLiteral("upsert")) {
+	if (type == QStringLiteral("upsert")) {   // upsert/remove 是单个 workspace 的增量；下面 archived/pinned/order 是集合级快照，整体替换
 		emit workspaceUpserted(frame.value(QStringLiteral("workspace")).toObject());
 		return;
 	}
@@ -1009,20 +1013,20 @@ void DshApiClient::handleControlItem(const QJsonValue& value)   // baseline 是�
 	}
 
 	if (type == QStringLiteral("projection")) {
+		// 单键增量：seq 由接收方用来丢弃乱序或重复的推送。
 		const QString sessionId = frame.value(QStringLiteral("sessionId")).toString();
 		const QString key = frame.value(QStringLiteral("key")).toString();
 		if (sessionId.isEmpty() || key.isEmpty())
 			return;
 
-		emit sessionProjectionChanged(sessionId, key,
-			frame.value(QStringLiteral("value")),
-			frame.value(QStringLiteral("seq")).toInt());
+		emit sessionProjectionChanged(sessionId, key, frame.value(QStringLiteral("value")), frame.value(QStringLiteral("seq")).toInt());
 		return;
 	}
 }
 
 void DshApiClient::handleTerminalItem(const QJsonValue& value)
 {
+	// 终端帧原样上抛：payload 结构由终端控制层自己解释，本类只负责带上是哪条流。
 	const QJsonObject frame = value.toObject();
 	if (frame.isEmpty())
 		return;
@@ -1032,6 +1036,7 @@ void DshApiClient::handleTerminalItem(const QJsonValue& value)
 
 void DshApiClient::onStreamTextMessage(const QString& message)
 {
+	// 入站帧统一是 { type, streamId, ... }；item 的负载在 value 里，按 streamId 分派给各自的 handler。
 	const QJsonObject frame = QJsonDocument::fromJson(message.toUtf8()).object();
 	const QString streamType = frame.value(QStringLiteral("type")).toString();
 	const QString streamId = frame.value(QStringLiteral("streamId")).toString();
@@ -1077,8 +1082,7 @@ void DshApiClient::onStreamTextMessage(const QString& message)
 			emit terminalStreamError(streamId, code, detail);
 		}
 
-		// 名册流失败（典型：profile 里没挂 job-controller ⇒ gateway/service-unavailable）：
-		// 发一次空名册让顶栏退回空态，再走下面的通用 transportError 记到状态行。
+		// 名册流失败（典型：profile 里没挂 job-controller ⇒ gateway/service-unavailable）统一按流级错误上报。
 		emit transportError(QStringLiteral("stream"), QStringLiteral("%1: %2").arg(code, detail));
 	}
 	else {

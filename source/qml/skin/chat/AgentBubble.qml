@@ -23,8 +23,10 @@ Item {
         var index = -1
         var segs = root.segments || []
         for (var i = 0; i < segs.length; ++i) {
-            if (segs[i].type === "reply"
-                    && String(segs[i].text || "").length > 0)
+            // ⚠️ 不能按 text 非空过滤：流式期间 C++ 会先补一个**空 reply 占位段**，
+            // 正文写到 replyTail 里。过滤掉空段会让 finalReplyIndex 指向上一段（或 -1），
+            // 于是 replyTail 挂不到这个占位块上 ⇒ 正文整轮都不流式，直到 turn/end 落段才一次性出现。
+            if (segs[i].type === "reply")
                 index = i
         }
         return index
@@ -243,7 +245,9 @@ Item {
         while (i < segs.length) {
             if (segs[i].type === "reply") {
                 // 空 reply 是流式占位/收尾残留，不构成正文，也不能切断过程组。
-                if (String(segs[i].text || "").length === 0) {
+                // 唯一的例外：它就是"最终 reply"且正在流式（replyTail 有内容）——这时它就是正文块。
+                if (String(segs[i].text || "").length === 0
+                        && !(i === lastReply && root.replyTail.length > 0)) {
                     i += 1
                     continue
                 }
@@ -434,8 +438,7 @@ Item {
 
                         readonly property bool isTail: root.streaming
                             && (block.blockData.start + block.blockData.count) === root.segments.length
-                        readonly property string activity: root.groupActivity(block.blockData.start,
-                                                                             block.blockData.count)
+                        readonly property string activity: root.groupActivity(block.blockData.start, block.blockData.count)
                         controlled: true
                         expanded: root.isGroupExpanded(block.blockData.start)
                         onToggled: root.toggleGroup(block.blockData.start)

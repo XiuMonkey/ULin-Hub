@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // 会话消息列表的 QML 模型：一行 = 一条消息（用户 / Agent / 系统提示）。
 // Agent 消息内部是**有序段**（thinking / reply / toolCall / toolResult），交错顺序不会丢；reply 段按代码围栏切成单元。
@@ -45,6 +45,10 @@ public:
 	// 会话切换：整表清空（换了会话，必须重置）
 	void clear();
 
+	// 收束窗口：删掉最前面的 count 行（内存/委托上限用）。
+	// 批量重建期间不触发 insert/remove 信号，直接改内部数组，最后由 endBatchRebuild 统一 reset。
+	void removeFirstRows(int count);
+
 	// 批量重建：只在 begin/end 之间发一次 reset，避免历史重建时逐条 insert/dataChanged
 	// 把 QML 的 ListView 拖死（加载更多一页 1500+ 条时尤其明显）。
 	void beginBatchRebuild();
@@ -66,7 +70,7 @@ public:
 	};
 	int appendUser(const QString& text);
 	int appendUserWithImages(const QString& text, const QVector<ImageRef>& images);
-	// 连续重复的历史用户消息（引擎快照里可能同一个 prompt 出现两次）不重复插入
+	// 最后一行是否就是这条用户消息（历史重建时去重用，避免同一 prompt 插两次）
 	bool lastRowIsUser(const QString& text, const QVector<ImageRef>& images) const;
 	// 历史重建后确认某条用户消息是否已经能从记录里画出来；没有就由 ChatController
 	// 把本地刚发送的那条补回末尾，避免“开始输出后用户消息被吞”。

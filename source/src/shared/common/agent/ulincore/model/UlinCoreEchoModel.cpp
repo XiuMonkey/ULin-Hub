@@ -47,6 +47,7 @@ void UlinCoreEchoModel::start(const ModelRequest& request, const ModelCallbacks&
 			return;
 		}
 
+		// 没有可用模型时的兜底：回显用户最后一条消息。
 		QString text;
 		for (int i = m_request.messages.size() - 1; i >= 0; --i) {
 			if (m_request.messages.at(i).role == Role::User) {

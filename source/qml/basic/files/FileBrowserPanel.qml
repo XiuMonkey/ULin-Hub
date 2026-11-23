@@ -5,22 +5,23 @@ import ULinHub 1.0
 import "../../widgets"
 
 // 右栏文件浏览：JetBrains 风格。
-// 大文件连续滚动：已加载块首尾相接，滚到边缘时按块前后补载。
+// 大文件连续滚动：已加载块首尾相接，滚到边缘时按块前后补载（见 chunks / ensureWindow）。
 Item {
     id: page
 
-    readonly property bool viewing: FileBrowser.textMode
+    readonly property bool viewing: FileBrowser.textMode   // 有文件在预览：此时隐藏目录树
     readonly property int rowHeight: 28
     readonly property string uiFont: "Microsoft YaHei UI"
     readonly property string monoFont: "JetBrains Mono"
     readonly property int monoSize: 12
 
-    property var chunks: []
-    property int firstChunk: 0
-    property int lastChunk: -1
-    property bool windowBusy: false
-    property bool pdfRendered: false
+    property var chunks: []       // 已加载的连续块，每块含文本、行号起点与高亮 HTML
+    property int firstChunk: 0    // 窗口首块下标（往上滚时变小）
+    property int lastChunk: -1    // 窗口末块下标（往下滚时变大）
+    property bool windowBusy: false   // 补载重入锁：contentY 变化很密，防止同一轮反复补块
+    property bool pdfRendered: false  // PDF 字节是否已推给 viewer（换文件时复位）
 
+    // 扩展名 → 语法高亮语言名（交给 Hub.highlightCode；未知扩展名原样返回）
     function languageOf(name) {
         var i = name.lastIndexOf(".")
         if (i < 0)
@@ -51,11 +52,13 @@ Item {
     }
 
     readonly property string language: page.languageOf(FileBrowser.fileName)
+    // 办公文档：类型与提取文本都有才算办公模式；PDF 字节就绪才走原版预览，否则降级成纯文本。
     readonly property bool officeMode: FileBrowser.officeKind.length > 0
         && FileBrowser.officeText.length > 0
     readonly property string officeKind: FileBrowser.officeKind
     readonly property bool officePdfReady: officeMode && FileBrowser.officePdfBase64.length > 0
 
+    // PDF.js 的 viewer 页还在加载时 runJavaScript 会打空，所以未就绪就延后重试。
     function renderPdfIntoView() {
         if (!page.officePdfReady || !pdfView)
             return
@@ -76,6 +79,7 @@ Item {
         return html.length > 0 ? html : text
     }
 
+    // 读一块：文本 + 行号起点 + 高亮 HTML；rich 表示高亮结果自带 <pre>（否则按纯文本给 TextEdit）。
     function makeChunk(index) {
         var text = FileBrowser.readPage(index)
         var html = page.htmlFor(text)
@@ -89,6 +93,7 @@ Item {
         }
     }
 
+    // 从头装窗口：初始只装前 3 块，其余等滚到底再补。
     function rebuild() {
         if (!FileBrowser.textMode || FileBrowser.pageCount <= 0) {
             chunks = []
@@ -106,6 +111,7 @@ Item {
         Qt.callLater(function () { editorList.contentY = 0 })
     }
 
+    // 向下补块：追加到窗口尾部（连续滚到底时触发）。
     function appendMore() {
         if (windowBusy || !FileBrowser.textMode)
             return
@@ -121,6 +127,7 @@ Item {
         windowBusy = false
     }
 
+    // 向上补块：插到窗口头部，并按内容高度差回补 contentY（否则视口会跳）。
     function prependMore() {
         if (windowBusy || !FileBrowser.textMode || firstChunk <= 0)
             return
@@ -139,6 +146,7 @@ Item {
         })
     }
 
+    // 滚动靠近边缘时补载：底部 1200px 内补后块，顶部 600px 内补前块。
     function ensureWindow() {
         if (editorList.contentHeight <= editorList.height + 100)
             return
@@ -148,11 +156,13 @@ Item {
             prependMore()
     }
 
+    // 文件树根目录跟着当前工作区走；工作区还没就绪时由下面的 Timer 定时重试。
     function syncRoot() {
         if (Hub.currentWorkspacePath.length > 0)
             FileBrowser.openRoot(Hub.currentWorkspacePath)
     }
 
+    // 进入预览重建窗口；退出预览清空块，回到目录树
     onViewingChanged: {
         if (viewing) {
             rebuild()
@@ -165,11 +175,13 @@ Item {
 
     Component.onCompleted: syncRoot()
 
+    // 换会话时把文件树根切到新工作区
     Connections {
         target: Hub
         function onCurrentSessionChanged() { page.syncRoot() }
     }
 
+    // 打开新文件时窗口为空就重建；当前路径变化同步地址栏
     Connections {
         target: FileBrowser
         function onFileChanged() {
@@ -181,6 +193,7 @@ Item {
         }
     }
 
+    // 工作区路径未就绪时低频重试（syncRoot 只在路径非空时开根目录）
     Timer {
         interval: 300
         repeat: true
@@ -205,6 +218,7 @@ Item {
             border.width: 1
             border.color: Theme.color.border
 
+            // 地址栏：↑ 上级 / 路径（点击转成输入框）/ ↵ 跳转 / ⟳ 刷新
             Row {
                 anchors.fill: parent
                 anchors.leftMargin: 6
@@ -308,6 +322,7 @@ Item {
             }
         }
 
+        // 目录树：只列当前目录一层，目录点进、文件点开
         ListView {
             id: tree
             anchors.left: parent.left
@@ -383,6 +398,7 @@ Item {
             }
         }
 
+        // 底部状态：错误信息或当前目录条目数
         Rectangle {
             id: treeStatus
             anchors.left: parent.left
@@ -410,6 +426,7 @@ Item {
         anchors.margins: 8
         visible: page.viewing && page.officeMode && page.officePdfReady
 
+        // 页签条：返回目录 + 文件名 / PDF 预览
         Rectangle {
             id: pdfTabBar
             anchors.left: parent.left
@@ -447,6 +464,7 @@ Item {
             }
         }
 
+        // PDF.js 查看器：页面就绪后再注入 PDF 字节（见 renderPdfIntoView）
         WebEngineView {
             id: pdfView
             anchors.left: parent.left
@@ -458,8 +476,7 @@ Item {
             url: FileBrowser.officeViewerUrl + "viewer.html"
 
             onLoadingChanged: (request) => {
-                console.log("[OfficeViewer] load status=", request.status,
-                    "url=", request.url, "error=", request.errorString)
+                console.log("[OfficeViewer] load status=", request.status, "url=", request.url, "error=", request.errorString)
                 if (request.status === WebEngineView.LoadSucceededStatus)
                     Qt.callLater(page.renderPdfIntoView)
             }
@@ -480,6 +497,7 @@ Item {
         anchors.margins: 8
         visible: page.viewing && (!page.officeMode || !page.officePdfReady)
 
+        // 页签条：返回 / 文件名 / 复制当前窗口内已加载的块
         Rectangle {
             id: editorTabBar
             anchors.left: parent.left
@@ -538,6 +556,7 @@ Item {
             }
         }
 
+        // 原版预览不可用时的降级提示：下方直接显示提取的纯文本
         Rectangle {
             id: fallbackBanner
             anchors.left: parent.left
@@ -570,6 +589,7 @@ Item {
             }
         }
 
+        // 代码区：横向 Flickable 包 ListView，按块虚拟化（只装窗口内那几块）
         Rectangle {
             id: editorBody
             anchors.left: parent.left
@@ -596,6 +616,7 @@ Item {
                 }
                 ScrollBar.vertical: AppScrollBar { }
 
+                // 块列表：数据是 page.chunks，chunks 变即整表重绑
                 ListView {
                     id: editorList
                     width: Math.max(hflick.width, page.codeWidth)
@@ -620,7 +641,7 @@ Item {
                             anchors.top: parent.top
                             anchors.topMargin: 4
 
-                            Text {
+                            Text {   // 行号列：整块的行号一次拼成单个多行文本，省掉每行一个 item
                                 id: gutterText
                                 width: 50
                                 rightPadding: 8
@@ -636,6 +657,7 @@ Item {
                                 font.pixelSize: page.monoSize
                             }
 
+                            // 代码文本：高亮 HTML + 不折行，横向平移由外层 hflick 承担
                             TextEdit {
                                 id: codeText
                                 width: Math.max(10, chunkItem.width - gutterText.width - 12)
@@ -656,6 +678,7 @@ Item {
             }
         }
 
+        // 底部状态：语言 / 总行数 / 编码，右侧文件名
         Rectangle {
             id: editorStatus
             anchors.left: parent.left
@@ -687,7 +710,7 @@ Item {
         }
     }
 
-    TextEdit {
+    TextEdit {   // 隐藏的剪贴板中转：只有 TextEdit 能 selectAll + copy
         id: codeClip
         visible: false
         readOnly: true

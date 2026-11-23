@@ -6,7 +6,8 @@
 #include <QStringList>
 
 namespace
-{	QVariantMap defaultRadius()
+{
+	QVariantMap defaultRadius()
 	{
 		QVariantMap map;
 		map.insert(QStringLiteral("window"), 12);      // main-window.qss #dshhubCentral { border-radius: 12px }
@@ -27,7 +28,6 @@ namespace
 		map.insert(QStringLiteral("composer"), 16);    // 输入卡片；与 shadow.inputRadius 绑定（原版 22，视觉收敛为 16）
 		return map;
 	}
-
 
 	// 字体族：运行期从已安装字体里挑第一个可用的，避免把平台名字写死进 QML。
 	// 候选顺序 = Win / macOS / Linux 的中文 UI 字体；都没有时退回 Qt 默认。

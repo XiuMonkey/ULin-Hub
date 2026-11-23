@@ -356,8 +356,7 @@ Item {
     }
 
     // 输入区最大宽度取左栏展开时的列宽：左栏收起后内容列变宽，输入框不应跟着无限拉长。
-    readonly property real conversationInputMaxWidth: Math.max(
-        Theme.size.minConversationWidth,
+    readonly property real conversationInputMaxWidth: Math.max(Theme.size.minConversationWidth,
         contentColumn.width - shell.sessionBarContentInset
             - 2 * Theme.spacing.columnClearance)
 
@@ -596,7 +595,7 @@ Item {
         }
     }
 
-    // 右侧栏从窗口右缘外滑入并淡入，只改 x/opacity，不改 width。
+    // 右侧栏从窗口右缘外滑入并淡入：开合动画只动 x/opacity，宽度变化归拖柄（panelBarW）。
     // 位置与尺寸放在附着槽位上，PanelBar 始终 anchors.fill，reparent 到独立窗口也无需改锚定。
     Item {
         id: panelBarSlot
@@ -708,17 +707,16 @@ Item {
             onPositionChanged: (mouse) => {
                 if (!pressed)
                     return
-                shell.setPanelBarWidth(shell.widthFromDrag(
-                    pressWindowX, pressWidth, resizeHandle.mapToItem(null, mouse.x, 0).x))
+                shell.setPanelBarWidth(shell.widthFromDrag(pressWindowX, pressWidth,
+                    resizeHandle.mapToItem(null, mouse.x, 0).x))
             }
             onReleased: shell.resizing = false
             onCanceled: shell.resizing = false
         }
     }
 
-    // 初始化中的遮罩：只提示状态，不挡住操作。
-    // 启动初始化 / Master 后端切换共用同一套遮罩。
-    // 初始化阶段只提示；Master 切换期间必须挡住操作，避免旧后端已停还继续发消息。
+    // 启动初始化 / Master 后端切换共用同一套遮罩：初始化只提示状态（不挡操作），
+    // 切换期间必须挡住操作（旧后端已停，别让用户继续发消息）。
     Rectangle {
         anchors.fill: parent
         visible: Hub.initializing || Hub.masterSwitching
@@ -816,7 +814,7 @@ Item {
         source: Style.url("basic/settings/SettingsPage.qml")
     }
 
-    // 璐︽埛绠＄悊锛氬乏涓嬭澶村儚鎵撳紑锛堟槸鐙珛 PageOverlay锛屼笉鍦ㄨ缃〉閲岋級
+    // 账户管理：左下角头像打开（独立 PageOverlay，不在设置页里）
     PageOverlay {
         anchors.fill: parent
         z: 32
@@ -824,8 +822,6 @@ Item {
         source: Style.url("basic/account/AccountPage.qml")
     }
 
-    // 工具过滤面板：顶栏 ☰ 打开，整壳覆盖。
-    // 工具过滤面板：顶栏图标打开，沿用 PageOverlay 的统一遮罩/卡片动画。
     // 单块脱离为独立窗口：模型只存 id，窗口内容仍走 PanelBarDock 的 kind→view 路由。
     Instantiator {
         model: PanelBarDock.detachedBlocks
@@ -837,6 +833,7 @@ Item {
         }
     }
 
+    // 工具过滤面板：顶栏工具按钮打开，整壳覆盖，沿用 PageOverlay 的统一遮罩/卡片动画。
     PageOverlay {
         anchors.fill: parent
         z: 36

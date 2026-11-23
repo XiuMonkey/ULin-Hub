@@ -8,13 +8,13 @@
 
 namespace
 {
-QString psQuote(const QString& value)
+QString psQuote(const QString& value)   // 单引号转义，避免路径里的字符破坏 PowerShell 字符串
 {
 	QString escaped = value;
 	escaped.replace(QLatin1Char('\''), QStringLiteral("''"));
 	return QLatin1Char('\'') + escaped + QLatin1Char('\'');
 }
-QString friendlyComError(const QString& raw)
+QString friendlyComError(const QString& raw)   // 把 COM 错误码收敛成用户能看懂的提示
 {
 	const QString lower = raw.toLower();
 	if (lower.contains(QStringLiteral("clsid"))
@@ -39,6 +39,7 @@ bool isOfficeDocument(const QString& path)
 		|| suffix == QLatin1String("pptx") || suffix == QLatin1String("ppt");
 }
 
+// 生成 PowerShell 脚本：按扩展名依次尝试 Office / WPS 的 COM 接口，导出 PDF；失败信息走 stderr。
 static QString makeScript(const QString& sourcePath, const QString& pdfPath)
 {
 	return QStringLiteral(R"PS(
@@ -116,11 +117,10 @@ try {
 
 [Console]::Error.WriteLine($lastError)
 exit 1
-)PS").arg(
-		psQuote(QDir::toNativeSeparators(sourcePath)),
-		psQuote(QDir::toNativeSeparators(pdfPath)));
+)PS").arg(psQuote(QDir::toNativeSeparators(sourcePath)), psQuote(QDir::toNativeSeparators(pdfPath)));
 }
 
+// 同步转换：启动 PowerShell 后最多等 30 秒；失败时把 COM 错误翻译成用户提示。
 bool convertToPdf(const QString& sourcePath, const QString& pdfPath, QString* error)
 {
 	if (error)
@@ -170,6 +170,7 @@ QString friendlyError(const QString& raw)
 	return friendlyComError(raw);
 }
 
+// 异步转换：立即返回 QProcess，调用方自己接 finished / errorOccurred。
 QProcess* startConversion(const QString& sourcePath, const QString& pdfPath, QObject* parent)
 {
 	QProcess* proc = new QProcess(parent);

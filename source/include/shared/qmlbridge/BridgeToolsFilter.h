@@ -2,6 +2,7 @@
 // QML 暴露面：组合 common 服务，不继承、不持有 Hub。
 #include "qmlbridge/BridgeCommon.h"
 
+// 工具开关列表的 QML 面：按目录分组的行数据 + 单项/整组可见性。
 class ToolsFilterBridge : public QAbstractListModel
 {
 	Q_OBJECT

@@ -18,6 +18,7 @@ bool isSpace(QChar c)
 
 int findMatching(const QString& text, int open)
 {
+	// 只按 {} 配对，字符串内部的括号不计数。
 	if (open < 0 || open >= text.size() || text.at(open) != QLatin1Char('{'))
 		return -1;
 	int depth = 0;
@@ -122,6 +123,7 @@ QJsonValue parseScalar(const QString& token)
 
 bool parseKeyValueBody(const QString& body, bool colon, QJsonObject* out, QString* error)
 {
+	// 解析 key: value 形式的参数体；值是 JSON 对象/数组时整体切出再解析。
 	int i = 0;
 	const int n = body.size();
 	while (i < n) {
@@ -162,8 +164,7 @@ bool parseKeyValueBody(const QString& body, bool colon, QJsonObject* out, QStrin
 		const QChar delimiter = colon ? QLatin1Char(':') : QLatin1Char('=');
 		if (i >= n || body.at(i) != delimiter) {
 			if (error)
-				*error = QStringLiteral("expected '%1' after key %2")
-					.arg(delimiter).arg(key);
+				*error = QStringLiteral("expected '%1' after key %2").arg(delimiter).arg(key);
 			return false;
 		}
 		++i;
@@ -179,12 +180,10 @@ bool parseKeyValueBody(const QString& body, bool colon, QJsonObject* out, QStrin
 				return false;
 			}
 			QJsonParseError parseError;
-			const QJsonDocument doc = QJsonDocument::fromJson(
-				body.mid(i, close - i + 1).toUtf8(), &parseError);
+			const QJsonDocument doc = QJsonDocument::fromJson(body.mid(i, close - i + 1).toUtf8(), &parseError);
 			if (parseError.error != QJsonParseError::NoError) {
 				if (error)
-					*error = QStringLiteral("invalid JSON for %1: %2")
-						.arg(key, parseError.errorString());
+					*error = QStringLiteral("invalid JSON for %1: %2").arg(key, parseError.errorString());
 				return false;
 			}
 			out->insert(key, doc.isArray() ? QJsonValue(doc.array()) : QJsonValue(doc.object()));
@@ -235,6 +234,7 @@ bool parseKeyValueBody(const QString& body, bool colon, QJsonObject* out, QStrin
 	return true;
 }
 
+// 协议里的 tags / Intent 字段大小写不敏感。
 QJsonValue valueIgnoreCase(const QJsonObject& object, const QString& key)
 {
 	for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
@@ -261,6 +261,7 @@ bool boolValue(const QJsonObject& object, const QString& key, bool* has, bool* v
 
 UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 {
+	// 只解析 `/it` 开头的极简调用语法，其余文本原样当提示词。
 	UlinCoreInvocation invocation;
 	invocation.rawText = rawText;
 
@@ -272,6 +273,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 	}
 
 	const QChar next = text.size() > 3 ? text.at(3) : QChar();
+	// `/it` 后必须跟空白、`{` 或 `->`，否则当作普通提示词处理。
 	if (text.size() > 3 && !next.isSpace() && next != QLatin1Char('{') && next != QLatin1Char('-')) {
 		invocation.kind = InvocationKind::Prompt;
 		invocation.promptText = rawText;
@@ -411,6 +413,7 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 		const bool tagAgent = tags.contains(QStringLiteral("agentEngaged"));
 		const bool tagSkill = tags.contains(QStringLiteral("skillRequired"));
 		const bool tagDefineOnly = tags.contains(QStringLiteral("defineOnly"));
+		// 标签组合的合法性约束：执行类与生成类互斥，任一冲突都让整条调用报错。
 		if (tagAsPrompt && tagAsSkill) {
 			invocation.kind = InvocationKind::Error;
 			invocation.error = QStringLiteral("asPrompt and asSkill cannot both be set");

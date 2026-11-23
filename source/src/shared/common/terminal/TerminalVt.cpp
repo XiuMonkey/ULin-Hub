@@ -48,7 +48,7 @@ VTermColor makeVTermColor(uint32_t rgb, bool isDefault, bool isForeground)
 	return color;
 }
 
-void toTermCell(const VTermScreenCell& src, VTermScreen* screen, TermCell& out)   // 屏幕格 → 本类的格。宽字符的续格归一化成 width=0 / chars 全 0，渲染侧照此跳过
+void toTermCell(const VTermScreenCell& src, VTermScreen* screen, TermCell& out)   // 屏幕格 → 本类的格；宽字符续格归一化成 width=0
 {
 	out = TermCell();
 	if (src.chars[0] == kWideContinuation)
@@ -222,7 +222,7 @@ struct TerminalVtCallbacks
 		return 1;
 	}
 
-	static int onPopLine(int cols, VTermScreenCell* cells, void* user)   // resize_buffer 结尾那段 "backfill rows by popping scrollback"）
+	static int onPopLine(int cols, VTermScreenCell* cells, void* user)   // resize_buffer 结尾那段 "backfill rows by popping scrollback"
 	{
 		TerminalVt* self = static_cast<TerminalVt*>(user);
 		if (self->m_scrollback.empty())
@@ -235,14 +235,9 @@ struct TerminalVtCallbacks
 		for (int col = 0; col < count; ++col)
 			fromTermCell(line.cells[static_cast<size_t>(col)], cells[col]);
 
-		// ⚠️ 尾巴必须补满到 cols —— 这里是"放大尺寸后顶部吞字"的真正现场：
-		// ① libvterm 拿这行是**按 old_cols 整行**搬进屏幕顶部的（resize_buffer 的回填循环读
-		// `sb_buffer[pos.col]`，不看我们写了多少格），没写的格子就原样搬进屏幕，被当成正文画出来；
-		// ② 没写的那段是 sb_buffer 里上一次塞进去的东西 —— 换列时 libvterm 会重新 malloc 这个缓冲
-		// （screen.c 的 resize 里 new_cols != old_cols 两条分支），内容是未初始化内存或回收来的旧行；
-		// ③ 更糟的是它按 `pos.col += sb_buffer[pos.col].width` 步进，碰上 width==0 就原地不动，
-		// 直接挂住；这正是脱离/回附时"变宽 + 变高"那一步）。
-		// 所以只要回滚行比 cols 窄，剩下的一律铺空白格。
+		// 尾巴必须补满到 cols：libvterm 按整行把回滚行搬进屏幕顶部（不看我写了多少格），没写的格子
+		// 是 sb_buffer 里的旧数据或未初始化内存，会被当正文画出来；它按 width 步进，碰上 width==0
+		// 还会原地挂住（放大尺寸后"顶部吞字"的现场）。所以窄于 cols 的回滚行一律补空白格。
 		for (int col = count; col < cols; ++col)
 			fromTermCell(blankCell(), cells[col]);
 

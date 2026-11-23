@@ -4,6 +4,7 @@ ToolsFilterBridge::ToolsFilterBridge(ToolsFilter* model, QObject* parent)
 	: QAbstractListModel(parent)
 	, m_model(model)
 {
+	// 源模型整体重建时桥也要走 begin/endResetModel，否则 QML 侧视图拿不到重置通知。
 	connect(m_model, &QAbstractItemModel::modelAboutToBeReset, this, [this]() {
 		beginResetModel();
 	});

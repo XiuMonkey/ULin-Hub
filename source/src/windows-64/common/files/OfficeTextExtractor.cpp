@@ -46,6 +46,7 @@ QStringList sortedFiles(const QString& dirPath, const QString& nameFilter)
 	return result;
 }
 
+// 按 OOXML 的段落/表格标记还原换行与制表符。
 QString docxText(const QString& documentXml)
 {
 	QXmlStreamReader xml(documentXml);
@@ -75,6 +76,7 @@ QString docxText(const QString& documentXml)
 	return text.trimmed();
 }
 
+// 单元格引用（如 BC12）的列字母 → 0 基列下标。
 int columnIndex(const QString& ref)
 {
 	int col = 0;
@@ -87,6 +89,7 @@ int columnIndex(const QString& ref)
 	return qMax(0, col - 1);
 }
 
+// 单元格引用里的行号 → 0 基行下标。
 int rowIndex(const QString& ref)
 {
 	int row = 0;
@@ -97,6 +100,7 @@ int rowIndex(const QString& ref)
 	return qMax(0, row - 1);
 }
 
+// 读取 workbook.xml 里的工作表名，按顺序当作分节标题。
 QStringList workbookSheetNames(const QString& workbookXml)
 {
 	QStringList names;
@@ -112,6 +116,7 @@ QStringList workbookSheetNames(const QString& workbookXml)
 	return names;
 }
 
+// 把一张工作表解析成按行列对齐的文本：共享字符串查 sharedStrings，空单元格按列补位。
 QString xlsxSheetText(const QString& sheetXml, const QStringList& shared)
 {
 	QMap<int, QMap<int, QString>> rows;
@@ -207,6 +212,7 @@ QString xlsxText(const QString& root)
 	return out.trimmed();
 }
 
+// 按幻灯片编号拼接 pptx 文本。
 QString pptxText(const QString& root)
 {
 	const QStringList slides = sortedFiles(root + QStringLiteral("/ppt/slides"), QStringLiteral("slide*.xml"));
@@ -273,6 +279,7 @@ bool extract(const QString& path, QString* text, QString* error)
 	else if (suffix == QLatin1String("pptx"))
 		result = pptxText(tempPath);
 
+	// 文本为空视为失败：上层据此回退到"展示原始文本"。
 	if (result.trimmed().isEmpty()) {
 		if (error)
 			*error = QStringLiteral("没有提取到可显示的文本内容");

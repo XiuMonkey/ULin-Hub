@@ -1,34 +1,26 @@
 #pragma once
 
 // 后端接管接口（API takeover）——宿主实现宿主侧，扩展实现接收侧。
-//
 // 设计约束：
 //  - 接口方法顺序 = vtable 槽位顺序；本文件是 ABI 的唯一来源。
 //  - 宿主和扩展必须使用同一份头文件；扩展侧副本由 extensions/_shared/include 同步。
 //  - 修改本文件必须同时提升 ULINHUB_HOST_ABI_VERSION，旧扩展会被宿主拒绝。
-//
-// 方向：
-//  插件 → 宿主：VirtualApiHost
-//  宿主 → 插件：VirtualApiSink
-//  入站数据注入：VirtualMain（VirtualCommon.h）
+// 方向：插件 → 宿主走 VirtualApiHost；宿主 → 插件走 VirtualApiSink；入站数据注入见 VirtualMain（VirtualCommon.h）。
 
 #include <qplugin.h>
 
 class QObject;
 
-// ---------------------------------------------------------------------------
 // 插件 → 宿主
-// ---------------------------------------------------------------------------
 class VirtualApiHost
 {
 public:
 	virtual ~VirtualApiHost() = default;
 
-	// 接管开关：true = 停止内置后端并把出站交给扩展；false = 交还。
-	// 宿主侧幂等；重复附着时可重复调用。
+	// 接管开关：true = 停止内置后端并把出站交给扩展；false = 交还。宿主侧幂等，可重复调用。
 	virtual void Takenover(bool on) = 0;
 
-	// 查询当前是否处于接管态。Takenover 无返回值，调用后用这个确认。
+	// 查询当前是否处于接管态（Takenover 无返回值，用它确认）。
 	virtual bool IsTakenover() const = 0;
 
 	// 回填一次成功的出站调用：resultJson 是成功回调应拿到的 value（不是 server-response 信封）。
@@ -45,15 +37,12 @@ public:
 	virtual bool ActivateMasterAgent(const char* backendId) { Q_UNUSED(backendId); return false; }
 	virtual void DeactivateMasterAgent() {}
 
-	// 当前激活的 Master id；空串 = 旧的直接接管 / 未注册。
-	// 扩展收到 Takenover(true) 时用它判断是不是自己被选中。
+	// 当前激活的 Master id；空串 = 旧的直接接管 / 未注册。扩展收到 Takenover(true) 时用它判断是不是自己。
 	virtual const char* ActiveMasterAgentId() const { return ""; }
 };
 Q_DECLARE_INTERFACE(VirtualApiHost, "com.ulinhub.VirtualApiHost/1.0")
 
-// ---------------------------------------------------------------------------
 // 宿主 → 插件：接管期间的出站请求接收端
-// ---------------------------------------------------------------------------
 class VirtualApiSink
 {
 public:

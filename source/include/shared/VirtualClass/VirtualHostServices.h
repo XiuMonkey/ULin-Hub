@@ -24,7 +24,7 @@ public:
 	virtual void ChatCancel() = 0;
 	virtual void ChatRefreshModelCatalog() = 0;
 	virtual void ChatSelectModel(const QString& provider, const QString& model) = 0;
-	virtual void ChatSelectLevel(const QString& levelId) = 0;
+	virtual void ChatSelectLevel(const QString& levelId) = 0;   // levelId = 推理档位（reasoning effort）的 id
 	virtual void ChatAddQuote(const QString& text) = 0;
 };
 Q_DECLARE_INTERFACE(VirtualChatHost, "com.ulinhub.VirtualChatHost/1.0")
@@ -112,4 +112,3 @@ public:
 	virtual void ExtensionRestartServer() = 0;
 };
 Q_DECLARE_INTERFACE(VirtualExtensionHost, "com.ulinhub.VirtualExtensionHost/1.0")
-

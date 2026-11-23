@@ -15,8 +15,8 @@ Item {
     // PageOverlay 会把这个属性绑到开合动画状态；动画期间停掉转圈，别让整窗每帧重绘。
     property bool overlayAnimating: false
 
-    property int selectedIndex: Hub.scheduleTasks.length > 0 ? 0 : -1
-    property string pendingDeleteId: ""
+    property int selectedIndex: Hub.scheduleTasks.length > 0 ? 0 : -1   // 默认选第一条；空目录为 -1
+    property string pendingDeleteId: ""   // 待确认删除的任务 id：第一次点删除只记下来，再点一次才真删
 
     readonly property var selectedTask: (selectedIndex >= 0 && selectedIndex < Hub.scheduleTasks.length)
         ? Hub.scheduleTasks[selectedIndex] : null
@@ -118,6 +118,7 @@ Item {
                     border.color: Theme.color.border
                 }
 
+                // 展示串（ruleText / nextText / nextRelative / statusText / lastDeliveryText）直接来自 C++ 的 scheduleTasks，本页不再加工。
                 ListView {
                     id: taskList
                     anchors.fill: parent
@@ -206,7 +207,7 @@ Item {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 page.selectedIndex = row.index
-                                page.pendingDeleteId = ""
+                                page.pendingDeleteId = ""   // 换选中项 = 放弃"再点一次才删"的待确认状态
                             }
                         }
                     }
@@ -420,6 +421,7 @@ Item {
                         font.pixelSize: Theme.font.caption
                     }
 
+                    // 打开原会话；删除要连点两次确认（第一次只记 pendingDeleteId）
                     Row {
                         spacing: 8
 

@@ -1,5 +1,3 @@
-// 见 UrlInputBridge.h：QML 单例 `UrlInput`，只把调用转给 normalizeUrlInput()。
-
 #include "qmlbridge/UrlInputBridge.h"
 
 #include "common/util/UrlInput.h"

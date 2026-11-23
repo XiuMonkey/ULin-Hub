@@ -11,9 +11,8 @@
 #include <QFileDialog>
 #include <QTimer>
 
-// 与现有实现 ExtensionManagerPopup 一一对应：
-// populate() <-> populateList()、installFromFile() <-> installExtension()、pollInstall() <-> pollInstall()、
-// removeSelected() <-> removeSelected()、cleanupResiduals() <-> cleanupResiduals()、refresh() <-> refresh()。
+// 与旧版 ExtensionManagerPopup 一一对应：populate ↔ populateList、installFromFile ↔ installExtension，
+// removeSelected / cleanupResiduals / refresh / pollInstall 同名。
 ExtensionManagerPage::ExtensionManagerPage(ServerManager* server, ExtensionToolHost* toolHost, QObject* parent)
 	: QObject(parent)
 	, m_server(server)
@@ -21,8 +20,7 @@ ExtensionManagerPage::ExtensionManagerPage(ServerManager* server, ExtensionToolH
 {
 	m_installTimer = new QTimer(this);  // 与原版一致：100ms 轮询后台安装任务（非阻塞，主线程不卡）
 	m_installTimer->setInterval(100);
-	dshRegister("ExtensionManager.001", m_installTimer, &QTimer::timeout, this,
-		&ExtensionManagerPage::pollInstall);
+	dshRegister("ExtensionManager.001", m_installTimer, &QTimer::timeout, this, &ExtensionManagerPage::pollInstall);
 
 	populate();   // 先备好列表，页面一开就有内容
 }
@@ -41,7 +39,7 @@ ExtensionRegistry ExtensionManagerPage::registry() const
 
 QString ExtensionManagerPage::kindLabel(const QString& kind) const
 {
-	return kind == QLatin1String("client") ? qtTrId("ext_kind_client") : QString();   // 工具扩展在原版里没有种类后缀（裸名字），所以这里返回空串，由 QML 决定不画徽章
+	return kind == QLatin1String("client") ? qtTrId("ext_kind_client") : QString();   // 工具扩展没有种类后缀（裸名字），空串让 QML 不画徽章
 }
 
 QVariantMap ExtensionManagerPage::selectedItem() const
@@ -162,8 +160,7 @@ void ExtensionManagerPage::installFromFile()
 		return;
 
 	// 与原版同一个过滤器与标题；宿主是 QApplication，原生对话框可用
-	const QString extPath = QFileDialog::getOpenFileName(nullptr, qtTrId("ext_choose_file_title"),
-		QString(), QStringLiteral("DSH Extension (*.ext)"));
+	const QString extPath = QFileDialog::getOpenFileName(nullptr, qtTrId("ext_choose_file_title"), QString(), QStringLiteral("DSH Extension (*.ext)"));
 	if (extPath.isEmpty())
 		return;
 
@@ -231,7 +228,8 @@ bool ExtensionManagerPage::removeSelected()
 	const QString kind = row.value(QStringLiteral("kind")).toString();
 
 	if (kind == QLatin1String("client")) {
-		QString removeError;  // 已装载的插件在进程内卸不掉，要重启应用才彻底消失
+		// 已装载的插件在进程内卸不掉，删完要重启应用才彻底消失。
+		QString removeError;
 		const bool removed = ClientExtension::remove(name, &removeError);
 		populate();
 		setStatus(removed ? qtTrId("ext_removed_fmt").arg(name) : qtTrId("ext_partial_delete_failed_fmt").arg(removeError));
@@ -241,7 +239,8 @@ bool ExtensionManagerPage::removeSelected()
 		return true;
 	}
 
-	QString dirError;  // 工具扩展：目录删没删成功都清配置残留，否则 cordis.patch.yml 引用不存在的包
+	// 工具扩展：目录删没删成功都要清配置残留，否则 cordis.patch.yml 引用不存在的包。
+	QString dirError;
 	if (m_toolHost)   // 先卸 DLL 再删目录：Windows 上本进程还映射着 main.dll 时，删文件会失败
 		m_toolHost->unloadExtension(name);
 	const bool dirRemoved = registry().removeExtensionDirectory(name, &dirError);

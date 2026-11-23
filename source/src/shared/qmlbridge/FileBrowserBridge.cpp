@@ -62,14 +62,9 @@ FileBrowserBridge::FileBrowserBridge(QObject* parent)
 {
 	ensureOfficeViewerFiles();
 	// 接线：领域服务的通知原样转成 QML 属性通知。
-	connect(&m_service, &FileBrowserService::rootPathChanged,
-		this, &FileBrowserBridge::rootPathChanged);
-	connect(&m_service, &FileBrowserService::currentPathChanged,
-		this, &FileBrowserBridge::currentPathChanged);
-	connect(&m_service, &FileBrowserService::entriesChanged,
-		this, &FileBrowserBridge::entriesChanged);
-	connect(&m_service, &FileBrowserService::fileChanged,
-		this, &FileBrowserBridge::fileChanged);
-	connect(&m_service, &FileBrowserService::errorChanged,
-		this, &FileBrowserBridge::errorChanged);
+	connect(&m_service, &FileBrowserService::rootPathChanged, this, &FileBrowserBridge::rootPathChanged);
+	connect(&m_service, &FileBrowserService::currentPathChanged, this, &FileBrowserBridge::currentPathChanged);
+	connect(&m_service, &FileBrowserService::entriesChanged, this, &FileBrowserBridge::entriesChanged);
+	connect(&m_service, &FileBrowserService::fileChanged, this, &FileBrowserBridge::fileChanged);
+	connect(&m_service, &FileBrowserService::errorChanged, this, &FileBrowserBridge::errorChanged);
 }

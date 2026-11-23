@@ -1,14 +1,10 @@
 #pragma once
 
-// 扩展工具宿主：把「DSH 服务端插件 → 命名管道 → 客户端 DllCaller」这条链接起来。
-// 背景：Agent 看到的工具由 .ext 里的 AttachedPlugin（跑在 node 服务端）注册，但 DLL 跑在
-// Qt 客户端进程里，两者之间是 \\.\pipe\ulinhub-bridge 上的行式 JSON：
+// 扩展工具宿主：把「DSH 服务端插件 → 命名管道 → 客户端 DllCaller」这条链补全。
+// 服务端插件（node）与 DLL（Qt 客户端进程）之间走 \\.\pipe\ulinhub-bridge 上的行式 JSON：
 //  {"id":1,"tool":"my_tool","args":{...}} → {"id":1,"ok":true,"result":{...}}
-// ，这条链只剩下两端（DshNamedPipeBridge、DllCaller），中间没人接：
-// 管道没人监听、requestReceived 没人收、callTool 没人调 —— 于是工具能注册、一调就超时。
-// 本类就是补上的那一段，并顺手把「调度」从 DllCaller 里分离出来：
-//  bridge.requestReceived ──▶ 本类 ──▶ 专用线程池 ──▶ DllCaller::callTool
-//  ──▶ 回投 GUI 线程 ──▶ bridge.sendResponse
+// 本类负责其中的调度：
+//  bridge.requestReceived ──▶ 本类 ──▶ 专用线程池 ──▶ DllCaller::callTool ──▶ 回投 GUI 线程 ──▶ bridge.sendResponse
 // 线程契约（改之前先读）：
 //  · 本对象、bridge 的监听/停止、DllCaller 的装载/卸载，都只在 GUI 线程；
 //  · 工作线程只调 DllCaller::callTool —— 它自带 per-DLL runMutex（同 DLL 串行）与
@@ -63,14 +59,12 @@ public:
 
 private:
 	void onRequestReceived(int id, const QString& tool, const QJsonObject& args, QLocalSocket* socket);
-	void respond(int id, bool ok, const QJsonObject& result, const QString& error,
-		const QPointer<QLocalSocket>& socket);
+	void respond(int id, bool ok, const QJsonObject& result, const QString& error, const QPointer<QLocalSocket>& socket);
 	// 清掉还没开始的、等在执行的；返回是否在时限内排空
 	bool drainPending();
 
 	static constexpr int kDrainTimeoutMs = 3000;
 	// 专用池上限：不同 DLL/COM 之间并行；同一个 DLL 仍由 DllCaller 的 runMutex 串行。
-	//  从 4 调到 6：多扩展同时被调用时，4 条线程会被长调用占满、后面的请求排队。
 	static constexpr int kMaxThreads = 6;
 
 	DshNamedPipeBridge* m_bridge = nullptr;
@@ -79,6 +73,6 @@ private:
 	QString m_profileDir;
 	QString m_error;
 	bool m_running = false;
-	bool m_draining = false;
-	QAtomicInt m_inFlight;
+	bool m_draining = false;   // true = 暂停收新请求（stop()/reload() 期间），onRequestReceived 直接回错
+	QAtomicInt m_inFlight;     // 已提交、还没回包的请求数
 };

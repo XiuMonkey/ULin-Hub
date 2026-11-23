@@ -1,6 +1,7 @@
 #pragma once
 
 // 面板块后端替换宿主接口。由 HostUi 实现（登记名 kUiHost，与 VirtualUiHost 同一个单例）。
+// 扩展按 owner 为某个 kind 的面板块注册后端对象，宿主之后按 kind 打开/关闭该面板块；Launcher 是侧栏入口登记。
 
 #include <QObject>
 #include <QString>

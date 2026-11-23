@@ -1,4 +1,4 @@
-﻿#include "common/agent/dsh/pluginmarket/PluginMarketInstaller.h"
+#include "common/agent/dsh/pluginmarket/PluginMarketInstaller.h"
 
 #include <QDebug>
 #include <QDir>
@@ -12,14 +12,14 @@
 namespace
 {
 	const char* const kMarketPackage = "dshmarket";   // 自动安装的市场包版本（与 registry 快照保持一致）
-	const char* const kMarketVersion = "1.66.32";   // 这里仍显式钉住一个具体版本（分发要可控），只是钉到当前最新；升级时改这一行即可
+	const char* const kMarketVersion = "1.66.32";   // 显式钉住具体版本以控制分发，升级时只改这一行
 	const char* const kMarketPackageJson =
 		"/resources/server/harness/profiles/web/node_modules/dshmarket/package.json";
 	const char* const kNodeRelativePath = "/resources/server/node.exe";
 	const char* const kHarnessRelativePath = "/resources/server/harness";
 
-	// dist/pnpm.mjs 是个坏 stub（跑 --version 直接抛异常），真正能跑的是 artifacts/exe/dist/pnpm.mjs
-	// （验证过：11.21.0，exit 0）。所以优先用它，退而求其次才是传统入口。
+	// dist/pnpm.mjs 是坏 stub（跑 --version 直接抛异常），真正可运行的是 artifacts/exe/dist/pnpm.mjs
+	// （验证过 11.21.0，exit 0），因此优先使用它，传统入口作为回退。
 	const char* const kPnpmEntryRelativePath = "/resources/server/node_modules/pnpm/artifacts/exe/dist/pnpm.mjs";
 	const char* const kPnpmEntryFallbackRelativePath = "/resources/server/node_modules/pnpm/bin/pnpm.cjs";
 }
@@ -46,19 +46,18 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 	const QString nodePath = appDir + QLatin1String(kNodeRelativePath);
 	const QString dshHome = appDir + QLatin1String(kHarnessRelativePath);
 
-	QString pnpmEntryPath = appDir + QLatin1String(kPnpmEntryRelativePath);   // 确保 pnpm 可用：如果 PATH 里没有 pnpm，就创建一个本地 shim
+	QString pnpmEntryPath = appDir + QLatin1String(kPnpmEntryRelativePath);
 	if (!QFile::exists(pnpmEntryPath))
 		pnpmEntryPath = appDir + QLatin1String(kPnpmEntryFallbackRelativePath);
 	const QString pnpmEntry = QDir::toNativeSeparators(pnpmEntryPath);
 	const QString binDir = QDir::toNativeSeparators(dshHome + QStringLiteral("/.desktop-bin"));
 	QDir().mkpath(binDir);
 	const QString pnpmCmdPath = binDir + QStringLiteral("/pnpm.cmd");
+	// PATH 里没有 pnpm 时，用本地 shim 把它转发到随包分发的 pnpm 入口。
 	if (!QFile::exists(pnpmCmdPath)) {
 		QFile shim(pnpmCmdPath);
 		if (shim.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-			shim.write(QStringLiteral("@echo off\r\n\"%1\" \"%2\" %*\r\n")
-				.arg(QDir::toNativeSeparators(nodePath), pnpmEntry)
-				.toUtf8());
+			shim.write(QStringLiteral("@echo off\r\n\"%1\" \"%2\" %*\r\n").arg(QDir::toNativeSeparators(nodePath), pnpmEntry).toUtf8());
 			shim.close();
 		}
 	}
@@ -91,8 +90,7 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 
 	const QString profileDir = QDir::toNativeSeparators(dshHome + QStringLiteral("/profiles/web"));
 
-	connect(m_installer, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-		this, [this, profileDir](int exitCode, QProcess::ExitStatus exitStatus) {
+	connect(m_installer, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, profileDir](int exitCode, QProcess::ExitStatus exitStatus) {
 		Q_UNUSED(exitStatus)
 		m_installer->deleteLater();
 		m_installer = nullptr;
@@ -110,18 +108,17 @@ bool PluginMarketInstaller::ensureInstalled(const QString& appDir)
 
 	m_installer->setWorkingDirectory(profileDir);
 
-	qInfo().noquote() << QStringLiteral("[market-installer] starting pnpm install for %1@%2")
-		.arg(QLatin1String(kMarketPackage), QLatin1String(kMarketVersion));
+	qInfo().noquote() << QStringLiteral("[market-installer] starting pnpm install for %1@%2").arg(QLatin1String(kMarketPackage), QLatin1String(kMarketVersion));
 
 	emit installStarted();
 
-	// 直接使用 node 运行 pnpm，避免依赖系统 PATH 里的 pnpm
-	m_installer->start(nodePath, QStringList{ pnpmEntry, QStringLiteral("add"), QStringLiteral("--save-exact"),
-		QStringLiteral("%1@%2").arg(QLatin1String(kMarketPackage), QLatin1String(kMarketVersion)) });
+	// 用 node 直接运行 pnpm，不依赖系统 PATH 中的 pnpm
+	m_installer->start(nodePath, QStringList{ pnpmEntry, QStringLiteral("add"), QStringLiteral("--save-exact"), QStringLiteral("%1@%2").arg(QLatin1String(kMarketPackage), QLatin1String(kMarketVersion)) });
 
 	return true;
 }
 
+// 把 dshmarket 补写进 profile 的 dependencies 与 dsh.profile.bundles。
 void PluginMarketInstaller::patchProfileManifest(const QString& profileDir) const
 {
 	const QString manifestPath = profileDir + QStringLiteral("/package.json");   // pnpm 只写 dependencies，需要手动把 dshmarket 加入 profile bundles

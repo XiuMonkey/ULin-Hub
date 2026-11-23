@@ -13,7 +13,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QJsonArray>    // 身份三件套里的 dependence 是数组 ⇒ 解析要用到 QJsonArray（此前只用到 QJsonObject）
+#include <QJsonArray>    // dependence 是数组，解析身份字段要用它
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QRegularExpression>
@@ -181,8 +181,7 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 		return false;
 	}
 
-	const QString rootDir = QDir::temp().filePath(
-		QStringLiteral("ULinHubExtensions/") + extInfo.completeBaseName());
+	const QString rootDir = QDir::temp().filePath(QStringLiteral("ULinHubExtensions/") + extInfo.completeBaseName());
 
 	if (QDir(rootDir).exists() && !removeRecursively(rootDir)) {
 		m_errorString = QStringLiteral("cannot clear old extension directory: %1").arg(rootDir);
@@ -198,7 +197,7 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 	if (!findFiles(rootDir, &loaded, error))
 		return false;
 
-	if (!readDescriptor(loaded.jsonPath, &loaded, error))   // regulation 里的 Type 决定走哪条路线（见头文件开头两条路线的说明）
+	if (!readDescriptor(loaded.jsonPath, &loaded, error))   // 身份文件里的 Type 决定走哪条路线（见头文件开头的分流说明）
 		return false;
 
 	// 界面契约门控（只对客户端扩展有意义）：扩展可以声明 ABIVersion，与宿主不符 ⇒ 只装 DLL，
@@ -206,14 +205,12 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 	// 未声明（uiAbi < 0）视为匹配：老扩展不受影响。
 	if (loaded.uiAbi >= 0 && loaded.uiAbi != ClientInfo::kUiAbi) {
 		loaded.uiAbiMatched = false;
-		qWarning().noquote() << QStringLiteral(
-			"[ExtensionLoader] ABIVersion %1 != host %2 —— 只装 DLL，跳过 ui/")
-			.arg(loaded.uiAbi).arg(ClientInfo::kUiAbi);
+		qWarning().noquote() << QStringLiteral("[ExtensionLoader] ABIVersion %1 != host %2 —— 只装 DLL，跳过 ui/").arg(loaded.uiAbi).arg(ClientInfo::kUiAbi);
 	}
 
 	if (ClientExtension::isClientExtensionType(loaded.type)) {
 		// 客户端扩展：不碰 serverProfilePath（不写 extensions.json、不改 cordis.patch.yml、不重启服务端），
-		// 只把 dll + regulation 落到 <exe>/extensions/<Name>/。这里**不装载 DLL** —— 本函数跑在
+		// 只把库文件与身份文件落到 <exe>/extensions/<Name>/。这里**不装载 DLL** —— 本函数跑在
 		// ExtensionInstallTask 的后台线程上，装载必须由 GUI 线程做（调用方拿到 isClientExtension 后自己
 		// 调 ClientExtension::loadOne）。
 		const QString name = loaded.declaredName.isEmpty()
@@ -230,12 +227,10 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 		}
 
 		const QString packageRoot = QFileInfo(loaded.dllPath).absolutePath();
-		const QFileInfoList entries = QDir(packageRoot).entryInfoList(
-			QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+		const QFileInfoList entries = QDir(packageRoot).entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
 		for (const QFileInfo& entry : entries) {
 			if (entry.isDir() && entry.fileName() == QLatin1String("ui") && !loaded.uiAbiMatched) {
-				qInfo().noquote() << QStringLiteral(
-					"[ExtensionLoader] skip ui/ (ABIVersion mismatch): %1").arg(entry.absoluteFilePath());
+				qInfo().noquote() << QStringLiteral("[ExtensionLoader] skip ui/ (ABIVersion mismatch): %1").arg(entry.absoluteFilePath());
 				continue;
 			}
 
@@ -296,9 +291,7 @@ bool ExtensionLoader::loadAndInstall(const QString& extFilePath, const QString& 
 			*out = loaded;
 
 		m_errorString.clear();
-		qInfo().noquote() << QStringLiteral(
-			"[ExtensionLoader] client extension installed: name=%1 type=%2 dll=%3 info=%4")
-			.arg(name, loaded.type, destDll, destInfo);
+		qInfo().noquote() << QStringLiteral("[ExtensionLoader] client extension installed: name=%1 type=%2 dll=%3 info=%4").arg(name, loaded.type, destDll, destInfo);
 		return true;
 	}
 
@@ -463,8 +456,7 @@ QString ExtensionLoader::infoPath(const QString& dir)
 	// 只在调用方确实要找身份文件时才会走到这里（一次安装/一次启动扫描各一遍），不必去重。
 	const QString legacy = dir + QStringLiteral("/regulation.json5");
 	if (QFile::exists(legacy)) {
-		qInfo().noquote() << QStringLiteral(
-			"[ExtensionLoader] 旧布局（缺 info.json5，身份读自 regulation.json5）：%1 —— 建议重打包").arg(dir);
+		qInfo().noquote() << QStringLiteral("[ExtensionLoader] 旧布局（缺 info.json5，身份读自 regulation.json5）：%1 —— 建议重打包").arg(dir);
 		return legacy;
 	}
 	return {};
@@ -704,8 +696,9 @@ bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& se
 	out->jsonPath = infoPath(extRoot);
 	out->regulationJsonPath = regulationPath(extRoot);
 
-	const QString newIndexPath = pluginPath + QStringLiteral("/index.js");   // 若别的已装插件暴露了同名工具，就跳过安装本插件，避免重复注册工具导致崩溃
+	const QString newIndexPath = pluginPath + QStringLiteral("/index.js");
 	const QSet<QString> newToolNames = extractToolNames(newIndexPath);
+	// 若别的已装插件暴露了同名工具，就跳过安装本插件，避免重复注册工具导致崩溃
 	if (!newToolNames.isEmpty()) {
 		QSet<QString> existingToolNames;
 		QDirIterator it(nodeModulesPath, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
@@ -753,8 +746,7 @@ bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& se
 			QString code = QString::fromUtf8(indexFile.readAll());
 			indexFile.close();
 
-			const QRegularExpression namePattern(
-				QStringLiteral("export\\s+const\\s+name\\s*=\\s*['\"][^'\"]*['\"];"));
+			const QRegularExpression namePattern(QStringLiteral("export\\s+const\\s+name\\s*=\\s*['\"][^'\"]*['\"];"));
 			if (namePattern.isValid()) {
 				code.replace(namePattern,
 					QStringLiteral("export const name = \"%1\";").arg(out->pluginName));
@@ -769,8 +761,7 @@ bool ExtensionLoader::installPlugin(const QString& pluginPath, const QString& se
 
 	// 确保 cordis.patch.yml 里有这个插件的行；行的格式与判重规则归 ExtensionRegistry 所有（它同时负责
 	// 解析这个文件做移除与残留清理），这样“一行长什么样”只有一个地方定义。
-	if (ExtensionRegistry::ensurePatchEntry(serverProfilePath, out->pluginName, out->pluginName,
-		QString(), &m_errorString) == ExtensionRegistry::PatchEntryResult::Failed) {
+	if (ExtensionRegistry::ensurePatchEntry(serverProfilePath, out->pluginName, out->pluginName, QString(), &m_errorString) == ExtensionRegistry::PatchEntryResult::Failed) {
 		if (error)
 			*error = m_errorString;
 		return false;

@@ -15,24 +15,22 @@ Item {
     // 给了就画图片，不再画字形/文字 —— 用 QIcon 的地方都走这里（发送/中止、侧栏入口…）。
     property string iconSource: ""
 
-    // 可选染色：alpha > 0 时把 iconSource 当"白色单色图标"用 MultiEffect 按亮度刷成该颜色。
-    // 同做法的独立控件是 widgets/LineIcon.qml，但两边**不互相委托**：LineIcon 按 name 拼 qrc 路径、
-    // 只服务图标集；这里 iconSource 可以是任意资源，且必须保留 PNG 直绘路径（委托过去会让每个按钮
-    // 多一层 Item，非染色时还多一次解码），所以两处各保留这十几行染色配置。
+    // 可选染色：alpha > 0 时把 iconSource 当"白色单色图标"，用 MultiEffect 按亮度刷成该颜色。
+    // 与 widgets/LineIcon.qml 同做法但不互相委托：LineIcon 只服务按 name 拼路径的图标集，
+    // 这里 iconSource 可以是任意资源，且要保留 PNG 直绘路径（委托会多一层 Item + 一次解码）。
     property color iconColor: "transparent"
 
-    // 可选悬停/按下底色。默认仍走官方 iconButtonHoverBg / iconButtonPressedBg；
-    // 侧栏折叠这类"只想让图标变亮、不要出现深色方块"的按钮可以把两者都设成 transparent。
+    // 可选悬停/按下底色。默认走官方 iconButtonHoverBg / iconButtonPressedBg；
+    // 侧栏折叠这类"只想让图标变亮、不要深色方块"的按钮可以把两者都设成 transparent。
     property color hoverBackground: Theme.color.iconButtonHoverBg
     property color pressedBackground: Theme.color.iconButtonPressedBg
     property int iconSize: Math.round(boxSize * 0.72)
 
-    // 圆形悬停蒙版（原版输入区发送键的做法：蒙版叠在**图标之上**、鼠标穿透、
+    // 圆形悬停蒙版（原版输入区发送键的做法：蒙版叠在图标之上、鼠标穿透、
     // hover 白 35% / pressed 白 55%、圆角 = 边长一半）。给了它就不再画方形悬停底。
     property bool circleHoverOverlay: false
 
-    // 蒙版基色。默认白 —— 底色深（或透明）时"提亮"才是对的悬停反馈。
-    // 但底色本身是浅色（如暗色主题下的白圆发送键）时，白蒙版叠上去等于没叠，此时要把 circleHoverTint 换成深色。
+    // 蒙版基色：底色深（或透明）时白色提亮即可；底色本身是浅色时白蒙版等于没叠，调用方需换成深色。
     property color circleHoverTint: "#FFFFFF"
     property string tooltip: ""
     property bool selected: false
@@ -42,11 +40,9 @@ Item {
     property color glyphColor: Theme.color.iconButtonText
     property color glyphColorHover: Theme.color.iconButtonTextHover
 
-    // 内容的视觉垂直微调（px，正数往下）。默认 0 = 不干预。
-    // 为什么需要它：`anchors.centerIn` 居中用的是 Text 的**行盒**（高度 = ascent + descent），
-    // 而那是**字体级**的盒子 —— 要容纳该字体里最高的字形（带升降部的字母、括号…），所以单个
-    // 字形未必落在盒子中线上。U+21C4「⇄」就是这种：Segoe UI Symbol 24px 下行盒 33px，而墨迹
-    // 落在 [11, 27)，中线比盒中线低 2.9px，夹在一排**精确居中**的 PNG 图标里肉眼可见地偏下。
+    // 内容的视觉垂直微调（px，正数往下）。anchors.centerIn 居中的是 Text 的行盒（ascent + descent），
+    // 行盒按字体最高字形撑开，单个字形未必落在中线上（如 Segoe UI Symbol 的 U+21C4「⇄」墨迹偏低），
+    // 夹在一排居中的 PNG 图标里肉眼可见地偏，故留这个微调口。
     property real contentYOffset: 0
 
     signal clicked()
@@ -79,8 +75,8 @@ Item {
         font.weight: root.selected ? Theme.font.weightMedium : Font.Normal
     }
 
-    // 原版图标（同一套 PNG，深浅色主题各有一版的地方由调用方按 Theme.isDark 选）
-    // 染色模式下本 Image 退居为**纹理源**（不上屏），由下面那颗 MultiEffect 画出来。
+    // PNG 图标（深浅色主题各一版的地方由调用方按 Theme.isDark 选）。
+    // 染色模式下本 Image 只作纹理源（不上屏），由下面那颗 MultiEffect 画出来。
     Image {
         id: iconImage
         anchors.centerIn: parent
@@ -119,7 +115,7 @@ Item {
         onClicked: root.clicked()
     }
 
-    Rectangle {   // 圆形蒙版：叠在图标**之上**（原版 m_sendOverlay 是同层级做法），鼠标穿透交给上面的 MouseArea
+    Rectangle {   // 圆形蒙版：叠在图标之上（原版 m_sendOverlay 同层级做法），鼠标穿透交给上面的 MouseArea
         anchors.fill: parent
         visible: root.circleHoverOverlay
         radius: width / 2

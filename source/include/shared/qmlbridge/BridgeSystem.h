@@ -2,6 +2,7 @@
 // QML 暴露面：组合 common 服务，不继承、不持有 Hub。
 #include "qmlbridge/BridgeCommon.h"
 
+// 样式逻辑路径 → 实际 URL，转发给 StyleResolver。
 class StyleBridge : public QObject
 {
 	Q_OBJECT
@@ -20,6 +21,7 @@ private:
 	explicit StyleBridge(QObject* parent = nullptr) : QObject(parent) {}
 };
 
+// 按索引登记 QML 侧的 connect()，统一交给 ConnectionManager 管理生命周期。
 class HostConnectionsBridge : public QObject
 {
 	Q_OBJECT
@@ -27,8 +29,7 @@ class HostConnectionsBridge : public QObject
 public:
 	static HostConnectionsBridge& instance();
 
-	Q_INVOKABLE void RegisterConnection(QString index, const QObject* sender,
-		const QString& signal, const QObject* receiver, const QString& slot)
+	Q_INVOKABLE void RegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)
 	{
 		ConnectionManager::instance().RegisterConnection(index, sender, signal, receiver, slot);
 	}
@@ -37,6 +38,7 @@ private:
 	explicit HostConnectionsBridge(QObject* parent = nullptr) : QObject(parent) {}
 };
 
+// 扩展可用的宿主 UI 入口：账号入口占用、UI 项登记/挂载、块后端释放。
 class HostUiBridge : public QObject
 {
 	Q_OBJECT
@@ -60,8 +62,7 @@ public:
 	{
 		return HostUi::instance().item(name);
 	}
-	Q_INVOKABLE QString mountInto(const QString& owner, const QString& hostItem,
-		const QString& url, QObject* context = nullptr)
+	Q_INVOKABLE QString mountInto(const QString& owner, const QString& hostItem, const QString& url, QObject* context = nullptr)
 	{
 		return HostUi::instance().mountInto(owner, hostItem, url, context);
 	}

@@ -152,8 +152,7 @@ Item {
                     const maxX = Math.max(0, scroller.contentWidth - scroller.width)
                     if (maxX <= 0)
                         return
-                    scroller.contentX = Math.max(0, Math.min(maxX,
-                        hbar.position * scroller.contentWidth))
+                    scroller.contentX = Math.max(0, Math.min(maxX, hbar.position * scroller.contentWidth))
                 }
             }
 

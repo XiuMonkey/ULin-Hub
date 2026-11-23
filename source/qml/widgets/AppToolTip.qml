@@ -1,9 +1,9 @@
 // 悬浮提示。刻意不用 QtQuick.Controls 的 ToolTip/Popup：Popup 弹层会接管鼠标（CloseOnPressOutside），
 // "悬停出提示 → 紧接着点击"的第一下会被用来关弹层。
-// ⚠️ 气泡必须画在**窗口 contentItem** 顶层：作为控件子项 + z 排序跨层不生效、父级 clip 还会裁掉它；
-// 挂到 contentItem 后（新追加子项画在所有内容之上、不裁剪、尺寸=窗口），鼠标行为不变。
-// 不用 Overlay.overlay：那层给 Popup 用、空时会被 Qt 销毁；contentItem 是场景根，永不为 null。
-// ⚠️ 位置必须**现算 + 跟随**：x/y 写成绑定调 mapToItem() 是错的（mapToItem 是 C++ 实现，读 x/y/父链
+// 气泡必须画在窗口 contentItem 顶层：作为控件子项时 z 排序跨层不生效、父级 clip 还会裁掉它；
+// 挂到 contentItem 后不裁剪、尺寸=窗口，鼠标行为不变。不用 Overlay.overlay：那层给 Popup 用，
+// 空时会被 Qt 销毁，而 contentItem 是场景根，永不为 null。
+// 位置必须现算 + 跟随：x/y 写成绑定调 mapToItem() 是错的（mapToItem 是 C++ 实现，读 x/y/父链
 // 不进 QML 绑定依赖图，绑定只在创建时算一次）；所以显示瞬间 place()、显示期间 16ms Timer 反复 place()、
 // 再挂 Connections 监听锚点与窗口几何；隐藏时 Timer 停 ⇒ 空闲零开销。
 // 用法：AppToolTip { text: "设置"; visible: mouseArea.containsMouse }（或显式给 anchorItem）。
@@ -21,11 +21,9 @@ Item {
 
     readonly property Item topLayer: Window.window ? Window.window.contentItem : null   // 顶层落点：窗口的 contentItem。窗口还没就绪时先留在宿主里（不可见时段无所谓）
 
-    // 气泡搬到顶层后**不再**跟着宿主一起隐藏（宿主的 visible 不会传导到 contentItem），
-    // 这里自己沿 parent 链查一遍。在绑定里逐个读 .visible 会自动建立依赖。
-    // visible 不要直接绑定 parent 链上的 visible：QML 会把“气泡 reparent 到 contentItem”
-    // 与锚点可见性识别成循环，启动/开设置页时刷出大量 Binding loop。
-    // 改为显式 bool，提示实际可见期间用 200ms 轮询刷新（工具栏 tooltip 不是流式热点）。
+    // 气泡搬到顶层后不再跟着宿主一起隐藏（宿主的 visible 不会传导到 contentItem），这里自己沿 parent 链查一遍。
+    // visible 不能直接绑 parent 链：QML 会把"气泡 reparent 到 contentItem"与锚点可见性识别成循环，
+    // 启动/开设置页时刷出大量 Binding loop；所以用显式 bool，提示可见期间用 200ms 轮询刷新。
     property bool tipVisible: false
 
     function refreshTipVisible() {
@@ -147,7 +145,6 @@ Item {
         function onWidthChanged() { root.place() }
         function onHeightChanged() { root.place() }
     }
-
 
     // 换 parent 会连同 QObject 父子关系一起改（气泡从此归 contentItem 所有），
     // 所以宿主被销毁时必须自己收尸 —— 否则 ListView 委托里的提示会一层层堆在窗口根上。

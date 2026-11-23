@@ -41,7 +41,7 @@ ExtensionToolHost::ExtensionToolHost(QObject* parent)
 	, m_bridge(new DshNamedPipeBridge(this))
 	, m_pool(new QThreadPool(this))
 {
-	// 专用池：切不要用 QThreadPool::globalInstance() —— 那条池还要解析 HTTP 回包，
+	// 专用池：不要用 QThreadPool::globalInstance() —— 那条池还要解析 HTTP 回包，
 	// 让可能阻塞的 DLL 调用挤进去会把大回包解析（以及后续所有解析）饿死。
 	m_pool->setMaxThreadCount(kMaxThreads);
 	connect(m_bridge, &DshNamedPipeBridge::requestReceived,
@@ -141,9 +141,7 @@ bool ExtensionToolHost::drainPending()
 {
 	const bool drained = m_pool->waitForDone(kDrainTimeoutMs);
 	if (!drained) {
-		qWarning().noquote() << QStringLiteral(
-			"[ToolHost] drain timeout (%1ms): still-running tool calls are not killed")
-			.arg(kDrainTimeoutMs);
+		qWarning().noquote() << QStringLiteral("[ToolHost] drain timeout (%1ms): still-running tool calls are not killed").arg(kDrainTimeoutMs);
 	}
 	return drained;
 }
@@ -158,14 +156,12 @@ int ExtensionToolHost::inFlight() const
 	return m_inFlight.loadRelaxed();
 }
 
-void ExtensionToolHost::onRequestReceived(int id, const QString& tool, const QJsonObject& args,
-	QLocalSocket* socket)
+void ExtensionToolHost::onRequestReceived(int id, const QString& tool, const QJsonObject& args, QLocalSocket* socket)
 {
-	const QPointer<QLocalSocket> guard(socket);
+	const QPointer<QLocalSocket> guard(socket);   // socket 可能在任务跑完前被销毁，回包时据此判活
 
 	if (!m_running || m_draining || !m_pool) {
-		respond(id, false, QJsonObject(),
-			QStringLiteral("extension tool host is not accepting requests"), guard);
+		respond(id, false, QJsonObject(), QStringLiteral("extension tool host is not accepting requests"), guard);
 		return;
 	}
 
@@ -185,8 +181,7 @@ void ExtensionToolHost::onRequestReceived(int id, const QString& tool, const QJs
 	m_pool->start(task);
 }
 
-void ExtensionToolHost::respond(int id, bool ok, const QJsonObject& result, const QString& error,
-	const QPointer<QLocalSocket>& socket)
+void ExtensionToolHost::respond(int id, bool ok, const QJsonObject& result, const QString& error, const QPointer<QLocalSocket>& socket)
 {
 	// 服务端断开（重启/崩溃）时在途请求会走到这里：没有对端可写，记一行就够。
 	// state 检查是必要的：stop() 之后 socket 只是 deleteLater，指针还活着但已不可写。

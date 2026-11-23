@@ -14,8 +14,7 @@ public:
 	using SelectSession = std::function<void(const QString&)>;
 	using CreateSession = std::function<void(const QString&)>;
 
-	explicit SessionsBridge(SessionListModel* model, SelectSession selectSession,
-		CreateSession createSession, QObject* parent = nullptr);
+	explicit SessionsBridge(SessionListModel* model, SelectSession selectSession, CreateSession createSession, QObject* parent = nullptr);
 
 	int count() const { return m_model->rowCount(); }
 	QString filterText() const { return m_model->filterText(); }

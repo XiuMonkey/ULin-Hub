@@ -41,12 +41,12 @@ bool UlinCoreIntentStore::load(QString* error)
 	const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
 	if (parseError.error != QJsonParseError::NoError || !document.isArray()) {
 		if (error) {
-			*error = QStringLiteral("invalid intent store %1: %2")
-				.arg(m_filePath, parseError.errorString());
+			*error = QStringLiteral("invalid intent store %1: %2").arg(m_filePath, parseError.errorString());
 		}
 		return false;
 	}
 
+	// 存储是 Intent 数组；同名条目后者覆盖前者。
 	for (const QJsonValue& value : document.array()) {
 		const Intent intent = Intent::fromJson(value.toObject());
 		if (!intent.name.trimmed().isEmpty())
@@ -55,6 +55,7 @@ bool UlinCoreIntentStore::load(QString* error)
 	return true;
 }
 
+// 排序后写盘；QSaveFile 原子提交，失败时保留原文件。
 bool UlinCoreIntentStore::save(QString* error) const
 {
 	if (m_filePath.isEmpty())
@@ -114,6 +115,7 @@ QList<Intent> UlinCoreIntentStore::all() const
 	return result;
 }
 
+// 生成喂给模型的 Intent 目录：名字 - 描述 (参数) [能力标签]。
 QString UlinCoreIntentStore::catalogText() const
 {
 	QStringList lines;

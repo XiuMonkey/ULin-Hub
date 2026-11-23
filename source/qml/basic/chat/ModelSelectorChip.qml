@@ -1,6 +1,5 @@
-// 模型 / 思考档位 chip + 弹层（按原版 ui/ModelSelector.cpp + chat.qss 复刻，视觉上"降一档"）：
-// chip 24px 高、radius chip、透明底；悬停 chipHoverBg、按下 activeBg；文字 = 当前模型名（secondary 12/500）
-// + 当前档位名（tertiary 12）+ ▾/▴（caption 11）。整块比正文弱一档，是输入区的配角。
+// 模型 / 思考档位 chip + 弹层（按原版 ui/ModelSelector.cpp + chat.qss 复刻，整块比正文弱一档）：
+// chip 24px 高、透明底；悬停 chipHoverBg、按下 activeBg；文字 = 模型名 + 档位名 + ▾/▴。
 // 提供方多于一个时插分组标签；档位用兜底时插一行 model_think_generic_note 说明。
 
 import QtQuick
@@ -13,16 +12,15 @@ import "../../skin/chat"
 Item {
     id: root
 
-    // 弹层内文字的列线：MenuRow 自身的左内边距就是 8，这里让分组标签、区块标题
-    // 也都按 8 缩进（相对 Popup 内容区，绝对位置再叠加 Popup padding 6）。
-    // 改之前三者分别是 6 / 8 / 14，差几像素看着就是"三行字没对齐"。
+    // 弹层内文字的列线：MenuRow 左内边距是 8，分组标签与区块标题也按 8 缩进
+    // （相对 Popup 内容区，绝对位置再叠加 Popup padding 6）。
     readonly property int textInset: 8
 
     signal selectModelRequested(string provider, string model)
     signal selectLevelRequested(string levelId)
 
     visible: Hub.hasModels && !Hub.settings.ulincoreMode
-    width: visible ? chipRow.implicitWidth + 2 * Theme.spacing.labelGap : 0   // 宽 = 内容宽 + 左右各 labelGap(8)：与上面 "chip 文字落在编辑器文字列线上" 的推导配套
+    width: visible ? chipRow.implicitWidth + 2 * Theme.spacing.labelGap : 0   // 宽 = 内容宽 + 左右各 labelGap(8)
     height: Theme.size.selectorChipHeight
 
     Rectangle {
@@ -30,9 +28,7 @@ Item {
         anchors.fill: parent
         radius: Theme.radius.chip
 
-        // 展开时 chip 自身也铺一层淡灰底：弹层是从它身上"长"出来的，
-        // 两者需要有呼应，否则像一块无关的板子浮在旁边。
-        // 浓度(8%)与 MenuRow 的选中底同档 —— 弹层一开，chip 与选中的那一行深浅一致。
+        // 展开时 chip 自身也铺 8% 淡灰底（与 MenuRow 选中底同档）：弹层从它身上"长"出来，两者要有呼应。
         color: chipMouse.pressed
             ? Theme.color.activeBg
             : (menu.visible
@@ -53,8 +49,7 @@ Item {
                 text: Hub.currentModelName.length > 0
                     ? Hub.currentModelName
                     : qsTrId("model_none_published")
-                // 展开时文字加深到 textPrimary：在淡灰底上如果还保持 textSecondary，
-                // 会和"未展开的另一处 chip"没区别；加深而不上色，仍留在灰阶里。
+                // 展开时文字加深到 textPrimary：淡灰底上保持 textSecondary 会和未展开时没区别，加深而不上色。
                 color: menu.visible ? Theme.color.textPrimary : Theme.color.textSecondary
                 font.family: Theme.font.uiFamily
                 font.pixelSize: Theme.font.caption
@@ -71,9 +66,8 @@ Item {
                 font.pixelSize: Theme.font.caption
             }
 
-            // ▾ / ▴ 原来用字体符号：不同字体下宽高、粗细、基线位置都不一样，
-            // 而且 ▴ 的字面高度和 ▾ 不对等，展开收起时箭头会跳一下。
-            // 改成等边三角（Canvas），展开时整体旋转 180°，两态严格镜像。
+            // ▾ / ▴ 用字体符号时宽高、粗细、基线随字体变，两态高度也不对等；改成等边三角（Canvas），
+            // 展开时整体旋转 180°，两态严格镜像。
             Canvas {
                 id: chevron
                 width: 9
@@ -115,23 +109,17 @@ Item {
     Popup {
         id: menu
 
-        x: 0   // 贴 chip 上方 8px（原版 kMenuGap）；越屏时翻到下方
-        y: -height - 8
+        x: 0   // 与 chip 左对齐
+        y: -height - 8   // 贴 chip 上方 8px（原版 kMenuGap）；越屏时翻到下方
         width: 300                       // 最长的副标题（12px，约 200）仍有余量；再窄就开始吃省略号
         padding: 4
         modal: false
         focus: false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-        // 背景原来只是一块 radius 12 的圆角面 + 1px 描边。单层阴影在这里是隐形的：
-        // 浅灰底与页面底(#F2F4F7)/输入卡(#FFF) 只差几个色阶，实测能压出的
-        // 最大明暗差只有 26 个灰阶 —— 弹层于是"糊"在背景上，看不出悬浮层级。
-        // 改成两层：近层收紧边缘给"压感"，远层弥散交代"浮多高"。
-        // （与 Card.qml 同一手法：源面隐藏，由 MultiEffect 连同阴影一起绘制。）
-        //
-        // 底色取 menuBg = 纯白（试过 #F8F9FA、#F7F9FD 两档微灰，用户最终选纯白）：
-        // 弹层与背后白输入卡同色，靠**下面这两层阴影 + 1px 描边**把边界交代出来，
-        // 不靠底色明度差 —— 明度差这条路本来就走不通：比白暗就成了"凹进去"。
+        // 背景由两层阴影 + 1px 描边交代边界：底色 menuBg = 纯白，与背后白输入卡同色，
+        // 靠明度差区分走不通（比白暗就成了"凹进去"）。近层收紧边缘给"压感"，远层弥散交代"浮多高"；
+        // 与 Card.qml 同一手法 —— 源面隐藏，由 MultiEffect 连同阴影一起绘制。
         background: Item {
             Rectangle {
                 id: menuFace
@@ -148,7 +136,7 @@ Item {
                 source: menuFace
                 shadowEnabled: true
                 shadowColor: Theme.color.shadowFloat
-                shadowBlur: Math.min(1.0, Theme.shadow.floatBlur / 64)   // 归一化：32px 为满值
+                shadowBlur: Math.min(1.0, Theme.shadow.floatBlur / 64)   // 归一化到 0..1（64px 为满值）
                 shadowVerticalOffset: 2
                 shadowHorizontalOffset: 0
                 autoPaddingEnabled: true
@@ -220,9 +208,7 @@ Item {
                             font.weight: Theme.font.weightBold
                             font.letterSpacing: 0.5      // 全大写英文靠字距看起来才"是一组"，而不是一个词
                             leftPadding: root.textInset
-                            // 第二组起上方留白：否则 "DEEPSEEK 账户" 会紧贴上一组最后一行，
-                            // 被读成那行的第二行副标题。首组也要留 4，才和上方的区块标题分开
-                            // （两个都是小号灰字，不隔开就是两行一样的标签）。
+                            // 组间留白：不留会让组标题紧贴上一组末行（被读成副标题）或上方区块标题。
                             topPadding: groupHost.index === 0 ? 4 : 8
                             bottomPadding: 0
                             elide: Text.ElideRight

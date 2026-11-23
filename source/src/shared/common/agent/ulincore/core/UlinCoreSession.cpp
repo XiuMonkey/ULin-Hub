@@ -23,6 +23,7 @@ void UlinCoreSession::setSystemPrompt(const QString& prompt)
 
 void UlinCoreSession::append(const Message& message)
 {
+	// createdAt 为 0 时补当前时间，随后广播追加事件。
 	Message stored = message;
 	if (stored.createdAt == 0)
 		stored.createdAt = QDateTime::currentMSecsSinceEpoch();
@@ -74,6 +75,7 @@ QJsonObject UlinCoreSession::snapshot() const
 
 bool UlinCoreSession::restore(const QJsonObject& snapshot)
 {
+	// 快照与恢复共用同一份 JSON 结构；id 缺失时沿用当前会话 id。
 	const QString id = snapshot.value(QStringLiteral("id")).toString();
 	if (!id.isEmpty())
 		m_id = id;

@@ -144,6 +144,7 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		}
 	}
 
+	// 本轮语义：带定义=定义，已保存=执行，未知名称=生成。
 	const bool known = m_intents.contains(name);
 	if (invocation.hasDefinition)
 		mode = IntentMode::Definition;
@@ -167,6 +168,7 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 		return;
 	}
 
+	// 已保存 Intent：按标签选择 prompt / chain / native 执行路径。
 	Intent intent = known ? m_intents.find(name) : Intent();
 	if (known) {
 		const QJsonObject params = effectiveParameters(intent, invocation.args);
@@ -182,12 +184,11 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 				emit errorOccurred(QStringLiteral("intent %1 needs external prompt and skill").arg(name));
 				return;
 			}
-			runPromptText(invocation.rawText,
-				expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n")
-					+ expandPromptTemplate(method, params));
+			runPromptText(invocation.rawText, expandPromptTemplate(prompt, params) + QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(method, params));
 			return;
 		}
 
+		// withSkill：内置 prompt + 内置/外部 skill；chain/native 需先用 asPrompt 降级。
 		if (invocation.withSkill()) {
 			if (invocation.hasPromptOverride) {
 				emit errorOccurred(QStringLiteral("intent %1 withSkill rejects external prompt").arg(name));
@@ -203,12 +204,11 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 				emit errorOccurred(QStringLiteral("intent %1 needs built-in prompt and skill").arg(name));
 				return;
 			}
-			runPromptText(invocation.rawText,
-				expandPromptTemplate(intent.prompt, params) + QStringLiteral("\n\n[Skill]\n")
-					+ expandPromptTemplate(method, params));
+			runPromptText(invocation.rawText, expandPromptTemplate(intent.prompt, params) + QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(method, params));
 			return;
 		}
 
+		// 没有执行标签时按 Intent 的默认模式决定走 prompt 还是执行器。
 		const bool usePrompt = invocation.asPrompt()
 			? true
 			: intent.defaultPromptMode();
@@ -221,8 +221,7 @@ void UlinCoreKernel::runParsed(const UlinCoreInvocation& invocation)
 				emit errorOccurred(QStringLiteral("intent %1 has no prompt template").arg(name));
 				return;
 			}
-			runPromptText(invocation.rawText,
-				expandPromptTemplate(prompt, params));
+			runPromptText(invocation.rawText, expandPromptTemplate(prompt, params));
 			return;
 		}
 
@@ -273,6 +272,7 @@ void UlinCoreKernel::runPromptText(const QString& rawText, const QString& prompt
 		return;
 	}
 
+	// 开新回合：重置步数/用量/代次，写 turn/start 后立刻发起第一步。
 	m_session->appendUserText(promptText);
 	m_running = true;
 	m_cancelled = false;
@@ -321,18 +321,18 @@ void UlinCoreKernel::runRecipeIntent(const Intent& intent, const QJsonObject& ar
 	QPointer<UlinCoreKernel> self(this);
 	auto resolver = [this](const QString& name) { return m_intents.find(name); };
 	auto recipe = std::make_shared<UlinCoreIntentCaller>(intent, &m_executors, resolver);
-	m_toolPool->start(new ToolRunnable(
-		[self, generation, callId, intent, args, context, recipe]() {
-			const IntentResult result = recipe->call(args, context);
-			if (!self)
-				return;
-			QMetaObject::invokeMethod(self.data(),
-				[self, generation, callId, intent, args, result]() {
-					if (UlinCoreKernel* kernel = self.data())
-						kernel->finishRecipe(generation, callId, intent, args, result);
-				},
-				Qt::QueuedConnection);
-		}));
+	// 链式 Intent 在工具线程池执行，回包经 QueuedConnection 回到主线程。
+	m_toolPool->start(new ToolRunnable([self, generation, callId, intent, args, context, recipe]() {
+		const IntentResult result = recipe->call(args, context);
+		if (!self)
+			return;
+		QMetaObject::invokeMethod(self.data(),
+			[self, generation, callId, intent, args, result]() {
+				if (UlinCoreKernel* kernel = self.data())
+					kernel->finishRecipe(generation, callId, intent, args, result);
+			},
+			Qt::QueuedConnection);
+	}));
 }
 
 void UlinCoreKernel::runNativeIntent(const Intent& intent, const QJsonObject& args, const QString& rawText)
@@ -342,17 +342,17 @@ void UlinCoreKernel::runNativeIntent(const Intent& intent, const QJsonObject& ar
 		return;
 	}
 
-	// Native Intent 直接交给 RecipeTool 的 native 分支：executor 是叶子，arguments 已实化。
+	// Native Intent 直接交给 intent caller 的 native 分支：executor 是叶子，arguments 已实化。
 	runRecipeIntent(intent, args, rawText);
 }
 
-void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const Intent& intent,
-	const QJsonObject& args, const IntentResult& result)
+void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const Intent& intent, const QJsonObject& args, const IntentResult& result)
 {
 	Q_UNUSED(args)
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
 
+	// 链式 Intent 收尾：记录工具结果；失败直接结束回合，成功再补 assistant 消息。
 	QString content = result.ok
 		? result.content
 		: (result.error.isEmpty() ? QStringLiteral("intent failed") : result.error);
@@ -393,6 +393,7 @@ void UlinCoreKernel::finishRecipe(int generation, const QString& callId, const I
 
 void UlinCoreKernel::finishEmptyTurn(const QString& rawText)
 {
+	// 无可执行体的 Intent 也要走完整回合，保证前端总能收到 turn/start..turn/end。
 	m_session->appendUserText(rawText);
 	m_running = true;
 	m_cancelled = false;
@@ -410,6 +411,7 @@ void UlinCoreKernel::finishEmptyTurn(const QString& rawText)
 
 QJsonObject UlinCoreKernel::effectiveParameters(const Intent& intent, const QJsonObject& args) const
 {
+	// Intent 默认值打底，再被本次调用参数覆盖。
 	QJsonObject params;
 	for (const IntentParameter& parameter : intent.parameters) {
 		if (!parameter.name.isEmpty() && !parameter.defaultValue.isUndefined())
@@ -431,6 +433,7 @@ void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 		return;
 	}
 
+	// 生成结果按标签分流：只生成、生成后继续对话，或边跑边收集来固化 steps。
 	Intent generated;
 	generated.name = invocation.intentName;
 	generated.description = QStringLiteral("Generated intent");
@@ -445,15 +448,13 @@ void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 
 	if (invocation.generateOnly()) {
 		addIntent(generated, invocation.save());
-		finishGeneratedTurn(invocation.rawText,
-			QStringLiteral("intent %1 generated").arg(generated.name));
+		finishGeneratedTurn(invocation.rawText, QStringLiteral("intent %1 generated").arg(generated.name));
 		return;
 	}
 
 	if (invocation.agentEngaged()) {
 		addIntent(generated, invocation.save());
-		runPromptText(invocation.rawText,
-			expandPromptTemplate(generated.prompt, invocation.args));
+		runPromptText(invocation.rawText, expandPromptTemplate(generated.prompt, invocation.args));
 		return;
 	}
 
@@ -464,8 +465,7 @@ void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 	m_generationPrompt = generated.prompt;
 	m_generationSkill = generated.skill;
 	m_generationCalls.clear();
-	runPromptText(invocation.rawText,
-		expandPromptTemplate(generated.prompt, invocation.args));
+	runPromptText(invocation.rawText, expandPromptTemplate(generated.prompt, invocation.args));
 }
 
 void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
@@ -482,9 +482,9 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 	++m_generation;
 	const int generation = m_generation;
 
+	// skillRequired：先让模型写出 skill 文本，再进入生成/执行流程。
 	ModelRequest request;
-	request.systemPrompt = QStringLiteral(
-		"You author reusable Intent skills. Return only the skill text, no markdown.");
+	request.systemPrompt = QStringLiteral("You author reusable Intent skills. Return only the skill text, no markdown.");
 	request.temperature = 0.2;
 	request.maxTokens = 512;
 	Message user;
@@ -495,8 +495,7 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 
 	ModelCallbacks callbacks;
 	callbacks.onDelta = [](const QString&, const QString&) {};
-	callbacks.onComplete = [this, generation, invocation](const QList<IntentCall>&,
-		const QString& text, const QString&, const Usage& usage, const QString&) {
+	callbacks.onComplete = [this, generation, invocation](const QList<IntentCall>&, const QString& text, const QString&, const Usage& usage, const QString&) {
 		if (generation != m_generation || !m_running)
 			return;
 		m_turnUsage.add(usage);
@@ -515,12 +514,10 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 		addIntent(generated, invocation.save());
 
 		if (invocation.generateOnly()) {
-			finishGeneratedTurn(invocation.rawText,
-				QStringLiteral("intent %1 generated").arg(generated.name));
+			finishGeneratedTurn(invocation.rawText, QStringLiteral("intent %1 generated").arg(generated.name));
 			return;
 		}
-		runPromptText(invocation.rawText,
-			expandPromptTemplate(generated.prompt, invocation.args));
+		runPromptText(invocation.rawText, expandPromptTemplate(generated.prompt, invocation.args));
 	};
 	callbacks.onError = [this, generation](const QString& error) {
 		if (generation != m_generation)
@@ -580,6 +577,7 @@ void UlinCoreKernel::addIntent(const Intent& intent, bool persist)
 {
 	if (intent.name.trimmed().isEmpty())
 		return;
+	// 先写内存；需要持久化且配置了路径时再落盘。
 	m_intents.add(intent);
 	if (persist && !m_intentsPath.isEmpty()) {
 		QString error;
@@ -590,6 +588,7 @@ void UlinCoreKernel::addIntent(const Intent& intent, bool persist)
 
 void UlinCoreKernel::installBuiltinIntents()
 {
+	// 内置 Intent 每次重新装载，store 加载后也不会丢掉内置项。
 	for (const Intent& intent : builtinIntents())
 		m_intents.add(intent);
 }
@@ -597,6 +596,7 @@ void UlinCoreKernel::installBuiltinIntents()
 QJsonArray UlinCoreKernel::executableToolSchemas() const
 {
 	QJsonArray tools;
+	// 只把可执行的 Intent 暴露给模型：prompt/chain/native 各算一种执行形态。
 	for (const Intent& intent : m_intents.all()) {
 		if (!intent.hasNative() && !intent.hasChain() && !intent.hasPrompt())
 			continue;
@@ -630,6 +630,7 @@ void UlinCoreKernel::cancel()
 
 ModelCallbacks UlinCoreKernel::makeCallbacks(int generation)
 {
+	// 回调绑定当前代次：cancel 或换代之后旧回调一律丢弃。
 	ModelCallbacks callbacks;
 	callbacks.onDelta = [this, generation](const QString& text, const QString& thinking) {
 		if (generation != m_generation || !m_running)
@@ -638,8 +639,7 @@ ModelCallbacks UlinCoreKernel::makeCallbacks(int generation)
 		m_pendingThinking += thinking;
 		emit assistantDelta(m_turnId, text, thinking);
 	};
-	callbacks.onComplete = [this, generation](const QList<IntentCall>& calls, const QString& text,
-		const QString& thinking, const Usage& usage, const QString& finishReason) {
+	callbacks.onComplete = [this, generation](const QList<IntentCall>& calls, const QString& text, const QString& thinking, const Usage& usage, const QString& finishReason) {
 		handleComplete(generation, calls, text, thinking, usage, finishReason);
 	};
 	callbacks.onError = [this, generation](const QString& error) {
@@ -655,8 +655,7 @@ void UlinCoreKernel::startStep(int generation)
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
 	if (m_steps >= m_options.maxSteps) {
-		finishTurn(generation, false,
-			QStringLiteral("max steps exceeded (%1)").arg(m_options.maxSteps), QString(), false);
+		finishTurn(generation, false, QStringLiteral("max steps exceeded (%1)").arg(m_options.maxSteps), QString(), false);
 		return;
 	}
 	if (!m_model) {
@@ -667,6 +666,7 @@ void UlinCoreKernel::startStep(int generation)
 	m_pendingText.clear();
 	m_pendingThinking.clear();
 
+	// 系统提示与工具清单每步重算，已保存 Intent 当轮即可见。
 	ModelRequest request;
 	request.systemPrompt = m_options.systemPrompt.isEmpty()
 		? m_session->systemPrompt()
@@ -676,8 +676,7 @@ void UlinCoreKernel::startStep(int generation)
 
 	const QString catalog = m_intents.catalogText();
 	if (!catalog.isEmpty()) {
-		request.systemPrompt += QStringLiteral(
-			"\n\nSaved intents:\n%1\n"
+		request.systemPrompt += QStringLiteral("\n\nSaved intents:\n%1\n"
 			"When a saved intent declares parameters, refer to them with "
 			"{\"$param\":\"name\"} in tool arguments instead of hard-coding the current value.")
 			.arg(catalog);
@@ -692,13 +691,13 @@ void UlinCoreKernel::startStep(int generation)
 	});
 }
 
-void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& calls, const QString& text,
-	const QString& thinking, const Usage& usage, const QString& finishReason)
+void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& calls, const QString& text, const QString& thinking, const Usage& usage, const QString& finishReason)
 {
 	Q_UNUSED(finishReason)
 	if (generation != m_generation || !m_running)
 		return;
 
+	// 模型回包：记账并落 assistant 消息；有工具调用就逐个执行，否则结束回合。
 	++m_steps;
 	m_turnUsage.add(usage);
 	m_session->addUsage(usage);
@@ -725,8 +724,7 @@ void UlinCoreKernel::handleComplete(int generation, const QList<IntentCall>& cal
 
 	if (calls.isEmpty()) {
 		if (fullText.trimmed().isEmpty()) {
-			finishTurn(generation, false,
-				QStringLiteral("model returned an empty response"), QString(), false);
+			finishTurn(generation, false, QStringLiteral("model returned an empty response"), QString(), false);
 			return;
 		}
 		finishTurn(generation, true, QString(), fullText, false);
@@ -740,6 +738,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 {
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
+	// 逐个执行本步的工具调用，全部完成后进入下一步。
 	if (index >= calls.size()) {
 		startStep(generation);
 		return;
@@ -755,6 +754,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		{ QStringLiteral("metadata"), call.metadata }
 	});
 
+	// metadata.tags 决定调用语义：执行标签、保存标签与 agent 生成标签互斥。
 	QStringList tags;
 	const QJsonValue tagsValue = call.metadata.value(QStringLiteral("tags"));
 	if (tagsValue.isArray()) {
@@ -773,18 +773,15 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		|| tags.contains(QStringLiteral("skillRequired"))
 		|| generateOnly;
 	if (agentTag) {
-		completeIntentCall(generation, calls, index, call,
-			IntentResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
+		completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("agent cannot request agentEngaged/skillRequired")));
 		return;
 	}
 	if ((asPrompt || asSkill || withSkill) && hasSaveTag) {
-		completeIntentCall(generation, calls, index, call,
-			IntentResult::failure(QStringLiteral("save cannot be combined with execution tags")));
+		completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("save cannot be combined with execution tags")));
 		return;
 	}
 	if (defineOnly && !hasSaveTag) {
-		completeIntentCall(generation, calls, index, call,
-			IntentResult::failure(QStringLiteral("defineOnly requires save")));
+		completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("defineOnly requires save")));
 		return;
 	}
 
@@ -792,44 +789,37 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	const QJsonValue definitionValue = call.metadata.value(QStringLiteral("Intent"));
 	if (definitionValue.isObject()) {
 		if (asPrompt || asSkill || withSkill) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("Intent definition cannot use execution tags")));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("Intent definition cannot use execution tags")));
 			return;
 		}
 		intent = Intent::fromJson(definitionValue.toObject());
 		intent.name = call.name;
 		if (intent.name.trimmed().isEmpty()) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("intent definition requires a name")));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("intent definition requires a name")));
 			return;
 		}
 		if (!intent.hasPrompt() && !intent.hasSkill() && !intent.hasChain() && !intent.hasNative()) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("intent %1 definition is empty").arg(call.name)));
 			return;
 		}
 		addIntent(intent, hasSaveTag);
 		if (defineOnly) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
+			completeIntentCall(generation, calls, index, call, IntentResult::success(QStringLiteral("intent %1 saved").arg(call.name)));
 			return;
 		}
 		if (!intent.hasChain() && !intent.hasNative()) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(call.name)));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("intent %1 has no executable form; use defineOnly").arg(call.name)));
 			return;
 		}
 	} else {
 		if (defineOnly) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("defineOnly requires Intent:{...}")));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("defineOnly requires Intent:{...}")));
 			return;
 		}
 		intent = m_intents.find(call.name);
 	}
 	if (intent.name.isEmpty()) {
-		completeIntentCall(generation, calls, index, call,
-			IntentResult::failure(QStringLiteral("unknown intent: %1").arg(call.name)));
+		completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("unknown intent: %1").arg(call.name)));
 		return;
 	}
 
@@ -839,13 +829,11 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		QString skill = call.metadata.value(QStringLiteral("skill")).toString();
 		if (withSkill) {
 			if (!prompt.isEmpty()) {
-				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("withSkill rejects external prompt")));
+				completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("withSkill rejects external prompt")));
 				return;
 			}
 			if (!asPrompt && (intent.hasChain() || intent.hasNative())) {
-				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("withSkill needs asPrompt for chain/native")));
+				completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("withSkill needs asPrompt for chain/native")));
 				return;
 			}
 			prompt = intent.prompt;
@@ -853,16 +841,14 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 				skill = intent.skill;
 		} else if (asSkill) {
 			if (prompt.trimmed().isEmpty()) {
-				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("asSkill requires an external prompt")));
+				completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("asSkill requires an external prompt")));
 				return;
 			}
 			if (skill.isEmpty())
 				skill = intent.skill;
 		} else {
 			if (!prompt.isEmpty() || !skill.isEmpty()) {
-				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("asPrompt rejects external prompt/skill")));
+				completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("asPrompt rejects external prompt/skill")));
 				return;
 			}
 			prompt = intent.prompt;
@@ -870,15 +856,13 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 		}
 
 		if (prompt.trimmed().isEmpty()) {
-			completeIntentCall(generation, calls, index, call,
-				IntentResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
+			completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("intent %1 has no prompt").arg(call.name)));
 			return;
 		}
 		QString content = expandPromptTemplate(prompt, params);
 		if (asSkill || withSkill) {
 			if (skill.trimmed().isEmpty()) {
-				completeIntentCall(generation, calls, index, call,
-					IntentResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
+				completeIntentCall(generation, calls, index, call, IntentResult::failure(QStringLiteral("intent %1 has no skill").arg(call.name)));
 				return;
 			}
 			content += QStringLiteral("\n\n[Skill]\n") + expandPromptTemplate(skill, params);
@@ -889,8 +873,7 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 
 	if (!intent.hasChain() && !intent.hasNative() && intent.hasPrompt()) {
 		const QJsonObject params = effectiveParameters(intent, call.arguments);
-		completeIntentCall(generation, calls, index, call,
-			IntentResult::success(expandPromptTemplate(intent.prompt, params)));
+		completeIntentCall(generation, calls, index, call, IntentResult::success(expandPromptTemplate(intent.prompt, params)));
 		return;
 	}
 
@@ -898,26 +881,25 @@ void UlinCoreKernel::callIntent(int generation, const QList<IntentCall>& calls, 
 	QPointer<UlinCoreKernel> self(this);
 	auto resolver = [this](const QString& name) { return m_intents.find(name); };
 	auto executor = std::make_shared<UlinCoreIntentCaller>(intent, &m_executors, resolver);
-	m_toolPool->start(new ToolRunnable(
-		[self, generation, calls, index, call, executor, context]() {
-			const IntentResult result = executor->call(call.arguments, context);
-			if (!self)
-				return;
-			QMetaObject::invokeMethod(self.data(),
-				[self, generation, calls, index, call, result]() {
-					if (UlinCoreKernel* kernel = self.data())
-						kernel->completeIntentCall(generation, calls, index, call, result);
-				},
-				Qt::QueuedConnection);
-		}));
+	m_toolPool->start(new ToolRunnable([self, generation, calls, index, call, executor, context]() {
+		const IntentResult result = executor->call(call.arguments, context);
+		if (!self)
+			return;
+		QMetaObject::invokeMethod(self.data(),
+			[self, generation, calls, index, call, result]() {
+				if (UlinCoreKernel* kernel = self.data())
+					kernel->completeIntentCall(generation, calls, index, call, result);
+			},
+			Qt::QueuedConnection);
+	}));
 }
 
-void UlinCoreKernel::completeIntentCall(int generation, const QList<IntentCall>& calls, int index,
-	const IntentCall& call, const IntentResult& result)
+void UlinCoreKernel::completeIntentCall(int generation, const QList<IntentCall>& calls, int index, const IntentCall& call, const IntentResult& result)
 {
 	if (generation != m_generation || !m_running || m_cancelled)
 		return;
 
+	// 结果超限截断，避免把整份大文件回灌模型上下文。
 	QString content = result.ok
 		? result.content
 		: (result.error.isEmpty() ? QStringLiteral("tool failed") : result.error);
@@ -959,6 +941,7 @@ void UlinCoreKernel::finishPendingGeneration(bool ok)
 	m_generationSkill.clear();
 	m_generationCalls.clear();
 
+	// 只有整轮成功才把命中的工具调用固化成 steps。
 	if (!ok || name.trimmed().isEmpty())
 		return;
 
@@ -978,19 +961,19 @@ void UlinCoreKernel::finishPendingGeneration(bool ok)
 	addIntent(generated, save);
 }
 
-void UlinCoreKernel::finishTurn(int generation, bool ok, const QString& error,
-	const QString& finalText, bool cancelled)
+void UlinCoreKernel::finishTurn(int generation, bool ok, const QString& error, const QString& finalText, bool cancelled)
 {
 	if (generation != m_generation)
 		return;
+	// 结束当前回合：先固化生成中的 Intent，再作废本轮所有在途回调。
 	finishPendingGeneration(ok && error.isEmpty() && !cancelled);
 	++m_generation;
 	emitTurnFinished(ok, error, finalText, cancelled);
 }
 
-void UlinCoreKernel::emitTurnFinished(bool ok, const QString& error,
-	const QString& finalText, bool cancelled)
+void UlinCoreKernel::emitTurnFinished(bool ok, const QString& error, const QString& finalText, bool cancelled)
 {
+	// 统一的收尾点：写 turn/end 日志并广播 TurnResult。
 	m_running = false;
 	m_cancelled = cancelled;
 

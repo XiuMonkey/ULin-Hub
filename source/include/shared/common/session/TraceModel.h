@@ -1,18 +1,12 @@
-﻿#pragma once
+#pragma once
 
 // 轨迹视图的数据面（对照官方 @deepseek-ai/dsh-client-ui-trajectory）。
-// 官方那套是"纯投影"：不额外问服务端要数据，而是把会话事件账本（turn/step/消息/工具/压缩）
-// 摊成一张按轮次组织的记录表。这里做同一件事 —— 数据来源就是 ChatController 已经在收的那条流：
-//  · session/follow 首帧快照的 records（历史）
-//  · mux 上的 session/event 帧（流式）
-// 所以**没有新增任何 RPC**，也不需要服务端配合。
-// 与官方的差距（有意为之，见 build 说明）：
-//  · 不做 14 个标签页的检查器，只给一份"原文 JSON + 时序 + 用量"的检查面板；
-//  · 不做可拖拽时间轴（Overview），只保留每条记录的耗时与 TTFT 文本；
-//  · 不做虚拟化（ListView 自己复用委托，行数上千也没有压力）。
+// 官方是"纯投影"：不额外问服务端要数据，而是把会话事件账本（turn/step/消息/工具/压缩）摊成
+// 按轮次组织的记录表。本模型同理，数据来源就是 ChatController 已经在收的那条流：
+// session/follow 首帧快照的 records（历史）+ mux 上的 session/event 帧（流式），没有新增 RPC。
+// 相比官方刻意不做：14 个标签页的检查器、可拖拽时间轴（只保留耗时与 TTFT 文本）、虚拟化。
 // 事件信封（dsh-session 的 SessionEvent）：{ type, seq, time(ms), data }。
-// 本模型只吃"账本事件"，**忽略 assistant/chunk** —— 那是 LLM 增量分片，不是账本记录，
-// 官方的记录表同样不显示（它只显示 assistant/message 这条已结算的记录）。
+// 本模型只吃"账本事件"，**忽略 assistant/chunk** —— 那是 LLM 增量分片，不是账本记录。
 
 #include <QAbstractListModel>
 #include <QByteArray>
@@ -61,6 +55,9 @@ public:
 
 	// 快照 / 上翻一页：整表重建（records 是 [{type:"event", event:{…}}]，与 ChatController 同形）
 	void setRecords(const QJsonArray& records);
+	// 上翻一页：把更早的 records 前插进轨迹账本。聊天区收束会裁 m_historyRecords，
+	// 轨迹保留全量（不参与聊天区内存收束），所以这里不能用 setRecords(裁剪后的 records) 覆盖。
+	void prependRecords(const QJsonArray& records);
 
 	// 流式：追加一条账本事件。非账本事件（assistant/chunk 等）直接丢掉。
 	void appendEvent(const QJsonObject& event);
@@ -92,7 +89,7 @@ private:
 	};
 
 	void rebuild();
-	// 一条事件能变成 0..n 行（返回时新行先落在 m_pendingRows 里）
+	// 一条事件能变成 0..n 行；新行先落在 m_pendingRows 里
 	void projectEvent(const QJsonObject& event);
 	void recomputeSummary();
 

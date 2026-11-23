@@ -23,16 +23,14 @@ QString wireName(const QString& intentName)
 		return intentName;
 
 	return QStringLiteral("intent_")
-		+ QString::fromLatin1(intentName.toUtf8().toBase64(
-			QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+		+ QString::fromLatin1(intentName.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
 }
 
 QString intentNameFromWire(const QString& wire)
 {
 	if (!wire.startsWith(QStringLiteral("intent_")))
 		return wire;
-	const QByteArray bytes = QByteArray::fromBase64(
-		wire.mid(7).toLatin1(), QByteArray::Base64UrlEncoding);
+	const QByteArray bytes = QByteArray::fromBase64(wire.mid(7).toLatin1(), QByteArray::Base64UrlEncoding);
 	return bytes.isEmpty() ? wire : QString::fromUtf8(bytes);
 }
 
@@ -58,6 +56,7 @@ QJsonObject metadataSchema()
 
 QJsonArray encodeToolSchemas(const QJsonArray& tools)
 {
+	// 每个工具都补一个 metadata 字段，承载 tags 与内联 Intent 定义。
 	QJsonArray out;
 	for (const QJsonValue& value : tools) {
 		QJsonObject tool = value.toObject();

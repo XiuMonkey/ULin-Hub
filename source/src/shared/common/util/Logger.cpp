@@ -60,7 +60,7 @@ namespace {
 		{ "ExtensionRegistry", "extension" },
 		{ "DllCaller", "extension" },
 		{ "DSH DllCaller", "extension" },
-		{ "ClientExtension", "extension" },   // 客户端扩展（装进本进程的 QPlugin DLL）：宿主侧装载器与插件自身各一个标签
+		{ "ClientExtension", "extension" },   // 客户端扩展（装进本进程的 QPlugin DLL）：宿主装载器与插件各一个标签
 		{ "QPlugin", "extension" },
 		{ "ServerManager", "server" },   // 服务端 / 网络
 		{ "DshApi", "server" },
@@ -77,7 +77,7 @@ namespace {
 	};
 
 	const int kRuleCount = static_cast<int>(sizeof(kModuleRules) / sizeof(kModuleRules[0]));
-	const int kGeneralModuleIndex = kRuleCount; // 最后一个槽位给未识别的模块
+	const int kGeneralModuleIndex = kRuleCount;   // 表尾多留一个槽位给未识别的模块
 	const int kModuleCount = kRuleCount + 1;
 
 	struct ModuleTarget
@@ -91,9 +91,8 @@ namespace {
 	QString g_logsDir;
 	QMutex g_logMutex;
 
-	// 单文件 8 MiB 封顶，保留 5 个历史分片（info.1.log … info.5.log，越新编号越小）。
-	// 此前每个「模块×级别」是一个永不轮转的 Append 文件，extension/info.log 累积到 121 MB，
-	// 打开/grep 都很慢；轮转后当前文件始终很小，最老的分片自动淘汰。
+	// 单文件 8 MiB 封顶，保留 5 个历史分片（info.1.log … info.5.log，越新编号越小）：
+	// 此前每个「模块×级别」都是永不轮转的追加文件，extension/info.log 曾涨到 121 MB。
 	constexpr qint64 kMaxLogFileBytes = 8 * 1024 * 1024;
 	constexpr int kMaxLogBackups = 5;
 
@@ -173,7 +172,8 @@ namespace {
 		return &g_modules[kGeneralModuleIndex];
 	}
 
-	const char* moduleFolderFor(const QMessageLogContext& context, const QString& message)   // 从消息开头的 [Tag]（找不到则尝试 Qt category）解析模块文件夹
+	// 模块归属：先看消息开头的 [Tag]，再退到 Qt category，都对不上返回 nullptr。
+	const char* moduleFolderFor(const QMessageLogContext& context, const QString& message)
 	{
 		if (message.startsWith(QLatin1Char('['))) {
 			const int close = message.indexOf(QLatin1Char(']'));
@@ -228,10 +228,8 @@ namespace {
 
 		*stream << message << QStringLiteral("\n");
 
-		// ⚠️ 必须显式 flush：QTextStream 写 "\n" 不会刷新缓冲区，而本模块的流是常驻的
-		// （单例刻意不析构，退出时也不会析构），于是**单条日志会一直躺在缓冲里丢掉** ——
-		// 表现是"某条 warn 明明该打却查不到"，只有刷屏级日志量才把缓冲撑满落盘。
-		// 每行 flush 的代价远小于丢日志：这是排障通道，宁可慢一点也不许丢。
+		// 必须显式 flush：写 "\n" 不会刷新 QTextStream 缓冲，而这些流是常驻的（单例刻意不析构），
+		// 不刷的话单条日志会一直躺在缓冲里丢掉。排障通道宁可慢一点，也不许丢日志。
 		stream->flush();
 		stream->flush();
 	}

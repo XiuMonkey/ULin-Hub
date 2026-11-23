@@ -1,7 +1,5 @@
-// 见 ThemeBridge.h：QML 壳的 A 层 token。
-// 内置默认值取自 docs/qss-token-archaeology.md（12 份 QSS + C++ 布局常量的频次统计），
-// 与 source/qml/metrics.json 逐键一致；metrics.json 只做覆盖，所以即使它被删/写坏，界面也不会崩。
-// 值若与现有实现不一致，注释里会点明 —— 删后这些注释就是唯一的出处记录。
+// 实现 ThemeBridge.h：把主题数据摊平成 QML 壳的 A 层 token。
+// 内置默认值在 common/appearance/ThemeTokens，source/qml/metrics.json 只做覆盖，缺失或解析失败都不会崩。
 
 #include "qmlbridge/ThemeBridge.h"
 
@@ -24,12 +22,9 @@
 
 namespace
 {
-	// 解析 theme-*.json 里的颜色：⚠️ rgb()/rgba() 函数式写法必须自己处理 —— QML 的 color 值类型不接受它
-	// 而 QSS 时代它合法）：这些字符串塞进 QML 后绑定被丢弃、属性退回默认值 —— 阴影就成了 MultiEffect 默认的
-	// 不透明黑、悬停底色同理，所以这里统一转成 QColor（带 alpha）再交给 QML。
-	// 支持 #RGB / #RRGGBB / #AARRGGBB / SVG 颜色名 / transparent，外加 rgb(r,g,b) 与 rgba(r,g,b,a)（a 可为 0..1 浮点或 0..255 整数）。
-	// 调色板颜色：解析交给 util/ColorText.h（rgb()/rgba() 与 #RRGGBB 等同一份实现）；
-	// 解析失败这里给品红占位，方便一眼看出 theme-*.json 写坏了。
+	// 调色板颜色统一转成 QColor：QML 的 color 类型不接受 rgb()/rgba() 字符串（QSS 时代合法），
+	// 否则绑定被丢弃、属性退回默认值——阴影变 MultiEffect 默认的不透明黑、悬停底色同理。
+	// 解析走 util/ColorText.h；失败时给品红占位，便于一眼看出 theme-*.json 写坏了。
 	QColor parsePaletteColor(const QString& text, bool* ok)
 	{
 		const QColor color = parseColorText(text, ok);
@@ -56,8 +51,7 @@ ThemeBridge::ThemeBridge(QObject* parent)
 void ThemeBridge::init(const QString& stylesDir)
 {
 	m_stylesDir = stylesDir;
-	connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
-		this, &ThemeBridge::reload);
+	connect(&ThemeManager::instance(), &ThemeManager::themeChanged, this, &ThemeBridge::reload);
 	rebuild();
 }
 
@@ -68,8 +62,7 @@ void ThemeBridge::reload()
 
 void ThemeBridge::rebuild()
 {
-	// 颜色：调色板由 ThemeManager 读 theme-<mode>.json 得到（键与旧 QSS 的 {{key}} 完全一致，老风格包里的
-	// theme-*.json 可原样搬过来）；⚠️ 必须转成 QColor —— 里面的 rgb()/rgba() 字符串 QML 不接受（见 parsePaletteColor）。
+	// 调色板键与旧 QSS 的 {{key}} 一致，老风格包的 theme-*.json 可原样沿用；这里必须转成 QColor。
 	const QHash<QString, QString> palette = ThemeManager::instance().palette();
 	m_color.clear();
 	for (auto it = palette.constBegin(); it != palette.constEnd(); ++it) {
@@ -82,8 +75,7 @@ void ThemeBridge::rebuild()
 		m_color.insert(it.key(), parsed);
 	}
 
-	// 语法高亮的色值也走主题包（syntax* 键）：推给高亮器，换肤后代码块才能按新配色重渲染。
-	// 高亮器自己解析这些键（去掉 "syntax" 前缀 == 规则里的角色名），所以这里整包塞过去即可。
+	// syntax* 键同样来自主题包，整包推给高亮器（它自己按 "syntax" 前缀映射角色名），换肤后代码块按新配色重渲染。
 	CodeHighlighter::instance().setThemeColors(palette, isDark());
 
 	m_radius = ThemeTokens::radius();  // 尺寸/圆角/字号/间距/阴影/动效：common 默认值 + metrics.json 覆盖

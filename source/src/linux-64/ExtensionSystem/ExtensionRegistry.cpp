@@ -131,6 +131,7 @@ bool ExtensionRegistry::removeExtensionDirectory(const QString& name, QString* e
 	return true;
 }
 
+// 这两行的缩进是 cordis.patch.yml 的固定结构：id 行 4 空格、name 行 6 空格，写入与解析共用
 QString ExtensionRegistry::patchIdLine(const QString& name)
 {
 	return QStringLiteral("    - id: %1").arg(name);
@@ -254,8 +255,7 @@ ExtensionRegistry::CleanupResult ExtensionRegistry::cleanupResiduals() const
 	patchFile.close();
 
 	const QString profileNodeModulesPath = nodeModulesPath();
-	const QString serverNodeModulesPath = QDir::cleanPath(
-		m_serverProfilePath + QStringLiteral("/../../../node_modules"));
+	const QString serverNodeModulesPath = QDir::cleanPath(m_serverProfilePath + QStringLiteral("/../../../node_modules"));
 
 	for (int i = 0; i + 1 < lines.size(); ++i) {
 		const QString trimmed = lines.at(i).trimmed();

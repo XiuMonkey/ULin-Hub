@@ -16,7 +16,7 @@ CheckBox {
     palette.highlight: Theme.color.textSecondary
     palette.highlightedText: Theme.color.controlBg || Theme.color.panelBg
 
-    indicator: Rectangle {
+    indicator: Rectangle {   // 自绘指示器：勾选 = textPrimary 实心块 + 反色勾（不用强调色）
         implicitWidth: Theme.size.checkbox
         implicitHeight: Theme.size.checkbox
         x: control.leftPadding

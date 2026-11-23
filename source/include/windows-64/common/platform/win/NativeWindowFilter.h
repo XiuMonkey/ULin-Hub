@@ -1,12 +1,9 @@
 #pragma once
 
-// 无边框 QQuickWindow 的"窗口级原生行为"（Windows）：补回 WS_* 样式位 + 关 Win11 系统圆角 + 客户区整块
-// （WM_NCCALCSIZE）+ 边缘缩放热区与标题栏拖动区（WM_NCHITTEST）+ 最大化时的工作区溢出量。
-// 为什么不用 QWindow::startSystemMove/startSystemResize：本类返回 HTCAPTION/HTMINBUTTON/
-// HTMAXBUTTON/HTCLOSE 让系统自己处理，才拿得到 Windows 的贴边吸附、双击标题栏最大化、
-// 以及 Win11 悬停最大化按钮弹出的 Snap Layouts —— 这三件事自绘拖动都换不来。
-// startSystemMove/startSystemResize 仍作为兜底保留在 WindowBridge 上（扩展自绘窗口条时用）。
-// 控件壳那套 common/appearance/WindowFrame（绑 QWidget）已于 随 清理删除，本类绑 QWindow（QML 壳用）。
+// 无边框 QQuickWindow 的窗口级原生行为（Windows）：补回 WS_* 样式位、关 Win11 系统圆角、
+// 客户区整块（WM_NCCALCSIZE）、边缘缩放热区与标题栏拖动区（WM_NCHITTEST）、最大化工作区溢出量。
+// 返回 HTCAPTION/HTMINBUTTON/HTMAXBUTTON/HTCLOSE 让系统处理，才能拿到贴边吸附、双击标题栏最大化
+// 与 Win11 Snap Layouts；startSystemMove/startSystemResize 仍作为兜底留在 WindowBridge 上。
 
 #include <QAbstractNativeEventFilter>
 #include <QList>
@@ -29,21 +26,17 @@ public:
 	void install();
 
 	// 根窗口创建后调一次：补回 WS_THICKFRAME/WS_CAPTION 等样式位、关掉 Win11 系统圆角（幂等）。
-	// 返回值无意义，仅为调用方便。
 	void applyNativeStyle(QWindow* window);
 
-	// 自绘标题栏：窗口内的拖动区（QML 的 TitleBar item）。为空 = 没有拖动区。
-	// ⚠️ **按 item 所属的窗口生效**（见 hitTest）：本类是**多窗**的（主窗口 + 右栏副窗口），
-	//  caption/窗口控件都拿"该 item 实际在的那扇窗"去比，登记进来的项只影响自己那扇窗。
+	// 自绘标题栏的拖动区（QML 的 TitleBar item），为空 = 没有拖动区。
+	// 按 item 所属窗口生效：本类服务多扇窗（主窗口 + 右栏副窗口），登记项只影响自己那扇窗。
 	void setCaptionItem(QQuickItem* item);
 	// 窗口按钮：落在这些 item 上不交给系统当标题栏。kind 见 WindowControlKind
 	void addWindowControl(QQuickItem* item, int kind);
 	void removeWindowControl(QQuickItem* item);
-	// 三个窗口按钮是否交给系统处理（true = 系统负责点击/悬停/Snap Layouts，QML 只画）。
-	// ⚠️ 默认 **false**：交给系统时关闭要按下很多次才生效 —— Windows 的非客户区按钮要在
-	// "按下→移动→抬起"的模态循环里由 DefWindowProc 判定，而 Qt 会在这条路径上插手鼠标捕获，
-	// 结果时中时不中。改为 QML 自己点（返回 HTCLIENT）后是确定性的单击生效；
-	// 代价是失去"悬停最大化按钮弹 Snap Layouts"这个入口（拖标题栏到屏幕顶边仍能拿到 Snap Layouts）。
+	// 三个窗口按钮是否交给系统处理（true = 系统负责点击/悬停/Snap Layouts，QML 只画）。默认 false：
+	// 系统路径下关闭要按很多次才生效（Qt 会插手非客户区按钮的鼠标捕获），QML 自己点才是确定的单击；
+	// 代价是失去悬停最大化按钮的 Snap Layouts（拖标题栏到屏幕顶边仍能拿到）。
 	void setSystemWindowButtons(bool enabled);
 	bool systemWindowButtons() const { return m_systemWindowButtons; }
 
@@ -79,10 +72,8 @@ private:
 		int kind = ControlOther;
 	};
 
-	// 记名 + 缓存原生句柄。
-	// ⚠️ **绝不为了查句柄去调 QWindow::winId**：它会强制创建平台窗口。窗口被关闭后平台窗口已销毁，
-	// 若此时还有人调 winId，Qt 就会重建它 —— 重建失败再重试，形成 CreateWindowEx 风暴，
-	// 表现就是"点关闭关不掉、要按很多次"。所以：只有 QWindow::handle 非空（平台窗口已在）时才读句柄。
+	// 记名 + 缓存原生句柄。绝不为查句柄调 QWindow::winId()（会强制创建平台窗口；窗口关闭后
+	// 反复重建会形成 CreateWindowEx 风暴，表现为"点关闭关不掉"）。只有 handle 非空时才读句柄。
 	struct WindowEntry
 	{
 		QPointer<QWindow> window;

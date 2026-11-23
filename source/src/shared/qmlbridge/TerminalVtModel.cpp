@@ -1,11 +1,10 @@
-// 见 TerminalVtModel.h：VT 状态与 QML 渲染之间的桥（按行暴露网格 + 脏行通知 + 键盘编码）。
-// ⚠️ 本文件里没有一处绘制、也没有一处 VT 解析：前者在 QML，后者在 common/terminal/TerminalVt。
+// 实现 TerminalVtModel.h：网格按行暴露 + 脏行通知 + 键盘编码；绘制在 QML，VT 解析在 common/terminal/TerminalVt。
 
 #include "qmlbridge/TerminalVtModel.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QJsonObject>   // rows() 兼容对象内带 rows 数组的形状
+#include <QJsonObject>   // rowSegments 兼容对象内带 rows 数组的形状
 #include <QtGlobal>
 
 #include <cstring>
@@ -13,7 +12,7 @@
 
 namespace
 {
-	constexpr int kWideContinuation = 0;   // 段里的 width 值（渲染遇到它必须跳过这一格 —— 宽字符首格已占两格）
+	constexpr int kWideContinuation = 0;   // 宽字符续格的 cell.width（渲染遇到必须跳过这一格，首格已占两格）
 
 	int parseRgb(const QString& text)   // "RRGGBB" / "#RRGGBB" → 0xRRGGBB；认不出来给 -1（该索引回落到库内置调色板）
 	{
@@ -156,8 +155,7 @@ void TerminalVtModel::emitDirty()
 	}
 }
 
-void TerminalVtModel::setSessionState(const QString& state, const QString& statusText,
-	const QString& title, bool readOnly)
+void TerminalVtModel::setSessionState(const QString& state, const QString& statusText, const QString& title, bool readOnly)
 {
 	if (m_state != state) {
 		m_state = state;
@@ -177,7 +175,7 @@ void TerminalVtModel::setSessionState(const QString& state, const QString& statu
 	}
 }
 
-void TerminalVtModel::setGridSize(int rows, int cols)   // （"screen_resize failed to update cursor position"），所以这里把下限也钉住，不依赖调用方自觉
+void TerminalVtModel::setGridSize(int rows, int cols)   // 过小尺寸会让 VT 报 "screen_resize failed"，下限在这里钉住，不依赖调用方
 {
 	const int safeRows = qBound(2, rows, 500);
 	const int safeCols = qBound(4, cols, 1000);
@@ -193,9 +191,8 @@ void TerminalVtModel::setGridSize(int rows, int cols)   // （"screen_resize fai
 
 QVariantList TerminalVtModel::rowSegments(int first, int last) const
 {
-	// 结构化的同一份数据：**复用 rowsJson 的合并逻辑**（段合并只此一份，别复制），
-	// 形状不符时 doc.array() 拿到空 ⇒ 终端整屏空白（已回过退一次 ✗）。这里两种都认，
-	// 仍拿不到就返回空列表，由 QML 侧兜底退回 rowsJson。
+	// 段合并只在 rowsJson 里实现一份，这里直接复用；数组与 { rows: [...] } 两种形状都认，
+	// 都不匹配时返回空列表，由 QML 侧退回 rowsJson。
 	const QByteArray raw = rowsJson(first, last).toUtf8();
 	if (raw.isEmpty())
 		return {};
@@ -222,6 +219,7 @@ QString TerminalVtModel::rowsJson(int first, int last) const
 	const int from = qBound(0, first, rows);
 	const int to = qBound(from, last, rows - 1);
 
+	// 每行是一组 [text, fg, bg, flags] 段：同样式的连续格合并成一段，QML 侧按段绘制。
 	QJsonArray out;
 	for (int row = from; row <= to; ++row)
 	{

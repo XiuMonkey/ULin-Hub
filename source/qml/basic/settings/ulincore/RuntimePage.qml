@@ -1,4 +1,4 @@
-﻿// ULin Core · 运行时：系统提示词、工作目录、工具线程、最大步数、写文件开关。
+// ULin Core · 运行时：系统提示词、工作目录、工具线程、最大步数、写文件开关。
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQml
@@ -9,7 +9,7 @@ import "../../../skin/settings"
 Item {
     id: page
 
-    readonly property var cfg: Hub.settings.ulincoreBridge
+    readonly property var cfg: Hub.settings.ulincoreBridge   // 自研内核配置桥：字段读写与保存/恢复操作都走它
 
     Flickable {
         anchors.fill: parent
@@ -68,9 +68,11 @@ Item {
                     selectionColor: Theme.color.selectionBg
                     font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.body
+                    // 只在自己有焦点时回写：否则 Binding 回填与用户输入会互相覆盖
                     onTextChanged: if (activeFocus) page.cfg.systemPrompt = text
                 }
 
+                // 单向回填：配置变化时覆盖控件文本；用户编辑只经上面的 onTextChanged 写回
                 Binding {
                     target: promptArea
                     property: "text"
@@ -85,6 +87,7 @@ Item {
                 onEdited: (text) => page.cfg.workspaceRoot = text
             }
 
+            // 工具线程数与最大步数：只接受可解析的整数，非数字输入直接丢弃。
             Row {
                 width: parent.width
                 spacing: 8

@@ -1,10 +1,9 @@
-// 全宽文本按钮（原版 sidebar.qss 的 #newWorkspaceButton / #clearSessionButton 这类）。
-// variant 决定配色（都取 token）：
-// primary     —— primaryButtonBg / Text（官方 brand-primary：light 近黑面 + 白字、dark 近白面 + 近黑字）
-// danger      —— dangerButtonBg / textOnAccent，hover danger
-// elevated    —— 官方 secondary 面：buttonBg/buttonHover/buttonPressed + textPrimary，
-// 无描边（层次靠面色差），用于"新建工作区"这种次要主动作
-// ghost       —— 透明面，文字 textSecondary → 悬停 textPrimary + chipHoverBg（官方 ghost 按钮）
+// 全宽文本按钮。variant 决定配色（都取 token）：
+// primary   —— primaryButtonBg/Text（官方 brand-primary：light 近黑面 + 白字，dark 反之）
+// danger    —— dangerButtonBg / dangerButtonText，hover 转 danger
+// elevated  —— 官方 secondary 面：buttonBg/buttonHover/buttonPressed + textPrimary，
+//              无描边（层次靠面色差），用于"新建工作区"这类次要主动作
+// ghost     —— 透明面，文字 textSecondary → 悬停 textPrimary + chipHoverBg
 
 import QtQuick
 import ULinHub 1.0
@@ -54,8 +53,7 @@ Item {
         if (root.variant === "elevated")
             return Theme.color.textPrimary
         if (root.variant === "danger")
-
-            // 红胶囊的字色不能借用 textOnAccent：那个 token 现在跟着"官方主按钮"走
+            // 红块的字色不能借用 textOnAccent：那个 token 现在跟着"官方主按钮"走
             // （light 白字 / dark 近黑字），暗色下会把红块上的字压成近黑。
             return Theme.color.dangerButtonText || Theme.color.textOnAccent
         return Theme.color.primaryButtonText

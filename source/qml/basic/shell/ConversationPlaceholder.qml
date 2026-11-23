@@ -1,5 +1,5 @@
-// 会话区占位：M3 只显示当前会话身份与服务端状态，消息列表/输入区在 M4–M5 接入。
-// 本文件将被 chat/MessageListView.qml + chat/Composer.qml 取代。
+// 会话区占位：只在没有选中会话时显示当前会话身份/提示语，消息列表与输入区由
+// chat/MessageListView.qml + chat/Composer.qml 承担。
 
 import QtQuick
 import ULinHub 1.0

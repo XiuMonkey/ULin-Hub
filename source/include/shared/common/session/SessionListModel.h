@@ -1,16 +1,11 @@
 ﻿#pragma once
 
-// 分层：本文件在 common/session/ —— **领域与纯逻辑层**（模型本体：摊平算法、
-// 折叠状态机、行的角色名映射都在这里）。它不 import 任何 QML 概念（只用 QtCore 的 QAbstractListModel），
-// 可以脱离 QML 引擎单测（`new SessionListModel(catalog)` 之后断言行数/角色值即可）。
-// QML 面（`Hub.sessions` 属性、SessionListModel 类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，
-// 那边只接线、不放算法。
-// 侧栏列表的行模型（QML 侧经 Hub.sessions 读）：把 SessionCatalog 的"工作区分组 + 会话"**摊平**成一行一行的列表。
-// 为什么摊平而不是嵌套 ListView（坑）：嵌套滚动会互相抢滚轮/惯性，是性能与手感的双重坑；
-// 摊平后一个 ListView 就够，行数规模是"几十行"，整份重建比增量补丁简单也不会错。
-// 行有三种：工作区表头（可折叠、带会话计数）、"置顶"表头（置顶段，同样可折叠），以及会话行。
-// 会话行可能出现在两处：置顶段一份、它所属的工作区分组一份 —— 这是设计上的有意重复（置顶段是快捷入口，
-// 工作区分组仍保持完整），两处都指向同一个 sessionId，选中态同步。
+// 侧栏列表的行模型（QML 侧经 Hub.sessions 读）：把 SessionCatalog 的"工作区分组 + 会话"摊平成行。
+// 它不 import 任何 QML 概念（只用 QtCore），可脱离 QML 引擎单测；QML 面（Hub.sessions、类型注册）在
+// qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线、不放算法。
+// 为什么摊平而不是嵌套 ListView：嵌套滚动会互相抢滚轮/惯性；摊平后行数只有几十，整份重建更简单。
+// 行有三种：工作区表头（可折叠、带会话计数）、"置顶"表头（同样可折叠）、会话行。
+// 会话行可能出现在两处（置顶段 + 所属工作区），这是有意重复，两处指向同一个 sessionId，选中态同步。
 
 #include "common/session/SessionCatalog.h"
 
@@ -47,10 +42,9 @@ public:
 
 	explicit SessionListModel(SessionCatalog* catalog, QObject* parent = nullptr);
 
-	// "未分组"表头行用的 **界面 key**（不是服务端的工作区 id）：它只在本模型里当折叠状态/行标识用。
-	// 任何要发给服务端的调用（session/create 等）都必须先把它翻成"没有工作区"（空 id），
-	// 原样发过去服务端会回 workspace/not-found —— 这就是"点＋新建不了会话"的根因。
-	// ⚠️ 换算在核心侧做（`ClientRuntime::createSession`），侧栏只管把 key 抛上来。
+	// "未分组"表头行用的 **界面 key**（不是服务端工作区 id）：只在本模型里当折叠状态/行标识。
+	// 发给服务端的调用（session/create 等）必须先翻成空 id，否则回 workspace/not-found
+	// （"点＋新建不了会话"的根因）；换算在 `ClientRuntime::createSession` 做。
 	static QString ungroupedWorkspaceKey();
 	// "置顶"表头行用的界面 key（同样不是服务端实体；服务端只有 pinnedSessionIds 集合）。
 	// 它只用于折叠状态/行标识，任何 RPC 都不能把它当 workspaceId 发出去。
@@ -105,8 +99,7 @@ private:
 	// 会话行内容（置顶段 / 工作区分组 / 未分组共用）：只差选中态；置顶归属由所在段决定。
 	Row makeSessionRow(const SessionRecord& record) const;
 	// 表头行内容（工作区 / 置顶 / 未分组共用）：expanded 统一按 workspaceId 查折叠状态
-	Row makeHeaderRow(const char* kind, const QString& workspaceId, const QString& workspaceTitle,
-		int sessionCount) const;
+	Row makeHeaderRow(const char* kind, const QString& workspaceId, const QString& workspaceTitle, int sessionCount) const;
 
 	QVector<Row> m_rows;
 	QSet<QString> m_collapsed;  // 被收起来的工作区 id（默认全展开：分组不该开局就是收着的）

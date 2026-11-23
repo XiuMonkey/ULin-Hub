@@ -25,8 +25,7 @@ class AgentSessionClient : public QObject
 public:
 	explicit AgentSessionClient(DshApiClient* api, QObject* parent = nullptr);
 
-	void followSession(const QString& sessionId, const QString& parentSessionId = QString(),
-		const QString& mode = QString());
+	void followSession(const QString& sessionId, const QString& parentSessionId = QString(), const QString& mode = QString());
 	void unfollowSession();
 	void pageSession(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0,
 		std::function<void(const QJsonObject& value)> onSuccess = {},
@@ -55,7 +54,7 @@ private:
 	QString m_followedSessionId;
 	QString m_followedParentSessionId;
 	QString m_followedMode;
-	// 与旧 DshApiClient 相同的“愿望账”：mux 重连后按它重开。
+	// follow 愿望账：mux 重连后按它重开。
 	QString m_resumeFollowId;
 	QString m_resumeFollowParent;
 	QString m_resumeFollowMode;

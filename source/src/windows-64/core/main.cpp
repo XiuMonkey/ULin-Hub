@@ -42,14 +42,9 @@
 
 int main(int argc, char* argv[])
 {
-	// WebEngine 的数据目录（icudtl.dat / qtwebengine_resources*.pak / v8_context_snapshot.bin）。
-	// 与服务端的 resources\node|server 分开放在 resources\webengine\：Qt 自己只找 <exe>\resources\，
-	// 不会递归子目录，所以必须用 QTWEBENGINE_RESOURCES_PATH 指过去。
-	// 设的时机有讲究 —— WebEngine 首次建上下文时把它读走并缓存，之后设无效，所以出现两次：
-	// 1) QApplication 之前：applicationDirPath() 还不能用，先按 argv[0] 推一次（explorer / 快捷方式
-	// 启动给的是完整路径，够用）；
-	// 2) QApplication 之后：按 applicationDirPath() 再设一次兜底（相对 argv[0] 之类的异常情况）。
-	// 目录不存在就不设，让 Qt 回落到默认的 <exe>\resources\。两处都走 util/WebEngineEnv.h。
+	// WebEngine 数据目录（icudtl.dat / qtwebengine_resources*.pak / v8_context_snapshot.bin）放在
+	// resources\webengine\：Qt 只找 <exe>\resources\，必须用 QTWEBENGINE_RESOURCES_PATH 指过去。
+	// 首次建上下文时读走并缓存，故 QApplication 前后各设一次；目录不存在就不设，让 Qt 回落默认。
 	if (argc > 0)
 		applyBundledWebEngineEnv(QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath());
 
@@ -59,19 +54,15 @@ int main(int argc, char* argv[])
 
 	QApplication app(argc, argv);
 
-	// 版本号收口到 common/ClientInfo.h（与发布包名对得上）。此前整个客户端没有任何地方
-	// 登记过版本 —— 日志头、崩溃报告、helpdesk 对版本只能靠猜。
-	// 本地数据契约（<exe>/data 持久化、<exe>/temp/run-<uuid> 临时化）已收进 util/RuntimeDirs.h，
-	// 两个平台入口共用，顺带把上一次进程遗留的 run-* 清掉。
+	// 版本号收口到 common/ClientInfo.h，日志、崩溃报告与 helpdesk 都从 applicationVersion 取。
+	// 运行时目录契约（<exe>/data 持久化、<exe>/temp/run-<uuid> 临时化）由 util/RuntimeDirs.h 负责。
 	(void)prepareRuntimeDirs();
 
 	QCoreApplication::setApplicationVersion(ClientInfo::kVersion);
 
-	// WebEngine 子进程定位：本工程把 Qt 运行库收进 <exe>/dependence/（SxS 私有程序集），
-	// 而 Qt 找 QtWebEngineProcess.exe 只搜 <exe>/bin 与 <exe>/ —— 搜不到 dependence/，
-	// 第一次建 WebEngineView 就 qFatal 整个进程退出（fatal.log："The following paths were
-	// searched for Qt WebEngine Process"）。指向 dependence/ 里的那份：子进程自己的目录
-	// 恰好就是全部 Qt DLL 所在，加载器直接命中。
+	// QtWebEngineProcess.exe 只搜 <exe>/bin 与 <exe>/，本工程却把它收在 <exe>/dependence/：
+	// 第一次建 WebEngineView 会因找不到而 qFatal（fatal.log 里会列出搜索过的路径）。
+	// 显式指到 dependence/ 里的那份，子进程自己的目录就是全部 Qt DLL 所在。
 	{
 		const QString bundledProcess = QCoreApplication::applicationDirPath()
 			+ QStringLiteral("/dependence/QtWebEngineProcess.exe");
@@ -177,9 +168,8 @@ int main(int argc, char* argv[])
 
 	QQmlApplicationEngine engine;
 
-	// 扩展自带的 QML：把每个已安装扩展的目录加进 import path —— 扩展包里的 ui/ 因此可以
-	// import 自己的兄弟组件与子目录（纯相对 import 本来就行；加上它是为了能用带 qmldir 的模块式目录）。
-	// 注意这是引擎级全局路径：扩展目录名会进入所有 QML 的解析范围（扩展之间以及宿主都能看见）。
+	// 扩展自带的 QML：把每个已安装扩展的目录加进 import path，ui/ 因而能 import 兄弟组件
+	// 与带 qmldir 的模块式目录。注意这是引擎级全局路径，扩展目录名会进入所有 QML 的解析范围。
 	{
 		const QString extensionRoot = ClientExtension::extensionDirectory();
 		const QStringList installedExtensions = ClientExtension::installedNames();
@@ -200,9 +190,8 @@ int main(int argc, char* argv[])
 
 	TimingLogger::mark(QStringLiteral("qml shell ready"));
 
-	// 启动装载客户端扩展（DLL 扩展的运行入口）。此前只有退出路径调过 ClientExtension，
-	// 启动路径漏了 ⇒ 装了 DLL 扩展也不会被装载（纯 QML 扩展的装载随后由扩展层负责）。
-	// 位置刻意在 engine.load() **之后**：DLL 的 attachHost() 要用的宿主对象（主题 / 多语言 /
+	// 启动装载客户端扩展（DLL 扩展的运行入口）。位置刻意在 engine.load() 之后：
+	// DLL 的 attachHost() 要用的宿主对象（主题 / 多语言 / 宿主 index）此时已就绪。
 	{
 		const QStringList loadedExtensions = ClientExtension::loadAll();
 		if (loadedExtensions.isEmpty())

@@ -1,8 +1,6 @@
-// 侧栏"更多"溢出菜单（原型右下角 ⋯ 的落点）：危险动作与低频动作不再常驻首屏。
-// 三项：
-// 新建工作区  —— 原顶部全宽按钮降级到这里（Hub.createWorkspace()）
-// 已归档会话  —— 原型里的占位项，功能未实现，置灰不可点
-// 清空会话    —— danger；不直连 Hub，发 clearSessionsRequested() 走连接表（扩展可接管）
+// 侧栏"更多"溢出菜单（侧栏底排 ⋯ 的落点）：危险动作与低频动作不再常驻首屏。
+// 三项：新建工作区（Hub.createWorkspace()）、已归档会话（弹出归档列表）、
+// 清空会话（danger；不直连 Hub，发 clearSessionsRequested() 走连接表，扩展可接管）。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -16,7 +14,7 @@ Popup {
     padding: 4
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    // 由 SessionFooter 传入：第 7 个及之后的扩展入口。每项形如
+    // 由 SessionFooter 传入：被挤出首屏的扩展入口。每项形如
     // { item, iconSource, label, description }，点击时调用原入口的 clicked 信号。
     property var extensionEntries: []
 
@@ -31,7 +29,7 @@ Popup {
         NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion.fast }
     }
 
-    function activate(kind) {   // "已归档会话"是置灰占位项（enabled=false，点击不触发）⇒ 这里只有 workspace / clear 两条活路
+    function activate(kind) {   // kind 只有 workspace / archived / clear；separator 项 enabled=false，点不到
         if (kind === "workspace")
             root.newWorkspaceRequested()
         else if (kind === "archived")

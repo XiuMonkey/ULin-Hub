@@ -2,6 +2,7 @@
 // QML 暴露面：组合 common 服务，不继承、不持有 Hub。
 #include "qmlbridge/BridgeCommon.h"
 
+// UlinCore 后端设置的 QML 面：provider / model / 读写开关，全部转发给 UlinCore::UlinCoreSettings。
 class UlinCoreSettingsBridge : public QObject
 {
 	Q_OBJECT
@@ -44,8 +45,7 @@ public:
 	{
 		UlinCore::UlinCoreSettings::instance().addProvider(name, baseUrl, apiKey);
 	}
-	Q_INVOKABLE void updateProvider(const QString& id, const QString& name,
-		const QString& baseUrl, const QString& apiKey)
+	Q_INVOKABLE void updateProvider(const QString& id, const QString& name, const QString& baseUrl, const QString& apiKey)
 	{
 		UlinCore::UlinCoreSettings::instance().updateProvider(id, name, baseUrl, apiKey);
 	}
@@ -57,13 +57,11 @@ public:
 	{
 		UlinCore::UlinCoreSettings::instance().selectProvider(id);
 	}
-	Q_INVOKABLE void addModel(const QString& providerId, const QString& id, const QString& name,
-		int maxTokens, double temperature)
+	Q_INVOKABLE void addModel(const QString& providerId, const QString& id, const QString& name, int maxTokens, double temperature)
 	{
 		UlinCore::UlinCoreSettings::instance().addModel(providerId, id, name, maxTokens, temperature);
 	}
-	Q_INVOKABLE void updateModel(const QString& providerId, const QString& modelId,
-		const QString& name, int maxTokens, double temperature)
+	Q_INVOKABLE void updateModel(const QString& providerId, const QString& modelId, const QString& name, int maxTokens, double temperature)
 	{
 		UlinCore::UlinCoreSettings::instance().updateModel(providerId, modelId, name, maxTokens, temperature);
 	}

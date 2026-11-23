@@ -1,7 +1,5 @@
-// 通用兜底落点：网页窗口（宿主自带 WebEngine 打开任意 URL）。
-// 定位：插件界面本来是 web 的，原生表达不了（或代价不划算）时，开一个独立窗口让 WebEngine 去解析。
-// 宿主不认识任何插件 —— 它只知道"给我一个 URL，我给你一个能前进后退刷新的窗口"。
-// 由 VirtualUiHost::OpenWebWindow 创建：initialUrl 是 required property（初始属性注入）。
+// 通用兜底落点：网页窗口（宿主自带 WebEngine 打开任意 URL），由 VirtualUiHost::OpenWebWindow 创建。
+// 插件界面本是 web 的、原生表达不了（或代价不划算）时用它；宿主不认识插件，只知道"给一个 URL，还一个能前进后退刷新的窗口"。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -11,7 +9,7 @@ import ULinHub 1.0
 Window {
     id: win
 
-    required property url initialUrl
+    required property url initialUrl   // 必需属性：创建时由宿主注入初始地址，本窗口没有别的入口
 
     width: Math.max(720, Math.min(1280, Math.round(Screen.width * 0.8)))
     height: Math.max(520, Math.min(900, Math.round(Screen.height * 0.82)))
@@ -34,7 +32,7 @@ Window {
             spacing: 6
 
             Repeater {
-                model: [
+                model: [   // 按钮模型：text 显示、enabled 控制可用、go 交给 onClicked 分发
                     { "text": "←", "enabled": view.canGoBack, "go": "back" },
                     { "text": "→", "enabled": view.canGoForward, "go": "forward" },
                     { "text": "↻", "enabled": true, "go": "reload" }
@@ -108,7 +106,7 @@ Window {
         }
     }
 
-    Rectangle {
+    Rectangle {   // 加载进度条：宽度按 loadProgress 拉
         id: progress
         anchors.top: toolbar.bottom
         anchors.left: parent.left

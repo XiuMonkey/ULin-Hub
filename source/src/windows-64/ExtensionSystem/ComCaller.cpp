@@ -174,8 +174,7 @@ namespace
 		VARIANT result;
 		VariantInit(&result);
 		UINT argErr = 0;
-		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT,
-			DISPATCH_PROPERTYGET, &params, &result, nullptr, &argErr);
+		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_PROPERTYGET, &params, &result, nullptr, &argErr);
 		if (FAILED(hr)) {
 			if (error)
 				*error = qtTrId("com_get_property_failed_fmt").arg(name, hrText(hr));
@@ -206,8 +205,7 @@ namespace
 		VARIANT result;
 		VariantInit(&result);
 		UINT argErr = 0;
-		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT,
-			DISPATCH_METHOD, &params, &result, nullptr, &argErr);
+		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, nullptr, &argErr);
 		if (FAILED(hr)) {
 			if (error) {
 				QString reason = qtTrId("com_invoke_method_failed_fmt")
@@ -243,8 +241,7 @@ namespace
 		params.rgdispidNamedArgs = &putId;
 
 		UINT argErr = 0;
-		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT,
-			DISPATCH_PROPERTYPUT, &params, nullptr, nullptr, &argErr);
+		HRESULT hr = obj->Invoke(dispId, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_PROPERTYPUT, &params, nullptr, nullptr, &argErr);
 		VariantClear(&value);
 		if (FAILED(hr)) {
 			if (error)
@@ -319,8 +316,7 @@ namespace comcall
 			return false;
 		}
 		IDispatch* root = nullptr;
-		hr = CoCreateInstance(clsid, nullptr,
-			CLSCTX_LOCAL_SERVER | CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&root);
+		hr = CoCreateInstance(clsid, nullptr, CLSCTX_LOCAL_SERVER | CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&root);
 		if (FAILED(hr) || !root) {
 			error = qtTrId("com_create_failed_fmt").arg(progId, hrText(hr));
 			return false;
@@ -413,8 +409,7 @@ namespace comcall
 			if (out.vt == VT_DISPATCH && out.pdispVal) {
 				result.insert(QStringLiteral("value"), summarizeObject(out.pdispVal));
 				result.insert(QStringLiteral("object"), true);
-				result.insert(QStringLiteral("note"),
-					qtTrId("com_returned_object_summary_only"));
+				result.insert(QStringLiteral("note"), qtTrId("com_returned_object_summary_only"));
 			}
 			else {
 				QJsonValue jv = variantToJson(out);

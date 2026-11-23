@@ -6,6 +6,7 @@ CommonRegistry& CommonRegistry::instance()
 	return *s_registry;
 }
 
+// 首次登记直接插入；同一 index 再次登记视为接管，只留一条日志。
 bool CommonRegistry::AddToRegistry(const QString& index, QObject* obj)
 {
 	if (index.isEmpty() || !obj)
@@ -46,6 +47,7 @@ bool CommonRegistry::Destroy(const QString& index, QObject* obj)
 	return true;
 }
 
+// 未登记过 index 时返回空 QPointer（对象已被析构时同样为空）。
 QPointer<QObject> CommonRegistry::FindFromRegistry(const QString& index) const
 {
 	const auto it = m_objects.constFind(index);
@@ -54,6 +56,7 @@ QPointer<QObject> CommonRegistry::FindFromRegistry(const QString& index) const
 	return it.value();
 }
 
+// 表里有记录且对象仍然存活才算包含。
 bool CommonRegistry::contains(const QString& index) const
 {
 	const auto it = m_objects.constFind(index);

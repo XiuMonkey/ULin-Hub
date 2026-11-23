@@ -274,17 +274,15 @@ public:
 		emit workspaceArchiveChanged(archivedSessionIds);
 	}
 
-	// 侧栏会话标题刷新：当前是 ULinHub::refreshSessionTitles（重拉标题、不重选会话）。本宿主**刻意不接**（只记一次日志）：
-	// 这条线上根本没有"只刷标题"的端点 —— 唯一接近的 session/list 由 ShellController::refreshSessions 拉，
-	// 它拿到列表后会把 SessionCatalog 整个重建（当前选中会话可能被换掉）；扩展调这条的动机是"标题变了、侧栏该更新"，
-	// 而侧栏本就是会话列表驱动的、稳态下已是新的 ⇒ 不接不会显示错内容，接错反而会把用户正看的会话切走。
-	// 真要做，得在 M4b 给 ShellController 加一条"只刷标题不动选择"的路，再来这里转发。
+	// 侧栏会话标题刷新：扩展调它是因为"标题变了、侧栏该更新"，但这条线上没有"只刷标题"的端点。
+	// 唯一接近的 session/list 会整份重建目录并可能换掉当前选中会话 ⇒ 本宿主刻意不接（只记一次日志）。
+	// 侧栏本就由会话列表驱动，稳态下已是新标题；不接不会显示错内容，接错反而会把用户正看的会话切走。
 	void ExternalRefreshSessionTitles() override;
 
 	// VirtualMain 末尾追加那条的**套壳实现**：原函数 baseUrl 一行没动，这里只转一下，
 	// 让插件经 VirtualMain 就能拿到引擎地址（`dsh web --port 0`，真实端口只有宿主知道）。
 	QUrl ServerBaseUrl() override { return baseUrl(); }
-	// 【末尾追加】带令牌的启动地址：扩展跑插件 JS 时 fetch 要鉴权
+	// 当前会话 id：QmlBridge 写，扩展经 VirtualMain 读
 	QString CurrentSessionId() override { return m_currentSessionId; }
 	// 一行转发：把宿主已鉴权的连接交给扩展
 	QNetworkAccessManager* AuthenticatedHttp() override { return m_nam; }
@@ -302,6 +300,7 @@ public:
 	}
 	// 实函数：宿主内部（QmlBridge）写，扩展经虚接口读
 	void setCurrentSessionId(const QString& id) { m_currentSessionId = id; }
+	// 【末尾追加】带令牌的启动地址：扩展跑插件 JS 时 fetch 要鉴权
 	QUrl ServerLaunchUrl() override
 	{
 		QUrl url = baseUrl();
@@ -341,7 +340,7 @@ public:
 	void closeGenericStream(const QString& streamId);
 
 signals:
-	// 宿主内部信号：ULinHub 靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
+	// 宿主内部信号：宿主靠它停掉内置 DSH 进程、关掉三条 DSH 专属旁路；插件 ↔ 宿主不走信号
 	void takeoverChanged(bool takenover);
 	void masterAgentsChanged();
 	void masterAgentActivated(const QString& backendId);
@@ -350,8 +349,7 @@ signals:
 	void muxFrameReceived(const QJsonObject& frame);
 	// workspace/follow 的 baseline：items + 归档集合 + **有序**置顶集合（pinnedSessionIds，最近置顶的在前）。
 	// 三个 payload 同源同帧，接收方应当在同一轮里应用完再刷新界面（拆成多条信号会多一轮重建）。
-	void workspaceSnapshotReady(const QJsonArray& items, const QJsonArray& archivedSessionIds,
-		const QJsonArray& pinnedSessionIds);
+	void workspaceSnapshotReady(const QJsonArray& items, const QJsonArray& archivedSessionIds, const QJsonArray& pinnedSessionIds);
 	// workspace/follow 的增量帧：order / archived / pinned 都是**整体替换**（服务端每次给完整集合）
 	void workspaceUpserted(const QJsonObject& workspace);
 	void workspaceRemoved(const QString& workspaceId);
@@ -419,8 +417,8 @@ private:
 
 	// 接管态出站请求的回填时限：扩展不回填时不能让调用方永久挂起（未接管路径有 failAuthQueue 兜底）
 	static constexpr qint64 kTakeoverCallTimeoutMs = 120000;
-	// session/prompt 是唯一允许长时间运行的接管调用：Agent 可能在工具链里跑几十秒
-	// 到几分钟。120s 会把"还在执行"误报成后端失联（WorkBuddy 的 takeover-timeout）。
+	// session/prompt 是唯一允许长时间运行的接管调用：Agent 可能在工具链里跑几十秒到几分钟。
+	// 120s 会把"还在执行"误报成后端失联（WorkBuddy 的 takeover-timeout）。
 	static constexpr qint64 kTakeoverPromptTimeoutMs = 600000;
 
 	// 取登记为接收端的扩展根对象（kApiSink）；每次现取，插件可能已被卸载或被顶掉
@@ -505,9 +503,9 @@ private:
 	QTimer* m_takeoverSweep = nullptr;  // 回填超时扫描（只有接管态才跑）
 
 	bool m_destroyed = false;
-	// 本类作为 kMainWindow（VirtualMain）时，"已连接"是否已经发过 —— 见 HandleConnected
 	AgentManager* m_agentManager = nullptr;
 	DshMasterAgent* m_dshMasterAgent = nullptr;
 
+	// 本类作为 kMainWindow（VirtualMain）时，"已连接"是否已经发过 —— 见 HandleConnected
 	bool m_injectConnectedEmitted = false;
 };

@@ -1,6 +1,5 @@
-// 右侧栏里的浏览器面板：地址栏 + 前进/后退/刷新/主页 + 加载进度 + WebEngineView。
-// 为什么放在右侧栏：官方那套右栏也是"面板坞"，浏览网页属于"临时看一眼"的辅助内容，
-// 不占主界面；宽度可拖（壳层已支持），窄了地址栏自己会挤，WebEngineView 跟着变。
+// 右侧栏里的浏览器面板：地址栏 + 后退/前进/刷新 + 加载进度 + WebEngineView。
+// 放右栏的理由：网页属于"临时看一眼"的辅助内容，不占主界面；宽度可拖，地址栏随宽度挤压。
 // ⚠️ 依赖 Qt WebEngine（`QT += webenginequick`）：main.cpp 里必须**在 QApplication 之前**调
 // QtWebEngineQuick::initialize()，否则运行期报 "WebEngineContext used before initialize"。
 
@@ -16,17 +15,16 @@ Item {
     property string startUrl: ""   // 打开面板时的首页（空 = 显示提示，等用户输入）
 
     // 应用视图 = 扩展的 harness 页面（打开时 URL 带 chrome=0，见 SupporterPlugin::openHarnessView）。
-    // 为什么判标记而不是判 127.0.0.1/端口/index.html：宿主不该知道扩展的回环端口与文件布局，
-    // 一个语义参数就够了；扩展换服务/换路径，宿主这行不用跟着改。
+    // 只判这个标记、不判回环端口/路径：宿主不该知道扩展的服务与文件布局，扩展换服务这里也不用改。
     property bool appView: false
     // 由 PanelBarDock 注入的稳定块 id：网页块离开/回附后据此把当前地址写回模型。
     property string blockId: ""
 
-    // 地址也可以**由外面给**（扩展面板）：PanelBarDock 把 PanelBarDock.activeViewUrl 活绑到 startUrl，
-    // 切块/换面板时这条 handler 负责真正导航。用户自己在地址栏敲的仍走 navigate()。
+    // 地址也可由外部给：PanelBarDock 把 activeViewUrl 活绑到 startUrl，切块/换面板时由这条 handler 真正导航（手输仍走 navigate）。
     onStartUrlChanged: openExternal(startUrl)
 
-    function syncChrome() {   // 从真正的页面 URL 判定"要不要画地址栏"。放在函数里而不是属性绑定的表达式里
+    // 按真实页面 URL 判定"要不要画地址栏"；写成函数而非绑定表达式，便于在 onUrlChanged 里显式调用。
+    function syncChrome() {
         appView = view.url.toString().indexOf("chrome=0") >= 0
     }
 
@@ -40,18 +38,16 @@ Item {
     }
 
     function navigate(text) {
-        // 规范化（判 scheme / 补 https:// / 拼搜索词 / 百分号编码）全在 C++：
-        // source/src/common/util/UrlInput.cpp，QML 面是单例 `UrlInput`（见 main.cpp 的注册）。
-        // 返回空串 = "这行不该导航"（空输入/纯空白），直接不动，别去加载空 URL。
+        // 输入规整（判 scheme / 补 https:// / 拼搜索词 / 百分号编码）在 C++ 的 UrlInput 单例（source/src/common/util/UrlInput.cpp）；
+        // 返回空串表示"这行不该导航"（空输入/纯空白），不要拿空 URL 去加载。
         const target = UrlInput.normalize(text)
         if (target.length === 0)
             return
         view.url = target
     }
 
-    // 程序化打开（扩展面板 / 宿主给的地址）：**不经过 UrlInput 的输入规整** —— 那是给"人敲进来的
-    // 半截地址"准备的（补 https://、把空格拼成搜索词）。扩展给的是完整 URL，规整反而会改坏它
-    // （例如无 scheme 的 127.0.0.1:port/... 会被补成 https）。空串 = 不导航（用户自己开的块）。
+    // 程序化打开（扩展面板 / 宿主给的地址）：不经过 UrlInput.normalize —— 那是给"人敲的半截地址"准备的，
+    // 会把无 scheme 的 127.0.0.1:port/... 补成 https，反而改坏完整 URL。空串 = 不导航（用户自己开的块）。
     function openExternal(address) {
         const target = String(address === undefined || address === null ? "" : address)
         if (target.length === 0 || target === view.url.toString())
@@ -192,12 +188,11 @@ Item {
             visible: view.loading && !root.appView
         }
 
+        // 高度减掉"当前真正占位的宿主装饰"：地址栏隐藏时 bar 被 Column 跳过，不能按它的旧高度算（否则底部空一条）；
+        // 进度条只在加载时占 2px。
         Item {
             id: viewHost
             width: parent.width
-
-            // 减掉"当前真正占位的宿主装饰"（地址栏隐藏时 bar 被 Column 跳过，不能按它的旧高度算，
-            // 否则底部会空出一整条）；进度条只在加载时占 2px。
             height: parent.height - bar.height - (loadingBar.visible ? loadingBar.height : 0)
 
             WebEngineView {
@@ -223,9 +218,8 @@ Item {
                     if (request.status !== WebEngineView.LoadSucceededStatus)
                         return
                     if (root.appView) {
-                        // 为什么必须在这里抢焦点：应用视图没有地址栏可点，WebEngine 的页面又只有
-                        // 在 WebEngineView 拿到 active focus 后才收键盘事件 —— 否则输入框点得进去、
-                        // 打不了字（"编辑不好用"）。加载完成即把焦点交给网页。
+                        // 应用视图没有地址栏可点，WebEngine 页面又只在 WebEngineView 拿到 active focus
+                        // 后才收键盘事件 —— 不抢焦点就会"输入框点得进去、打不了字"。加载完成即把焦点交给网页。
                         view.forceActiveFocus()
                     } else {
                         urlField.text = url.toString()
@@ -250,16 +244,14 @@ Item {
         }
     }
 
-    // 创建时就带地址（扩展面板绑上来的那份）；再同步一次地址栏可见性，
-    // 避免"打开瞬间先闪一下地址栏"（startUrl 可能在 onLoaded 里才绑上来，urlChanged 稍后才到）
+    // 创建时带上外部地址，并立即同步一次地址栏可见性：startUrl 可能晚于 urlChanged 才绑上来，不补这一下会闪。
     Component.onCompleted: {
         openExternal(startUrl)
         syncChrome()
     }
 
-    // 右键菜单：宿主自绘（默认菜单被 request.accepted 关掉了），保留常用动作并加「询问 Agent」。
-    // 浏览器右键菜单：宿主自绘。用 Popup 而不是原生 Menu，才能做圆角、
-    // 行悬停、分组间距和进出场淡入；动作仍走 WebEngineView 的 action。
+    // 右键菜单：宿主自绘（默认菜单已被 request.accepted 关掉），保留常用动作并加「询问 Agent」。
+    // 用 Popup 而非原生 Menu，才能做圆角、行悬停与淡入淡出；动作仍走 WebEngineView 的 action。
     Popup {
         id: contextMenu
         parent: root
@@ -307,6 +299,7 @@ Item {
             close()
         }
 
+        // 菜单项：kind 交给 activate() 分发，enabled 由 WebEngine 的 editFlags 与导航状态决定。
         property var menuModel: [
             { kind: "back", label: "后退", enabled: view.canGoBack },
             { kind: "forward", label: "前进", enabled: view.canGoForward },

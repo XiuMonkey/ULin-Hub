@@ -23,6 +23,7 @@ QString jsonTypeName(const QJsonValue& value)
 	return QStringLiteral("string");
 }
 
+// 递归替换 {"$param":"name"} 占位符，其余结构原样保留。
 QJsonValue resolveBinding(const QJsonValue& value, const QJsonObject& params)
 {
 	if (value.isObject()) {
@@ -53,6 +54,7 @@ QJsonObject resolveBindings(const QJsonObject& args, const QJsonObject& params)
 	return resolved;
 }
 
+// 模板变量同时支持 [name] 与 {{name}} 两种占位写法。
 QString expandPromptTemplate(const QString& text, const QJsonObject& params)
 {
 	QString result = text;
@@ -76,6 +78,7 @@ QString expandPromptTemplate(const QString& text, const QJsonObject& params)
 	return result;
 }
 
+// 生成 JSON Schema：没有默认值的参数进 required 列表。
 QJsonObject parametersSchema(const QVector<IntentParameter>& parameters)
 {
 	QJsonObject properties;

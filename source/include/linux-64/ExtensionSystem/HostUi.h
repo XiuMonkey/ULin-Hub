@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // 扩展 UI 宿主（QML 单例 `HostUi` / 插件侧 index `kUiHost`）
 // 职责（不做槽位、不做贡献清单、不做 mount 编排 —— 见 VirtualCommon.h 的 VirtualUiHost / VirtualBlockBackendHost）：
@@ -58,8 +58,8 @@ public:
 	bool SetBlockBackend(const QString& owner, const QString& kind, QObject* backend) override;
 	void ClearBlockBackend(const QString& owner, const QString& kind) override;
 	bool HasBlockBackend(const QString& kind) override;
-	// 虚接口层（末尾追加）：**只做转发** —— 底下 PanelBarDockModel 的 openUrl / closeBlock 是模型本来
-	// 就有的方法，为扩展没改过一行。扩展 include 宿主头、拿到本单例后 cast 调它们。
+	// 虚接口层（末尾追加）：**只做转发** —— 底下 PanelBarDockModel 的 openUrl / closeBlock 是模型本来就有的方法。
+	// 扩展 include 宿主头、拿到本单例后 cast 调它们。
 	QString OpenBlockUrl(const QString& url, const QString& title) override;
 	void RegisterLauncher(const char* kind, const char* label, const char* hint) override;
 	void UnregisterLauncher(const char* kind) override;
@@ -91,7 +91,7 @@ signals:
 	void composerFilesRequested(const QStringList& paths);
 	void namesChanged();
 	void accountEntryOwnerChanged();
-	// files kind 的 office 转换后端登记/撤销（FileBrowser 接线用）
+	// 某个 kind 的顶替后端登记/撤销（面板据此在扩展后端与内置后端之间切换）
 	void blockBackendChanged(const QString& kind);
 
 private:

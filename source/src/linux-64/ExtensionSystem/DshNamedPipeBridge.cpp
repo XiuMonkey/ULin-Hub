@@ -51,8 +51,7 @@ QString DshNamedPipeBridge::errorString() const
 	return m_errorString;
 }
 
-void DshNamedPipeBridge::sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result,
-	const QString& error)
+void DshNamedPipeBridge::sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result, const QString& error)
 {
 	if (!socket) {
 		return;

@@ -112,6 +112,7 @@ Item {
         focus: false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
+        // 双层阴影 + 1px 描边，与 ModelSelectorChip 的弹层同一套画法（源面隐藏，由 MultiEffect 连同阴影绘制）。
         background: Item {
             Rectangle {
                 id: menuFace

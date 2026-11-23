@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="..\assets\resources">
@@ -127,7 +127,22 @@
     <ClCompile Include="src\shared\common\session\TraceModel.cpp">
       <Filter>src\shared\common\session</Filter>
     </ClCompile>
-    <ClCompile Include="src\shared\common\session\ChatController.cpp">
+    <ClCompile Include="src\shared\common\session\chat\ChatController.cpp">
+      <Filter>src\shared\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\session\chat\ChatControllerAttachments.cpp">
+      <Filter>src\shared\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\session\chat\ChatControllerHistory.cpp">
+      <Filter>src\shared\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\session\chat\ChatControllerStreaming.cpp">
+      <Filter>src\shared\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\session\chat\ChatControllerInteraction.cpp">
+      <Filter>src\shared\common\session</Filter>
+    </ClCompile>
+    <ClCompile Include="src\shared\common\session\chat\ChatControllerModels.cpp">
       <Filter>src\shared\common\session</Filter>
     </ClCompile>
     <ClCompile Include="src\shared\common\agent\ToolsFilter.cpp">

@@ -15,12 +15,12 @@ Item {
     id: traceRoot
 
     property int selectedIndex: -1   // 当前打开检查面板的行（-1 = 收起）
-    property string selectedDetail: ""   // 选中时把这一行的角色值抄一份出来 —— 检查面板不用再按 index 回查模型（省掉角色编号魔法值）
-    property string selectedMeta: ""
+    property string selectedDetail: ""   // 选中行的角色值副本：检查面板不必按 index 回查模型（省掉角色编号魔法值）
+    property string selectedMeta: ""   // 检查面板标题行的时间/序号附注
 
-    readonly property var summary: Hub.traceSummary
+    readonly property var summary: Hub.traceSummary   // 顶部汇总快照：轮次/步骤/工具/token/耗时
 
-    property bool followBottom: true
+    property bool followBottom: true   // 是否贴底跟随新记录（滚轮或拖动离开底部即关闭）
 
     // 列表宽度是否正被外层驱动（右栏开合 / 拖右栏宽度；Shell 注入 shell.contentWidthDriven）。
     // 与 MessageListView 同一语义：动画期间宽度持续在变，旧行为是每次变化都重排后立刻 pinToBottom
@@ -43,7 +43,7 @@ Item {
     }
     onWidthAnimatingChanged: if (!widthAnimating) scheduleFollowPin()
 
-    function pinToBottom() {
+    function pinToBottom() {   // 外部触发一次贴底（会话切换 / 宽度落定后）
         list.pinBottom()
     }
 
@@ -68,6 +68,7 @@ Item {
         selectedIndex = index
     }
 
+    // 顶部汇总条：轮次 / 步骤 / 工具 / token / 耗时
     Item {
         id: summaryBar
 
@@ -124,6 +125,7 @@ Item {
         }
     }
 
+    // 轨迹列表：跟随、贴底与滚轮/拖动判定都在这一层
     ListView {
         id: list
 
@@ -183,9 +185,9 @@ Item {
 
         property real pinTargetY: -1         // 上一次贴底落点（真实底部；-1 = 还不知道）
         property bool pinning: false         // 贴底过程中：此时 contentY 的变化不算"用户滚动"
-        property bool clampingY: false
+        property bool clampingY: false       // 夹取 contentY 期间：同样跳过"用户滚动"判定
         property int pinAttempts: 0
-        readonly property int pinRetryLimit: 12
+        readonly property int pinRetryLimit: 12   // 逐帧逼近的最多帧数，超了按已建区域底收尾
 
         function pinBottom() {
             if (widthAnimating)          // 动画期间不每帧贴底，落定后 onWidthAnimatingChanged 补
@@ -233,7 +235,7 @@ Item {
             pinning = false
         }
 
-        readonly property real wheelStepPx: 120
+        readonly property real wheelStepPx: 120   // 一格滚轮（angleDelta 120）换算的像素步长
         property real wheelTargetY: -1
 
         NumberAnimation {
@@ -327,6 +329,7 @@ Item {
         onCountChanged: traceRoot.scheduleFollowPin()
         onHeightChanged: traceRoot.scheduleFollowPin()
 
+        // 行委托分三类：turn（轮次头）、step（步骤头）、其余按记录画（徽标 + 两行文字 + 右侧指标）。
         delegate: Item {
             id: rowRoot
 
@@ -547,11 +550,7 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: traceRoot.selectRow(
-                        rowRoot.index,
-                        rowRoot.detail,
-                        rowRoot.timeText + "  ·  seq " + rowRoot.seq
-                            + (rowRoot.durationText ? "  ·  " + rowRoot.durationText : ""))
+                    onClicked: traceRoot.selectRow(rowRoot.index, rowRoot.detail, rowRoot.timeText + "  ·  seq " + rowRoot.seq + (rowRoot.durationText ? "  ·  " + rowRoot.durationText : ""))
                 }
             }
         }
@@ -566,6 +565,7 @@ Item {
         }
     }
 
+    // 检查面板：右侧浮层，显示选中记录的原文 JSON（自带 MouseArea 挡住点击穿透）。
     Rectangle {
         id: detailPane
 
@@ -648,6 +648,7 @@ Item {
                 maximumLineCount: 1
             }
 
+            // 原文视图：只读等宽，长行按任意位置折行
             Flickable {
                 id: detailScroll
 
@@ -682,6 +683,7 @@ Item {
                 }
             }
 
+            // 底部：复制整份原文
             Item {
                 id: copyBar
                 anchors.left: parent.left
@@ -724,6 +726,7 @@ Item {
         }
     }
 
+    // 角色 → 本地化名（列表徽标与检查面板共用）
     function kindLabel(kind) {
         switch (kind) {
         case "turn": return qsTrId("trace_kind_turn")
@@ -740,6 +743,7 @@ Item {
         }
     }
 
+    // 徽标底色：失败一律危险底色，其余按角色区分
     function kindTint(kind, statusKind) {
         if (statusKind === "error")
             return Theme.color.dangerBg
@@ -751,6 +755,7 @@ Item {
         }
     }
 
+    // 徽标文字色：用户消息用主文字色，其余用次级色
     function kindTextColor(kind) {
         return kind === "user" ? Theme.color.textPrimary : Theme.color.textSecondary
     }

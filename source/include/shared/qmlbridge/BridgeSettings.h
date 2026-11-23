@@ -2,6 +2,7 @@
 // QML 暴露面：组合 common 服务，不继承、不持有 Hub。
 #include "qmlbridge/BridgeCommon.h"
 #include "qmlbridge/BridgeUlinCoreSettings.h"
+
 class SettingsBridge : public QObject
 {
 	Q_OBJECT
@@ -78,24 +79,17 @@ public:
 	{
 		m_controller->discover(provider, apiKey);
 	}
-	Q_INVOKABLE void addModel(const QString& provider, const QString& modelId,
-		const QString& displayName)
+	Q_INVOKABLE void addModel(const QString& provider, const QString& modelId, const QString& displayName)
 	{
 		m_controller->addModel(provider, modelId, displayName);
 	}
-	Q_INVOKABLE void createCustomProvider(const QString& route, const QString& displayName,
-		const QString& baseUrl, const QString& api, const QString& modelId,
-		const QString& modelName, const QString& apiKey)
+	Q_INVOKABLE void createCustomProvider(const QString& route, const QString& displayName, const QString& baseUrl, const QString& api, const QString& modelId, const QString& modelName, const QString& apiKey)
 	{
-		m_controller->createCustomProvider(route, displayName, baseUrl, api,
-			modelId, modelName, apiKey);
+		m_controller->createCustomProvider(route, displayName, baseUrl, api, modelId, modelName, apiKey);
 	}
-	Q_INVOKABLE void submitModelForm(const QString& provider, const QString& modelId,
-		const QString& displayName, const QString& contextWindow, const QString& maxTokens,
-		const QString& efforts, const QString& apiKey)
+	Q_INVOKABLE void submitModelForm(const QString& provider, const QString& modelId, const QString& displayName, const QString& contextWindow, const QString& maxTokens, const QString& efforts, const QString& apiKey)
 	{
-		m_controller->submitModelForm(provider, modelId, displayName,
-			contextWindow, maxTokens, efforts, apiKey);
+		m_controller->submitModelForm(provider, modelId, displayName, contextWindow, maxTokens, efforts, apiKey);
 	}
 	Q_INVOKABLE QString routeHint(const QString& provider) const
 	{

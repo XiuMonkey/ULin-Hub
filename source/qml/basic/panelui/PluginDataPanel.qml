@@ -1,5 +1,5 @@
-// 右栏「插件数据」块的宿主外壳（PanelBarDockModel kind = pluginData）。
-// 只提供容器与空态；内容由扩展挂到 pluginData.host，这里不含 WebEngine。
+// 右栏「插件数据」块宿主（PanelBarDockModel kind = pluginData）：只提供容器与空态，
+// 内容由扩展挂到 pluginData.host，不含 WebEngine。
 
 import QtQuick
 import ULinHub 1.0

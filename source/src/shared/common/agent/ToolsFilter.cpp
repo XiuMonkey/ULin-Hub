@@ -102,6 +102,7 @@ QString ToolsFilter::defaultDirectoryName()
 	return QString::fromLatin1(kDefaultDirectoryName);
 }
 
+// 把插件返回的工具列表与已存配置合成目录视图：配置里的目录/可见性是权威，插件目录只作新条目的初始归属。
 QVector<ToolsFilter::Directory> ToolsFilter::buildDirectories(const QJsonArray& tools, const QJsonObject& storedConfig)
 {
 	QVector<Directory> directories;
@@ -131,8 +132,7 @@ QVector<ToolsFilter::Directory> ToolsFilter::buildDirectories(const QJsonArray& 
 		if (directory.isEmpty())
 			continue;
 
-		const QString name = normalizedDirectoryName(
-			directory.value(QStringLiteral("DirectoryName")).toString());
+		const QString name = normalizedDirectoryName(directory.value(QStringLiteral("DirectoryName")).toString());
 		const QString key = name.toLower();
 		const bool isNewDirectory = !indexByKey.contains(key);
 		const int index = ensureDirectory(name);
@@ -170,11 +170,11 @@ QVector<ToolsFilter::Directory> ToolsFilter::buildDirectories(const QJsonArray& 
 		const auto stored = storedVisible.constFind(entry.name);
 		entry.visible = stored == storedVisible.constEnd() ? true : stored.value();
 
-		// 工具归到哪个目录：**找，找不到再新建**。三级回退，顺序不能反：
-		// ① 已存配置的归属（配置是权威 —— 用户在界面上改过的分组不能因为插件换了分组就复位）
+		// 工具归到哪个目录：找，找不到再新建。三级回退，顺序不能反：
+		// ① 已存配置的归属（配置是权威 —— 用户改过的分组不能因为插件换了分组就复位）
 		// ② 插件随 tools[] 给的 directory（新装的工具、配置里还没有它）
 		// ③ 内置功能表 / Default（兜底）
-		// ⚠️ 这里**不能**把 index 预置成 defaultIndex：那样会直接命中 Default，永远走不到上面的匹配分支。
+		// ⚠️ index 不能预置成 defaultIndex：那样会直接命中 Default，走不到上面的匹配分支。
 		int index = -1;
 		if (autoGroup) {
 			QString directory = tool.value(QStringLiteral("directory")).toString().trimmed();
@@ -227,8 +227,7 @@ QJsonArray ToolsFilter::buildToolsList(const QVector<Tool>& tools)
 	return list;
 }
 
-QJsonObject ToolsFilter::buildDocument(const QVector<Directory>& directories, bool dropGuidance,
-	const QStringList& hideContexts)
+QJsonObject ToolsFilter::buildDocument(const QVector<Directory>& directories, bool dropGuidance, const QStringList& hideContexts)
 {
 	QJsonArray filterList;
 	for (const Directory& directory : directories) {
@@ -257,6 +256,7 @@ QJsonObject ToolsFilter::buildDocument(const QVector<Directory>& directories, bo
 	return document;
 }
 
+// 摊平成目录头 + 工具行，供 ListView 直接消费；折叠的目录只留头部行。
 void ToolsFilter::rebuildRows()
 {
 	beginResetModel();
@@ -541,8 +541,7 @@ void ToolsFilter::refresh(const QString& sessionId)
 			return;
 		}
 
-		setStatus(qtTrId("toolfilter_summary_full_fmt")
-			.arg(totalCount()).arg(m_directories.size()).arg(totalCount() - visibleCount()));
+		setStatus(qtTrId("toolfilter_summary_full_fmt").arg(totalCount()).arg(m_directories.size()).arg(totalCount() - visibleCount()));
 		statusSummaryOrEmpty();
 	});
 }
@@ -554,8 +553,7 @@ void ToolsFilter::statusSummaryOrEmpty()   // 目录为空 / 服务器只答出�
 		return;
 	}
 
-	QString text = qtTrId("toolfilter_summary_full_fmt")
-		.arg(totalCount()).arg(m_directories.size()).arg(totalCount() - visibleCount());
+	QString text = qtTrId("toolfilter_summary_full_fmt").arg(totalCount()).arg(m_directories.size()).arg(totalCount() - visibleCount());
 	if (m_degraded)
 		text += qtTrId("toolfilter_global_layer_only_suffix");
 	setStatus(text);

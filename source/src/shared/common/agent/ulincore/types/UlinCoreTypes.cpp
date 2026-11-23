@@ -5,6 +5,7 @@
 
 namespace UlinCore
 {
+// 落 JSON 时采用 OpenAI 兼容的角色名，工具结果记为 tool。
 QString roleName(Role role)
 {
 	switch (role) {
@@ -75,15 +76,15 @@ Message Message::fromJson(const QJsonObject& json)
 	message.role = roleFromName(json.value(QStringLiteral("role")).toString());
 	message.text = json.value(QStringLiteral("text")).toString();
 	message.thinking = json.value(QStringLiteral("thinking")).toString();
+	// 优先读 intentCalls，旧数据回退到 toolCalls。
 	const QJsonArray calls = json.value(QStringLiteral("intentCalls")).toArray().isEmpty()
 		? json.value(QStringLiteral("toolCalls")).toArray()
 		: json.value(QStringLiteral("intentCalls")).toArray();
 	for (const QJsonValue& value : calls)
 		message.intentCalls.append(IntentCall::fromJson(value.toObject()));
-	message.intentCallId = json.value(QStringLiteral("intentCallId")).toString(
-		json.value(QStringLiteral("toolCallId")).toString());
-	message.intentName = json.value(QStringLiteral("intentName")).toString(
-		json.value(QStringLiteral("toolName")).toString());
+	// 兼容旧字段名 toolCallId / toolName，读不到新字段时回退。
+	message.intentCallId = json.value(QStringLiteral("intentCallId")).toString(json.value(QStringLiteral("toolCallId")).toString());
+	message.intentName = json.value(QStringLiteral("intentName")).toString(json.value(QStringLiteral("toolName")).toString());
 	message.isError = json.value(QStringLiteral("isError")).toBool();
 	message.createdAt = static_cast<qint64>(json.value(QStringLiteral("createdAt")).toDouble());
 	return message;
@@ -152,6 +153,7 @@ ExecuteResult ExecuteResult::success(const QString& content, const QJsonObject& 
 	return result;
 }
 
+// 失败结果同时保留 error 与 "error: ..." 文本，便于直接回灌模型。
 ExecuteResult ExecuteResult::failure(const QString& error)
 {
 	ExecuteResult result;

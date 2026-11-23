@@ -24,8 +24,7 @@ public:
 	QString errorString() const;
 
 	// 主动向某个连接的客户端发送 JSON 响应（协议：JSON + '\n'）
-	void sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result,
-		const QString& error = QString());
+	void sendResponse(QLocalSocket* socket, int id, bool ok, const QJsonObject& result, const QString& error = QString());
 
 signals:
 	// 收到一个完整的请求行（JSON 已被解析）
@@ -40,7 +39,7 @@ private:
 	void handleLine(QLocalSocket* socket, const QByteArray& line);
 
 	QLocalServer* m_server = nullptr;
-	QHash<QLocalSocket*, QByteArray> m_buffers;
+	QHash<QLocalSocket*, QByteArray> m_buffers;   // 每个连接尚未消费完的接收字节（按 '\n' 切成请求行）
 	QString m_pipeName;
 	QString m_errorString;
 };

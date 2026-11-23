@@ -19,6 +19,7 @@
 
 namespace
 {
+	// 一道提问在面板上的控件状态：单选组、复选按钮或自由输入三选一。
 	struct UiQuestion
 	{
 		QString id;
@@ -36,6 +37,7 @@ namespace
 		return array;
 	}
 
+	// 交互面板外壳：问答与审批共用同一套外观。
 	QWidget* createInteractionPanel(QVBoxLayout* layout)
 	{
 		auto* panel = new QWidget;
@@ -50,6 +52,7 @@ namespace
 		return panel;
 	}
 
+	// 单道问题的卡片容器。
 	QFrame* createQuestionCard(QWidget* panel, QVBoxLayout* panelLayout)
 	{
 		auto* card = new QFrame(panel);
@@ -65,6 +68,7 @@ namespace
 	}
 } // namespace
 
+// 把 ask 帧渲染成提问面板；帧字段不全时返回 nullptr，调用方不插入面板。
 QWidget* InteractionHandler::handleQuestion(const QJsonObject& frame, DshApiClient* api, QVBoxLayout* layout)
 {
 	if (!api || !layout)
@@ -151,6 +155,7 @@ QWidget* InteractionHandler::handleQuestion(const QJsonObject& frame, DshApiClie
 	auto* submitButton = new QPushButton(qtTrId("ask_submit_answer"), panel);
 	panelLayout->addWidget(submitButton, 0, Qt::AlignRight);
 
+	// 收集每题已勾选项与自定义输入，一次性 respond，然后销毁面板。
 	QObject::connect(submitButton, &QPushButton::clicked, panel, [panel, api, rpcId, sessionId, uiQuestions]() {
 		QJsonObject answerPayload;
 		answerPayload.insert(QStringLiteral("sessionId"), sessionId);
@@ -187,6 +192,7 @@ QWidget* InteractionHandler::handleQuestion(const QJsonObject& frame, DshApiClie
 	return panel;
 }
 
+// 工具审批面板：只有"允许一次 / 拒绝"两种结果。
 QWidget* InteractionHandler::handleApproval(const QJsonObject& frame, DshApiClient* api, QVBoxLayout* layout)
 {
 	if (!api || !layout)

@@ -30,7 +30,7 @@
 #endif
 
 namespace {
-	constexpr int kResizeBorder = 5;
+	constexpr int kResizeBorder = 5;   // 边缘缩放热区宽度（逻辑像素）
 
 	// 读原生句柄：**只有平台窗口已经存在时才读**（QWindow::winId() 在没有平台窗口时会强制创建它 ——
 	// 窗口关闭/销毁之后再调就变成"反复重建 → CreateWindowEx 失败"的风暴，表现为关不掉的窗口）。
@@ -270,8 +270,7 @@ QWindow* NativeWindowFilter::findByHwnd(void* hwnd)
 	return nullptr;
 }
 
-const NativeWindowFilter::ControlEntry* NativeWindowFilter::windowControlAt(QWindow* window,
-	const QPoint& logicalPos) const
+const NativeWindowFilter::ControlEntry* NativeWindowFilter::windowControlAt(QWindow* window, const QPoint& logicalPos) const
 {
 	for (const ControlEntry& entry : m_windowControls) {
 		if (!entry.item || !entry.item->isVisible())
@@ -394,9 +393,9 @@ bool NativeWindowFilter::nativeEventFilter(const QByteArray& eventType, void* me
 		}
 		break;
 	case WM_NCHITTEST: {
-		// WM_NCHITTEST 的 lParam 是**屏幕物理像素**，QML 几何是逻辑像素，必须先换算，
-		// 否则整块窗口都成了缩放热区。
-		// 物理客户区对不上；直接用"窗口自身的物理客户区宽度 / 逻辑宽度"自校准，永远一致。
+		// WM_NCHITTEST 的 lParam 是屏幕物理像素，QML 几何是逻辑像素，必须先换算，
+		// 否则整块窗口都成了缩放热区。DPI 缩放从系统取不可靠，这里用"物理客户区宽度 /
+		// 逻辑宽度"自校准，保证与窗口自身一致。
 		const POINTS point = MAKEPOINTS(msg->lParam);
 		POINT nativePoint{ point.x, point.y };
 		ScreenToClient(msg->hwnd, &nativePoint);

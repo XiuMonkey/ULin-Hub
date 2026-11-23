@@ -12,24 +12,17 @@ AgentSessionClient::AgentSessionClient(DshApiClient* api, QObject* parent)
 {
 	if (!m_api)
 		return;
-	connect(m_api, &DshApiClient::genericStreamItem,
-		this, &AgentSessionClient::onGenericStreamItem);
-	connect(m_api, &DshApiClient::genericStreamEnded,
-		this, &AgentSessionClient::onGenericStreamEnded);
-	connect(m_api, &DshApiClient::connected,
-		this, &AgentSessionClient::onConnected);
+	connect(m_api, &DshApiClient::genericStreamItem, this, &AgentSessionClient::onGenericStreamItem);
+	connect(m_api, &DshApiClient::genericStreamEnded, this, &AgentSessionClient::onGenericStreamEnded);
+	connect(m_api, &DshApiClient::connected, this, &AgentSessionClient::onConnected);
 	// 接管态：扩展直接调 VirtualMain::HandleSessionSnapshot / ForwardMuxFrame，
 	// 通讯层只做信号转发；这里接到本类，保证接管与真实 DSH 走同一套 UI 消费入口。
-	connect(m_api, &DshApiClient::sessionSnapshotReady,
-		this, &AgentSessionClient::sessionSnapshotReady);
-	connect(m_api, &DshApiClient::sessionProjectionsReady,
-		this, &AgentSessionClient::sessionProjectionsReady);
-	connect(m_api, &DshApiClient::muxFrameReceived,
-		this, &AgentSessionClient::muxFrameReceived);
+	connect(m_api, &DshApiClient::sessionSnapshotReady, this, &AgentSessionClient::sessionSnapshotReady);
+	connect(m_api, &DshApiClient::sessionProjectionsReady, this, &AgentSessionClient::sessionProjectionsReady);
+	connect(m_api, &DshApiClient::muxFrameReceived, this, &AgentSessionClient::muxFrameReceived);
 }
 
-void AgentSessionClient::followSession(const QString& sessionId, const QString& parentSessionId,
-	const QString& mode)
+void AgentSessionClient::followSession(const QString& sessionId, const QString& parentSessionId, const QString& mode)
 {
 	if (!m_api || sessionId.isEmpty())
 		return;
@@ -49,8 +42,7 @@ void AgentSessionClient::followSession(const QString& sessionId, const QString& 
 
 	qInfo().noquote() << "[AgentSession] follow target =" << sessionId
 		<< (parentSessionId.isEmpty() ? QStringLiteral("(session)")
-			: QStringLiteral("(subagent of %1, mode=%2)").arg(parentSessionId,
-				mode.isEmpty() ? QStringLiteral("unknown") : mode));
+			: QStringLiteral("(subagent of %1, mode=%2)").arg(parentSessionId, mode.isEmpty() ? QStringLiteral("unknown") : mode));
 	openSessionStreams();
 }
 
@@ -69,27 +61,21 @@ void AgentSessionClient::unfollowSession()
 	m_followedMode.clear();
 }
 
-void AgentSessionClient::pageSession(const QString& sessionId, int throughSeq, int maxMessages,
-	int beforeSeq, std::function<void(const QJsonObject&)> onSuccess,
-	std::function<void(const DshApiClient::RpcError&)> onError)
+void AgentSessionClient::pageSession(const QString& sessionId, int throughSeq, int maxMessages, int beforeSeq, std::function<void(const QJsonObject&)> onSuccess, std::function<void(const DshApiClient::RpcError&)> onError)
 {
 	if (!m_api)
 		return;
 	const bool sameTarget = sessionId == m_followedSessionId;
 	const QString parentSessionId = sameTarget ? m_followedParentSessionId : QString();
 	const QString mode = sameTarget ? m_followedMode : QString();
-	m_api->callMethod(QStringLiteral("session/page"),
-		SessionCommands::sessionPage(sessionId, throughSeq, maxMessages, beforeSeq,
-			parentSessionId, mode),
-		std::move(onSuccess), std::move(onError));
+	m_api->callMethod(QStringLiteral("session/page"), SessionCommands::sessionPage(sessionId, throughSeq, maxMessages, beforeSeq, parentSessionId, mode), std::move(onSuccess), std::move(onError));
 }
 
 void AgentSessionClient::openSessionStreams()
 {
 	if (!m_api || m_resumeFollowId.isEmpty())
 		return;
-	const QJsonObject followArgs = SessionCommands::sessionFollow(
-		m_resumeFollowId, m_resumeFollowParent, m_resumeFollowMode);
+	const QJsonObject followArgs = SessionCommands::sessionFollow(m_resumeFollowId, m_resumeFollowParent, m_resumeFollowMode);
 	m_sessionStreamId = m_api->openGenericStream(QStringLiteral("session/follow"), followArgs);
 
 	QJsonObject jobsRequest;
@@ -139,10 +125,10 @@ void AgentSessionClient::handleSessionItem(const QJsonObject& frame)
 	const QString type = frame.value(QStringLiteral("type")).toString();
 	const QString sessionId = m_followedSessionId;
 
+	// follow 流首帧快照：records 与 cursor/hasMore 一起交给上层重建时间线。
 	if (type == QStringLiteral("snapshot")) {
 		const int cursor = frame.value(QStringLiteral("cursor")).toInt();
-		const QJsonArray records = SessionCommands::legacyRecords(
-			frame.value(QStringLiteral("records")).toArray());
+		const QJsonArray records = SessionCommands::legacyRecords(frame.value(QStringLiteral("records")).toArray());
 		const bool hasMore = frame.value(QStringLiteral("hasMore")).toBool();
 
 		qInfo().noquote() << "[AgentSession] session snapshot sessionId=" << sessionId
@@ -150,9 +136,7 @@ void AgentSessionClient::handleSessionItem(const QJsonObject& frame)
 
 		const QJsonObject projections = frame.value(QStringLiteral("projections")).toObject();
 		if (!projections.isEmpty()) {
-			emit sessionProjectionsReady(sessionId,
-				projections.value(QStringLiteral("asOfSeq")).toInt(),
-				projections.value(QStringLiteral("values")).toObject());
+			emit sessionProjectionsReady(sessionId, projections.value(QStringLiteral("asOfSeq")).toInt(), projections.value(QStringLiteral("values")).toObject());
 		}
 		emit sessionSnapshotReady(sessionId, cursor, records, hasMore);
 		return;
@@ -163,14 +147,13 @@ void AgentSessionClient::handleSessionItem(const QJsonObject& frame)
 		if (event.isEmpty())
 			return;
 		const QJsonObject surfaceOp = event.value(QStringLiteral("surfaceOp")).toObject();
+		// surfaceOp=replace 表示整表替换：按 seq 重取一页记录覆盖列表，而不是追加。
 		if (surfaceOp.value(QStringLiteral("op")).toString() == QStringLiteral("replace")) {
 			const int cursor = event.value(QStringLiteral("seq")).toInt();
 			pageSession(sessionId, cursor, 200, 0,
 				[this, sessionId, cursor](const QJsonObject& page) {
-					const QJsonArray records = SessionCommands::legacyRecords(
-						page.value(QStringLiteral("records")).toArray());
-					emit sessionSnapshotReady(sessionId, cursor, records,
-						page.value(QStringLiteral("hasMore")).toBool());
+					const QJsonArray records = SessionCommands::legacyRecords(page.value(QStringLiteral("records")).toArray());
+					emit sessionSnapshotReady(sessionId, cursor, records, page.value(QStringLiteral("hasMore")).toBool());
 				},
 				[this](const DshApiClient::RpcError& error) {
 					qWarning().noquote() << "[AgentSession] replacement page refresh failed:"
@@ -182,6 +165,7 @@ void AgentSessionClient::handleSessionItem(const QJsonObject& frame)
 		return;
 	}
 
+	// 流式分片包成与历史记录同形的 assistant/chunk 事件后转发。
 	if (type == QStringLiteral("assistant-stream")) {
 		const QJsonObject streamFrame = frame.value(QStringLiteral("frame")).toObject();
 		if (streamFrame.value(QStringLiteral("type")).toString() == QStringLiteral("chunk")) {
@@ -200,6 +184,7 @@ void AgentSessionClient::handleSessionItem(const QJsonObject& frame)
 
 void AgentSessionClient::handleJobsItem(const QJsonObject& frame)
 {
+	// job/list 只有 rows 帧带名册，其他类型忽略。
 	if (frame.value(QStringLiteral("type")).toString() != QStringLiteral("rows"))
 		return;
 	emit jobRosterReady(frame.value(QStringLiteral("jobs")).toArray());

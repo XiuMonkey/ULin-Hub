@@ -1,9 +1,5 @@
-// 模态弹窗：遮罩 + 居中 + 标题栏 + 关闭按钮 + 进出场淡入淡出。
-// 取代 PopupWindow/StatusPopupWindow 与 common/WindowFrame 的"铺遮罩 + 居中"那套（QML 里
-// 遮罩由 Overlay.modal 负责，不需要宿主再算几何）。
-// 用法：
-// AppPopup { id: p; title: "设置"; bodyWidth: 560; bodyHeight: 420; contentComponent: ... }
-// p.open()
+// 模态弹窗：遮罩 + 居中 + 标题栏 + 关闭按钮 + 进出场淡入淡出，遮罩由 Overlay.modal 负责。
+// 用法：AppPopup { id: p; title: "设置"; bodyWidth: 560; bodyHeight: 420; contentComponent: ... } → p.open()
 
 import QtQuick
 import QtQuick.Controls.Basic

@@ -266,9 +266,9 @@ Item {
             required property bool selected
             required property int index
 
-            // UpdatedAtRole（role 名 "updatedAtMs"，qint64）：
+            // UpdatedAtRole（role 名 "updatedAtMs"，qint64）：delegate 里不能读 model（会报
             // `ReferenceError: model is not defined`），role 只有声明成 required property 才读得到。
-            // 数值约定：0 = 时间未知（行内不显示时间；undefined 比较也恒为 false）。
+            // 数值约定：0 = 时间未知（行内不显示时间）。
             required property var updatedAtMs
 
             width: list.width
@@ -289,8 +289,7 @@ Item {
                 title: rowRoot.workspaceTitle
                 expanded: rowRoot.expanded
                 sessionCount: rowRoot.sessionCount
-                workspaceColor: sessionBar.workspaceColorFor(
-                    rowRoot.workspaceId.length > 0 ? rowRoot.workspaceId : rowRoot.workspaceTitle)
+                workspaceColor: sessionBar.workspaceColorFor(rowRoot.workspaceId.length > 0 ? rowRoot.workspaceId : rowRoot.workspaceTitle)
                 onToggleRequested: Hub.sessions.toggleWorkspace(rowRoot.workspaceId)
                 onAddSessionRequested: Hub.createSession(rowRoot.workspaceId)
                 onMenuRequested: sessionBar.openRowContext(rowRoot.workspaceId, true, rowRoot.y)
@@ -347,7 +346,7 @@ Item {
                 title: rowRoot.title
                 running: rowRoot.running
                 selected: rowRoot.selected
-                timeText: rowRoot.updatedAtMs > 0   // UpdatedAtRole（role 名 "updatedAtMs"）：0 = 未知（不显示时间）
+                timeText: rowRoot.updatedAtMs > 0   // 0 = 时间未知，与上面 updatedAtMs 的约定一致
                     ? sessionBar.relativeTimeText(rowRoot.updatedAtMs)
                     : ""
                 onSelectRequested: Hub.selectSession(rowRoot.sessionId)
@@ -706,6 +705,7 @@ Item {
         onArchivedSessionsRequested: sessionBar.openArchivedSessions()
     }
 
+    // 行内删除的两步状态：pendingId 非空 = 弹出「删除」小按钮；confirmOpen = 换成确认卡。
     property string pendingId: ""
     property bool pendingIsWorkspace: false
     property real pendingY: 0

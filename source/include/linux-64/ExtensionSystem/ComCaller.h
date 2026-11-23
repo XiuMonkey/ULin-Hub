@@ -1,11 +1,9 @@
 #pragma once
 
-// InterfaceType = "com" 的独立执行器：参数以 JSON 形式传输，执行的是 COM 自动化（IDispatch），
-// 与 DllCaller 的 json/native 风格是并列关系。
-// 组件（ProgId）在 regulation.json5（注册表）的 "Com" 段里白名单式声明，运行时 args 只能控制
-// member / kind(method|get|put) / path / params / value，不能任意指定对象。
-// 返回：成功写入 { "value": <JSON 标量> }（结果为对象时附 "object": true，仅摘要）；失败 invoke 返回 false、
-// error 给出可读信息。当前仅支持无状态的“一次一调”，无对象句柄保活。
+// InterfaceType = "com" 的独立执行器：参数以 JSON 形式传输，执行 COM 自动化（IDispatch），与 DllCaller 的 json/native 风格并列。
+// 组件（ProgId）在 regulation.json5 的 "Com" 段白名单式声明，运行时 args 只能控制 member / kind(method|get|put) / path / params / value。
+// 返回：成功写入 { "value": <JSON 标量> }（结果为对象时附 "object": true，仅摘要）；失败返回 false、error 给出可读信息。
+// Linux 没有 COM/IDispatch：本平台的 invoke 恒失败并写明原因，接口形状与 Windows 版保持一致。
 
 #include <QJsonObject>
 #include <QString>

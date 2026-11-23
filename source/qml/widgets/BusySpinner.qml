@@ -1,4 +1,4 @@
-// 转圈指示器：Canvas 画一段圆弧 + 旋转动画。取代手绘的 SpinnerWidget。
+// 转圈指示器：Canvas 画一段圆弧 + 旋转动画。
 // 不依赖 QtQuick.Shapes（少一个部署模块），Canvas 只画一次、转的是整个 item。
 
 import QtQuick
@@ -17,9 +17,8 @@ Item {
     onColorChanged: canvas.requestPaint()
     onLineWidthChanged: canvas.requestPaint()
 
-    // 所在页面若声明了 overlayAnimating（PageOverlay 会把它绑到"卡片正在展开/收起"），
-    // 动画展示期间就**静止不转**：那段时间帧预算全给动画，转圈只会抢帧。
-    // 沿父链找，所以不用每个页面各自传入（漏一个就白改）。
+    // 沿父链找 overlayAnimating（PageOverlay 把它绑到"卡片正在展开/收起"）：动画期间静止不转，
+    // 帧预算全给动画；沿父链找，免得每个页面各自传入而漏掉。
     readonly property bool pageAnimating: {
         let p = root.parent
         while (p) {
@@ -30,8 +29,7 @@ Item {
         return false
     }
 
-    // ⚠️ 转的是**这个外层容器**，不是 Canvas 本身：Qt Quick 里对 Canvas 做旋转会让它每帧
-    // 只是变换矩阵，代价几乎为零，外观完全一样。
+    // 转的是外层容器而不是 Canvas 本身：旋转只走 Item 变换，Canvas 只在尺寸/颜色变化时重绘。
     Item {
         id: rotor
         anchors.fill: parent
@@ -67,10 +65,8 @@ Item {
         duration: 900
         loops: Animation.Infinite
 
-                // 只在**真正可见**时才转：running 默认 true，而这里是一条 Animation.Infinite ——
-                // 页面被遮住/收起（visible=false）时动画仍会继续跑，白烧 CPU 并抢帧（插件市场/扩展管理
-                // 这类"页 + 转圈"的界面打开时不流畅就是这个原因）。门控在组件里做，比让每个页面自己
-                // 声明 overlayAnimating 更不容易漏。
+        // 只在真正可见时才转：running 默认 true 且 loops 无限，页面被遮住时仍会空转，白烧 CPU 抢帧。
+        // 门控放在组件里，比让每个页面各自声明 overlayAnimating 更不容易漏。
         running: root.running && root.visible && !root.pageAnimating
     }
 }

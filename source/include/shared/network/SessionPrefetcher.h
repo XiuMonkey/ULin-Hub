@@ -32,5 +32,5 @@ signals:
 
 private:
 	DshApiClient* m_api = nullptr;
-	QSet<QString> m_inFlight;
+	QSet<QString> m_inFlight;   // 已发出、还没回调的会话，用来避免同一会话重复预取
 };

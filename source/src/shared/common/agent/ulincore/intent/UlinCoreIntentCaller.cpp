@@ -14,8 +14,7 @@ thread_local int g_executorDepth = 0;
 constexpr int kMaxExecutorDepth = 32;
 }
 
-UlinCoreIntentCaller::UlinCoreIntentCaller(Intent intent, UlinCoreNativeRegistry* executors,
-	IntentResolver resolver)
+UlinCoreIntentCaller::UlinCoreIntentCaller(Intent intent, UlinCoreNativeRegistry* executors, IntentResolver resolver)
 	: m_intent(std::move(intent))
 	, m_executors(executors)
 	, m_resolve(std::move(resolver))
@@ -24,6 +23,7 @@ UlinCoreIntentCaller::UlinCoreIntentCaller(Intent intent, UlinCoreNativeRegistry
 
 IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const ExecutorContext& context)
 {
+	// 递归深度上限，防止 chain 自引用无限展开。
 	if (g_executorDepth >= kMaxExecutorDepth)
 		return IntentResult::failure(QStringLiteral("intent execution recursion limit reached"));
 	if (!m_executors)
@@ -40,11 +40,9 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 		// 不做去前缀回退：拼错或注册错误必须立即暴露，避免与同名用户执行器混淆。
 		const auto executor = m_executors->findShared(original);
 		if (!executor)
-			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
-				.arg(m_intent.name, m_intent.executor));
+			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2").arg(m_intent.name, m_intent.executor));
 		if (!executor)
-			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
-				.arg(m_intent.name, m_intent.executor));
+			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2").arg(m_intent.name, m_intent.executor));
 
 		++g_executorDepth;
 		const ExecuteResult result = executor->execute(arguments, context);
@@ -63,15 +61,13 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 		const Intent target = m_resolve ? m_resolve(step.intent) : Intent();
 		if (target.name.isEmpty()) {
 			--g_executorDepth;
-			return IntentResult::failure(QStringLiteral("unknown intent in recipe %1: %2")
-				.arg(m_intent.name, step.intent));
+			return IntentResult::failure(QStringLiteral("unknown intent in recipe %1: %2").arg(m_intent.name, step.intent));
 		}
 		UlinCoreIntentCaller nested(target, m_executors, m_resolve);
 		const IntentResult result = nested.call(resolveBindings(step.arguments, arguments), context);
 		if (!result.ok) {
 			--g_executorDepth;
-			return IntentResult::failure(result.error.isEmpty()
-				? QStringLiteral("step failed: %1").arg(step.intent) : result.error);
+			return IntentResult::failure(result.error.isEmpty() ? QStringLiteral("step failed: %1").arg(step.intent) : result.error);
 		}
 		if (!result.content.isEmpty())
 			output.append(result.content);

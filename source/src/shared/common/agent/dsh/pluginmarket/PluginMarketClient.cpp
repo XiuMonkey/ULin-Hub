@@ -1,4 +1,4 @@
-﻿#include <QUrlQuery>
+#include <QUrlQuery>
 #include "common/agent/dsh/pluginmarket/PluginMarketClient.h"
 
 #include <QDebug>
@@ -38,6 +38,7 @@ void PluginMarketClient::setAuthToken(const QString& token)
 {
 	m_authToken = token;
 }
+
 void PluginMarketClient::setNetworkAccessManager(QNetworkAccessManager* nam)
 {
 	if (!nam || nam == m_nam)
@@ -47,6 +48,7 @@ void PluginMarketClient::setNetworkAccessManager(QNetworkAccessManager* nam)
 	if (old)
 		old->deleteLater();
 }
+
 PluginMarketClient::PluginMarketClient(QObject* parent)
 	: QObject(parent)
 	, m_nam(new QNetworkAccessManager(this))
@@ -121,10 +123,8 @@ void PluginMarketClient::fetchRegistry()
 	QNetworkRequest request(endpointUrl(path));
 	qInfo().noquote() << "[Market] GET" << path;
 
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	// 必须设超时：引擎接了连接却不回（插件未加载、路由挂住）时会一直悬着，界面永远停在"正在等待最新数据"；
+	// 超时即失败并退回快照。
 	request.setTransferTimeout(180000);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
@@ -149,7 +149,7 @@ void PluginMarketClient::fetchRegistry()
 		const QJsonArray plugins = root.value(QStringLiteral("registry")).toObject()
 			.value(QStringLiteral("plugins")).toArray();
 
-		if (plugins.isEmpty())   // 契约没满足就喊出来：这类"静默 0 个插件"过去只能靠猜，这里把状态码/字节数/响应开头都打出来
+		if (plugins.isEmpty())   // 契约没满足就喊出来：这类"静默 0 个插件"过去只能靠猜，把状态码/字节数/响应开头都打出来
 			qWarning().noquote() << "[PluginMarketClient] registry payload unexpected"
 			<< "status=" << status << "bytes=" << raw.size() << "body=" << bodyPreview(raw);
 
@@ -195,10 +195,8 @@ void PluginMarketClient::fetchInstalled()
 	QNetworkRequest request(endpointUrl(path));
 	qInfo().noquote() << "[Market] GET" << path;
 
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	// 必须设超时：引擎接了连接却不回（插件未加载、路由挂住）时会一直悬着，界面永远停在"正在等待最新数据"；
+	// 超时即失败并退回快照。
 	request.setTransferTimeout(180000);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
@@ -268,8 +266,7 @@ void PluginMarketClient::post(const QString& path, const QJsonObject& body)
 	request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 	request.setRawHeader("Origin", originOf(m_baseUrl).toString().toUtf8());   // 市场服务端要求同源（Origin 的 host 必须等于 Host）；用纯 origin，别把令牌带进去
 
-	qInfo().noquote() << QStringLiteral("[Market] POST %1 body=%2")
-		.arg(path, QString::fromUtf8(QJsonDocument(body).toJson(QJsonDocument::Compact)));
+	qInfo().noquote() << QStringLiteral("[Market] POST %1 body=%2").arg(path, QString::fromUtf8(QJsonDocument(body).toJson(QJsonDocument::Compact)));
 
 	QNetworkReply* reply = m_nam->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
 	connect(reply, &QNetworkReply::finished, this, [this, reply, path]() {
@@ -323,10 +320,7 @@ void PluginMarketClient::fetchDiagnosticLogs(const QString& reason)
 {
 	QNetworkRequest request(endpointUrl(QLatin1String(kLogsPath)));
 
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
-	// 超时必须设：引擎接了连接却不回（例如插件没加载/路由挂住）时，默认会一直悬着 ⇒
-	// 界面上就是永远"正在等待最新数据"。1.5 秒足够一次本地请求，超时即失败 ⇒ 退回快照。
+	// 引擎未响应时避免无限悬着；超时按失败处理，只记日志。
 	request.setTransferTimeout(180000);
 	QNetworkReply* reply = m_nam->get(request);
 	connect(reply, &QNetworkReply::finished, this, [reason, reply]() {

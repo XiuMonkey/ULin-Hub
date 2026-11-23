@@ -1,13 +1,14 @@
+// DSH ModelsPage 的数据适配层：页面结构保持 DSH 原样，只把数据源换成 ULinCore。
 import QtQml
 import ULinHub 1.0
 
-// DSH ModelsPage 的数据适配层：页面结构保持 DSH 原样，只把数据源换成 ULinCore。
 QtObject {
     id: adapter
 
     property var cfg: Hub.settings.ulincoreBridge
     property string formFeedback: ""
 
+        // 对齐 DSH ModelListPage 读取的状态字段（busy/writable/notice/status 等），页面结构不用改
         property bool busy: false
         property bool writable: true
         property string notice: cfg.status
@@ -15,6 +16,7 @@ QtObject {
         property var candidates: []
         property var failures: []
 
+        // 提供商列表：字段名对齐 DSH ModelListPage 的约定，ulincore 下都算已声明且可写
         property var providers: {
             const out = []
             const rows = cfg.providers
@@ -37,6 +39,7 @@ QtObject {
             return out
         }
 
+        // 模型列表：把各提供商的 models 摊平，字段同样对齐 DSH 页面的约定
         property var models: {
             const out = []
             const rows = cfg.providers
@@ -75,12 +78,12 @@ QtObject {
             return null
         }
 
+        // 表单签名沿用 DSH 页面；contextWindow / efforts 目前未写入内核配置。
         function submitModelForm(provider, id, name, contextWindow, maxTokens, efforts, apiKey) {
             if (apiKey && apiKey.length > 0)
                 saveApiKey(provider, apiKey)
             const tokens = parseInt(maxTokens)
-            cfg.addModel(provider, id, name,
-                Number.isNaN(tokens) ? 4096 : tokens, 0.2)
+            cfg.addModel(provider, id, name, Number.isNaN(tokens) ? 4096 : tokens, 0.2)
             formFeedback = "已添加模型 " + id
         }
 
@@ -114,5 +117,4 @@ QtObject {
 
         function supportsThinkingLevels() { return false }
         function routeHint() { return "写入 ULinCore 配置" }
-    
 }

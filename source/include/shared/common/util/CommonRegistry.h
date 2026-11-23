@@ -25,6 +25,7 @@ public:
 	// 不存在或已销毁都返回空 QPointer
 	QPointer<QObject> FindFromRegistry(const QString& index) const;
 
+	// 登记项是否存在；对象已销毁也算不存在
 	bool contains(const QString& index) const;
 
 private:

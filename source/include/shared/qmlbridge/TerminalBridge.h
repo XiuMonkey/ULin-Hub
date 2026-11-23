@@ -1,26 +1,16 @@
 #pragma once
 
 // TerminalBridge —— 右栏面板坞「终端」块的接线层（QML 单例名 `Terminal`）。
-// 为什么是"接线"而不是自绘终端：引擎（@deepseek-ai/dsh-api-terminal-controller）给客户端的只有
-// **原始 PTY 字节流 + 一份序列化的 VT 重放串**（`terminal/follow` 的 snapshot.screen 是
-// @xterm/addon-serialize 的产物），没有任何"单元格网格"接口 —— 自绘等于重写一个 xterm。
-// 所以路线定为：WebEngine 里跑引擎自带包里抽出来的 **xterm.js 6.0.0**，传输留在 C++：
-//  · 页面（qrc:/ULinHub/Terminal/terminal.html）一个网络请求都不发（引擎的信任边界要求
-//  Origin == Host，qrc: 页面发了就是 403 / WS 1006）；
-//  · 本类经既有 DshApiClient 代发 terminal/*（认证 cookie、mux、rpcId 全是现成的）；
-//  · 帧经 QWebChannel 推给页面 term.write，页面 onData 再回来调 write。
-// 调查与证据见 build/temp/terminal-probe/TERMINAL-REPORT.md（§2 契约 / §4 / §5.5 MVP）。
-// 分层：本文件在 qmlbridge/**，不放解析也不放渲染（都在页面里）。它承担的确实是**协议状态**：
-//  ① mount 流程：environment → list（有 running 的就 adopt，否则 shells + create，id 客户端铸、
-//  create 幂等）；② attach：每次换新 attachmentId，**首帧必须是 snapshot**，否则判协议异常重连；
-//  ③ sequence 连续性：gap 视为丢帧（官方客户端也当致命），重连取新快照；
-//  ④ 输入串行化 + maxInputBytes(64KB) 记账；⑤ resize 限幅、同尺寸不发；⑥ close；
-//  ⑦ terminal/control-unavailable 只置只读，不当致命错误。
-// 之所以不收进 common/**：它整体是"贴着 DshApiClient 与 QWebChannel 的接线"，没有能脱离
-// QObject/网络独立单测的纯算法；真要抽，抽的也是"sequence 判定 / 切片记账"那几条纯规则。
-// QWebChannel 的**注册对象是本类（单例）**，不是每个会话对象：WebChannel 只在组件完成时注册一次
-// （QQmlWebChannel 的 registeredObjects 事后改不生效），而"块"是会增删的。所以页面上的每个调用都带上
-// blockId，由本类路由到对应的 TerminalSession；反过来每一个上行信号也都带 blockId 供页面过滤。
+// 引擎只给原始 PTY 字节流 + 一份序列化的 VT 重放串（terminal/follow 的 snapshot.screen 是
+// @xterm/addon-serialize 的产物），没有单元格网格接口，所以渲染交给页面里内嵌的 xterm.js 6.0.0：
+// qrc 页面不发任何网络请求（引擎要求 Origin == Host），传输留在 C++ —— 本类经 DshApiClient 代发
+// terminal/*，帧经 QWebChannel 推给页面 term.write，页面 onData 再回来调 write。
+// 承担的协议状态：① mount（environment → list，有 running 就 adopt，否则 shells + create，id 客户端铸、create 幂等）；
+// ② attach（每次换新 attachmentId，首帧必须是 snapshot，否则判协议异常重连）；③ sequence 连续性（gap 视为丢帧）；
+// ④ 输入串行化 + maxInputBytes(64KB) 记账；⑤ resize 限幅、同尺寸不发；⑥ close；
+// ⑦ terminal/control-unavailable 只置只读，不当致命错误。
+// QWebChannel 注册的是本单例而非会话对象（registeredObjects 事后改不生效），而块会增删，
+// 所以页面每个调用都带 blockId，由本类路由到对应 TerminalSession；上行信号也带 blockId 供页面过滤。
 
 #include <QByteArray>
 #include <QHash>
@@ -40,8 +30,7 @@ class QWebChannel;
 class TerminalVtModel;
 
 // 一个「终端块」的会话状态：终端 id / attachmentId / 尺寸 / 帧序 / 待投队列 / 输入队列。
-// 块被切走、右栏收起时页面会销毁，但本对象**活着**：终端进程继续跑，重新绑定页面时换新 attachment
-// 再取一份快照恢复画面。只有"关块"才会真去 terminal/close。
+// 块被切走或右栏收起时页面会销毁，但本对象常驻（终端进程继续跑），重新绑定页面时换新 attachment 取快照恢复画面。
 class TerminalSession : public QObject
 {
 	Q_OBJECT
@@ -121,8 +110,7 @@ private:
 
 	// 扩展后端的两条入流（旧页面面的信号；用**字符串信号**接，扩展对象不必共享头文件）
 	void onBackendFrame(const QString& blockId, const QString& kind, int sequence, const QString& text);
-	void onBackendStatus(const QString& blockId, const QString& state, const QString& statusText,
-		bool readOnly, const QString& title);
+	void onBackendStatus(const QString& blockId, const QString& state, const QString& statusText, bool readOnly, const QString& title);
 	// 字节面的两条入流（v2，默认）：hostData 直接喂 VT；hostReady / hostExit 只改状态行
 	bool hookByteFace(QObject* backend);          // 接 3 个信号（缺 hostData 就返回 false ⇒ 回退页面面）
 	void onBackendHostData(const QByteArray& bytes);
@@ -207,8 +195,7 @@ private:
 private Q_SLOTS:
 	// 这四个要能被**字符串连接**找到，所以必须是真正的槽（扩展对象是别人的 DLL，没有共享头文件）
 	void onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence, const QString& text);
-	void onBackendStatusSlot(const QString& blockId, const QString& state, const QString& statusText,
-		bool readOnly, const QString& title);
+	void onBackendStatusSlot(const QString& blockId, const QString& state, const QString& statusText, bool readOnly, const QString& title);
 	// 字节面（v2）：hostData 是裸字节，hostReady/hostExit 是状态行
 	void onBackendHostDataSlot(const QString& blockId, const QByteArray& bytes);
 	void onBackendHostReadySlot(const QString& blockId);
@@ -261,8 +248,7 @@ signals:
 	// Qt → 页面
 	void frameReady(const QString& blockId, const QString& kind, int sequence, const QString& text);
 	// 状态行/只读态/标题的变化（页面据此画顶部那行提示）；pageReady 后也会补发一次
-	void statusChanged(const QString& blockId, const QString& state, const QString& statusText,
-		bool readOnly, const QString& title);
+	void statusChanged(const QString& blockId, const QString& state, const QString& statusText, bool readOnly, const QString& title);
 	// 页面刚接上 QWebChannel：叫宿主把"这个页面属于哪个块"推过去（所有面板都会收到，幂等）
 	void pageHelloReceived();
 

@@ -66,7 +66,7 @@ class SettingsController : public QObject, public VirtualSettingsHost
 		// 服务端地址
 		Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
 		// 外观
-		// 注意：这里**不能**是 CONSTANT。openPage 是先 emit openChanged（QML 的 Loader 是
+		// 该属性**不能**是 CONSTANT。openPage 是先 emit openChanged（QML 的 Loader 是
 		// 同步装载，ComboBox 当场绑定 languages）再 refresh → loadAppearance 填数据；
 		// 标成 CONSTANT 就等于"绑定时为空、之后永远不再读"，语言下拉会一直空白（无任何报错）。
 		Q_PROPERTY(QVariantList languages READ languages NOTIFY languageChanged)
@@ -129,7 +129,7 @@ public:
 	QString routeHint(const QString& provider) const;
 	// 该路由是否 pi-ai
 	bool routeIsPiAi(const QString& provider) const;
-	// VirtualSettingsHost：只转调真实函数，不把 面直接交给扩展。
+	// VirtualSettingsHost：只转调真实函数，不把实现面直接交给扩展。
 	QString SettingsMasterBackend() const override { return masterBackend(); }
 	QString SettingsServerUrl() const override { return serverUrl(); }
 	bool SettingsOpen() const override { return isOpen(); }

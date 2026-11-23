@@ -1,4 +1,11 @@
 ﻿// 见 SettingsController.h：设置页数据面。
+// 数据一律以 QVariantMap / QVariantList 摊平后暴露给 QML；改动集中 emit 对应 xxxChanged()，QML 不轮询。
+// 写操作契约：setBusy(true) → RPC → 回调里 setBusy(false) 再 refresh()，刷新期间 QML 禁用表单。
+// 四套反馈文案各管一处：m_notice 列表级瞬时提示（4s 自隐）、m_status 模型页状态行、
+// m_formFeedback 表单内联提示、m_presetFeedback 预设下拉的失败文案。
+// 账号面板状态机（服务端 account/getState 的 status 字段）：
+// signed-out --startSignIn--> attempt(phase / authorizeUrl / id) --浏览器完成登录--> credential-stored；
+// 只有 credential-stored 才继续拉 getProfile 与 getBalance，取消、登出或失败都先回到 signed-out。
 
 #include "common/settings/SettingsController.h"
 
@@ -36,6 +43,7 @@ SettingsController::SettingsController(DshApiClient* api, QObject* parent)
 		emit noticeChanged();
 		});
 
+	// 默认态先铺满所有键：m_account 直接暴露给 QML，缺键的绑定会读到 undefined。
 	m_account.insert(QStringLiteral("status"), QStringLiteral("signed-out"));
 	m_account.insert(QStringLiteral("signedIn"), false);
 	m_account.insert(QStringLiteral("busy"), false);
@@ -44,10 +52,9 @@ SettingsController::SettingsController(DshApiClient* api, QObject* parent)
 	for (const char* key : {"name", "contact", "avatarUrl", "balanceText", "bonusText",
 		"attemptPhase", "attemptId", "usageUrl", "topUpUrl", "authorizeUrl"})
 		m_account.insert(QString::fromLatin1(key), QString());
-	// 语言列表必须在**任何 QML 绑定之前**就位。
-	// openPage() 的顺序是"先 emit openChanged()（QML 的 Loader 同步开始装载设置页，
-	// 语言下拉当场绑定 Hub.settings.languages）、后 refresh() → loadAppearance() 填数据"，
-	// 所以在第一次打开设置页时绑定到的是空列表；配合 CONSTANT 属性就是"永远空白且不报错"。
+	// 语言列表必须在任何 QML 绑定之前就位：openPage() 先 emit openChanged()（QML Loader 同步装载
+	// 设置页、语言下拉当场绑定），后 refresh() → loadAppearance() 才填数据；配合 CONSTANT 属性
+	// 就会"永远空白且不报错"。
 	loadAppearance();
 	loadMasterBackend();
 }
@@ -57,11 +64,12 @@ namespace
 QJsonObject accountClientMetadata()
 {
 	QJsonObject client;
+	// 随所有 account/* 请求上报的客户端标识（version / locale / timezoneOffsetSeconds），服务端据此做兼容与展示。
 	const QString version = QCoreApplication::applicationVersion().isEmpty()
 		? QStringLiteral("0.2.0") : QCoreApplication::applicationVersion();
 	client.insert(QStringLiteral("version"), version);
 	QString locale = QLocale::system().name();
-	locale.replace(QLatin1Char('_'), QLatin1Char('-'));
+	locale.replace(QLatin1Char('_'), QLatin1Char('-'));   // QLocale 给的是 zh_CN，协议要 BCP-47 的 zh-CN
 	client.insert(QStringLiteral("locale"), locale);
 	client.insert(QStringLiteral("timezoneOffsetSeconds"),
 		QDateTime::currentDateTime().offsetFromUtc());
@@ -70,6 +78,7 @@ QJsonObject accountClientMetadata()
 
 QJsonObject accountClientArgs()
 {
+	// 所有 account/* 请求共用的 args 外壳：只有一个 client 对象，字段固定。
 	QJsonObject args;
 	args.insert(QStringLiteral("client"), accountClientMetadata());
 	return args;
@@ -87,6 +96,7 @@ QString formatBalanceAmount(const QString& raw)
 
 QString walletText(const QJsonArray& wallets)
 {
+	// 钱包列表转单行摘要：余额为空的是服务端占位项，跳过；CNY 用 ¥，其它币种保留原始代码。
 	QStringList parts;
 	for (const QJsonValue& value : wallets)
 	{
@@ -106,6 +116,8 @@ QString walletText(const QJsonArray& wallets)
 
 void SettingsController::openAccountPage()
 {
+	// 已打开时只清提示不重拉：数据由 refreshAccount() 的 m_accountBusy 闸门去重。
+	// 登录提示 = 浏览器已拉起但还没登录成功时，账号按钮上挂的那条提示。
 	m_accountLoginHint = false;
 	emit accountLoginHintChanged();
 	if (m_accountOpen)
@@ -125,6 +137,7 @@ void SettingsController::dismissAccountLoginHint()
 
 void SettingsController::closeAccountPage()
 {
+	// 只关面板，不取消进行中的登录 attempt：用户可能还要在浏览器里把登录走完。
 	if (!m_accountOpen)
 		return;
 	m_accountOpen = false;
@@ -133,6 +146,7 @@ void SettingsController::closeAccountPage()
 
 void SettingsController::refreshAccount()
 {
+	// m_accountBusy 一次只放行一组 RPC：既挡重复刷新，也挡住刷新期间的登录/登出。
 	if (!m_api || m_accountBusy)
 		return;
 	m_accountBusy = true;
@@ -140,6 +154,7 @@ void SettingsController::refreshAccount()
 	m_account.insert(QStringLiteral("error"), QString());
 	emit accountChanged();
 
+	// getState 是账号面板的总入口：它定 signedIn、登录 attempt 与外链，确认已登录后才继续补资料与余额。
 	m_api->callMethod(QStringLiteral("account/getState"), QJsonObject(),
 		[this](const QJsonObject& value) {
 			m_account.insert(QStringLiteral("status"),
@@ -147,12 +162,13 @@ void SettingsController::refreshAccount()
 			const bool signedIn = value.value(QStringLiteral("status")).toString()
 				== QLatin1String("credential-stored");
 			m_account.insert(QStringLiteral("signedIn"), signedIn);
+			// 登录已成功：旧提示必须自己消失，不能等用户再点开一次。
 			if (signedIn && m_accountLoginHint)
 			{
 				m_accountLoginHint = false;
 				emit accountLoginHintChanged();
 			}
-			const QJsonObject links = value.value(QStringLiteral("links")).toObject();
+			const QJsonObject links = value.value(QStringLiteral("links")).toObject();   // 用量页 / 充值页地址，缺失时是空串，界面据此隐藏按钮
 			m_account.insert(QStringLiteral("usageUrl"),
 				links.value(QStringLiteral("usageUrl")).toString());
 			m_account.insert(QStringLiteral("topUpUrl"),
@@ -162,6 +178,7 @@ void SettingsController::refreshAccount()
 				attempt.value(QStringLiteral("phase")).toString());
 			const QString authorizeUrl = attempt.value(QStringLiteral("authorizeUrl")).toString();
 			m_account.insert(QStringLiteral("authorizeUrl"), authorizeUrl);
+			// 与上次不同 = 服务端起了新的登录 attempt：请宿主开浏览器；同一个 URL 不重复弹。
 			if (!authorizeUrl.isEmpty() && authorizeUrl != m_lastAuthorizeUrl)
 			{
 				m_lastAuthorizeUrl = authorizeUrl;
@@ -173,7 +190,7 @@ void SettingsController::refreshAccount()
 				attempt.value(QStringLiteral("id")).toString());
 			if (!signedIn)
 			{
-				m_accountBusy = false;
+				m_accountBusy = false;   // 这条分支后面没有并发的 profile/balance，busy 必须在这里收
 				m_account.insert(QStringLiteral("busy"), false);
 				m_account.insert(QStringLiteral("name"), QString());
 				m_account.insert(QStringLiteral("contact"), QString());
@@ -183,6 +200,8 @@ void SettingsController::refreshAccount()
 				return;
 			}
 
+			// profile / balance 两条 RPC 并发，都回来才收起 busy。
+			// pending 用 shared_ptr 共享计数：两个回调可能同批到达，捕获的必须是同一份计数。
 			const auto pending = std::make_shared<int>(2);
 			auto finishOne = [this, pending]() {
 				if (--(*pending) > 0)
@@ -195,10 +214,11 @@ void SettingsController::refreshAccount()
 				[this, finishOne](const QJsonObject& profileResult) {
 					const QString status = profileResult.value(QStringLiteral("status")).toString();
 					const QJsonObject profile = profileResult.value(QStringLiteral("value")).toObject();
+					// 只有 status=="ready" 才带 value；未就绪时保留旧值，别把姓名清成空串。
 					if (status == QLatin1String("ready"))
 					{
 						m_account.insert(QStringLiteral("name"),
-							profile.value(QStringLiteral("name")).toString());
+							profile.value(QStringLiteral("name")).toString());   // profile 就三个展示字段：姓名 / 联系方式 / 头像
 						m_account.insert(QStringLiteral("contact"),
 							profile.value(QStringLiteral("contact")).toString());
 						m_account.insert(QStringLiteral("avatarUrl"),
@@ -218,6 +238,7 @@ void SettingsController::refreshAccount()
 					{
 						const QJsonArray wallets = balanceResult.value(QStringLiteral("value")).toArray();
 						const QJsonArray bonus = balanceResult.value(QStringLiteral("bonusWallets")).toArray();
+						// 余额分两桶：value 是充值钱包、bonusWallets 是赠送钱包；展示合并，"bonus" 标记供界面区分。
 						QVariantList rows;
 						for (const QJsonValue& value : wallets)
 							rows.append(value.toObject().toVariantMap());
@@ -255,13 +276,15 @@ void SettingsController::startAccountSignIn()
 	m_account.insert(QStringLiteral("busy"), true);
 	m_account.insert(QStringLiteral("error"), QString());
 	emit accountChanged();
+	// startSignIn 只负责建 attempt 并返回 authorizeUrl；真正的登录结果靠之后的 getState 轮询。
 	QJsonObject args = accountClientArgs();
-	args.insert(QStringLiteral("callbackOrigin"), m_api->baseUrl().toString());
-	args.insert(QStringLiteral("loginSource"), QStringLiteral("desktop"));
+	args.insert(QStringLiteral("callbackOrigin"), m_api->baseUrl().toString());   // 浏览器登录完回跳到本机 DSH 地址
+	args.insert(QStringLiteral("loginSource"), QStringLiteral("desktop"));       // 服务端据此选登录页形态（desktop / web）
 	m_api->callMethod(QStringLiteral("account/startSignIn"), args,
 		[this](const QJsonObject& value) {
 			m_accountBusy = false;
 			m_account.insert(QStringLiteral("busy"), false);
+			// 返回的 attempt 三字段各有用途：phase 决定按钮态、authorizeUrl 用来开浏览器、id 用于取消。
 			const QJsonObject attempt = value.value(QStringLiteral("attempt")).toObject();
 			m_account.insert(QStringLiteral("attemptPhase"),
 				attempt.value(QStringLiteral("phase")).toString());
@@ -269,6 +292,7 @@ void SettingsController::startAccountSignIn()
 			m_account.insert(QStringLiteral("authorizeUrl"), authorizeUrl);
 			m_account.insert(QStringLiteral("attemptId"),
 				attempt.value(QStringLiteral("id")).toString());
+			// 同一 attempt 的 authorizeUrl 只开一次浏览器：与 refreshAccount() 共用 m_lastAuthorizeUrl 去重。
 			if (!authorizeUrl.isEmpty() && authorizeUrl != m_lastAuthorizeUrl)
 			{
 				m_lastAuthorizeUrl = authorizeUrl;
@@ -277,6 +301,7 @@ void SettingsController::startAccountSignIn()
 				emit accountLoginHintChanged();
 			}
 			emit accountChanged();
+			// 没拿到 authorizeUrl 说明 attempt 还没就绪：600ms 后再问一次，别让界面空等。
 			if (authorizeUrl.isEmpty())
 				QTimer::singleShot(600, this, [this]() { refreshAccount(); });
 		},
@@ -292,6 +317,7 @@ void SettingsController::cancelAccountSignIn()
 {
 	if (!m_api)
 		return;
+	// attemptId 来自上一次 getState/startSignIn：为空说明本来就没有进行中的登录，省掉一次必然失败的 RPC。
 	const QString attemptId = m_account.value(QStringLiteral("attemptId")).toString();
 	if (attemptId.isEmpty())
 		return;
@@ -301,7 +327,7 @@ void SettingsController::cancelAccountSignIn()
 		[this](const QJsonObject& value) {
 			m_account.insert(QStringLiteral("status"), value.value(QStringLiteral("status")).toString());
 			m_account.insert(QStringLiteral("attemptPhase"),
-				value.value(QStringLiteral("attempt")).toObject().value(QStringLiteral("phase")).toString());
+				value.value(QStringLiteral("attempt")).toObject().value(QStringLiteral("phase")).toString());   // 只回 phase：取消后 attempt 已作废，其余字段无意义
 			emit accountChanged();
 		},
 		[this](const DshApiClient::RpcError& error) {
@@ -318,6 +344,7 @@ void SettingsController::signOutAccount()
 	m_account.insert(QStringLiteral("busy"), true);
 	m_account.insert(QStringLiteral("error"), QString());
 	emit accountChanged();
+	// 登出后本地资料与余额一起清空：服务端只回状态，不保证再下发这些字段。
 	m_api->callMethod(QStringLiteral("account/signOut"), accountClientArgs(),
 		[this](const QJsonObject& value) {
 			m_accountBusy = false;
@@ -344,6 +371,7 @@ void SettingsController::signOutAccount()
 		});
 }
 
+// 三个外链按钮（用量 / 充值 / 授权）共用服务端下发的 URL：为空时静默不打开，离线也不报错。
 void SettingsController::openAccountUsage()
 {
 	const QString url = m_account.value(QStringLiteral("usageUrl")).toString();
@@ -369,12 +397,13 @@ void SettingsController::setNotice(const QString& text)
 {
 	m_notice = text;
 	emit noticeChanged();
-	if (!text.isEmpty())
+	if (!text.isEmpty())   // 计时从最后一次提示重算：连续提示只保留最新的 4 秒窗口
 		m_noticeTimer->start();
 }
 
 void SettingsController::openPage()
 {
+	// 只在 false→true 时拉数据：重复 open 不触发整页刷新。
 	if (m_open)
 		return;
 
@@ -385,7 +414,7 @@ void SettingsController::openPage()
 
 void SettingsController::setPage(int page)
 {
-	const int bounded = qBound(0, page, 6);
+	const int bounded = qBound(0, page, 6);   // 页索引 0..6 与 QML 侧 7 个设置页一一对应，越界直接夹住
 	if (m_page == bounded)
 		return;
 
@@ -399,6 +428,7 @@ void SettingsController::closePage()
 		return;
 
 	m_open = false;
+	// 丢弃"发现模型"结果：候选列表只对本次打开有效，重开时重新发现。
 	m_discovered.clear();
 	m_candidates.clear();
 	emit openChanged();
@@ -415,7 +445,7 @@ void SettingsController::removeModel(const QString& provider, const QString& mod
 	}
 
 	setBusy(true);
-
+	// modelId 按值捕获进两个回调：refresh() 之后 *entry 不再有效，但文案里仍要用原 id。
 	ModelSelectionService::removeModel(m_api, *entry, *ns, modelId,
 		[this, modelId](const SettingsNamespace&) {
 			setBusy(false);
@@ -434,18 +464,19 @@ void SettingsController::loadAgentPresets()
 		return;
 
 	m_presetFeedback.clear();
+	// 预设列表与选中项都以服务端为准（每行的 isDefault），本类不落本地副本。
 	AgentPresetService::fetch(m_api,
 		[this](const QVector<AgentPreset>& presets) {
 			QVariantList rows;
 			for (const AgentPreset& preset : presets) {
 				QVariantMap row;
 				row.insert(QStringLiteral("id"), preset.id);
-				row.insert(QStringLiteral("name"), preset.name);
+				row.insert(QStringLiteral("name"), preset.name);   // 预设行只带 id/name：界面只做展示与选择
 				rows.append(row);
 			}
 			m_agentPresets = rows;
 
-			if (rows.isEmpty()) {
+			if (rows.isEmpty()) {   // 服务端一个预设都没给：按钮上直接写明，不留空白
 				m_defaultPresetName = qtTrId("settings_no_preset");
 			}
 			else {
@@ -504,8 +535,8 @@ void SettingsController::selectDefaultPreset(const QString& presetId)
 
 QObject* SettingsController::ulincore() const
 {
-	auto& settings = UlinCore::UlinCoreSettings::instance();
-	settings.setDataDir(QCoreApplication::applicationDirPath() + QStringLiteral("/data/ulincore"));
+		auto& settings = UlinCore::UlinCoreSettings::instance();
+	settings.setDataDir(QCoreApplication::applicationDirPath() + QStringLiteral("/data/ulincore"));   // 数据目录跟着 exe 走：便携版与安装版都以可执行文件位置为准
 	// 单例由 C++ 持有：QML 不能接管所有权，否则引擎销毁时会 delete 静态对象。
 	QQmlEngine::setObjectOwnership(&settings, QQmlEngine::CppOwnership);
 	return &settings;
@@ -514,6 +545,8 @@ QObject* SettingsController::ulincore() const
 QVariantList SettingsController::masterBackends() const
 {
 	QVariantList rows;
+	// dsh 是内置后端，恒占第 0 项；扩展注册的后端按 id 去重后追加在后面。
+	// 列表每次现算、不缓存：扩展随时可能装载或卸载。
 	QVariantMap dsh;
 	dsh.insert(QStringLiteral("id"), QStringLiteral("dsh"));
 	dsh.insert(QStringLiteral("name"), QStringLiteral("DSH"));
@@ -526,7 +559,7 @@ QVariantList SettingsController::masterBackends() const
 			const QString id = row.value(QStringLiteral("id")).toString();
 			if (id.isEmpty() || id == QLatin1String("dsh"))
 				continue;
-			bool exists = false;
+			bool exists = false;   // 扩展可能重复注册同一后端：按 id 去重，避免下拉出现两项同名的
 			for (const QVariant& existing : rows) {
 				if (existing.toMap().value(QStringLiteral("id")).toString() == id) {
 					exists = true;
@@ -547,11 +580,12 @@ QString SettingsController::masterBackendName() const
 		if (row.value(QStringLiteral("id")).toString() == m_masterBackend)
 			return row.value(QStringLiteral("name")).toString();
 	}
-	return m_masterBackend;
+	return m_masterBackend;   // 后端已卸载时退回原始 id，至少不会显示空白
 }
 
 void SettingsController::loadMasterBackend()
 {
+	// 以 api 侧保存的选择为准；没有 api 时退回内置 dsh。值没变就不发信号，避免重复刷新。
 	const QString saved = m_api ? m_api->selectedMasterAgentId() : QStringLiteral("dsh");
 	if (m_masterBackend == saved)
 		return;
@@ -561,6 +595,7 @@ void SettingsController::loadMasterBackend()
 
 void SettingsController::refreshMasterBackends()
 {
+	// 扩展注册/卸载后由宿主调用：后端列表与显示名都变了，让 QML 重新取一遍。
 	emit masterBackendChanged();
 }
 
@@ -584,11 +619,12 @@ void SettingsController::selectMasterBackend(const QString& backendId)
 	// 若仍读到旧值会把刚切走的后端又拉起来。
 	if (m_api) m_api->setSelectedMasterAgentId(id);
 	if (m_api) {
+		// 内置 dsh 恒可激活，故不查询返回值（逗号表达式只为给 ok 一个值）。
 		const bool ok = id == QLatin1String("dsh")
 			? (m_api->ActivateMasterAgent("dsh"), true)
 			: m_api->ActivateMasterAgent(id.toUtf8().constData());
 		if (!ok) {
-			if (m_api) m_api->setSelectedMasterAgentId(m_masterBackend);
+			if (m_api) m_api->setSelectedMasterAgentId(m_masterBackend);   // 回滚落盘值：别让下次启动再去激活一个起不来的后端
 			emit masterBackendSwitchFailed(id, QStringLiteral("激活失败"));
 			return;
 		}
@@ -610,13 +646,14 @@ void SettingsController::selectMasterBackend(const QString& backendId)
 void SettingsController::saveServerUrl(const QString& url)
 {
 	SettingsStore::setServerUrl(url.trimmed());
-	m_serverUrl = SettingsStore::serverUrl();
+	m_serverUrl = SettingsStore::serverUrl();   // 回读落盘值：界面显示的永远是实际保存的内容，而不是输入框原文
 	emit serverUrlChanged();
 	emit serverRestartRequested();   // Settings::serverSettingsSaved -> ServerManager::restart
 }
 
 void SettingsController::loadAppearance()
 {
+	// 构造函数与 refresh() 都会走到这里：重建列表并重读已保存的语言码（可能已被外部改过）。
 	QVariantList rows;
 	QVariantMap follow;   // 第 0 项固定是"跟随系统"（数据为空串），保持一致
 	follow.insert(QStringLiteral("name"), qtTrId("settings_language_follow_system"));
@@ -638,6 +675,7 @@ void SettingsController::loadAppearance()
 
 void SettingsController::setLanguage(const QString& code)
 {
+	// 先落盘再应用：apply 失败也不回滚已保存的语言码，界面只提示语言包缺失。
 	Translation::setSavedLanguageCode(code);
 	m_languageCode = code;
 
@@ -663,6 +701,7 @@ void SettingsController::resetStyles()
 	emit languageChanged();
 }
 
+// 两者都查最近一次 fetchView 的 m_view：写操作前必须确认 provider 与 namespace 同时存在。
 const ConfigurableProvider* SettingsController::findProvider(const QString& provider) const
 {
 	return m_view.findProvider(provider);
@@ -673,6 +712,7 @@ const SettingsNamespace* SettingsController::findNamespace(const ConfigurablePro
 	return m_view.findNamespace(provider.settingsNs);
 }
 
+// 三个 setter 都是"变了才发信号"：QML 绑定多，重复 emit 会让整页重算。
 void SettingsController::setBusy(bool busy)
 {
 	if (m_busy == busy)
@@ -706,6 +746,7 @@ QString SettingsController::routeHint(const QString& provider) const
 	if (!entry)
 		return qtTrId("model_no_configurable_provider");
 
+	// 提示由三段拼成：写入路径与条数、该路由的风险提示、settings 只读提示。
 	QStringList parts;
 	const SettingsNamespace* ns = findNamespace(*entry);
 	if (!ns)
@@ -734,6 +775,7 @@ QString SettingsController::routeHint(const QString& provider) const
 
 bool SettingsController::routeIsPiAi(const QString& provider) const
 {
+	// 判据是 settings namespace 名里带 pi-ai：pi-ai 系路由的条目形态与写回语义都和 DeepSeek 不同。
 	const ConfigurableProvider* entry = findProvider(provider);
 	return entry && entry->settingsNs.contains(QStringLiteral("pi-ai"));
 }
@@ -741,8 +783,9 @@ bool SettingsController::routeIsPiAi(const QString& provider) const
 void SettingsController::writeModel(const ConfigurableProvider& provider, const SettingsNamespace& ns, const AddModelRequest& request, bool replacing)
 {
 	setFormFeedback(qtTrId("model_writing"));
+	// 成功文案按"覆盖已有条目 / 新增条目"区分：replacing 由 submitModelForm 事先判定。
 	ModelSelectionService::addModel(m_api, provider, ns, request,
-		[this, request, replacing](const SettingsNamespace&) {
+		[this, request, replacing](const SettingsNamespace&) {   // 参数是写入后的快照，用不上：统一 refresh() 重拉全量
 			setBusy(false);
 			setFormFeedback(replacing
 				? qtTrId("model_updated_fmt").arg(request.id)
@@ -801,6 +844,7 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 	}
 
 	const bool piAi = routeIsPiAi(provider);
+	// pi-ai 的 reasoningEfforts 只认目录公布过的 level id：写错会被服务端静默忽略，所以在提交前就拒掉。
 	if (piAi && !efforts.trimmed().isEmpty()) {
 		QStringList available;
 		for (const ReasoningLevel& level : fallbackReasoningLevels())
@@ -836,6 +880,7 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 
 	setBusy(true);
 	const QString typedKey = apiKey.trimmed();
+	// 两条写路径：没填 key 直接写条目；填了就先写凭据再写条目，避免条目已落地而 key 缺失。
 	if (typedKey.isEmpty()) {
 		writeModel(*entry, *ns, request, replacing);
 		return;
@@ -844,6 +889,7 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 	request.apiKeyRef = ref;
 	request.recordApiKeyEnv = declared.isEmpty() && !ref.isEmpty();
 	setFormFeedback(qtTrId("model_writing_credential"));
+	// 按值拷贝 provider/namespace：*entry、*ns 指向 m_view，凭据回调回来前 refresh() 可能已换掉它。
 	const ConfigurableProvider providerCopy = *entry;
 	const SettingsNamespace nsCopy = *ns;
 	ModelSelectionService::saveCredential(m_api, ref, typedKey,
@@ -856,11 +902,10 @@ void SettingsController::submitModelForm(const QString& provider, const QString&
 		});
 }
 
-void SettingsController::createCustomProvider(const QString& route, const QString& displayName,
-	const QString& baseUrl, const QString& api, const QString& modelId,
-	const QString& modelName, const QString& apiKey)
+void SettingsController::createCustomProvider(const QString& route, const QString& displayName, const QString& baseUrl, const QString& api, const QString& modelId, const QString& modelName, const QString& apiKey)
 {
 	const QString trimmedRoute = route.trimmed();
+	// 路由 ID 会写进 settings 与凭据引用：限定小写字母开头、短横线分段，避免与内置路由撞名或写出非法键。
 	static const QRegularExpression routePattern(QStringLiteral("^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"));
 	if (!routePattern.match(trimmedRoute).hasMatch()) {
 		setFormFeedback(QStringLiteral("提供商 ID 需以小写字母开头，只能包含小写字母、数字和短横线。"));
@@ -883,6 +928,7 @@ void SettingsController::createCustomProvider(const QString& route, const QStrin
 		return;
 	}
 	const SettingsNamespace* ns = m_view.findNamespace(QStringLiteral("llm-pi-ai"));
+	// 自定义提供商只能落在 llm-pi-ai 这个 namespace 下；没挂载就无从写入。
 	if (!ns) {
 		setFormFeedback(QStringLiteral("当前 DSH 没有挂载 llm-pi-ai，无法新增自定义提供商。"));
 		return;
@@ -896,11 +942,12 @@ void SettingsController::createCustomProvider(const QString& route, const QStrin
 	request.api = api.trimmed();
 	request.modelId = modelId.trimmed();
 	request.modelName = modelName.trimmed();
-	request.apiKeyRef = key.isEmpty() ? QString() : ModelSelectionService::providerKeyRef(trimmedRoute);
+	request.apiKeyRef = key.isEmpty() ? QString() : ModelSelectionService::providerKeyRef(trimmedRoute);   // 没填 key 就只建 provider，凭据留给后续补
 
 	setBusy(true);
 	setFormFeedback(QStringLiteral("正在保存提供商…"));
-	const SettingsNamespace nsCopy = *ns;
+	const SettingsNamespace nsCopy = *ns;   // 同 submitModelForm：ns 指向 m_view，回调期间可能失效
+	// 顺序固定：先建 provider 条目（失败即整体失败），再写凭据（失败只降级为"已保存但 key 未写入"）。
 	ModelSelectionService::createCustomProvider(m_api, nsCopy, request,
 		[this, request, key, nsCopy](const SettingsNamespace&) {
 			setFormFeedback(QStringLiteral("提供商已保存：%1").arg(request.route));
@@ -922,29 +969,34 @@ void SettingsController::createCustomProvider(const QString& route, const QStrin
 		});
 }
 
+// 打开设置页或改动后重拉：服务端地址、预设、模型目录与凭据状态。
 void SettingsController::refresh()
 {
 	if (!m_api)
 		return;
 
 	setBusy(true);
-	setStatus(QString());
+	setStatus(QString());   // 清掉上一次的状态行，旧的失败文案不该留在新一次读取里
 
 	loadAgentPresets();   // 同一行为 Settings::refreshOnOpen：每次打开重同步服务端地址、预设、模型目录
 	loadMasterBackend();
 	loadAppearance();
 	m_serverUrl = SettingsStore::serverUrl();
+	// 本地还没存过地址时回落到 api 实际连的地址：首次运行的设置页也要有值可显示。
 	if (m_serverUrl.isEmpty())
 		m_serverUrl = m_api->baseUrl().toString();
 	emit serverUrlChanged();
 
+	// fetchView 一次拿全 provider 目录、settings 快照与失败项，再交给 rebuildProviders() 摊平成 QML 行。
 	ModelSelectionService::fetchView(m_api,
 		[this](const ServerModelView& view) {
-			m_view = view;
+			m_view = view;   // 整份替换：m_view 只代表最近一次 fetchView 的结果
 			setBusy(false);
 			rebuildProviders();
 
 			m_credentials.clear();  // 逐个 provider 查凭据状态：配没配、可不可写、来源（env / file）
+			// 凭据查询是逐 provider 的异步扇出：每回来一条就 rebuild 一次，界面渐进补全；
+			// 这里不等全部完成，busy 只跟 fetchView 绑定。
 			for (const ConfigurableProvider& provider : m_view.providers) {
 				// deepseek-account 走账号登录，不需要 API Key（服务端 hasProviderApiKey 也跳过它）；
 				// 别去 describe 一个不存在的凭据引用，否则设置页会显示「缺 key」。
@@ -956,6 +1008,7 @@ void SettingsController::refresh()
 					continue;
 
 				const QString ref = ModelSelectionService::resolveKeyRef(provider.provider, *ns, provider.settingsPath);
+				// ref 为空 = 这个 provider 没有可描述的凭据引用，直接跳过，别发一条必然失败的 describe。
 				if (ref.isEmpty())
 					continue;
 
@@ -965,11 +1018,12 @@ void SettingsController::refresh()
 						rebuildProviders();
 					},
 					[](const DshApiClient::RpcError& error) {
+						// 单条凭据查不到只记日志：其它 provider 照常渲染，不把整页打成错误态。
 						qWarning().noquote() << "[Settings] credentials/describe 失败:" << error.code << error.message;
 					});
 			}
 
-			if (m_view.providers.isEmpty())
+			if (m_view.providers.isEmpty())   // 一个 provider 都没有时给条状态，否则模型页整片空白且无解释
 				setStatus(qtTrId("model_provider_none_reported"));
 		},
 		[this](const DshApiClient::RpcError& error) {
@@ -978,6 +1032,8 @@ void SettingsController::refresh()
 		});
 }
 
+// 把 provider、凭据状态、模型行与失败项摊平成 QML 直接可用的 QVariantList。
+// provider 行分三组字段：目录信息、凭据状态（keyKnown/keyConfigured/keyWritable/keySource）、已声明的模型列表。
 void SettingsController::rebuildProviders()
 {
 	QVariantList rows;
@@ -999,7 +1055,7 @@ void SettingsController::rebuildProviders()
 		row.insert(QStringLiteral("label"), label);
 
 		QString ref;
-		bool declaredByProfile = false;
+		bool declaredByProfile = false;   // key 引用是 profile 写死的、还是按 provider 约定派生：QML 用来决定要不要让用户编辑
 		if (ns) {
 			declaredByProfile = !ModelSelectionService::profileApiKeyEnv(*ns, provider.settingsPath).isEmpty();
 			ref = ModelSelectionService::resolveKeyRef(provider.provider, *ns, provider.settingsPath);
@@ -1101,6 +1157,7 @@ void SettingsController::rebuildProviders()
 	emit viewChanged();
 }
 
+// 保存单个 provider 的 API key：写完后重拉状态，并通知宿主刷新会话模型目录。
 void SettingsController::saveApiKey(const QString& provider, const QString& apiKey)
 {
 	if (!m_api || apiKey.trimmed().isEmpty()) {
@@ -1115,6 +1172,7 @@ void SettingsController::saveApiKey(const QString& provider, const QString& apiK
 		return;
 	}
 
+	// ref 是凭据在服务端的引用名：profile 声明优先，否则按 provider 约定派生。
 	const QString ref = ModelSelectionService::resolveKeyRef(entry->provider, *ns, entry->settingsPath);
 	setBusy(true);
 	ModelSelectionService::saveCredential(m_api, ref, apiKey.trimmed(),
@@ -1134,6 +1192,7 @@ void SettingsController::saveApiKey(const QString& provider, const QString& apiK
 
 void SettingsController::discover(const QString& provider, const QString& apiKey)
 {
+	// 只探测目录、不写 settings：结果进 m_candidates 供用户挑，真正落库走 addModel()。
 	const ConfigurableProvider* entry = findProvider(provider);
 	const SettingsNamespace* ns = entry ? findNamespace(*entry) : nullptr;
 	if (!m_api || !entry || !ns) {
@@ -1142,17 +1201,18 @@ void SettingsController::discover(const QString& provider, const QString& apiKey
 	}
 
 	setBusy(true);
+	// 发现请求同时带上表单里刚输入的 key（可能还没保存），用于临时探测模型目录。
 	const QJsonObject request = ModelSelectionService::buildDiscoveryRequest(*entry, ns, apiKey);
 	ModelSelectionService::discoverModels(m_api, entry->settingsNs, request,
 		[this](const QVector<DiscoveredModel>& models) {
 			setBusy(false);
-			m_discovered = models;
+			m_discovered = models;   // 保留完整结果（含容量字段），addModel() 会按 id 回查
 
 			QVariantList rows;
 			for (const DiscoveredModel& model : models) {
 				QVariantMap row;
 				row.insert(QStringLiteral("id"), model.id);
-				row.insert(QStringLiteral("name"), model.name.isEmpty() ? model.id : model.name);
+				row.insert(QStringLiteral("name"), model.name.isEmpty() ? model.id : model.name);   // 上游不给显示名时退回 id
 				row.insert(QStringLiteral("contextWindow"), model.hasContextWindow ? model.contextWindow : 0);
 				rows.append(row);
 			}
@@ -1164,7 +1224,7 @@ void SettingsController::discover(const QString& provider, const QString& apiKey
 		},
 		[this](const DshApiClient::RpcError& error) {
 			setBusy(false);
-			setStatus(qtTrId("model_fetch_failed_fmt").arg(error.code, error.message));
+			setStatus(qtTrId("model_fetch_failed_fmt").arg(error.code, error.message));   // 失败不清候选：上一批结果仍可选择
 		});
 }
 

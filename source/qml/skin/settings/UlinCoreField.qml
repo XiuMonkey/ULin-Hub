@@ -41,6 +41,7 @@ Column {
             font.pixelSize: Theme.font.body
         }
 
+        // 只在用户编辑时发 edited：Binding 回填 value 不触发 onTextEdited，上层不会把回填当成输入。
         TextInput {
             id: input
             anchors.fill: parent

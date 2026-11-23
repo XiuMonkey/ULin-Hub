@@ -12,8 +12,7 @@ class DshPromptClient : public QObject
 	Q_OBJECT
 
 public:
-	explicit DshPromptClient(CommandController* commands, ChatController* chat,
-		QObject* parent = nullptr);
+	explicit DshPromptClient(CommandController* commands, ChatController* chat, QObject* parent = nullptr);
 
 public slots:
 	void handlePrompt(const QString& sessionId, const QString& text);

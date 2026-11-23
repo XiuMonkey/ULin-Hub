@@ -18,7 +18,6 @@ Item {
         spacing: 6
 
         // 页面标题：四页统一到 14 + 半粗，让"设置 / 各页标题 / 字段标签 / 说明"成为四级。
-        // 原版这页没有标题，进来只有一行 14px 的字段标签，比导航项还轻，整页没有落点。
         Text {
             text: qsTrId("settings_agent_preset_tab")
             color: Theme.color.textPrimary
@@ -28,7 +27,7 @@ Item {
             bottomPadding: 2
         }
 
-        // ---- Master：当前 Agent 后端 ----
+        // Master 段：按钮显示当前 Agent 后端，下拉列表切换。
         Text {
             text: "Master"
             color: Theme.color.textSecondary
@@ -159,9 +158,7 @@ Item {
             text: qsTrId("settings_default_agent_preset")
             color: Theme.color.textSecondary
             font.family: Theme.font.uiFamily
-            // 字段标签取 caption(12) + 次级色：它只是"说明下面这个框是什么"，
-            // 取 14/13 会和输入框里的内容同级，读起来分不清谁是标签谁是值。
-            font.pixelSize: Theme.font.caption
+            font.pixelSize: Theme.font.caption   // caption(12) + 次级色：标签比输入框内容低一级
         }
 
         Item {
@@ -177,10 +174,9 @@ Item {
                 height: 34
                 radius: Theme.radius.control
                 color: presetMouse.containsMouse ? Theme.color.hoverBg : Theme.color.pageBg || Theme.color.panelBg
+                // 下拉触发按钮属于交互控件：描边走 inputBorder（官方 --dsw-alias-border-l2，10% 黑），
+                // 与语言下拉同档；卡片/面板那类被动面才用 4% 的 border。
                 border.width: 1
-
-                // 这是"下拉触发按钮"：交互控件走官方 DSH 的 `--dsw-alias-border-l2`(inputBorder, 10% 黑)，
-                // 和语言下拉同档；卡片/面板那类被动面才用 4% 的 border。
                 border.color: Theme.color.inputBorder
 
                 Text {
@@ -288,7 +284,7 @@ Item {
             visible: Hub.settings.presetFeedback.length > 0
             text: Hub.settings.presetFeedback
             wrapMode: Text.WordWrap
-            color: Theme.color.textSecondary   // 反馈文案：原版走强调色，设置页不出蓝 ⇒ 中性灰（与同页说明文字同档）
+            color: Theme.color.textSecondary   // 反馈文案走中性灰：设置页不出蓝（与同页说明文字同档）
             font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }

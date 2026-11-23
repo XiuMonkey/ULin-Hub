@@ -6,7 +6,7 @@
 // 3) 内容没超屏时不显示把手：由 policy: AsNeeded 负责。
 // 4) 观感：细窄、两端圆角、低对比；轨道透明，把手四周内收 1px 与内容对齐。
 // ⚠️ 内收只作用在"可见把手"这层：拖拽/点击轨道仍用框架摆放的 contentItem 几何，滚动行为一字未改。
-// ⚠️ 令牌硬编码在 C++（ThemeBridge::defaultSize），改它必须重编 EXE；这里用 Math.max 兜一个下限，
+// ⚠️ 令牌硬编码在 C++（ThemeTokens.cpp），改它必须重编 EXE；这里用 Math.max 兜一个下限，
 // 令牌取到旧值时也会被抬到 10/8，立即生效；重编后两边一致。
 
 import QtQuick
@@ -20,21 +20,20 @@ ScrollBar {
 
     readonly property bool isHorizontal: orientation === Qt.Horizontal
 
-    readonly property int thickness: Math.max(Theme.size.scrollbarThickness || 0, 10)   // 粗细（框架只定长度，厚度靠 implicit）。见文件头第 5 条：下限保证"免编也变粗"
+    readonly property int thickness: Math.max(Theme.size.scrollbarThickness || 0, 10)   // 粗细（框架只定长度，厚度靠 implicit）；下限保证未重编 EXE 时也变粗
     readonly property int handleWidth: Math.max(Theme.size.scrollbarHandleWidth || 0, 8)
 
     implicitWidth: isHorizontal ? 0 : root.thickness
     implicitHeight: isHorizontal ? root.thickness : 0
 
-    readonly property int handleInset: Math.max(0, Math.round(   // 可见把手相对轨道每侧内收多少（厚度差的一半）：让把手比轨道窄一圈，留出气口
-        (root.thickness - root.handleWidth) / 2))
+    readonly property int handleInset: Math.max(0, Math.round((root.thickness - root.handleWidth) / 2))   // 可见把手每侧内收 = 厚度差的一半，让把手比轨道窄一圈
 
     contentItem: Item { }   // 框架摆放的"几何来源"，本身不画（拖拽/点轨道的命中区仍是它，即整条 thickness）
 
     Rectangle {
         id: handle
 
-        visible: root.policy !== ScrollBar.AlwaysOff && root.size < 1
+        visible: root.policy !== ScrollBar.AlwaysOff && root.size < 1   // size = 可见内容占视图的比例，= 1 即内容没超屏
         color: root.pressed   // 三态克制（都是中性灰，无强调色）：静止 scrollbar（最淡）→ 悬停/滚动 scrollbarHandle → 按下 scrollbarHandleHover
             ? Theme.color.scrollbarHandleHover
             : ((root.hovered || root.active) ? Theme.color.scrollbarHandle : Theme.color.scrollbar)

@@ -1,8 +1,8 @@
-// 分段控件（segmented control）：按 DSH 官方版 `SegmentedControl.module.css` 的形状做 ——
-// * 轨道 = 半透明交互底色（--dsw-alias-interactive-bg-hover）+ 4px 内边距 + md 圆角；
-// * 选中指示器 = 一块"浮起来"的面（bg-layer-1 + 柔和高度阴影），在轨道里滑动
+// 分段控件（segmented control）：按 DSH 官方 SegmentedControl 的形状做 ——
+// * 轨道 = 半透明交互底色（--dsw-alias-interactive-bg-hover）+ 3px 内边距 + small 圆角；
+// * 选中指示器 = 一块"浮起来"的面（bg-layer-1 + 柔和阴影），在轨道里滑动
 // （官方是 transform 过渡 160ms，这里用 x 的 Behavior 同速）；
-// * 标签 = 未选中 label-secondary、选中 label-primary（官方就是靠字色 + 指示器双重表达，
+// * 标签 = 未选中 label-secondary、选中 label-primary（官方靠字色 + 指示器双重表达）。
 // 用法：model 给 [{ key: "conversation", label: "对话" }, ...]，currentKey 是选中项的 key。
 // 只负责画和发 selected(string)：互斥由内部按 currentKey 保证，容器不需要再管。
 
@@ -23,7 +23,7 @@ Item {
     readonly property int gap: 2
     readonly property int count: model ? model.length : 0
 
-    readonly property color trackColor: Theme.color.trackBg || Theme.color.iconButtonHoverBg   // 轨道底色 / 指示器面：新 token 带兜底，老风格包里没有也能用
+    readonly property color trackColor: Theme.color.trackBg || Theme.color.iconButtonHoverBg   // 轨道底色：trackBg 是新 token，老风格包缺失时退回 iconButtonHoverBg
     readonly property color indicatorColor: Theme.color.indicatorBg || Theme.color.controlBg || Theme.color.panelBg
 
     // 每颗等宽：取最宽的那颗（官方也是 grid-auto-columns: 1fr —— 等宽才不会让指示器算错位置）

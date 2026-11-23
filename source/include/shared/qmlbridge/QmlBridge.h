@@ -1,25 +1,13 @@
 ﻿#pragma once
 
-// QmlBridge —— **QML 唯一的门**（QML 单例名 `Hub`）。
-// 分层规矩：
-//  · common/** = 领域与纯逻辑（解析、策略、状态机、模型本体）：不 import QML 概念，能脱离 QML 引擎单测。
-//  · qmlbridge/** = 只做接线：属性/信号、Q_INVOKABLE 转发、QAbstractListModel 的角色名映射，**不放算法**。
-//  留在本目录的接线对象：QmlBridge（本类）、ThemeBridge、WindowBridge、UrlInputBridge。
-//  带逻辑的模型与控制器（SessionListModel / CommandController / SettingsController / PanelBarDockModel /
-//  PluginMarketController / StyleResolver）在 common/**，算法在那边、QML 面在这里。
-// ⚠️ 本类的职责被刻意收窄成**只有接线**：
-//  · 把核心层（core/ClientRuntime、core/ServerManager）与业务层（common/session/**、common/appearance/**）
-//  的对象与信号，接到 QML 能用的形态上：Q_PROPERTY / Q_INVOKABLE / 信号转发；
-//  · 持有"当前会话 id"这类**纯界面状态**，并在它们变化时发对应信号；
-//  · 把 QML 的动作转成一次调用（`Hub.xxx` → 某个核心/业务对象的方法）。
-// ❌ 本类**不许**出现的东西（出现就说明逻辑又漏回来了）：
-//  · 网络/RPC 细节（QNetworkAccessManager、DshApiClient::callMethod、JSON 解析）
-//  · 服务端生命周期（起/停/重启）—— 在 core/ClientRuntime
-//  · 发送策略、自愈状态机、模型目录判断 —— 在 common/session/ChatController
-//  · 主题切换流程、落盘 —— 在 qmlbridge/ThemeController（它虽是 QML 面驱动，但流程本身不是接线）
-//  · 会自己改数据模型的业务分支（目录更新、归档集合写回）—— 在 core/ClientRuntime
-// 分层依赖方向（自上而下，不许反向）：
-//  qmlbridge → core / common/session / common/appearance → common/util / network
+// QmlBridge —— QML 唯一的门（QML 单例名 `Hub`）。
+// 分层规矩：common/** 放领域与纯逻辑（不 import QML 概念，可脱离引擎单测）；qmlbridge/** 只做接线
+// （属性/信号、Q_INVOKABLE 转发、QAbstractListModel 角色名映射），不放算法。
+// 本类只做三件事：把核心层（core/ClientRuntime、core/ServerManager）与业务层的对象/信号接到 QML 可用的形态；
+// 持有"当前会话 id"这类纯界面状态并在变化时发对应信号；把 QML 的动作转成一次调用（Hub.xxx → 某个对象的方法）。
+// 不许出现：网络/RPC 细节、服务端生命周期、发送策略/自愈状态机/模型目录判断、主题切换流程与落盘、
+// 会自己改数据模型的业务分支 —— 它们分别在 core/ClientRuntime、common/session/ChatController 等层。
+// 依赖方向单向：qmlbridge → core / common/session / common/appearance → common/util / network。
 
 #include "common/agent/dsh/DshPromptClient.h"
 #include "common/agent/dsh/pluginmarket/PluginMarketController.h"
@@ -42,10 +30,8 @@ class QTimer;
 class ThemeController;
 class ToolsFilter;
 
-// Q_PROPERTY 里用的是 ToolsFilter*，但这里只前置声明（完整定义在 common/agent/ToolsFilter.h）。
-// 指针元类型指向未定义类型时必须显式声明成 opaque pointer，否则 moc 生成的元对象编不过
-// （qmetatype.h 的 static_assert：「Pointer Meta Types must either point to fully-defined types
-// or be declared with Q_DECLARE_OPAQUE_POINTER(T *)」）。
+// Q_PROPERTY 里用的是 ToolsFilter*，这里只前置声明（完整定义在 common/agent/ToolsFilter.h）。
+// 指针元类型指向未定义类型时必须显式声明成 opaque pointer，否则 moc 的 static_assert 编不过。
 Q_DECLARE_OPAQUE_POINTER(ToolsFilter*)
 
 class QmlBridge : public QObject
@@ -250,7 +236,7 @@ public:
 	bool panelBarOpen() const { return m_panelBarOpen; }
 	QVariantList peerTabs() const;
 	// 页签组根：当前会话的父会话（父目录已知时），否则当前会话自己。
-	// ⚠️ 它是 m_peerRootId 的读法，**不是**遍历全量 subagentCatalog —— 页签行只属于这一个组。
+	// 它是 m_peerRootId 的读法，不是遍历全量 subagentCatalog —— 页签行只属于这一个组。
 	QString peerRootId() const { return m_peerRootId; }
 	QString peerRootTitle() const;
 	int subagentCount() const;
@@ -258,7 +244,6 @@ public:
 	QVariantList jobs() const;
 	int jobCount() const;
 	bool jobRunning() const;
-	// 顶栏 ☰：开着就收起，否则打开并拉一次该会话的工具目录
 	// 自动化任务（自动化任务页）：catalog 列出全部任务，delete 删除，open 到原会话。
 	Q_INVOKABLE void openSchedulePage();
 	Q_INVOKABLE void closeSchedulePage();
@@ -267,6 +252,7 @@ public:
 	Q_INVOKABLE void openScheduleSession(const QString& sessionId);
 	// 「新建任务」：打开一个新会话，由 Agent 用 schedule_create 建任务（服务端没有直接创建 RPC）。
 	Q_INVOKABLE void createScheduleSession();
+	// 顶栏 ☰：开着就收起，否则打开并拉一次该会话的工具目录
 	Q_INVOKABLE void openToolsFilter();
 	Q_INVOKABLE void closeToolsFilter();
 	Q_INVOKABLE void refreshSkills(const QString& sessionId = QString());

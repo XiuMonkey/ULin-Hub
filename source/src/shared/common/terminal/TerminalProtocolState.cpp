@@ -2,6 +2,7 @@
 
 #include <QtGlobal>
 
+// 重新挂载：清空序号与待发字节，等下一帧快照重建基线。
 void TerminalProtocolState::beginAttachment()
 {
 	m_uplinkSequence = 0;
@@ -10,12 +11,14 @@ void TerminalProtocolState::beginAttachment()
 	m_pendingBytes = 0;
 }
 
+// 脱离后不再接受数据帧，直到下次 beginAttachment。
 void TerminalProtocolState::markDetached()
 {
 	m_sequence = -1;
 	m_awaitSnapshot = false;
 }
 
+// 帧序判定：快照只在等待期接受；数据帧要求序号严格递增，跳号一律回 NeedSnapshot/Gap。
 TerminalProtocolState::FrameStatus TerminalProtocolState::acceptFrame(int sequence, bool snapshot)
 {
 	if (snapshot) {
@@ -48,6 +51,7 @@ void TerminalProtocolState::requestGrid(int cols, int rows)
 	m_wantRows = qBound(1, rows, m_maxRows);
 }
 
+// 网格尺寸变化只在真正不同时报一次，避免重复下发 resize。
 bool TerminalProtocolState::takeGridChange(int* cols, int* rows)
 {
 	if (m_wantCols <= 0 || m_wantRows <= 0)
@@ -69,6 +73,7 @@ void TerminalProtocolState::resetKnownGrid()
 	m_knownRows = 0;
 }
 
+// 发送队列水位：累计超过上限即由调用方暂停投喂。
 bool TerminalProtocolState::notePendingBytes(qint64 bytes)
 {
 	m_pendingBytes += qMax<qint64>(0, bytes);

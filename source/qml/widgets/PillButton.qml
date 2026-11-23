@@ -1,5 +1,5 @@
-// 胶囊按钮：浅色胶囊底 + 半高圆角，选中时**只把底色深一档**（字色、字号、字重一律不变）。
-// 只管画和发 clicked()：**互斥归调用方**（每颗只认自己的 selected，"一排里只能选一颗"由用它的地方保证）。
+// 胶囊按钮：浅色胶囊底 + 半高圆角，选中时只把底色深一档（字色、字号、字重一律不变）。
+// 只管画和发 clicked()：互斥归调用方（每颗只认自己的 selected，"一排里只能选一颗"由用它的地方保证）。
 // 形状/颜色/字号/缓动全取 token，没有本地魔法值。
 
 import QtQuick
@@ -19,14 +19,10 @@ Item {
     signal clicked()
 
     // 底色只有两档，统一在这里挑，别在 Rectangle 里现算：
-    // 未选中 = 浅色（light 是 rgba(0,0,0,0.08) 的浅灰，dark 是比卡片亮一档的灰）
-    // ⚠️ 为什么是"提亮后的 buttonPressed"而不是现成的某一档：调色板在 224（rgba .12，太淡看不清）
-    // 与 205（#CDD0D5，用户嫌深）之间没有第三档；提亮 6% 正好落在中间，且仍挂在 token 上。
-    // ⚠️ 只动底色，**别动文字**。踩过的两版都在这里留了记录：
-    // ① 近黑实心 + 白字：太抢，用户否掉；
-    // ② 中灰 #CDD0D5 + 主字色 + 加重笔画：底色还是嫌深，而且"字色跟着变"最不协调 ⇒
-    // 字色/字重现在两态完全一致，选中只靠这一档底色。
-    // ⚠️ dark 主题里"更深"看不见，所以那边是**亮一档**，语义仍是"选中的那颗离底色更远"。
+    // 未选中 = 浅色（light 是 rgba(0,0,0,0.08) 的浅灰，dark 是比卡片亮一档的灰）；
+    // 选中 = 提亮 6% 的 buttonPressed：调色板在"太淡"与"太深"之间没有第三档，提亮后正好落在中间且仍挂 token。
+    // 只动底色、不动文字：近黑实心 + 白字太抢，字色跟着变也不协调，两版都被否掉。
+    // dark 主题里"更深"看不见，所以那边是亮一档，语义仍是"选中的那颗离底色更远"。
     readonly property color baseColor: Theme.color.iconButtonHoverBg
     readonly property color selectedColor: Qt.lighter(Theme.color.buttonPressed, 1.06)
 
@@ -47,7 +43,7 @@ Item {
         anchors.centerIn: parent
         text: root.text
 
-        // 字色**恒定**：选中/未选中/悬停/按下全一样（用户两次否掉过"字色跟着变"——换色就不协调）。
+        // 字色恒定：选中/未选中/悬停/按下全一样（两次否掉过"字色跟着变"——换色就不协调）。
         // 所以这里刻意不绑 mouseArea 的任何状态；状态反馈只由底色那一档承担。
         color: Theme.color.textSecondary
         font.family: Theme.font.uiFamily

@@ -1,16 +1,6 @@
-// 插件市场（按原版 ui/PluginsManager.cpp + styles/plugin-market.qss 复刻）
-// 820×600 弹窗：#popupBody 式圆角卡片 + 标题 plugin_market_title + 右上关闭
-// 工具栏：搜索框（plugin_search_placeholder）+ 刷新（common_refresh）+ 重启服务（plugin_restart_server）
-// 两个 Tab：市场（plugin_market_title）/ 已安装（plugin_installed）
-// 市场页：卡片（名称 14/600 + 分类徽章 tagBg + 描述 12px + 安装按钮 primary 样式）+ 分页（每页 20）
-// 已安装页：卡片（名称 + 版本，更新 hoverBg / 卸载 danger）
-// 底部状态行（三种加载态 + 操作反馈，全部用既有 id）
-// 列表用 ListView（惰性建委托），不是 Flickable+Column+Repeater —— 理由见"列表区"那段注释。
-// 整页像一张表格。改版做了四件事（都不改数据与交互语义）：
-// ② 搜索框补一颗放大镜（SearchField 新增 leadingIcon，其它调用方默认不受影响）；
-// ③ 市场卡片：左侧 32×32 图标底 + 名称/分类/描述 + 右侧**实心**安装键（一页一个的主动作），
-// 悬停只把描边提到 inputBorder（不再整圈变蓝）；
-// 没有颜色语义的普通按钮）。
+// 插件市场（按原版 ui/PluginsManager.cpp + plugin-market.qss 复刻）：820×600 弹窗，圆角卡片 + 标题 + 右上关闭。
+// 工具栏：搜索 + 刷新 + 重启服务；两个 Tab：市场 / 已安装。市场卡片 = 名称 + 分类徽章 + 描述 + primary 安装键，分页每页 20。
+// 已安装卡片 = 名称 + 版本 + 更新 / 卸载；底部状态行给加载态与操作反馈。悬停只把描边提到 inputBorder。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -23,8 +13,9 @@ Item {
     implicitWidth: 820
     implicitHeight: 600
 
-    property double nowMs: Date.now()
+    property double nowMs: Date.now()   // 时间基准：算运行中任务的已耗时（Timer 每秒刷新）
 
+    // 任务动作 → 文案（C++ 只给机器值）
     function taskActionLabel(action) {
         if (action === "install") return qsTrId("plugin_install_action")
         if (action === "update") return qsTrId("plugin_update_action")
@@ -35,6 +26,7 @@ Item {
         return action
     }
 
+    // 任务状态 → 文案（未知状态原样返回）
     function taskStateLabel(task) {
         if (task.state === "running") return "进行中"
         if (task.state === "blocked") return "等待批准"
@@ -49,7 +41,7 @@ Item {
         return Math.max(0, Math.floor((nowMs - task.startedAt) / 1000)) + "s"
     }
 
-    Timer {
+    Timer {   // 有进行中的任务才每秒走一次（没任务就不重算耗时文案）
         interval: 1000
         repeat: true
         running: Hub.plugins.activeTaskCount > 0
@@ -94,9 +86,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                // 理由：转圈是常驻无限动画 ⇒ 每帧整窗重绘 ⇒ 加载期间整窗 ~30ms/帧；按时间门控
-                // 又必然要么盖住建卡（变卡）要么延迟（450ms）。静态文字立刻可见且永不重绘。
-                // 静态文字两项都满足：**立刻可见**（无延迟）、**永不重绘**（无掉帧）。
+                // 这里刻意不用 BusySpinner：转圈是常驻无限动画 ⇒ 每帧整窗重绘；静态文字立刻可见且永不重绘。
                 // ⚠️ Row 子项不写 verticalCenter 锚（Qt 会拒绝），按行高现算 y。
                 Text {
                     y: Math.round((parent.height - height) / 2)
@@ -166,12 +156,15 @@ Item {
             currentKey: Hub.plugins.tab === 0 ? "market" : "installed"
             model: [
                 { key: "market", label: qsTrId("plugin_market_title") },
-                { key: "installed", label: qsTrId("plugin_installed")   // "已安装"带上数量：两页之间切来切去时，这个数字是最有用的一条信息
+                // "已安装"带上数量：两页之间切来切去时，这个数字是最有用的一条信息
+                { key: "installed", label: qsTrId("plugin_installed")
                     + (Hub.plugins.installedItems.length > 0 ? " " + Hub.plugins.installedItems.length : "") }
             ]
             onSelected: (key) => Hub.plugins.setTab(key === "market" ? 0 : 1)
         }
 
+        // 列表区：两张 ListView（惰性建委托）按 tab 切换 —— 不用 Flickable + Column + Repeater，
+        // 卡片一多就会把全部委托都建出来。
         Item {
             id: listArea
             anchors.left: parent.left
@@ -230,13 +223,11 @@ Item {
                         }
                     }
 
+                    // 原版 createMarketCard：infoLayout stretch=1、中间 12px 间隔、安装键 stretch=0
+                    // ⇒ 文字栏右边停在按钮左侧，否则描述文字会跑到按钮底下（重合）。
                     Column {
                         id: cardBody
                         anchors.left: iconTile.right
-
-                        // 原版 createMarketCard：QHBoxLayout(contentsMargins 14,12,14,12; spacing 12)，
-                        // 左侧 infoLayout 是 stretch=1、中间 12px 间隔、右侧安装按钮 stretch=0。
-                        // 所以文字栏的右边必须停在按钮左侧，否则描述文字会跑到按钮底下（重合）。
                         anchors.right: installButton.left
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: 12
@@ -249,9 +240,8 @@ Item {
 
                             Text {
                                 id: nameText
-                                width: Math.min(implicitWidth,   // 名称让位给分类徽章后自己省略（Row 不会"吃掉剩余宽度"，必须显式算）
-                                                parent.width - (categoryBadge.visible
-                                                    ? categoryBadge.implicitWidth + parent.spacing : 0))
+                                // 名称给分类徽章让位后自己省略（Row 不会"吃掉剩余宽度"，必须显式算）
+                                width: Math.min(implicitWidth, parent.width - (categoryBadge.visible ? categoryBadge.implicitWidth + parent.spacing : 0))
                                 text: card.modelData.name
                                 elide: Text.ElideRight
                                 color: Theme.color.textPrimary
@@ -350,11 +340,10 @@ Item {
                         }
                     }
 
+                    // 原版 createInstalledCard：名字 label 是 stretch=1，右侧两个按钮 stretch=0
+                    // ⇒ 名字给按钮让位并以省略号收尾，不能盖到按钮上。
                     Row {
                         anchors.left: installedIconTile.right
-
-                        // 原版 createInstalledCard：名字 label 是 stretch=1，右侧两个按钮 stretch=0。
-                        // 所以名字要给按钮让位并省略号收尾，不能盖到按钮上。
                         anchors.right: buttonRow.left
                         anchors.leftMargin: 12
                         anchors.rightMargin: 12
@@ -362,9 +351,7 @@ Item {
                         spacing: 8
 
                         Text {
-                            width: Math.min(implicitWidth,
-                                            parent.width - (versionBadge.visible
-                                                ? versionBadge.implicitWidth + parent.spacing : 0))
+                            width: Math.min(implicitWidth, parent.width - (versionBadge.visible ? versionBadge.implicitWidth + parent.spacing : 0))
                             text: installedCard.modelData.name
                             elide: Text.ElideRight
                             color: Theme.color.textPrimary
@@ -419,14 +406,13 @@ Item {
             }
         }
 
+        // 安装区：任务行（最多 5 条）+ 待批准的构建脚本 + 进度条/阶段条 + 日志尾。
+        // ⚠️ 不能锚到 installBox 自己（Qt 会丢弃这条锚点）：塌到 y=0 后列表区高度归零，市场数据拉到了也一条都显示不出来。
+        // 贴在底部状态行（statusRow）之上，列表区才正确让位。
         Column {
             id: installBox
-
             anchors.left: parent.left
             anchors.right: parent.right
-
-            // ⚠️ 不能锚到 installBox 自己（Qt 会丢弃这条锚点）：installBox 塌到 y=0 后列表区高度归零，
-            // 市场数据拉到了也一条都显示不出来。贴在底部状态行（statusRow）之上，列表区才正确让位。
             anchors.bottom: statusRow.top
             anchors.leftMargin: 20
             anchors.rightMargin: 20
@@ -498,8 +484,7 @@ Item {
                             }
                             Text {
                                 id: taskName
-                                width: Math.max(0, parent.width - taskAction.width - taskState.width
-                                    - taskElapsed.width - 3 * parent.spacing)
+                                width: Math.max(0, parent.width - taskAction.width - taskState.width - taskElapsed.width - 3 * parent.spacing)
                                 text: modelData.name
                                 elide: Text.ElideRight
                                 color: Theme.color.textSecondary
@@ -525,7 +510,6 @@ Item {
                             font.family: Theme.font.uiFamily
                             font.pixelSize: Theme.font.small
                         }
-
                     }
                 }
             }
@@ -594,9 +578,9 @@ Item {
                 font.pixelSize: Theme.font.caption
             }
 
+            // 有进度条时这行让位（进度行已经在说同一件事）；结束后再显示结果文案。
             Text {
                 width: parent.width
-                // 有进度条时这行让位（进度行已经在说同一件事）；结束后再显示结果文案。
                 visible: !Hub.plugins.progressActive
                 text: Hub.plugins.installStatus
                 elide: Text.ElideRight
@@ -618,6 +602,7 @@ Item {
             }
         }
 
+        // 底部状态行：左手是市场页的分页，右手是状态文案（限宽在分页行右侧）。
         Item {
             id: statusRow
             anchors.left: parent.left
@@ -663,13 +648,12 @@ Item {
                 }
             }
 
+            // 状态文案限宽：左边界锚到翻页行（pagerRow）右侧，右边界到卡片右边，超出部分尾部省略 ——
+            // 文案再长也不会压住"上一页/下一页"。
             Text {
                 id: statusText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-
-                // 限宽：左边界锚到翻页行（pagerRow）右侧 —— 文案再长也不会压住"上一页/下一页"，
-                // 右边界到卡片右边，超出部分尾部省略号。
                 anchors.left: pagerRow.right
                 anchors.leftMargin: 16
                 horizontalAlignment: Text.AlignRight

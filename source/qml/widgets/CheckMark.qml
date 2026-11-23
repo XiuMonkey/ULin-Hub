@@ -22,7 +22,7 @@ Item {
             ctx.reset()
             ctx.clearRect(0, 0, width, height)
             ctx.save()
-            ctx.scale(width / 18, height / 18)
+            ctx.scale(width / 18, height / 18)   // 下面的坐标按 18×18 设计栅格写，随 size 等比缩放
             ctx.strokeStyle = root.color
             ctx.lineWidth = 1.9
             ctx.lineCap = "butt"

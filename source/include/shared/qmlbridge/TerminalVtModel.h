@@ -1,15 +1,10 @@
 #pragma once
 
-// TerminalVtModel —— 终端网格的 QML 可见桥：VT 状态（TerminalVt）与渲染（TerminalView.qml）之间那一层。
-// 分层：TerminalSession（协议状态）→ TerminalVt（VT 状态）→ **本类（QML 面）** → TerminalView.qml（逐格画）。
-// 本类只做三件事：① 把会话身份/状态露给 QML（rows/cols/state/statusText/readOnly/title）；
-// ② 网格**按行**暴露 + 脏行通知（渲染只重画脏行）；③ 把 QML 的键盘事件翻译成回写 PTY 的字节。
-// 解析不在这里（TerminalVt），画也不在这里（QML）。
-// 为什么"按行 + 按样式合并的段"而不是"每格一个 QVariantMap"：一屏 80×30 就是 2400 格，每帧重发
-// 2400 个 map 光构造就吃满主线程；合并成"同样式的一段"之后，一整行命令行的文本通常只剩个位数段，
-// QML 侧拿到的是小字符串。渲染侧缓存住整屏，脏行来了只换那几行。
-// 为什么键盘编码放在 C++：libvterm 的键盘表（vterm_keyboard_key/unichar）是权威 —— 方向键在
-// "普通/DECCKM 应用模式"下序列不同、Ctrl/Alt 的组合规则也在库里，QML 只该做"KeyEvent → 码点/特殊键"。
+// TerminalVtModel —— 终端网格的 QML 可见桥：TerminalSession（协议）→ TerminalVt（VT 状态）→ 本类 → TerminalView.qml。
+// 只做三件事：① 把会话身份/状态露给 QML（rows/cols/state/statusText/readOnly/title）；
+// ② 网格按行暴露 + 脏行通知（渲染只重画脏行）；③ 把 QML 的键盘事件翻译成回写 PTY 的字节。
+// 暴露"行 + 同样式合并的段"而非每格一个 QVariantMap：一屏 80×30 就是 2400 格，逐格构造 map 会吃满主线程。
+// 键盘编码放 C++ 是因为 libvterm 的键盘表是权威（DECCKM 下方向键序列不同），QML 只做 KeyEvent → 码点/特殊键。
 
 #include "common/terminal/TerminalVt.h"
 
@@ -48,7 +43,7 @@ public:
 	// 网格尺寸跟着面板走：会话把引擎侧尺寸推给引擎，这里只同步本地 VT
 	void setGridSize(int rows, int cols);
 
-	Q_INVOKABLE QVariantList rowSegments(int first, int last) const;   // 注意别叫 rows()：本类已有 int rows() 返回行数，同名会让 QML 拿到 int
+	Q_INVOKABLE QVariantList rowSegments(int first, int last) const;   // 不能叫 rows()：本类已有 int rows() 返回行数，同名会让 QML 拿到 int
 
 	Q_INVOKABLE QString rowsJson(int first, int last) const;
 

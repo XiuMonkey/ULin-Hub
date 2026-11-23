@@ -1,7 +1,7 @@
 #pragma once
 
-// Windows x64 运行时 thunk 生成器：运行时按参数/返回值描述生成一段可执行机器码，把统一参数数组
-// 转换成目标 DLL 函数的真实调用约定；由 DllCaller 的 native 调用风格（invokeNativeFunction）使用。
+// thunk 生成器：按参数/返回值描述把统一参数数组转换成目标函数的真实调用约定，由 DllCaller 的
+// native 调用风格（invokeNativeFunction）使用。Linux 版内部走 libffi（Windows 版生成 x64 机器码）。
 
 #include <QVector>
 #include <QString>
@@ -62,14 +62,13 @@ namespace Thunk
 		// 根据签名和目标函数地址生成 thunk：成功返回 true，失败可通过 errorString 获取原因。
 		bool build(const Signature& signature, void* target);
 
-		// 调用生成的 thunk。
+		// 调用 thunk：args 是参数数组，result 指向返回值缓冲区（返回 void 时给个哑元即可）。
 		void call(const Arg* args, void* result) const;
 
 		QString errorString() const;
 
-		// 仅用于测试/诊断：已生成机器码的首字节与长度（未成功 build 时为 nullptr / 0）。用例靠它校验
-		// 栈帧调整用的是 imm32 形式 —— 这是"参数一多就写穿调用者栈帧"那个边界唯一可确定性断言的地方
-		// （见 Thunk.cpp 里 subRspImm32 的说明）。
+		// 仅用于测试/诊断：机器码的首字节与长度。Linux 版走 libffi、不生成机器码，故恒为 nullptr / 0；
+		// Windows 版用例靠它校验栈帧调整用的是 imm32 形式（参数一多就写穿调用者栈帧的那个边界）。
 		const std::uint8_t* codeBytes() const
 		{
 			return static_cast<const std::uint8_t*>(m_code);
@@ -81,11 +80,12 @@ namespace Thunk
 		}
 
 	private:
+		// 仅 Windows 版实现；Linux 版恒失败（内部走 libffi，不生成机器码）。
 		bool emitMachineCode(const Signature& signature, void* target);
 
-		void* m_code = nullptr;
+		void* m_code = nullptr; // Windows 版生成的机器码；Linux 版恒为空
 		std::size_t m_codeSize = 0;
-		// Linux 使用 libffi；Windows 的机器码字段保留以保持两平台头文件形状一致。
+		// Linux 版的 libffi 状态（FfiState*）；Windows 版不用它，保留字段只为两平台头文件形状一致。
 		void* m_state = nullptr;
 		QString m_errorString;
 	};

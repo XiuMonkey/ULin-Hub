@@ -1,12 +1,10 @@
-// 右栏面板坞里的「终端」块：宿主**自绘**的终端视图（不再有 WebEngine / xterm.js）。
-// 为什么不再走页面：VT 解析 + 网格 + 键盘编码都在 C++（TerminalVt ← libvterm；TerminalVtModel 是 QML 桥），
-// 页面那条路等于把同一件事在第二个语言里再做一遍。传输也在 C++：本文件不发网络请求，帧由
-// TerminalBridge → TerminalSession 喂进 VT；本面板只做三件事：建/绑视图（Terminal.bindView）、
-// 把"我属于哪个块 / 哪个会话"告诉桥、块关掉时通知桥解绑。
+// 右栏面板坞里的「终端」块：宿主自绘的终端视图（不再有 WebEngine / xterm.js）。
+// VT 解析 + 网格 + 键盘编码都在 C++（TerminalVt ← libvterm；TerminalVtModel 是 QML 桥），
+// 传输也在 C++：本文件不发网络请求，帧由 TerminalBridge → TerminalSession 喂进 VT。
+// 本面板只做三件事：建/绑视图（Terminal.bindView）、把"我属于哪个块 / 哪个会话"告诉桥、块关掉时解绑。
 // ⚠️ 对外契约不变：`blockId`（模型给的稳定 id）、`sessionId`（默认跟当前会话）、扩展后端缝
-// （HostUi::SetBlockBackend(owner, "terminal", backend)）。后端被扩展顶替时还是装自绘视图：按
-// `apiVersion` 选面 —— >=2 字节面（hostWrite/hostData，裸字节直通），否则页面面（兼容层，deprecated）；
-// 两条面都由 TerminalSession 接进同一个 VT。
+// （HostUi::SetBlockBackend(owner, "terminal", backend)）。后端被扩展顶替时仍装自绘视图，按 `apiVersion`
+// 选面 —— >=2 字节面（hostWrite/hostData，裸字节直通），否则页面面（兼容层，deprecated）；两条面接进同一个 VT。
 
 import QtQuick
 import ULinHub 1.0
@@ -17,11 +15,10 @@ Item {
     id: root
 
     property string blockId: ""   // 块的稳定 id（模型给的，见 PanelBarDock.activeBlockId / delegate 的 blockId 角色）
-    property string sessionId: Hub.currentSessionId   // 终端是**会话作用域**的：跟着当前会话走（换会话就改挂到那个会话的终端上）
+    property string sessionId: Hub.currentSessionId   // 终端是会话作用域的：跟着当前会话走（换会话就改挂到那个会话的终端上）
 
-    // 被扩展顶替时的后端（空 = 内置引擎）。**不再"创建时读一次"**：自绘路径下由 Terminal.bindBackend
-    // 把这条缝接上，而扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），
-    // 所以下面有一个低频轮询兜底（见 syncBackend 的注释）。
+    // 被扩展顶替时的后端（空 = 内置引擎）。不"创建时读一次"：扩展的登记可能比本面板晚 ~0.2s，
+    // 所以由 Terminal.bindBackend 在每次同步时接上，另有低频轮询兜底（见 syncBackend 的注释）。
     readonly property var backend: HostUi.blockBackend("terminal")
 
     // ANSI 16 色（索引语义固定）：与 TerminalView 内置的默认表同值（两份是有意的 —— 视图那份是
@@ -30,11 +27,9 @@ Item {
     readonly property var ansiDark: ["#000000", "#CD3131", "#0DBC79", "#E5E510", "#2472C8", "#BC3FBC", "#11A8CD", "#E5E5E5", "#666666", "#F14C4C", "#23D18B", "#F5F543", "#3B8EEA", "#D670D6", "#29B8DB", "#FFFFFF"]
     readonly property var ansiLight: ["#000000", "#CD3131", "#00BC00", "#949800", "#0451A5", "#BC05BC", "#0598BC", "#555555", "#666666", "#CD3131", "#14CE12", "#B5BA00", "#0451A5", "#BC05BC", "#0598BC", "#A5A5A5"]
 
-    // 后端缝：页面时代是 registerOn(channel, backend)，自绘路径没有页面了 ⇒ 走 Terminal.bindBackend。
-    // **幂等**（同一个后端反复接不动作），所以可以在多个时机反复调：
-    // ① 面板就绪 / 换块；② 低频轮询（HostUi 没有"后端变了"的信号，而扩展可能晚于面板登记，
-    // 也可能在运行期被卸载撤销 —— 轮询是唯一不引入新信号就能同时覆盖"晚到"和"撤销"的办法，
-    // 一次调用只是两次哈希查找，1 秒一次可以忽略）。
+    // 后端缝：页面时代是 registerOn(channel, backend)，自绘路径改走 Terminal.bindBackend（幂等，可反复调）。
+    // HostUi 没有"后端变了"的信号，而扩展可能晚于面板登记、也可能运行期被卸载 ⇒ 用低频轮询兜底：
+    // 一次调用只是两次哈希查找，1 秒一次可以忽略。
     function syncBackend() {
         Terminal.bindBackend(HostUi.blockBackend("terminal"))   // 直接调：attachTransport 自己就是幂等的（同一个后端不重复动作、null→null 也不动作）
     }
@@ -55,10 +50,10 @@ Item {
         view.model = Terminal.bindView(root.blockId)
 
         // 有扩展后端时，引擎那条路（terminal/environment → create）不该跑：不调 start。
-        // ⚠️ 扩展的登记可能比本面板晚 ~0.2s（它在 Component.onCompleted 里登记），那时这里读到的是 null，
-        // 于是 start() 照旧跑一次（内置引擎）。等轮询接上后端后，会话改用后端、引擎那次失败不会影响画面。
+        // ⚠️ 扩展登记可能比本面板晚 ~0.2s，那时这里读到 null，start() 照旧跑一次（内置引擎）；
+        // 等轮询接上后端后会话改用后端，引擎那次失败不影响画面。
         // 后端在场时仍要把"块属于哪个会话"告诉桥：字节面的 hostStart(blockId, sessionId) 要这个参数，
-        // 而 bindSession 是**只记 id、不碰引擎**的旁路（不会建终端、不会发任何 terminal/*）。
+        // 而 bindSession 是只记 id、不碰引擎的旁路（不建终端、不发 terminal/*）。
         if (HostUi.blockBackend("terminal") === null)
             Terminal.start(root.blockId, root.sessionId)
         else
@@ -85,11 +80,11 @@ Item {
         function onChanged() { root.pushTheme() }
     }
 
-    // 视图：直接写组件名（与 qml.qrc / 本目录同源）。早先这里考虑过 Style.url() 装载
-    // （<exe>/ui/ 遮蔽内置那个范式），但 Loader 会让每次切块都重建整个网格视图 —— 终端的
-    // 终端壳按网页 demo 的「工作台终端」：圆角深色卡 + 路径/状态头 + 网格/编码尾。
+    // 视图：直接写组件名（与 qml.qrc 同源）。不用 Style.url() + Loader（<exe>/ui/ 遮蔽内置那个范式）——
+    // Loader 会让每次切块都重建整个网格视图。
     readonly property var vtModel: view.model
     readonly property bool terminalAttached: vtModel !== null && String(vtModel.state) === "attached"
+    // 状态头文案：已连接 / 会话给的 statusText / 退化成 state / 连接中
     readonly property string connectionText: {
         if (vtModel === null)
             return qsTrId("terminal_connecting")
@@ -101,6 +96,7 @@ Item {
             : (state.length > 0 ? state : qsTrId("terminal_connecting"))
     }
 
+    // 终端壳按网页 demo 的「工作台终端」：圆角深色卡 + 路径/状态头 + 网格/编码尾。
     Rectangle {
         id: terminalFrame
         anchors.fill: parent

@@ -1,4 +1,4 @@
-﻿#include "common/session/SessionService.h"
+#include "common/session/SessionService.h"
 
 #include "common/agent/dsh/DshApiClient.h"
 #include "network/SessionCommands.h"
@@ -17,9 +17,7 @@ namespace
 	const char* const kSessionCreateMethod = "session/create";
 }
 
-void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog,
-	const std::function<void(const QString& autoSelectSessionId)>& onReady,
-	const std::function<void(const DshApiClient::RpcError& error)>& onError)
+void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog, const std::function<void(const QString& autoSelectSessionId)>& onReady, const std::function<void(const DshApiClient::RpcError& error)>& onError)
 {
 	if (!api || !catalog)
 		return;
@@ -46,7 +44,7 @@ void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog,
 			const QJsonArray items = value.value(QStringLiteral("items")).toArray();
 			state->sessions = items;
 			state->sessionsOk = true;
-			state->workspacesOk = false;   // workspacesOk 淇濇寔 false锛岃 catalog 淇濈暀 workspace/follow 缁欑殑鍩虹嚎鍒嗙粍
+			state->workspacesOk = false;   // 保持 false：让 catalog 保留 workspace/follow 给的基线分组
 			applySnapshot();
 		},
 		[state, applySnapshot](const DshApiClient::RpcError& error) {
@@ -57,9 +55,7 @@ void SessionService::refreshSessions(DshApiClient* api, SessionCatalog* catalog,
 		});
 }
 
-void SessionService::createSession(DshApiClient* api, const QString& workspaceId,
-	const std::function<void(const QString& sessionId)>& onCreated,
-	const std::function<void(const DshApiClient::RpcError& error)>& onError)
+void SessionService::createSession(DshApiClient* api, const QString& workspaceId, const std::function<void(const QString& sessionId)>& onCreated, const std::function<void(const DshApiClient::RpcError& error)>& onError)
 {
 	if (!api)
 		return;
@@ -78,8 +74,7 @@ void SessionService::createSession(DshApiClient* api, const QString& workspaceId
 		});
 }
 
-void SessionService::refreshTitles(DshApiClient* api,
-	const std::function<void(const QString& sessionId, const QString& title)>& onTitle)
+void SessionService::refreshTitles(DshApiClient* api, const std::function<void(const QString& sessionId, const QString& title)>& onTitle)
 {
 	if (!api)
 		return;
@@ -103,8 +98,7 @@ void SessionService::refreshTitles(DshApiClient* api,
 		[](const DshApiClient::RpcError&) {});
 }
 
-void SessionService::refreshRunningStates(DshApiClient* api, SessionCatalog* catalog,
-	const std::function<void(bool changed)>& onChanged)
+void SessionService::refreshRunningStates(DshApiClient* api, SessionCatalog* catalog, const std::function<void(bool changed)>& onChanged)
 {
 	if (!api || !catalog)
 		return;
@@ -117,7 +111,7 @@ void SessionService::refreshRunningStates(DshApiClient* api, SessionCatalog* cat
 				onChanged(changed);
 		},
 		[](const DshApiClient::RpcError&) {
-			// 杞婚噺鍒锋柊澶辫触涓嶆墦鎵扮敤鎴凤細椤舵爮閭ｉ鐐逛繚鎸佹棫鍊硷紝绛変笅涓€娆¤Е鍙?
+			// 轻量刷新失败不打扰用户：顶栏状态保持旧值，等下一次触发。
 		});
 }
 
@@ -126,11 +120,10 @@ void SessionService::deleteSessionData(const QString& dshHome, const QString& se
 	if (dshHome.isEmpty() || sessionId.isEmpty())
 		return;
 
-	// 浼氳瘽鐩綍閫氬父褰㈠ dshHome/sessions/<encoded-cwd>/session-<id>锛涙寜鐩綍鍚嶇簿纭尮閰嶏紝
-	// 涓嶈鍒犲悓鍓嶇紑鐨勫叾浠栦細璇濄€?
+	// 会话目录形如 dshHome/sessions/<encoded-cwd>/session-<id>，按目录名精确匹配，
+	// 避免误删同前缀的其他会话。
 	const QString root = dshHome + QStringLiteral("/sessions");
-	QDirIterator it(root, QDir::Dirs | QDir::NoDotAndDotDot,
-		QDirIterator::Subdirectories);
+	QDirIterator it(root, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
 	while (it.hasNext()) {
 		const QString path = it.next();
 		if (QFileInfo(path).fileName() == sessionId) {
@@ -151,8 +144,8 @@ void SessionService::clearAllSessionData(const QString& dshHome)
 		sessionsDir.mkpath(QStringLiteral("."));
 	}
 
-	// 鏈杩愯鍐呯殑鍒嗙粍涓嶅彈褰卞搷 鈥斺€?娉ㄥ唽琛ㄦ椿鍦ㄦ湇鍔＄杩涚▼鍐呭瓨閲岋紝涓旀瘡娆″彉鏇撮兘浼氶噸鏂板啓鐩?
-	// 锛坉sh-storage-json 鐨?putRecord 鈫?publish锛夛紝鎵€浠?杩炲綋鍓嶈繍琛岀殑宸ヤ綔鍖轰竴璧锋竻"瑕佽蛋 workspace/delete銆?
-	// 榛樿宸ヤ綔鍖轰笉鍦ㄨ繖閲岃ˉ锛岀敱 ClientRuntime::resolveSessionWorkspace() 鍦ㄧ己鍒嗙粍鏃惰ˉ寤恒€?
+	// 本次运行内的分组不受影响 —— 注册表活在服务端进程内存里，每次变更都会重新写盘
+	//（dsh-storage-json 的 putRecord → publish），所以"连当前运行的工作区一起清"要走 workspace/delete。
+	// 默认工作区不在这里补，由 ClientRuntime::resolveSessionWorkspace() 在缺分组时补建。
 	QFile::remove(dshHome + QStringLiteral("/storages/workspace.json"));
 }

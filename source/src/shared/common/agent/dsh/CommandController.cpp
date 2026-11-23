@@ -1,4 +1,4 @@
-﻿// 见 CommandController.h：斜杠命令的发现 / 过滤 / 执行。
+// 见 CommandController.h：斜杠命令的发现 / 过滤 / 执行。
 
 #include "common/agent/dsh/CommandController.h"
 
@@ -14,9 +14,8 @@
 
 namespace
 {
-	// 与引擎 dsh-commands/lib/index.js 的 COMMAND_NAME 同一条文法：
-	// 斜杠在字节 0、小写名（字母/数字/_/-），后面必须是空白或行尾。
-	// 捕获组 1 = 命令名；capturedEnd(0) 用来判断"名字后面有没有东西"。
+	// 与引擎 dsh-commands/lib/index.js 的 COMMAND_NAME 文法一致：斜杠在字节 0，
+	// 小写名（字母/数字/_/-），其后必须是空白或行尾；捕获组 1 为命令名。
 	const QRegularExpression& commandLinePattern()
 	{
 		static const QRegularExpression pattern(QStringLiteral("^/([a-z][a-z0-9_-]*)(?:\\s|$)"));
@@ -37,10 +36,9 @@ bool CommandController::looksLikeCommand(const QString& line)
 
 QVariantList CommandController::matching(const QString& text) const
 {
-	// 注意：这里**不能用执行用的严格文法**（commandLinePattern 要求名字至少一个字符，且
-	// · 只打一个 `/` 时名字还没开始，严格文法不匹配 ⇒ 菜单永不出现（而"打开命令列表"正是它的用途）；
-	// · 名字后打了空格时 `capturedEnd(0)` 已经越过空格 ⇒ 菜单赖着不走，挡住参数输入。
-	// 所以这里单独解析：`/` + 名字前缀（可为空），一旦出现空白就说明名字已敲定，收菜单。
+	// 不能用执行用的严格文法：只打 `/` 时名字尚未开始，严格文法不匹配会让菜单永不出现；
+	// 名字后已跟空格时菜单又迟迟不消失。因此单独解析 `/` + 名字前缀（可为空），
+	// 一旦出现空白就收菜单。
 	if (!text.startsWith(QLatin1Char('/')))
 		return QVariantList();
 
@@ -85,8 +83,7 @@ void CommandController::refresh(const QString& sessionId)
 				item.insert(QStringLiteral("name"), object.value(QStringLiteral("name")).toString());
 				item.insert(QStringLiteral("description"), object.value(QStringLiteral("description")).toString());
 				item.insert(QStringLiteral("hint"), input.value(QStringLiteral("hint")).toString());
-				item.insert(QStringLiteral("takesAttachments"),
-					input.value(QStringLiteral("attachments")).toBool());
+				item.insert(QStringLiteral("takesAttachments"), input.value(QStringLiteral("attachments")).toBool());
 				items.append(item);
 			}
 			setItems(items);

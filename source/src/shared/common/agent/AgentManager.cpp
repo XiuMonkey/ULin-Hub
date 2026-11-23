@@ -173,6 +173,7 @@ void AgentManager::emitRegistered()
 	emit registeredChanged();
 }
 
+// 读取用户上次选择的 master backend，缺省为内置 dsh。
 QString AgentManager::selectedId() const
 {
 	const QString saved = ClientSettings::read(QStringLiteral("AgentSetting.json"))

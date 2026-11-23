@@ -1,8 +1,8 @@
 #pragma once
 
-// DSH RPC 请求载荷的统一构造入口（纯 header + inline）：JSON payload 拼装收敛到这里，控制器只负责编排。
+// DSH RPC 请求载荷的统一构造入口（纯 header + inline）：JSON payload 拼装收敛在本文件，控制器只负责编排。
 // 约定：endpoint 是 `<namespace>/<method>`（斜杠，不是点号）；请求体恰好只有一个 `args` 对象，信封由 DshApiClient 包。
-// 因此这里返回的都是 **args 的内容**，键名必须是描述符里的 wire 名（多数是 `request`，session/list 是 `_request`，
+// 因此这些函数返回的都是 **args 的内容**，键名必须是描述符里的 wire 名（多数是 `request`，session/list 是 `_request`，
 // 无参是空对象，agentPresets/select 是 `agentId` + `agentPreset`，commands/* 与 terminal/* 的 agent 作用域是平铺 `agentId`）。
 
 #include <QJsonArray>
@@ -86,16 +86,14 @@ namespace SessionCommands
 	//  但一帧快照都不发，表现就是"点进子代理页签消息区全空"。parentSessionId 为空即普通会话。
 	// mode 取 subagentCatalog 条目的 mode（one-shot / continuable）；取不到传空 = "unknown"
 	// （引擎只在 mode != "unknown" 时校验它，空串兜底是安全的）。
-	inline QJsonObject sessionAddress(const QString& sessionId, const QString& parentSessionId = QString(),
-		const QString& mode = QString())
+	inline QJsonObject sessionAddress(const QString& sessionId, const QString& parentSessionId = QString(), const QString& mode = QString())
 	{
 		QJsonObject address;
 		if (!parentSessionId.isEmpty()) {
 			address.insert(QStringLiteral("kind"), QStringLiteral("subagent"));
 			address.insert(QStringLiteral("parentSessionId"), parentSessionId);
 			address.insert(QStringLiteral("childSessionId"), sessionId);
-			address.insert(QStringLiteral("mode"),
-				mode.isEmpty() ? QStringLiteral("unknown") : mode);
+			address.insert(QStringLiteral("mode"), mode.isEmpty() ? QStringLiteral("unknown") : mode);
 			return address;
 		}
 
@@ -106,8 +104,7 @@ namespace SessionCommands
 
 	// session/follow -> args { request: { address, assistantStream? } }。
 	// assistantStream = true 才有实时分片（不带只发已提交的整段消息）；流的生命周期在 DshApiClient。
-	inline QJsonObject sessionFollow(const QString& sessionId, const QString& parentSessionId = QString(),
-		const QString& mode = QString(), bool assistantStream = true)
+	inline QJsonObject sessionFollow(const QString& sessionId, const QString& parentSessionId = QString(), const QString& mode = QString(), bool assistantStream = true)
 	{
 		QJsonObject request;
 		request.insert(QStringLiteral("address"), sessionAddress(sessionId, parentSessionId, mode));
@@ -123,8 +120,7 @@ namespace SessionCommands
 	// 取 follow 快照的 cursor 或 session/list 行的 projections.asOfSeq（两者相等）；不传 beforeSeq = 预取"throughSeq 往前最近一页"，
 	// 传 = 首屏上翻（取当前内容里最早一条的 seq）；maxMessages 数的是**消息**而不是事件。
 	// parentSessionId 非空 = 子代理会话（见 sessionAddress 的说明）。
-	inline QJsonObject sessionPage(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0,
-		const QString& parentSessionId = QString(), const QString& mode = QString())
+	inline QJsonObject sessionPage(const QString& sessionId, int throughSeq, int maxMessages = 0, int beforeSeq = 0, const QString& parentSessionId = QString(), const QString& mode = QString())
 	{
 		QJsonObject request;
 		request.insert(QStringLiteral("address"), sessionAddress(sessionId, parentSessionId, mode));
@@ -207,8 +203,7 @@ namespace SessionCommands
 					if (message.value(QStringLiteral("isError")).toBool() && !reason.isEmpty())
 						text = QStringLiteral("[Tool error] %1\n%2").arg(reason, text);
 					if (data.contains(QStringLiteral("meta")))
-						text += QStringLiteral("\n\n[Tool details]\n%1").arg(QString::fromUtf8(
-							QJsonDocument(data.value(QStringLiteral("meta")).toObject()).toJson(QJsonDocument::Indented)));
+						text += QStringLiteral("\n\n[Tool details]\n%1").arg(QString::fromUtf8(QJsonDocument(data.value(QStringLiteral("meta")).toObject()).toJson(QJsonDocument::Indented)));
 					data.insert(QStringLiteral("message"), text);
 					event.insert(QStringLiteral("data"), data);
 				}
@@ -248,6 +243,7 @@ namespace SessionCommands
 		return events;
 	}
 
+	// 归一化（eventsFromRecords）后再包回 {type:"event", event:{…}} 记录，供按记录消费的路径使用。
 	inline QJsonArray legacyRecords(const QJsonArray& records)
 	{
 		QJsonArray normalized;
@@ -415,6 +411,7 @@ namespace SessionCommands
 		return args;
 	}
 
+	// commands/list -> args { agentId }
 	inline QJsonObject commandsList(const QString& sessionId)
 	{
 		QJsonObject args;

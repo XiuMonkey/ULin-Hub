@@ -1,14 +1,8 @@
 #pragma once
 
-// 分层：本文件是**正确样板**，本次不动 —— 算法（normalizeUrlInput）在
-// common/util/UrlInput，这里只转发一行；qmlbridge 的规矩就是"只做接线：属性/信号、Q_INVOKABLE 转发、
-// QAbstractListModel 的角色名映射，不放算法"。
-// QML 面：地址栏输入的规范化（QML 单例名 `UrlInput`，注册见 main.cpp）。
-// 真正的规则在 common/util/UrlInput.h 的 normalizeUrlInput —— 这里**只做转调**。
-// 为什么单独一个单例、而不是挂到 Hub（QmlBridge）上：QmlBridge 的契约是"接线 + 纯界面状态"，
-// 而这是一条**无状态纯函数**；单列一个单例后 QML 侧读起来是 `UrlInput.normalize(text)`，
-// 归属清楚，也不必为了一个函数去动 QML 唯一那扇门。注册机制与 WindowBridge / ThemeBridge
-// 完全一样（qmlRegisterSingletonInstance，"C++ 名字带 Bridge、QML 名字取短名"也是同一套惯例）。
+// QML 单例 `UrlInput`（注册见 main.cpp）：只把 normalize() 转调给 common/util/UrlInput 的
+// normalizeUrlInput，不承载算法 —— qmlbridge 的约定是"只做接线：属性/信号、Q_INVOKABLE 转发、
+// model 角色名映射"。单列一个无状态单例，QML 侧即可写成 UrlInput.normalize(text)。
 
 #include <QObject>
 #include <QString>

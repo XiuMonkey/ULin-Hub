@@ -17,7 +17,7 @@ Item {
     implicitWidth: bubble.width
     implicitHeight: bubble.height
     opacity: 0
-    visible: opacity > 0
+    visible: opacity > 0   // 淡出播完才隐藏：opacity 未归零前一直上屏，Behavior 不会被 visible 掐断
 
     function show(message) {
         text = message

@@ -6,6 +6,7 @@
 
 namespace
 {
+	// 服务端地址的落盘文件与字段名；读写一律经 ClientSettings（自带缺失/损坏兜底）。
 	const char* const kServerFile = "ServerSetting.json";
 	const char* const kUrlKey = "url";
 }

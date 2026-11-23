@@ -26,8 +26,8 @@ namespace ClientExtension
 		QHash<QString, QPluginLoader*> g_loaders;  // 已装载扩展的 loader（键 = 扩展名，所有权在 qApp）
 
 		const char* const kPendingRemovalMarker = ".pending-removal";  // 卸载时删不掉的目录留此标记，下次启动由 sweepPendingRemovals() 清掉
-		const char* const kDetachSlot = "detachHost()";  // 插件可选槽"我要退场了"：元对象层字符串契约（非接口方法），invoke 后宿主不再用插件的任何对象；老插件没有它也不踩空 vtable 槽位
-		const char* const kIdentitySlot = "setHostIdentity(QString)";  // 可选槽：attachHost() 之前推一次本扩展的安装目录名；架空舞台要求 owner 等于安装名才能校验所有权、卸载时收回它占的台，插件不必硬编码名字
+		const char* const kDetachSlot = "detachHost()";  // 可选槽"我要退场了"：元对象层字符串契约（非接口方法）；invoke 后宿主不再用插件的任何对象，老插件没有它也不踩空槽位
+		const char* const kIdentitySlot = "setHostIdentity(QString)";  // 可选槽：attachHost() 之前推一次本扩展的安装名；架空台按它校验所有权、卸载时收回，插件不必硬编码名字
 
 		// 身份文件 = <dir>/info.json5（老扩展是 regulation.json5）。规则归 ExtensionLoader 所有：
 		// "已安装"的判据、残留判定、启动扫描都走它，免得三处各写一个文件名。
@@ -191,8 +191,7 @@ namespace ClientExtension
 				HostUi::instance().releaseBlockBackends(name);
 
 				const bool unloaded = loader->unload();  // unload() 自己会把根组件删掉，这里不该手工 delete 插件对象
-				qInfo("[ClientExtension] remove: detach+unload %s -> %s", qPrintable(name),
-					unloaded ? "ok" : "failed (loader refused)");
+				qInfo("[ClientExtension] remove: detach+unload %s -> %s", qPrintable(name), unloaded ? "ok" : "failed (loader refused)");
 
 				if (unloaded)  // 实例已销毁、dll 也解映射，名字不再代表活着的东西；不摘掉的话"移除 → 再安装"会走"重新 attach"分支却找不到 loader、扩展按钮不出来
 					g_loadedNames.removeAll(name);
@@ -207,8 +206,6 @@ namespace ClientExtension
 					" falling back to mark + sweep", qPrintable(name), kDetachSlot);
 			}
 		}
-
-		// 是控件壳的能力，它要 QMainWindow*，而现在的宿主是 QQmlApplicationEngine + QML Window、永远抢不到台，所以整套连同 WindowFrame 一起删了。
 
 		// 删判据文件即"已卸载"：不再出现在列表，下次启动也不会被装载。
 		// 两个名字都删 —— 新装的是 info.json5，老扩展可能还叫 regulation.json5（只删存在的那个）。
@@ -363,5 +360,3 @@ namespace ClientExtension
 		qInfo("[ClientExtension] 退出收尾：%d 个扩展已退场，dll 随进程终止回收", int(names.size()));
 	}
 }
-
-// 宿主自己就是 QML 壳、Qt Quick 随宿主部署 ⇒ 运行时包与其 Subtype 预检一并退役，见 docs/codex-port-handover.md 工单 A。

@@ -9,8 +9,7 @@
 // 时机有讲究：WebEngine 首次建上下文时把这两个值读走并缓存，之后设无效，因此调用方要在
 // QApplication 之前（按 argv[0] 推）和之后（按真实 exe 目录兜底）各调一次。
 //
-// 路径写入统一走 EnvPath.h —— 那里收口了 Windows 上 qputenv 的本地 8 位编码问题，
-// 中文安装目录（D:\新建文件夹）不会再变成乱码路径。
+// 路径写入统一走 EnvPath.h —— 那里收口了 Windows 上 qputenv 的本地 8 位编码问题。
 
 #include "common/util/EnvPath.h"
 

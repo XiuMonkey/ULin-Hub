@@ -22,12 +22,11 @@ public:
 
 	void setBaseUrl(const QUrl& url);
 
-	// 复用宿主 api 客户端的 QNetworkAccessManager：鉴权 cookie 在它的 cookie jar 里（各用各的 NAM 会拿不到 ⇒ host need authentication）。
-
+	// 复用宿主 api 客户端的 QNetworkAccessManager：鉴权 cookie 在它的 cookie jar 里
+	// （各用各的 NAM 会拿不到 ⇒ host need authentication）。
 	void setNetworkAccessManager(QNetworkAccessManager* nam);
 
 	// 宿主 launch token：所有 /dsh-market/* 请求带上它（见 endpointUrl）。
-
 	void setAuthToken(const QString& token);
 
 	// 各接口路径（也用于让调用方识别失败来源）
@@ -79,7 +78,6 @@ private:
 	QUrl m_baseUrl;
 
 	// 宿主 launch token：新版 dshmarket(1.66.x) 要求宿主身份，否则 401
-
 	QString m_authToken;
 	QNetworkAccessManager* m_nam = nullptr;
 };

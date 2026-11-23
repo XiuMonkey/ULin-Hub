@@ -57,8 +57,7 @@ namespace ModelSelectionService
 		if (!api || sessionId.isEmpty() || !selection.isValid())
 			return;
 
-		api->callMethod(QLatin1String(kSelectModelMethod),
-			SessionCommands::sessionSelectModel(sessionId, selection.provider, selection.model, selection.reasoningEffort),
+		api->callMethod(QLatin1String(kSelectModelMethod), SessionCommands::sessionSelectModel(sessionId, selection.provider, selection.model, selection.reasoningEffort),
 			[selection, onSelected](const QJsonObject& value) {
 				if (!onSelected)
 					return;
@@ -242,7 +241,7 @@ namespace ModelSelectionService
 		mutateSettings(api, provider.settingsNs, ops, namespaceView, onAdded, onError);
 	}
 
-	// 删除模型：把"去掉该条目后的整份数组"写回去（数组写入即整体替换）
+	// 路由名转成环境变量形式的凭据引用：非字母数字一律换成下划线，末尾加 _API_KEY。
 	QString providerKeyRef(const QString& route)
 	{
 		QString ref;
@@ -257,9 +256,7 @@ namespace ModelSelectionService
 		return ref;
 	}
 
-	void createCustomProvider(DshApiClient* api, const SettingsNamespace& namespaceView, const CustomProviderRequest& request,
-		const std::function<void(const SettingsNamespace& updated)>& onCreated,
-		const std::function<void(const DshApiClient::RpcError& error)>& onError)
+	void createCustomProvider(DshApiClient* api, const SettingsNamespace& namespaceView, const CustomProviderRequest& request, const std::function<void(const SettingsNamespace& updated)>& onCreated, const std::function<void(const DshApiClient::RpcError& error)>& onError)
 	{
 		if (!api || !request.isValid()) {
 			if (onError) {
@@ -292,6 +289,7 @@ namespace ModelSelectionService
 		mutateSettings(api, QStringLiteral("llm-pi-ai"), ops, namespaceView, onCreated, onError);
 	}
 
+	// 删除模型：把"去掉该条目后的整份数组"写回去（数组写入即整体替换）。
 	void removeModel(DshApiClient* api, const ConfigurableProvider& provider, const SettingsNamespace& namespaceView, const QString& modelId, const std::function<void(const SettingsNamespace& updated)>& onRemoved, const std::function<void(const DshApiClient::RpcError& error)>& onError)
 	{
 		if (!api || modelId.isEmpty() || provider.settingsNs.isEmpty()) {

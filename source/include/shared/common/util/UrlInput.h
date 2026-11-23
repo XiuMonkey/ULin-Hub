@@ -1,9 +1,7 @@
 #pragma once
 
-// 地址栏输入的规范化 —— 从 basic/browser/WebBrowserPanel.qml 的 navigate 搬来。
-// 为什么进 C++（与仓库既有分层一致）：判 scheme / 判"像不像域名" / 拼搜索词 / 百分号编码
-// 都是一次**纯字符串变换**，与窗口、与 WebEngine 都无关。留在 QML 里既没法脱离窗口单测，
-// 也会随风格包被拷一份出来各写各的（WebBrowserPanel.qml 是可被风格包覆盖的单元）。
+// 地址栏输入的规范化：判 scheme / 判"像不像域名" / 拼搜索词 / 百分号编码都是纯字符串变换，
+// 与窗口、与 WebEngine 无关，所以放在 C++ 侧（可脱离窗口单测，也不会被风格包各拷一份）。
 // 这里只有自由函数（没有 QObject）：QML 面由 qmlbridge/UrlInputBridge 转调（单例名 `UrlInput`）。
 
 #include <QString>

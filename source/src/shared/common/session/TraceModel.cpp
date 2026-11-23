@@ -1,4 +1,4 @@
-// 这里刻意**不碰 UI**：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
+// 刻意不碰 UI：所有文案（"第 N 轮"/"工具"/"进行中"…）都由 QML 用 qsTrId 拼，
 // 模型只吐数据（kind + 数字 + 原文）。这样加语言不用改 C++，也不会出现"模型里塞中文"的老问题。
 
 #include "common/session/TraceModel.h"
@@ -18,7 +18,8 @@ namespace
 		return static_cast<qint64>(event.value(QStringLiteral("time")).toDouble());
 	}
 
-	QString blocksText(const QJsonValue& content)   // 内容块数组 -> 纯文本（只取 text 块；image / tool 等留给检查面板看原文）
+	// 内容块数组 -> 纯文本（只取 text 块；image / tool 等留给检查面板看原文）。
+	QString blocksText(const QJsonValue& content)
 	{
 		if (content.isString())
 			return content.toString();
@@ -64,7 +65,8 @@ namespace
 		return parts.join(QLatin1Char('\n'));
 	}
 
-	QString preview(const QString& text, int limit = 400)   // 单行预览：换行折成空格，超长截断（委托里还有 elide，这里只为不让模型带着整篇正文）
+	// 单行预览：换行折成空格，超长截断（委托里还有 elide，这里只为不让模型带着整篇正文）。
+	QString preview(const QString& text, int limit = 400)
 	{
 		const QString flat = text.simplified();
 		if (flat.size() > limit)
@@ -215,6 +217,38 @@ void TraceModel::setRecords(const QJsonArray& records)
 	rebuild();
 }
 
+void TraceModel::prependRecords(const QJsonArray& records)
+{
+	if (records.isEmpty())
+		return;
+
+	const int firstSeq = m_events.isEmpty()
+		? 0 : m_events.first().value(QStringLiteral("seq")).toInt();
+	QVector<QJsonObject> older;
+	int lastSeq = 0;
+	for (const QJsonValue& value : records) {
+		const QJsonObject event = unwrapRecord(value);
+		if (event.isEmpty())
+			continue;
+		const int seq = event.value(QStringLiteral("seq")).toInt();
+		if (seq > 0) {
+			if (seq <= lastSeq)
+				continue;   // 同一页内重复/倒退
+			if (firstSeq > 0 && seq >= firstSeq)
+				continue;   // 已经是当前账本里的记录，不重复前插
+			lastSeq = seq;
+		}
+		older.append(event);
+	}
+	if (older.isEmpty())
+		return;
+
+	QVector<QJsonObject> merged = older;
+	merged += m_events;
+	m_events = merged;
+	rebuild();
+}
+
 void TraceModel::appendEvent(const QJsonObject& event)
 {
 	if (event.isEmpty())
@@ -249,8 +283,8 @@ void TraceModel::setPaused(bool paused)
 }
 
 // 整表重建：换会话、follow 首帧快照、上翻一页。
-// ⚠️ 只有这里允许 beginResetModel —— 流式追加绝不能走 reset：
-// ListView 在 reset 时把全部委托作废重排，行高不一时 contentHeight（估值）会来回修正
+// 只有这里允许 beginResetModel —— 流式追加绝不能走 reset：
+// ListView 在 reset 时把全部委托作废重排，行高不一时 contentHeight（估值）会来回修正。
 void TraceModel::rebuild()
 {
 	beginResetModel();
@@ -535,7 +569,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 		const QString name = data.value(QStringLiteral("name")).toString();
 		const QString arguments = data.value(QStringLiteral("arguments")).toString();
 
-		QString prettyArguments = arguments;   // arguments 是模型产出的**原始 JSON 字符串**（未解析）；能解析就美化，不能就原样
+		QString prettyArguments = arguments;   // arguments 是模型产出的原始 JSON 字符串（未解析）；能解析就美化，不能就原样
 		const QJsonDocument parsed = QJsonDocument::fromJson(arguments.toUtf8());
 		if (!parsed.isNull())
 			prettyArguments = QString::fromUtf8(parsed.toJson(QJsonDocument::Indented));
@@ -567,8 +601,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 
 	if (type == QStringLiteral("tool/result")) {
 		const QJsonObject message = data.value(QStringLiteral("message")).toObject();
-		const QString callId = message.value(QStringLiteral("intentCallId")).toString(
-			message.value(QStringLiteral("toolCallId")).toString());
+		const QString callId = message.value(QStringLiteral("intentCallId")).toString(message.value(QStringLiteral("toolCallId")).toString());
 		const QJsonObject error = data.value(QStringLiteral("error")).toObject();
 		const bool failed = message.value(QStringLiteral("isError")).toBool() || !error.isEmpty();
 
@@ -667,6 +700,7 @@ void TraceModel::projectEvent(const QJsonObject& event)
 	// request/header、tool/ptc-dispatch 等：只在检查面板里有意义，不占记录表一行
 }
 
+// 汇总口径：turns / steps / tools / errors 是累计计数，耗时取首末事件的 time 差。
 void TraceModel::recomputeSummary()
 {
 	QVariantMap summary;
@@ -676,8 +710,7 @@ void TraceModel::recomputeSummary()
 	summary.insert(QStringLiteral("errors"), m_errors);
 	summary.insert(QStringLiteral("inputTokens"), static_cast<qlonglong>(m_inputTokens));
 	summary.insert(QStringLiteral("outputTokens"), static_cast<qlonglong>(m_outputTokens));
-	summary.insert(QStringLiteral("durationMs"),
-		m_firstTimeMs > 0 && m_lastTimeMs > m_firstTimeMs ? m_lastTimeMs - m_firstTimeMs : 0LL);
+	summary.insert(QStringLiteral("durationMs"), m_firstTimeMs > 0 && m_lastTimeMs > m_firstTimeMs ? m_lastTimeMs - m_firstTimeMs : 0LL);
 	summary.insert(QStringLiteral("durationText"), formatElapsed(m_lastTimeMs - m_firstTimeMs));
 	m_summary = summary;
 	emit summaryChanged();

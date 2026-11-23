@@ -13,6 +13,7 @@
 class VirtualConnectionManager
 {
 public:
+	// 一次白名单登记：Prev 保存接管前的原始配方，ReleaseTakeover 用它回滚。
 	struct ConnectionGroup
 	{
 		QPointer<QObject> Sender;
@@ -36,6 +37,7 @@ public:
 	// 交还接管，恢复接管前配方。
 	virtual bool ReleaseTakeover(QString index) = 0;
 
+	// 按 index 挂起（断开但保留登记）、删除登记、按登记表重连（Lambda 槽重连不了）。
 	virtual void SuspendConnection(QString index) = 0;
 	virtual void PublicRemoveConnection(QString index) = 0;
 	virtual void Reconnect(QString index) = 0;

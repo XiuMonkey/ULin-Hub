@@ -45,6 +45,7 @@ UlinCoreSettings::UlinCoreSettings(QObject* parent)
 
 void UlinCoreSettings::setDataDir(const QString& dir)
 {
+	// 目录变化或尚未加载时才重读设置。
 	if (m_dataDir == dir && m_loaded)
 		return;
 	m_dataDir = dir;
@@ -69,8 +70,7 @@ const UlinCoreSettings::ProviderEntry* UlinCoreSettings::providerById(const QStr
 	return nullptr;
 }
 
-const UlinCoreSettings::ModelEntry* UlinCoreSettings::modelById(const ProviderEntry& provider,
-	const QString& id) const
+const UlinCoreSettings::ModelEntry* UlinCoreSettings::modelById(const ProviderEntry& provider, const QString& id) const
 {
 	for (const ModelEntry& model : provider.models) {
 		if (model.id == id)
@@ -81,6 +81,7 @@ const UlinCoreSettings::ModelEntry* UlinCoreSettings::modelById(const ProviderEn
 
 void UlinCoreSettings::selectFirstAvailable()
 {
+	// 保证选中的 provider/model 始终有效，失效时回退到第一个。
 	if (m_providers.isEmpty()) {
 		m_selectedProvider.clear();
 		m_selectedModel.clear();
@@ -100,6 +101,7 @@ void UlinCoreSettings::selectFirstAvailable()
 
 void UlinCoreSettings::ensureLoaded()
 {
+	// 首次访问时读取 settings.json；文件不存在就落默认配置。
 	if (m_loaded)
 		return;
 	m_loaded = true;
@@ -191,6 +193,7 @@ void UlinCoreSettings::ensureLoaded()
 
 QVariantList UlinCoreSettings::providers() const
 {
+	// QML 侧按行读取 provider 与 model，selected 只标记当前项。
 	QVariantList rows;
 	for (const ProviderEntry& provider : m_providers) {
 		QVariantList models;
@@ -235,6 +238,7 @@ QString UlinCoreSettings::selectedModelName() const
 	return model ? model->id : QString();
 }
 
+// 本地没填 key 时回落到环境变量，供首次启动直接可用。
 bool UlinCoreSettings::selectedProviderHasKey() const
 {
 	if (!selectedApiKey().isEmpty())
@@ -263,6 +267,7 @@ double UlinCoreSettings::selectedTemperature() const
 
 void UlinCoreSettings::addProvider(const QString& name, const QString& baseUrl, const QString& apiKey)
 {
+	// provider id 由名字生成 slug，冲突时追加序号。
 	ProviderEntry provider;
 	provider.id = slugFor(name, QStringLiteral("provider"));
 	QString id = provider.id;
@@ -279,8 +284,7 @@ void UlinCoreSettings::addProvider(const QString& name, const QString& baseUrl, 
 	save();
 }
 
-void UlinCoreSettings::updateProvider(const QString& id, const QString& name,
-	const QString& baseUrl, const QString& apiKey)
+void UlinCoreSettings::updateProvider(const QString& id, const QString& name, const QString& baseUrl, const QString& apiKey)
 {
 	for (ProviderEntry& provider : m_providers) {
 		if (provider.id != id)
@@ -319,8 +323,7 @@ void UlinCoreSettings::selectProvider(const QString& id)
 	save();
 }
 
-void UlinCoreSettings::addModel(const QString& providerId, const QString& id, const QString& name,
-	int maxTokens, double temperature)
+void UlinCoreSettings::addModel(const QString& providerId, const QString& id, const QString& name, int maxTokens, double temperature)
 {
 	ProviderEntry* provider = nullptr;
 	for (ProviderEntry& entry : m_providers) {
@@ -341,6 +344,7 @@ void UlinCoreSettings::addModel(const QString& providerId, const QString& id, co
 		unique = model.id + QStringLiteral("-%1").arg(suffix);
 	model.id = unique;
 	model.name = name.trimmed().isEmpty() ? model.id : name.trimmed();
+	// 模型参数写入前做范围夹取。
 	model.maxTokens = qBound(128, maxTokens, 65536);
 	model.temperature = temperature;
 	provider->models.append(model);
@@ -351,8 +355,7 @@ void UlinCoreSettings::addModel(const QString& providerId, const QString& id, co
 	save();
 }
 
-void UlinCoreSettings::updateModel(const QString& providerId, const QString& modelId,
-	const QString& name, int maxTokens, double temperature)
+void UlinCoreSettings::updateModel(const QString& providerId, const QString& modelId, const QString& name, int maxTokens, double temperature)
 {
 	for (ProviderEntry& provider : m_providers) {
 		if (provider.id != providerId)
@@ -407,6 +410,7 @@ void UlinCoreSettings::setStatus(const QString& status)
 	emit statusChanged();
 }
 
+// GET <base>/models 拉取模型清单：只补新增项，不覆盖本地已配置的名称与参数。
 void UlinCoreSettings::fetchModels(const QString& providerId)
 {
 	const ProviderEntry* provider = providerById(providerId);
@@ -438,6 +442,7 @@ void UlinCoreSettings::fetchModels(const QString& providerId)
 	if (!m_network)
 		m_network = new QNetworkAccessManager(this);
 
+	// 模型列表端点由 baseUrl 推导，兼容填了 /chat/completions 的旧配置。
 	QNetworkRequest request(QUrl(base + QStringLiteral("/models")));
 	request.setRawHeader("Authorization", QByteArray("Bearer ") + key.toUtf8());
 	request.setRawHeader("Accept", "application/json");
@@ -508,6 +513,7 @@ bool UlinCoreSettings::writeFile(QString* error) const
 		return false;
 	}
 
+	// 统一写 settings.json：providers、当前选中项与全局选项。
 	QJsonArray providers;
 	for (const ProviderEntry& provider : m_providers) {
 		QJsonArray models;
@@ -550,6 +556,7 @@ bool UlinCoreSettings::writeFile(QString* error) const
 
 void UlinCoreSettings::save()
 {
+	// 保存成功后发 saved 信号，主代理据此重建模型。
 	QString error;
 	if (!writeFile(&error)) {
 		setStatus(error);
@@ -570,6 +577,7 @@ void UlinCoreSettings::resetToDefaults()
 {
 	m_providers.clear();
 
+	// 默认配置：DeepSeek 两个模型、4 线程、24 步、默认禁写。
 	ProviderEntry provider;
 	provider.id = QStringLiteral("deepseek");
 	provider.name = QStringLiteral("DeepSeek");
@@ -592,8 +600,7 @@ void UlinCoreSettings::resetToDefaults()
 	m_providers.append(provider);
 	m_selectedProvider = provider.id;
 	m_selectedModel = chat.id;
-	m_systemPrompt = QStringLiteral(
-		"You are ULin Core, a concise coding agent. Use tools when they help.");
+	m_systemPrompt = QStringLiteral("You are ULin Core, a concise coding agent. Use tools when they help.");
 	m_workspaceRoot = QStringLiteral("launch-root");
 	m_toolThreads = 4;
 	m_maxSteps = 24;

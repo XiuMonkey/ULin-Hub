@@ -1,9 +1,7 @@
-// 折叠行（照官方 DisclosureRow 规格）。官方出处：dsh-client-ui-primitives/lib/DisclosureRow.module.css +
-// dsh-client-ui-chat 的 ReasoningRow / ChatGroupSeat、dsh-client-ui-tool 的 ToolRow（dsh 0.2.0-rc.2）。
-// 规格（截图逐条核对过）：行高恒 24px、无底块/描边/圆角/悬停底色，只有一行 tertiary 文字；标题 13px，
-// 悬停 textSecondary；折叠摘要内联在标题后（2×2 圆点 + 单行省略）；展开/收起瞬时切换（无高度动画）；
-// 工具行传 keepContentWhenOpen（展开后摘要仍在），思考行不传；工具正文限高 260、思考 400 内滚。
-// ⚠️ 过程组只做排版容器、自己不再限高：组一旦内滚，同组后面的成员行会被卷进滚动内容（见 AgentBubble 的注）。
+// 折叠行（照官方 DisclosureRow 规格：行高恒 24px、无底块/描边/圆角/悬停底色，只有一行 tertiary 文字；
+// 标题 13px，悬停 textSecondary；折叠摘要内联在标题后（2×2 圆点 + 单行省略）；展开/收起瞬时切换）。
+// 工具行传 keepSummaryWhenExpanded（展开后摘要仍在），思考行不传；工具正文限高 260、思考 400 内滚。
+// 过程组只做排版容器、自己不再限高：组一旦内滚，同组后面的成员行会被卷进滚动内容（见 AgentBubble 的注）。
 // 图标与箭头都用 Canvas 画：项目没有线性图标资源，U+2303/U+2304（⌃⌄）在部分字体里缺字、会渲染成豆腐块。
 
 import QtQuick
@@ -116,10 +114,9 @@ Column {
                     ctx.lineJoin = "round"
 
                     if (kind === "think") {
-                        // 用户反馈那个形状像"复选框打了个叉/取消"，而这一行的语义是"模型在想"。
-                        // 四角星是 AI 生成语境里的通用符号，1.1px 线条 + 内凹曲线在 14px 下仍认得出。
-                        // 画法：外尖 + 内凹各一条直线组成的八点星（尖端贴 1.6 / 12.4，腰部收到 5.6）。
-                        // 用直线而不是曲线：14px 下贝塞尔的内凹会被抗锯齿糊成一团，直线星反而认得出。
+                        // 四角星是 AI 生成语境的通用符号（之前那个形状被反馈像"复选框打了个叉"）。
+                        // 画法：外尖 + 内凹各一条直线组成的八点星（尖端贴 1.6 / 12.4，腰部收到 5.6），
+                        // 14px 下用直线比贝塞尔的内凹更认得出。
                         ctx.beginPath()
                         ctx.moveTo(7.0, 1.6)     // 上尖
                         ctx.lineTo(8.4, 5.6)     // 右上内凹
@@ -197,8 +194,8 @@ Column {
             color: root.labelColor
             font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.body
-            // 折叠行只有 24px：默认 NoWrap 虽禁自动折行，但命令/工具名里的显式 \n 照样断行，
-            // 会把这一行撑高、顶到后面的成员行上（同 EntryChip.qml:228-233 的坑）。
+            // 折叠行只有 24px：命令/工具名里的显式 \n 照样断行，会把这一行撑高、顶到后面的成员行上
+            // （同 EntryChip 里踩过的坑）。
             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
             maximumLineCount: 1
             elide: Text.ElideRight
@@ -254,8 +251,8 @@ Column {
             maximumLineCount: 1
             elide: Text.ElideRight
 
-            // 官方在流式尾巴上给摘要套 TextShimmer（高亮扫光）。**本版不做任何动画**：
-            // 而且还拖累 MessageListView 的贴底（每次 opacity 变化都触发一次重绘）。
+            // 官方在流式尾巴上给摘要套 TextShimmer（高亮扫光），本版不做任何动画：它看不见，
+            // 还拖累 MessageListView 的贴底（每次 opacity 变化都触发一次重绘）。
             // running 只保留成属性（调用方还在算"这一段是不是流式尾巴"），不再驱动视觉。
         }
 
@@ -285,8 +282,8 @@ Column {
         id: bodyWrapper
         width: root.width
 
-        // 只裁自己的内容；高度**必须**等于滚动区的实际占高：wrapper 是 root Column 的兄弟排布依据，
-        // 下一条内容（过程组里的工具调用行等）从 bodyFlick.height 之后开始排。滚动区绝不冒出去。
+        // 只裁自己的内容；高度必须等于滚动区实际占高：wrapper 是 root Column 的兄弟排布依据，
+        // 下一条内容（过程组里的工具调用行等）从 bodyFlick.height 之后开始排，滚动区绝不冒出去。
         clip: true
         implicitHeight: root.expanded ? bodyFlick.height : 0
         height: implicitHeight
@@ -322,11 +319,9 @@ Column {
                 ? scrollBar.implicitWidth + 2
                 : 0
 
-            // 滚轮：**推理区自己能滚时，由它独占滚轮**（到顶/到底也不把事件放给外层消息列表）。
-            // 为什么必须自己接管：Qt 的 Flickable 在内容边缘**不消费**滚轮 —— 内层到底后再滚一格，
-            // 内层停在 maxContentY 不动、外层 ListView 却跟着滚了 120px（正是用户说的"滚一下跳两处"）。
-            // 反过来，内容没超高时下面的 WheelHandler 直接 enabled=false，滚轮照常落到外层列表 ——
-            // 鼠标停在"展开但其实很短"的推理区上时列表还能滚。
+            // 滚轮：推理区自己能滚时由它独占，到顶/到底也不把事件放给外层消息列表。必须自己接管：
+            // Qt 的 Flickable 在内容边缘不消费滚轮，内层到底后再滚一格，外层 ListView 会跟着滚（"滚一下跳两处"）；
+            // 内容没超高时下面的 WheelHandler enabled=false，滚轮照常落到外层列表。
             function handleWheel(angleY, pixelY) {
                 if (!needsScroll)
                     return false
@@ -340,19 +335,17 @@ Column {
 
             WheelHandler {
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                enabled: bodyFlick.needsScroll   // 也不会再交给祖先的 WheelHandler）—— 展开但很短的正文会因此吞掉外层列表的滚轮
+                enabled: bodyFlick.needsScroll   // 不可滚时不接管，滚轮落到外层列表
                 onWheel: function(event) {
                     event.accepted = bodyFlick.handleWheel(event.angleDelta.y, event.pixelDelta.y)
                 }
             }
 
-            // 滚动条：挂在 Flickable 上（框架摆到右缘、按 visibleArea 定长度），这里只负责
+            // 滚动条挂在 Flickable 上（框架摆到右缘、按 visibleArea 定长度），这里只管两件事：
             // · 不需要滚动时整条关掉（policy 用 AlwaysOff，把手也不会画）；
-            // · 可见把手的几何：Basic 样式默认 padding:2 会把 contentItem 四边各缩 2px ——
-            // 10px 厚的滚动条可见把手只剩 4px，还上下顶满区块。左右归零找回 AppScrollBar 设计的
-            // 8px 把手（与它头注里的 10/8 一致），上下各留 4px，不贴推理区的上下边缘。
-            // 注：其它地方的 AppScrollBar 仍是 4px 把手（同一个 padding 坑）；这里先只修推理区，
-            // 全局改会把 Composer 只按 8px 预留的宽度顶到字上，需要一起调，暂不动。
+            // · 修 Basic 样式默认 padding:2 的坑：四边各缩 2px 会让 10px 滚动条的可见把手只剩 4px。
+            // 左右归零找回 AppScrollBar 设计的 8px 把手，上下各留 4px；其它位置的 AppScrollBar 仍是
+            // 4px 把手（全局改会把 Composer 按 8px 预留的宽度顶到字上），暂不动。
             ScrollBar.vertical: AppScrollBar {
                 id: scrollBar
                 objectName: "collapseScrollBar"   // 供离屏试装台定位
@@ -365,7 +358,7 @@ Column {
 
             Column {
                 id: bodyHolder
-                width: bodyFlick.width - bodyFlick.scrollGutter   // 右侧让出 scrollGutter（滚动条只在需要时出现，沟宽随之在 0 / thickness+2 之间切）
+                width: bodyFlick.width - bodyFlick.scrollGutter   // 右侧让出 scrollGutter：滚动条出现时才留沟
                 spacing: Theme.spacing.buttonGap
             }
         }

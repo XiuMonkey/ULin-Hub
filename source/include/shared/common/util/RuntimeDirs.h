@@ -42,8 +42,7 @@ inline RuntimeDirs prepareRuntimeDirs()
 	QDir().mkpath(dirs.runDir);
 	setEnvPath("ULINHUB_TEMP_RUN", dirs.runDir);
 
-	const QFileInfoList stale = QDir(dirs.tempRoot).entryInfoList(
-		{ QStringLiteral("run-*") }, QDir::Dirs | QDir::NoDotAndDotDot);
+	const QFileInfoList stale = QDir(dirs.tempRoot).entryInfoList({ QStringLiteral("run-*") }, QDir::Dirs | QDir::NoDotAndDotDot);
 	const QString currentRun = QDir(dirs.runDir).absolutePath();
 	for (const QFileInfo& info : stale) {
 		if (info.absoluteFilePath() != currentRun)

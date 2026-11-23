@@ -27,22 +27,23 @@ Item {
     property bool cursorBlink: true   // 光标闪烁
 
     // 面板尺寸算出来的网格。
-    // ⚠️ 首帧/尺寸未定时 flick 的宽高还是 0，算式会算出负数 —— 必须夹掉"没有布局"的情形：
+    // ⚠️ 首帧/尺寸未定时 flick 的宽高还是 0，算式会算出负数 —— 必须夹掉"没有布局"的情形，
     // 否则会把 2×1 这种退化尺寸推给 VT，而 libvterm 的 screen_resize 遇到这种尺寸会直接 abort
-    // pushGridSize() 见 0 直接跳过，等布局真出来再推一次。
+    // （pushGridSize() 见到 0 直接跳过，等布局真出来再推一次）。
     readonly property int gridCols: (flick.width > padding * 2 && cellWidth > 1)
                                     ? Math.max(2, Math.floor((flick.width - padding * 2) / cellWidth)) : 0
     readonly property int gridRows: (flick.height > padding * 2 + lineHeight)
                                     ? Math.max(1, Math.floor((flick.height - padding * 2) / lineHeight)) : 0
     readonly property real cellWidth: metrics.advanceWidth
 
-    TextMetrics {   // 网格量宽用：等宽字体里 "M" 的advance 就是格宽；宽字符按两格算（CJK 在等宽字体里正好两倍）
+    TextMetrics {   // 网格量宽用：等宽字体里 "M" 的 advance 就是格宽；宽字符按两格算（CJK 在等宽字体里正好两倍）
         id: metrics
         font.family: root.fontFamily
         font.pixelSize: root.fontSize
         text: "M"
     }
 
+    // ANSI 16 色默认表（索引语义固定；宿主主题的现行值在 TerminalPanel，两份是有意的）
     readonly property var ansiDark: ["#000000", "#CD3131", "#0DBC79", "#E5E510", "#2472C8", "#BC3FBC", "#11A8CD", "#E5E5E5", "#666666", "#F14C4C", "#23D18B", "#F5F543", "#3B8EEA", "#D670D6", "#29B8DB", "#FFFFFF"]
     readonly property var ansiLight: ["#000000", "#CD3131", "#00BC00", "#949800", "#0451A5", "#BC05BC", "#0598BC", "#555555", "#666666", "#CD3131", "#14CE14", "#B5BA00", "#0451A5", "#BC05BC", "#0598BC", "#A5A5A5"]
     readonly property color defaultFg: darkTheme ? "#E5E5E5" : "#333333"
@@ -59,15 +60,15 @@ Item {
     readonly property int fConceal: 128
     readonly property int fStrike: 256
 
-    property var rows: []
+    property var rows: []   // 逐行段数组：rows[i] 是该行的 [文本, fg, bg, flags] 段列表
     property int padding: 6
     property bool cursorOn: true   // 光标闪烁相位（只在需要重画光标时才动）
 
     clip: true
 
-    // 键盘入口：**本视图必须拿到 active focus**，Keys.onPressed 才会来（这是"输入不进去"的第一现场）。
-    // focus:true 只是"在本作用域里声明想要焦点"，真正生效要靠 forceActiveFocus()：
-    // 一直是 null / QQuickRootItem）。所以下面还有三处主动要焦点：建好模型、绑上块、以及点一下视图。
+    // 键盘入口：本视图必须拿到 active focus，Keys.onPressed 才会来（这是"输入不进去"的第一现场）。
+    // focus: true 只是"在本作用域里声明想要焦点"，真正生效要靠 forceActiveFocus()。
+    // 所以下面还有三处主动要焦点：建好模型、绑上块、以及点一下视图。
     focus: true
     activeFocusOnTab: false   // Tab 必须留给 PTY（补全/切换焦点在 shell 里是 Tab 键的活），所以不参与 Tab 焦点导航
 
@@ -86,6 +87,7 @@ Item {
         return "#" + ("000000" + (value >>> 0).toString(16)).slice(-6)   // 0xRRGGBB → "#rrggbb"
     }
 
+    // 索引色查表；越界回退到默认前景色
     function paletteColor(index) {
         var table = darkTheme ? ansiDark : ansiLight
         return (index >= 0 && index < table.length) ? table[index] : root.defaultFg
@@ -107,6 +109,7 @@ Item {
         rows = next
     }
 
+    // 整屏重取：模型尺寸变了或脏行覆盖全屏时走这里
     function reloadAll() {
         if (!model)
             return
@@ -197,6 +200,7 @@ Item {
         onTriggered: root.cursorOn = !root.cursorOn
     }
 
+    // 键盘编码：可打印 ASCII 按 text 发，特殊键/组合键走 Qt 键盘表，最后统一把字节交给桥
     function handleKey(key, text, modifiers) {
         if (!root.model)
             return
@@ -243,9 +247,7 @@ Item {
         root.handleKey(event.key, event.text, event.modifiers)
     }
 
-    // 没有 activeFocus 时也把按键接住（比如焦点在别处但鼠标刚点进来这一瞬）：
-    // QML 的 Keys 只在有焦点时投递，这里用 Window 级兜底没有意义 —— 真正的手段是 grabFocus()，
-    // 所以这里只把"焦点丢了"这件事记进日志，别静默（用户报障时第一眼就能看出来）。
+    // 失焦只记一条日志：Keys 只在有焦点时投递，真正的手段是 grabFocus()，别静默（用户报障时第一眼就能看出来）。
     onActiveFocusChanged: {
         cursorOn = true
         if (!activeFocus && model !== null)
@@ -442,10 +444,7 @@ Item {
             if (!root.model)
                 return
             var lines = wheel.angleDelta.y / 40   // 一格滚轮 ≈ 3 行（120/40）
-            root.model.scrollBy(lines > 0 ? Math.max(1, Math.round(lines))
-                                          : Math.min(-1, Math.round(lines)))
+            root.model.scrollBy(lines > 0 ? Math.max(1, Math.round(lines)) : Math.min(-1, Math.round(lines)))
         }
     }
-
-    // 视图自己的 blockId 已在上面的"外部契约"里声明（键盘路径用它路由 Terminal.flushInput）
 }

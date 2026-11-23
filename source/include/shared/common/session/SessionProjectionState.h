@@ -1,10 +1,10 @@
 ﻿#pragma once
 
-// 小灰字（会话统计）的本地投影合并态（纯 header + inline）：两块投影分开记，哪个来源带了哪块就更新
-// 哪块、没带的保持原样（整包覆盖会把快照带来的"轮/步 + 耗时"擦掉，踩过）。合并规则只有一条
-// 「服务端 higher-seq-wins」，比已并进来的旧就整帧丢弃。两个来源都走这里：follow 快照的全量折叠、
-// control 的 baseline 与实时帧。只合并 JSON 不拼行文本；SessionUsageStats 在 ui/ChatInputWidget.h，
-// 本类在 common/session/ 不能反向依赖 UI 层，对外只吐 QJsonObject。
+// 小灰字（会话统计）的本地投影合并态：sessionStats 与 tokenUsage 两块分开记，哪个来源带了哪块
+// 就更新哪块、没带的保持原样（整包覆盖会擦掉快照带来的"轮/步 + 耗时"）。合并规则只有一条：
+// 「服务端 higher-seq-wins」，比已并进来的旧就整帧丢弃。follow 快照与 control 的 baseline/实时帧都走这里。
+// 只合并 JSON 不拼行文本；本类在 common/session/，不反向依赖 ui/ChatInputWidget.h 的 SessionUsageStats，
+// 对外只吐 QJsonObject。
 
 #include <QJsonObject>
 #include <QJsonValue>
@@ -47,7 +47,7 @@ public:
 	}
 
 	// 两块合并后的整包，交给 parseSessionUsage 拼小灰字那一行。
-	// 注意：两块都空时也照样返回空对象 —— 全 0 也要交给控件（那条小灰字是"始终显示"的）。
+	// 两块都空时也照样返回空对象 —— 全 0 也要交给控件（那条小灰字是"始终显示"的）。
 	QJsonObject merged() const
 	{
 		QJsonObject merged;

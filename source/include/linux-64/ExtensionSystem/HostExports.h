@@ -25,7 +25,7 @@
 #define ULINHUB_HOST_SYM_ABI_VERSION   "ULinHubHostAbiVersion"
 #define ULINHUB_HOST_SYM_REGISTRY_FIND "ULinHubHostRegistryFind"
 
-// C ABI 函数类型（定义在 src/ExtensionSystem/HostExports.cpp）；返回的 void* = QObject*，不存在或已销毁时是 nullptr。
+// C ABI 函数类型（定义在 src/linux-64/ExtensionSystem/HostExports.cpp）；返回的 void* = QObject*，不存在或已销毁时是 nullptr。
 using DshHostAbiVersionFn = unsigned int (*)(void);
 using DshHostRegistryFindFn = void* (*)(const char* index);
 

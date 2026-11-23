@@ -1,8 +1,8 @@
-﻿#pragma once
+#pragma once
 
 // 工具扩展 DLL 的启动装载（纯 header + inline）：env 显式指定则只加载那一份，否则扫描 extensions/
 // 与 node_modules/ 下每个扩展目录的 **regulation.json5（注册表：Function[]）+ main.so**；
-// caller 内部按扩展名去重。注意认的是注册表而不是身份文件（info.json5）—— 客户端扩展根本没有
+// caller 内部按扩展名去重。认的是注册表而不是身份文件（info.json5）—— 客户端扩展根本没有
 // regulation.json5，靠这一点天然被排除；纯 DLL 却没声明 Function[] 的扩展也扫不到，装了也没有工具可调。
 // 与 ExtensionLoader（管 .ext 安装）、ClientExtension::loadAll（客户端扩展）不是一回事。
 
@@ -23,6 +23,7 @@ namespace ExtensionDllLoader
 		if (!caller)
 			return;
 
+		// env 双指定（DSH_DLL_JSON5 / DSH_DLL）时只加载这一对，不再扫描目录
 		QString descriptorPath = qEnvironmentVariable("DSH_DLL_JSON5", QString());
 		QString soPath = qEnvironmentVariable("DSH_DLL", QString());
 

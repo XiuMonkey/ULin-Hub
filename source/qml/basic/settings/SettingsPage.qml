@@ -1,9 +1,8 @@
-// 设置（按原版 ui/Settings.cpp + ui/PopupWindow.cpp 复刻）
-// 弹窗外壳：可见卡片 632×432（原版窗口 680×480 含 CardShadow level3 的阴影留白
-// 24/16/24/32），radius 16，标题 #popupTitle 16px + 28×28 关闭按钮（tooltip common_close）。
-// 主体：左导航（宽 120、每项最小高 36、可 check，选中/悬停 = hoverBg）+ 右内容（间距 12）。
-// 导航顺序与原版一致：模型列表 / Agent预设 / Server设置 / 外观设置。
-// 文案一律用原版既有 id（qsTrId），不写字面量。
+// 设置页：按原版 ui/Settings.cpp + ui/PopupWindow.cpp 复刻，卡片 632×432、radius 16，
+// 标题 15px 半粗 + 28×28 关闭按钮（tooltip common_close）。
+// 左导航宽 120（每项最小高 34，选中 = panelBg、悬停 = activeBg），右内容间距 12。
+// 导航顺序：模型列表 / Agent预设 / Server设置 / 外观设置；文案用原版 qsTrId。
+// ulincore 模式换一套 6 项导航，标签为字面量。
 
 import QtQuick
 import ULinHub 1.0
@@ -12,7 +11,7 @@ import "../../widgets"
 Item {
     id: page
 
-    Component.onCompleted: HostUi.registerItem("settingsPage", page)
+    Component.onCompleted: HostUi.registerItem("settingsPage", page)   // 登记为扩展注入点：扩展可按名把 UI 挂进这一页
 
     // Master 后端切到自研内核时，第一页（原“模型列表”）自动换成 ULin Core 设置。
     readonly property bool ulincoreMode: Hub.settings.ulincoreMode
@@ -20,7 +19,7 @@ Item {
     implicitWidth: 632
     implicitHeight: 432
 
-    Item {   // 遮罩与圆角面都由 PageOverlay 提供（它还要按 t 动画），这里只留内容
+    Item {   // 遮罩与圆角面由 PageOverlay 绘制（含 t 动画），子项只放内容
         id: popup
         anchors.fill: parent
 
@@ -41,9 +40,8 @@ Item {
                 text: qsTrId("settings_title")
                 color: Theme.color.textPrimary
                 font.family: Theme.font.uiFamily
-                // 弹窗标题：不取 lead(16)。16px 常规字重在 632 宽的卡片里像"放大的正文"，
-                // 和下面 14px 的页面标题只差 2px，两级标题挤在一起反而都不像标题。
-                // 收敛到 15 + 半粗，靠字重立起层级，靠字号与正文(13)拉开。
+                // 弹窗标题不取 lead(16)：16px 常规字重在 632 宽的卡片里像"放大的正文"，
+                // 与下面 14px 的页面标题只差 2px，两级标题会挤在一起；收敛到 15 + 半粗，靠字重立层级。
                 font.pixelSize: 15
                 font.weight: Theme.font.weightBold
             }
@@ -71,9 +69,8 @@ Item {
             anchors.bottomMargin: 20
             spacing: 12
 
-            // 导航列：整列铺一块浅面（#F7F8F9）并加圆角，与右侧纯白内容分栏。
-            // 原版只有"几行灰字"，选中项又是一块和 hover 同色的灰，看不出"导航 / 内容"的分界，
-            // 也分不清当前停在哪一页 —— 这里把选中项反过来做成"白底浮在面上"。
+            // 导航列整列铺 windowBg 圆角面与右侧分栏；选中项做成白底浮在面上，
+            // 避免原版"几行灰字 + 选中与悬停同色"分不清当前页。
             Item {
                 id: navColumn
                 width: 120
@@ -96,7 +93,7 @@ Item {
                     spacing: 2
 
                     Repeater {
-                        // ulincore 模式下换一套导航：提供商 / 模型 / 运行时 / 数据 / Agent / 外观 / 服务
+                        // ulincore 模式下换一套导航：模型列表 / 运行时 / 数据 / Agent / 外观 / 服务
                         model: page.ulincoreMode
                             ? [
                                 { label: "模型列表", icon: "model" },
@@ -173,11 +170,12 @@ Item {
                 }
             }
 
-            Item {   // 右内容区：通用 4 页；ulincore 模式下换成 7 页（含 Agent / 外观 / 服务）
+            Item {   // 右内容区：通用 4 页；ulincore 模式下换成 6 页（含 Agent / 外观 / 服务）
                 id: content
                 width: layout.width - navColumn.width - layout.spacing
                 height: layout.height
 
+                // 每个 Loader 对应一页；source 按 ulincoreMode 二选一，4/5 页只在 ulincore 模式激活。
                 Loader {
                     anchors.fill: parent
                     visible: Hub.settings.page === 0
@@ -223,7 +221,6 @@ Item {
                     visible: page.ulincoreMode && Hub.settings.page === 5
                     source: Style.url("basic/settings/dsh/ServerPage.qml")
                 }
-
             }
         }
     }

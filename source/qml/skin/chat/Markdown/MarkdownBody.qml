@@ -126,8 +126,7 @@ Item {
     // QTextDocument 只能给 inline-code 画直角纯色底；圆角/内边距用这层矩形补。
     // 声明在 TextEdit 之前，确保底块在文字下方，不盖住选中高亮。
     Repeater {
-        // 不能固定 256：每个 MarkdownBody 都会常驻几百个 Rectangle，流式多段时
-        // 场景图/布局明显变重。按实际 inline-code 数量创建，没有时就是 0 个。
+        // 按实际 inline-code 数量创建：固定 256 会让每个 MarkdownBody 常驻几百个 Rectangle，流式时明显变重。
         model: root.inlineCodeRects.length
         delegate: Rectangle {
             required property int index
@@ -168,11 +167,8 @@ Item {
     }
 
     // QML 的 QTextDocument 不画 table cell 边框；这里只覆盖旧 MarkdownTable 需要的那一条
-    // 横向发丝线（行底），没有外框/竖线。
-    // 固定池：Repeater(model: tableLines) 在数组一换时会销毁重建全部 delegate，
-    // 表格线会整批闪；固定池只更新已有 Rectangle 的 x/y/w/visible。
+    // 横向发丝线（行底），没有外框/竖线。按实际行数创建，数组换了只更新已有 Rectangle 的几何。
     Repeater {
-        // 同上：表格线按实际数量创建，不再固定 128 个空 Rectangle。
         model: root.tableLines.length
         delegate: Rectangle {
             required property int index

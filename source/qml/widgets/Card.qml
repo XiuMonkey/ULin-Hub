@@ -1,6 +1,5 @@
-// 通用卡片：圆角面 + 1px 描边 + 可选阴影（MultiEffect，GPU 一次绘制）。
-// 对应 CardShadow/ShadowPanel 那一套"手绘阴影 + 留白反推"，但不再需要调用方算留白 ——
-// 阴影由 MultiEffect 的 autoPadding 自己撑开。
+// 通用卡片：圆角面 + 半像素描边 + 可选阴影（MultiEffect 一次 GPU 绘制）。
+// 阴影由 MultiEffect 的 autoPadding 自身撑开，调用方不需要预留留白。
 
 import QtQuick
 import QtQuick.Effects
@@ -17,20 +16,20 @@ Item {
     property bool bordered: true
     property real padding: Theme.spacing.cardPadding
 
-    property bool shadowEnabled: false   // 阴影规格（像素），取值来自 Theme.shadow.*
+    property bool shadowEnabled: false   // 是否画阴影；下面三项是像素规格（Theme.shadow.*）
     property real shadowBlur: Theme.shadow.cardBlur
     property real shadowDy: Theme.shadow.cardDy
     property color shadowColor: Theme.color.shadow
 
-    Rectangle {   // 有阴影时由 MultiEffect 负责绘制（源面隐藏），否则直接画面
+    Rectangle {   // 有阴影时作为 MultiEffect 的源（自身隐藏），否则直接绘制
         id: surface
         anchors.fill: parent
         visible: !root.shadowEnabled
         radius: root.radius
         color: root.color
 
-        // 官方所有"浮起面"的边不是 border，而是 `--dsw-elevation-stroke: 0 0 0 .5px` 的**半像素环**
-        // （见 dsh-client-ui-theme 的 gradient_shadow_text.css）。这里跟它同厚：0.5 逻辑px（DPR 2 时正好一个物理像素）。
+        // 浮起面的边不是 border 而是半像素环（官方 --dsw-elevation-stroke: 0 0 0 .5px），
+        // 这里同厚：0.5 逻辑px（DPR 2 时正好一个物理像素）。
         border.width: root.bordered ? 0.5 : 0
         border.color: root.borderColor
     }

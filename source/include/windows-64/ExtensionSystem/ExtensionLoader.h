@@ -10,7 +10,7 @@
 //   regulation.json5  注册表：Function[]（导出名 → 工具名、怎么调）。**只有工具扩展有**。
 // 为什么要分开：客户端扩展的"regulation"里从来没有 Function[]，它只是一张身份卡；
 // 工具扩展则是"身份 + 注册表"两件事挤在一个文件里 —— 拆开后各自的字段集才有唯一归属，
-// 也不会再出现"改个版本号要动注册表"这种混账事。
+// 也不会再出现"改个版本号要动注册表"这种情况。
 //
 // 兼容：老包只有一个 regulation.json5（身份和 Function[] 混在一起）。读取规则是
 // **info.json5 优先，缺了回退 regulation.json5**（见 infoPath）——老包装上新宿主照旧能用，
@@ -49,7 +49,7 @@ public:
 		bool uiAbiMatched = true;
 
 		QString declaredId;
-		// version：扩展**自身**版本（自由字符串，如 "0.1.0"）。注意与 ABIVersion（界面契约版本）不同。
+		// version：扩展**自身**版本（自由字符串，如 "0.1.0"），与 ABIVersion（界面契约版本）不同。
 		QString declaredVersion;
 		// dependence：依赖的其它扩展 ID 列表。非数组/非字符串项一律忽略（不报错、不拒绝整包）。
 		QStringList dependencies;

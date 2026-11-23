@@ -1,8 +1,8 @@
 // 设置 · 模型列表（按原版 ui/ModelListPanel.cpp + styles/model-list.qss 复刻）。
-// 结构自上而下：标题/说明 → 状态行 → 瞬时提示（4 秒自隐）→ 滚动区（分组标题 + 成员卡 + 空态 + 新增表单）
-// → 「添加模型」按钮在滚动区**外**（表单在滚动区内，面板高度才不随表单开合变化）。
+// 结构自上而下：标题/说明 → 状态行 → 提示行（桥接 status）→ 滚动区（分组标题 + 成员卡 + 空态 + 新增表单）
+// → 「添加模型」按钮在滚动区外（表单在滚动区内，面板高度才不随表单开合变化）。
 // 要点：成员卡无列/无选中态，表头最小高 48、右侧 ▸/▾，徽章按 userDeclared/declared 决定；
-// 删除走右键菜单（common_delete）不是行内按钮；表单提交先（可选）写凭据，失败整次中止，再整份写回 models。
+// 删除走右键菜单（common_delete）不是行内按钮；表单提交先（可选）写凭据，再经适配层写入 models。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -15,25 +15,29 @@ import "../../../skin/chat"
 Item {
     id: page
 
-    readonly property var cfg: Hub.settings.ulincoreBridge
+    readonly property var cfg: Hub.settings.ulincoreBridge   // 设置侧桥对象：providers/models/凭据状态与写回命令都由它转发
 
     // DSH ModelListPage 的数据适配层：页面结构/控件保持原样，只把数据源换成 ULinCore。
     property var api: UlinCoreModelAdapter { cfg: page.cfg }
 
     property var expandedKeys: ({})   // 展开过的成员 key（刷新后按它恢复展开态，与原版 m_expanded 同思路）
-    property bool formOpen: false
-    property bool candidatesVisible: false
+    property bool formOpen: false   // 新增表单展开态：表单在滚动区末尾，由底部按钮切换
+    property bool candidatesVisible: false   // 「获取模型」拉回的候选列表是否可见，选中一条即收起
+    // 表单行高 30；标签列宽 96（详情行沿用同一宽度）。
     readonly property int fieldHeight: 30
     readonly property int labelWidth: 96
     readonly property int detailLabelWidth: 96
 
+    // 下拉项 = api 层汇总的 provider + 末尾的「自定义…」哨兵项。
     readonly property var providerOptions: {
         const rows = page.api.providers.slice()
         rows.push({ provider: "__custom__", label: "自定义…" })
         return rows
     }
+    // 选中哨兵项即进入自定义表单（index 超出 provider 数量）。
     readonly property bool isCustomProvider: providerCombo.currentIndex >= page.api.providers.length
 
+    // 当前下拉选中的 provider；选到「自定义…」时为 null。
     readonly property var currentProvider: {
         const rows = page.api.providers
         const index = providerCombo.currentIndex
@@ -42,6 +46,7 @@ Item {
         return rows[index]
     }
 
+    // 展开态 key：provider 与模型 id 用不可见字符 0x1f 分隔，避免拼串时与 id 自身字符撞车。
     function keyOf(row) {
         return row.provider + "\u001f" + row.id
     }
@@ -52,7 +57,7 @@ Item {
 
     // 模型行只带 settings 侧信息（settingsNs / settingsWritable）；凭据状态挂在 provider 行上，
     // 按 provider 路由回查一行 —— 同一路由下的所有模型共用一条凭据引用（如
-    // deepseek-official → DEEPSEEK_API_KEY），所以 key 是**路由级**的，不是模型级的。
+    // deepseek-official → DEEPSEEK_API_KEY），所以 key 是路由级的，不是模型级的。
     function providerRowFor(providerId) {
         const rows = page.api.providers
         for (let i = 0; i < rows.length; ++i) {
@@ -67,9 +72,10 @@ Item {
         return row !== null && row.keyKnown && !row.keyWritable
     }
 
+    // 展开/收起：expandedKeys 按不可变对象处理，整体回写才能触发依赖它的绑定。
     function toggleRow(row) {
         const key = page.keyOf(row)
-        const next = Object.assign({}, page.expandedKeys)
+        const next = Object.assign({}, page.expandedKeys)   // 浅拷贝：QML 按引用判断属性是否变化
         if (next[key])
             delete next[key]
         else
@@ -79,8 +85,9 @@ Item {
 
     function statusText() {   // 状态行文案（原版 updateStatus）
         if (!page.api.busy && "running" !== "running" && page.api.models.length === 0)
-            return qsTrId("model_server_not_ready")
+            return qsTrId("model_server_not_ready")   // 未就绪且无缓存目录：只报「服务未连接」，不叠加统计
 
+        // 加载中只报进度；已有目录时拼「模型数 + 分组数」，再按需追加只读与逐路由失败原因。
         let text = ""
         if (page.api.busy && page.api.models.length === 0) {
             text = qsTrId("model_loading_catalog")
@@ -93,11 +100,11 @@ Item {
                 text += " " + qsTrId("model_add_readonly")
             for (let i = 0; i < page.api.failures.length; ++i) {
                 const failure = page.api.failures[i]
-                text += " " + qsTrId("model_provider_load_failed_fmt").arg(failure.name).arg(failure.message)
+                text += " " + qsTrId("model_provider_load_failed_fmt").arg(failure.name).arg(failure.message)   // 单个 provider 失败不阻断其余分组
             }
         }
         if (page.api.status.length > 0)
-            text += " " + page.api.status
+            text += " " + page.api.status   // 桥接层的瞬时状态放末尾，不挤掉统计信息
         return text
     }
 
@@ -105,21 +112,20 @@ Item {
         if (row && row.noApiKey === true)   // 账号登录路由：没有 key 可填，别按"未配置"呈现
             return qsTrId("model_credential_account_auth")
         if (!row || !row.keyRef || row.keyRef.length === 0)
-            return ""
+            return ""   // 没有引用名（路由未声明 keys）：整行留空，不占高度
 
+        // 基础句给「引用名 + 来源」：profile 显式声明的与按规则派生的措辞不同。
         let text = row.keyDeclaredByProfile
             ? qsTrId("model_credential_from_profile_fmt").arg(row.keyRef)
             : qsTrId("model_credential_derived_fmt").arg(row.keyRef)
 
+        // 状态后缀四选一：未知 > 只读 > 已配置（附来源）> 未配置，不叠加。
         if (!row.keyKnown)
             text += qsTrId("model_credential_unknown_suffix")
         else if (!row.keyWritable)
             text += qsTrId("model_credential_readonly_suffix")
         else if (row.keyConfigured) {
-            text += qsTrId("model_credential_configured_fmt").arg(
-                row.keySource && row.keySource.length > 0
-                    ? qsTrId("model_credential_source_fmt").arg(row.keySource)
-                    : "")
+            text += qsTrId("model_credential_configured_fmt").arg(row.keySource && row.keySource.length > 0 ? qsTrId("model_credential_source_fmt").arg(row.keySource) : "")
         }
         else {
             text += qsTrId("model_credential_unconfigured_suffix")
@@ -129,21 +135,24 @@ Item {
 
     function reasoningText(row) {   // 详情行：值为空时不显示（原版 addDetailRow）
         if (row.reasoningDisabled)
-            return qsTrId("model_think_not_offered")
+            return qsTrId("model_think_not_offered")   // 适配器明确声明该模型不支持思考档位
         if (row.hasReasoning)
-            return row.levels.join(" / ")
+            return row.levels.join(" / ")   // 已声明：按声明顺序展示，顺序即强弱
+        // 未声明时展示 pi-ai 默认档位，并标明「未声明」，避免被读成已生效配置。
         const fallback = ["off", "low", "high", "max"]
         return qsTrId("model_think_undeclared_fmt").arg(fallback.join("/"))
     }
 
+    // 配置来源三档：用户 settings 覆写 → 内置声明 → 仅适配器提供（后两者界面上不可写）。
     function configSourceText(row) {
         if (row.userDeclared)
-            return qsTrId("model_source_settings_user")
+            return qsTrId("model_source_settings_user")   // 用户自己加或改过的模型
         if (row.declared)
-            return qsTrId("model_source_settings_bundled")
+            return qsTrId("model_source_settings_bundled")   // 随包分发的内置声明
         return qsTrId("model_source_adapter_only")
     }
 
+    // 写回目标：settings 命名空间下的 models 数组；只读时补后缀，免得用户以为保存没生效。
     function writebackText(row) {
         if (!row.settingsNs || row.settingsNs.length === 0)
             return ""
@@ -153,6 +162,7 @@ Item {
         return text
     }
 
+    // 页面骨架：标题 → 说明 → 状态 → 提示 → 滚动区 → 底部动作条，剩余高度全部由 Flickable 吸收。
     Column {
         id: root
         anchors.fill: parent
@@ -179,7 +189,7 @@ Item {
             width: parent.width
             text: qsTrId("model_list_desc")
             wrapMode: Text.WordWrap
-            color: Theme.color.textSecondary
+            color: Theme.color.textSecondary   // 固定说明：不随目录状态变化
             font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
@@ -188,7 +198,7 @@ Item {
             width: parent.width
             text: page.statusText()
             wrapMode: Text.WordWrap
-            color: Theme.color.textSecondary
+            color: Theme.color.textSecondary   // 目录状态：模型数/分组数/只读/失败原因，由 statusText 统一拼装
             font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
@@ -198,18 +208,20 @@ Item {
             visible: page.api.notice.length > 0
             text: page.api.notice
             wrapMode: Text.WordWrap
-            color: Theme.color.textSecondary   // 瞬时提示：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
+            color: Theme.color.textSecondary   // 提示行：原版走强调色（蓝），设置页不出蓝 ⇒ 与状态行同档的中性灰
             font.family: Theme.font.uiFamily
             font.pixelSize: Theme.font.caption
         }
 
+        // 滚动区高度 = 页面剩余高度（扣掉底部动作条与 4px 间隔），下限 120 防止窗口过矮时塌陷；
+        // 内容高度只由 listColumn 决定，因此表单开合不会改变面板自身高度。
         Flickable {
             id: scroller
             width: parent.width
             height: Math.max(120, root.height - scroller.y - actionFooter.height - 4)
             contentHeight: listColumn.implicitHeight
             clip: true
-            boundsBehavior: Flickable.StopAtBounds
+            boundsBehavior: Flickable.StopAtBounds   // 禁止拖拽回弹：桌面端越界露底观感不对
             ScrollBar.vertical: AppScrollBar { }
 
             Column {
@@ -218,21 +230,21 @@ Item {
                 spacing: 4
 
                 Repeater {
-                    model: page.api.models
+                    model: page.api.models   // 适配层已汇总好的扁平模型列表，按 provider 分组顺序排列
 
                     delegate: Column {
                         id: rowHost
 
                         required property var modelData
-                        required property int index
+                        required property int index   // 仅用于判断上一条的 provider，决定是否插入分组标题
 
                         readonly property var providerRow: page.providerRowFor(modelData.provider)   // 该模型所属 provider 的那一行（凭据状态都在那边）
 
                         width: listColumn.width
                         spacing: 2
 
-                        // 分组标题：provider 与上一行不同时插入（原版 modelListGroup）
-                        // 分组标题：压到 textTertiary + 一点字距，读起来是"分区"而不是"正文"
+                        // 分组标题：provider 与上一行不同时插入（原版 modelListGroup）；压到 textTertiary +
+                        // 一点字距，读起来是"分区"而不是"正文"。
                         Text {
                             width: parent.width
                             visible: rowHost.index === 0
@@ -250,13 +262,12 @@ Item {
                         Rectangle {   // 成员卡（原版 #modelListEntry：panelBg + 1px border + radius 10）
                             id: entry
                             width: parent.width
-                            implicitHeight: entryColumn.implicitHeight
+                            implicitHeight: entryColumn.implicitHeight   // 高度跟随内容：详情/凭据面板收起时卡片自动变矮
                             radius: Theme.radius.card
                             color: Theme.color.pageBg || Theme.color.panelBg
-                            border.width: 1
-
                             // 原描边是 border(4% 黑)，和白底几乎同色 —— 卡片边界只能靠 4px 间距"猜"。
                             // 提到 menuBorder(6%)，展开时 inputBorder(10%)：一屏四张才分得清。
+                            border.width: 1
                             border.color: page.isExpanded(rowHost.modelData)
                                 ? Theme.color.inputBorder
                                 : Theme.color.menuBorder
@@ -275,7 +286,7 @@ Item {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: Theme.radius.inner
-                                        color: headerMouse.containsMouse ? Theme.color.hoverBg : "transparent"
+                                        color: headerMouse.containsMouse ? Theme.color.hoverBg : "transparent"   // 整块表头可悬停，提示这行可点
                                     }
 
                                     Row {
@@ -287,7 +298,7 @@ Item {
                                         anchors.verticalCenter: parent.verticalCenter
                                         spacing: 8
 
-                                        Column {
+                                        Column {   // 名称列：吃掉徽章与箭头之外的全部宽度
                                             width: parent.width - badge.width - chevron.width - 2 * parent.spacing
                                             spacing: 0
 
@@ -297,13 +308,11 @@ Item {
                                                 elide: Text.ElideRight
                                                 color: Theme.color.textPrimary
                                                 font.family: Theme.font.uiFamily
-                                                // 行标题取 body(13)：原来和页面标题同为 14，
-                                                // 一屏里两个"14"抢层级，模型名反而比"模型列表"更显眼。
-                                                font.pixelSize: Theme.font.body
+                                                font.pixelSize: Theme.font.body   // body(13)：与页面标题(14)拉开层级，模型名不抢标题
                                                 font.weight: Theme.font.weightMedium
                                             }
 
-                                            Text {
+                                            Text {   // 副标题：显示名 · 模型 id，id 是写配置文件时的真实键
                                                 width: parent.width
                                                 text: rowHost.modelData.providerName + " · " + rowHost.modelData.id
                                                 elide: Text.ElideRight
@@ -312,8 +321,7 @@ Item {
                                                 font.pixelSize: Theme.font.caption
                                             }
 
-                                            // 这条路由还没配凭据时给个入口提示：否则"已接上的模型在哪填 key"
-                                            // 在界面上没有任何线索。前面的 5px 琥珀点是全页唯一的饱和度来源，
+                                            // 这条路由还没配凭据时给个入口提示；前面的 5px 琥珀点是全页唯一的饱和度来源，
                                             // 只出现在需要动手的那一行。
                                             Row {
                                                 width: parent.width
@@ -329,7 +337,7 @@ Item {
                                                     height: 5
                                                     radius: 2.5
                                                     anchors.verticalCenter: parent.verticalCenter
-                                                    color: "#F59E0B"
+                                                    color: "#F59E0B"   // 唯一一处硬编码色：琥珀点只在「待配置」行出现
                                                 }
 
                                                 Text {
@@ -345,7 +353,7 @@ Item {
 
                                         Rectangle {
                                             id: badge
-                                            visible: rowHost.modelData.userDeclared || !rowHost.modelData.declared
+                                            visible: rowHost.modelData.userDeclared || !rowHost.modelData.declared   // 只在「自定义」或「无内置声明」时出现
                                             implicitWidth: badgeText.implicitWidth + 16
                                             implicitHeight: badgeText.implicitHeight + 2
                                             radius: Theme.radius.control   // 徽章走中性面：tagBg 是蓝调底（#EEF2FF / #1E3A5F）
@@ -356,8 +364,8 @@ Item {
                                                 id: badgeText
                                                 anchors.centerIn: parent
                                                 text: rowHost.modelData.userDeclared
-                                                    ? qsTrId("model_source_custom")
-                                                    : qsTrId("model_source_adapter_builtin")
+                                                    ? qsTrId("model_source_custom")   // 用户声明
+                                                    : qsTrId("model_source_adapter_builtin")   // 适配器内置
                                                 color: Theme.color.textSecondary
                                                 font.family: Theme.font.uiFamily
                                                 font.pixelSize: Theme.font.small
@@ -367,12 +375,13 @@ Item {
                                         Text {
                                             id: chevron
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: page.isExpanded(rowHost.modelData) ? "▾" : "▸"
+                                            text: page.isExpanded(rowHost.modelData) ? "▾" : "▸"   // 展开/收起方向指示，纯文本字符不用图标
                                             color: Theme.color.textCaption
                                             font.pixelSize: Theme.font.caption
                                         }
                                     }
 
+                                    // 表头命中区：左键切换展开，右键弹菜单；两种键都落在这个 MouseArea 上。
                                     MouseArea {
                                         id: headerMouse
                                         anchors.fill: parent
@@ -381,26 +390,26 @@ Item {
                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         onClicked: (mouse) => {
                                             if (mouse.button === Qt.RightButton)
-                                                rowMenu.popup()
+                                                rowMenu.popup()   // 右键只开菜单，不改变展开态
                                             else
                                                 page.toggleRow(rowHost.modelData)
                                         }
                                     }
 
+                                    // 右键菜单：不可写时删除项禁用，并补一条只读说明。
                                     Menu {
                                         id: rowMenu
 
                                         MenuItem {
                                             text: qsTrId("common_delete")
                                             enabled: page.api.writable
-                                            onTriggered: page.api.removeModel(rowHost.modelData.provider,
-                                                                                   rowHost.modelData.id)
+                                            onTriggered: page.api.removeModel(rowHost.modelData.provider, rowHost.modelData.id)   // provider + id 才能唯一定位一条模型
                                         }
 
                                         MenuItem {
                                             visible: !page.api.writable
                                             enabled: false
-                                            text: qsTrId("model_delete_readonly")
+                                            text: qsTrId("model_delete_readonly")   // 只读时补一条说明，避免菜单看起来「坏了」
                                         }
                                     }
                                 }
@@ -408,7 +417,7 @@ Item {
                                 Column {   // 详情（原版边距 (10,0,10,10)、spacing 2；名称列固定 96）
                                     id: detail
                                     width: parent.width
-                                    visible: page.isExpanded(rowHost.modelData)
+                                    visible: page.isExpanded(rowHost.modelData)   // 收起时 Column 跳过该项，卡片高度随之收缩
                                     topPadding: 0
                                     bottomPadding: 10
                                     leftPadding: 10
@@ -416,6 +425,7 @@ Item {
                                     spacing: 2
 
                                     Repeater {
+                                        // 详情行：provider / id / 名称必有，其余字段按是否存在追加。
                                         model: {
                                             const row = rowHost.modelData
                                             const rows = [
@@ -423,12 +433,15 @@ Item {
                                                 [qsTrId("model_id_label"), row.id],
                                                 [qsTrId("model_display_name"), row.name]
                                             ]
+                                            // 可选字段：描述为空、未声明上下文窗口/最大输出时不占一行。
                                             if (row.description && row.description.length > 0)
                                                 rows.push([qsTrId("model_description_label"), row.description])
+                                            // hasXxx 由适配层给出，区分「未声明」与「声明为 0」。
                                             if (row.hasContextWindow)
                                                 rows.push([qsTrId("model_context_window"), String(row.contextWindow)])
                                             if (row.hasMaxTokens)
                                                 rows.push([qsTrId("model_max_output"), String(row.maxTokens)])
+                                            // 思考档位与配置来源始终显示，是排查「为什么没生效」的主要线索。
                                             rows.push([qsTrId("model_think_level"), page.reasoningText(row)])
                                             rows.push([qsTrId("model_config_source"), page.configSourceText(row)])
                                             const writeback = page.writebackText(row)
@@ -437,7 +450,7 @@ Item {
                                             return rows
                                         }
 
-                                        delegate: Row {
+                                        delegate: Row {   // 两列：固定 96 宽标签 + 可换行的值
                                             required property var modelData
                                             width: detail.width - detail.leftPadding - detail.rightPadding
                                             spacing: 8
@@ -462,27 +475,27 @@ Item {
                                     }
                                 }
 
-                                // 凭据是**路由级**的（一个 provider 一条引用），所以展开任意一条模型就地写，
+                                // 凭据是路由级的（一个 provider 一条引用），所以展开任意一条模型就地写，
                                 // 同路由下所有模型共用；只写 credentials/set，不动 models 数组。
                                 Column {
                                     id: keyPanel
                                     width: parent.width
-                                    visible: page.isExpanded(rowHost.modelData)
+                                    visible: page.isExpanded(rowHost.modelData)   // 与详情区同一展开态，收起时不占高度
                                     bottomPadding: 10
                                     leftPadding: 10
                                     rightPadding: 10
                                     spacing: 4
 
+                                    // 账号登录路由没有 key 可填：整行隐藏，只留下面的状态说明。
                                     Row {
                                         width: keyPanel.width - keyPanel.leftPadding - keyPanel.rightPadding
                                         spacing: 8
-                                        // 账号登录路由没有 key 可填：整行隐藏，只留下面的状态说明。
                                         visible: !(rowHost.providerRow !== null && rowHost.providerRow.noApiKey === true)
 
                                         Text {
                                             width: page.detailLabelWidth
                                             anchors.verticalCenter: parent.verticalCenter
-                                            text: "API Key"
+                                            text: "API Key"   // 字面量标签：与原版一致，不走 qsTrId
                                             color: Theme.color.textTertiary
                                             font.family: Theme.font.uiFamily
                                             font.pixelSize: Theme.font.caption
@@ -494,7 +507,7 @@ Item {
                                             height: page.fieldHeight
                                             placeholder: page.keyReadonly(rowHost.modelData.provider)
                                                 ? qsTrId("model_credential_readonly_hint")
-                                                : qsTrId("model_key_hint")
+                                                : qsTrId("model_key_hint")   // 只读路由换提示语，而不是让输入框「静默」不可用
                                             password: true
                                             enabled: !page.keyReadonly(rowHost.modelData.provider)
                                         }
@@ -508,7 +521,7 @@ Item {
                                                 && !page.api.busy
                                             onClicked: {
                                                 page.api.saveApiKey(rowHost.modelData.provider, rowKeyField.text)
-                                                rowKeyField.text = ""
+                                                rowKeyField.text = ""   // 保存后立即清空：凭据不回显明文，只由下一行状态说明体现
                                             }
                                         }
                                     }
@@ -524,7 +537,7 @@ Item {
                                 }
                             }
 
-                            Rectangle {   // 多张卡里找不到是哪一张被打开了。声明在 entryColumn 之后，保证在最上层
+                            Rectangle {   // 左侧竖条：展开时标出当前卡；声明在 entryColumn 之后，保证在最上层
                                 visible: page.isExpanded(rowHost.modelData)
                                 x: 1
                                 y: 10
@@ -540,13 +553,14 @@ Item {
                 Text {
                     width: parent.width
                     visible: page.api.models.length === 0
-                    text: qsTrId("model_catalog_empty")
+                    text: qsTrId("model_catalog_empty")   // 空态只描述「没有模型」，加载/错误另由状态行承担
                     wrapMode: Text.WordWrap
                     color: Theme.color.textSecondary
                     font.family: Theme.font.uiFamily
                     font.pixelSize: Theme.font.caption
                 }
 
+                // 新增表单：与成员卡同一套圆角与描边，藏在滚动区末尾，展开时滚到底部才可见。
                 Rectangle {
                     id: form
                     width: parent.width
@@ -587,7 +601,7 @@ Item {
                                 font.pixelSize: Theme.font.caption
                             }
 
-                            ComboBox {   // 无圆角，且键盘焦点时描边是 palette.highlight = 强调蓝）
+                            ComboBox {   // 原版无圆角、焦点描边取强调蓝；本页改走 token（radius.control + 中性描边）
                                 id: providerCombo
                                 width: parent.width - page.labelWidth - parent.spacing
                                 height: page.fieldHeight
@@ -600,7 +614,7 @@ Item {
 
                                 HoverHandler {
                                     id: providerHover
-                                    cursorShape: Qt.PointingHandCursor
+                                    cursorShape: Qt.PointingHandCursor   // 悬停只影响描边色，不改文字色
                                 }
 
                                 contentItem: Text {
@@ -624,7 +638,7 @@ Item {
                                     color: providerCombo.activeFocus
                                         ? Theme.color.textPrimary
                                         : Theme.color.textSecondary
-                                    rotation: providerCombo.popup.visible ? 180 : 0
+                                    rotation: providerCombo.popup.visible ? 180 : 0   // 弹层展开时箭头翻转，收起时复原
                                     Behavior on rotation {
                                         NumberAnimation { duration: Theme.motion.fast }
                                     }
@@ -639,6 +653,7 @@ Item {
                                     radius: Theme.radius.control
                                 }
 
+                                // 下拉行复用 MenuRow：选中即回填 currentIndex 并主动收起弹层。
                                 delegate: MenuRow {
                                     required property var modelData
                                     required property int index
@@ -655,7 +670,7 @@ Item {
                                 popup: Popup {
                                     y: providerCombo.height + 4
                                     width: providerCombo.width
-                                    implicitHeight: Math.min(contentItem.implicitHeight + 12, 280)
+                                    implicitHeight: Math.min(contentItem.implicitHeight + 12, 280)   // 最多 280 高，超出内部滚动
                                     padding: 6
 
                                     background: Rectangle {
@@ -676,10 +691,11 @@ Item {
                             }
                         }
 
+                        // 自定义提供商表单：ID / 名称 / API 地址 / 协议 / 模型 / Key，保存后写入 provider 列表。
                         Column {
                             width: parent.width
                             spacing: 6
-                            visible: page.isCustomProvider
+                            visible: page.isCustomProvider   // 只有下拉选到末尾「自定义…」哨兵项时才展开
 
                             Text {
                                 width: parent.width
@@ -713,7 +729,7 @@ Item {
                                         { label: "Anthropic Messages", value: "anthropic-messages" }
                                     ]
                                     textRole: "label"
-                                    valueRole: "value"
+                                    valueRole: "value"   // 界面显示 label，提交给后端的是 value（provider 配置里的协议枚举）
                                     font.family: Theme.font.uiFamily
                                     font.pixelSize: Theme.font.body
                                     leftPadding: Theme.spacing.fieldPadX
@@ -797,8 +813,9 @@ Item {
                             }
                             Row { width: parent.width; height: page.fieldHeight; spacing: 8
                                 Text { width: page.labelWidth; text: "API Key"; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; color: Theme.color.textSecondary; font.family: Theme.font.uiFamily; font.pixelSize: Theme.font.caption }
-                                FieldBox { id: customKeyField; width: parent.width - page.labelWidth - parent.spacing; height: page.fieldHeight; placeholder: "可留空"; password: true }
+                                FieldBox { id: customKeyField; width: parent.width - page.labelWidth - parent.spacing; height: page.fieldHeight; placeholder: "可留空"; password: true }   // 可留空：不填就不写该路由的凭据
                             }
+                            // 保存按钮右对齐；成功/失败就地显示在下方反馈行，不进全局状态行。
                             Row { width: parent.width; height: page.fieldHeight; spacing: 8; layoutDirection: Qt.RightToLeft
                                 IconButton { height: page.fieldHeight; label: "保存提供商"; onClicked: page.api.createCustomProvider(customRouteField.text, customNameField.text, customBaseUrlField.text, customProtocolCombo.currentValue, customModelIdField.text, customModelNameField.text, customKeyField.text) }
                             }
@@ -833,23 +850,22 @@ Item {
                                 tooltip: qsTrId("model_fetch_hint")
                                 onClicked: {
                                     page.candidatesVisible = true
-                                    page.api.discover(providerCombo.currentIndex >= 0
-                                        ? page.api.providers[providerCombo.currentIndex].provider : "",
-                                        apiKeyField.text)
+                                    // 未选路由时传空串占位，避免按下标取 provider 越界。
+                                    page.api.discover(providerCombo.currentIndex >= 0 ? page.api.providers[providerCombo.currentIndex].provider : "", apiKeyField.text)
                                 }
                             }
                         }
 
-                        Column {   // 候选模型（原版是独立弹层；这里就地铺在 ID 输入框下方，点一条回填）
+                        Column {   // 候选模型（原版是独立弹层；就地铺在 ID 输入框下方，点一条回填）
                             visible: !page.isCustomProvider && page.candidatesVisible && page.api.candidates.length > 0
                             width: parent.width
                             leftPadding: page.labelWidth + 8
                             spacing: 2
 
                             Repeater {
-                                model: page.api.candidates
+                                model: page.api.candidates   // discover 拉回的 { id } 列表，只用来回填 idField
 
-                                delegate: Rectangle {
+                                delegate: Rectangle {   // 单行候选：悬停高亮，整行可点
                                     required property var modelData
                                     width: parent.width
                                     implicitHeight: 26
@@ -873,7 +889,7 @@ Item {
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             idField.text = modelData.id
-                                            page.candidatesVisible = false
+                                            page.candidatesVisible = false   // 选中即收起列表，不自动提交表单
                                         }
                                     }
                                 }
@@ -921,7 +937,7 @@ Item {
                                 id: contextField
                                 width: parent.width - page.labelWidth - parent.spacing
                                 placeholder: qsTrId("model_context_window_hint")
-                                numeric: true
+                                numeric: true   // 只收数字：留空表示未声明，与填 0 区分
                             }
                         }
 
@@ -944,7 +960,7 @@ Item {
                                 id: maxTokensField
                                 width: parent.width - page.labelWidth - parent.spacing
                                 placeholder: qsTrId("model_max_output_hint")
-                                numeric: true
+                                numeric: true   // 同上：空值即不写回 maxTokens
                             }
                         }
 
@@ -967,7 +983,7 @@ Item {
                             FieldBox {
                                 id: effortsField
                                 width: parent.width - page.labelWidth - parent.spacing
-                                placeholder: qsTrId("model_think_level_hint")
+                                placeholder: qsTrId("model_think_level_hint")   // 自由文本档位，留空即不声明
                             }
                         }
 
@@ -987,10 +1003,9 @@ Item {
                                 font.pixelSize: Theme.font.caption
                             }
 
-                            // 勾选控件：默认 Basic 风格的指示器是 28×28 方角 + 1px 平台灰描边，
-                            // 且 **键盘焦点时描边取 palette.highlight（ThemeManager 装的是强调蓝）**。
-                            // 悬停浅灰底、选中 = textPrimary 近黑面 + 反相勾（panelBg），
-                            // 禁用退回 border 描边。整体高 = 18 + 上下 padding 12 = 30px（命中区 > 24px）。
+                            // 勾选控件：Basic 默认指示器 28×28 方角 + 1px 平台灰描边，键盘焦点描边取
+                            // palette.highlight（ThemeManager 装的是强调蓝）。悬停浅灰底、选中 = textPrimary
+                            // 近黑面 + 反相勾（panelBg），禁用退回 border 描边。整体高 = 18 + 上下 padding 12 = 30px。
                             CheckBox {
                                 id: imageInputBox
                                 text: qsTrId("model_supports_image")
@@ -1043,7 +1058,6 @@ Item {
                             visible: !page.isCustomProvider && !(page.currentProvider !== null && page.currentProvider.noApiKey === true)
                             width: parent.width
                             spacing: 8
-                            // 账号登录路由没有 key 可填：表单里也隐藏这一行。
 
                             Text {
                                 width: page.labelWidth
@@ -1059,13 +1073,13 @@ Item {
                                 id: apiKeyField
                                 width: parent.width - page.labelWidth - parent.spacing
                                 placeholder: page.credentialReadonly()
-                                    ? qsTrId("model_credential_readonly_hint")
+                                    ? qsTrId("model_credential_readonly_hint")   // 只读路由：直接说明写不进去
                                     : qsTrId("model_credential_ref_hint")
                                 password: true
                             }
                         }
 
-                        Text {
+                        Text {   // 当前路由的凭据状态：与展开卡片里的那一行同一套文案
                             width: parent.width
                             text: page.credentialText(page.currentProvider)
                             wrapMode: Text.WordWrap
@@ -1074,7 +1088,7 @@ Item {
                             font.pixelSize: Theme.font.small
                         }
 
-                        Text {
+                        Text {   // 路由说明：key 从哪来、是否走账号登录；无可用路由时给提示
                             width: parent.width
                             text: page.currentProvider
                                 ? page.api.routeHint(page.currentProvider.provider)
@@ -1094,6 +1108,7 @@ Item {
                             font.pixelSize: Theme.font.caption
                         }
 
+                        // 右对齐：layoutDirection 反转后「取消」在左、「添加」在右。
                         Row {
                             width: parent.width
                             spacing: 6
@@ -1107,9 +1122,8 @@ Item {
                                 onClicked: {
                                     const provider = page.currentProvider
                                     if (!provider)
-                                        return
-                                    page.api.submitModelForm(provider.provider, idField.text, nameField.text,
-                                        contextField.text, maxTokensField.text, effortsField.text, apiKeyField.text)
+                                        return   // 选到「自定义…」时提交按钮不可见，这次返回只是兜底
+                                    page.api.submitModelForm(provider.provider, idField.text, nameField.text, contextField.text, maxTokensField.text, effortsField.text, apiKeyField.text)
                                 }
                             }
 
@@ -1117,7 +1131,7 @@ Item {
                                 id: cancelButton
                                 height: page.fieldHeight
                                 label: qsTrId("common_cancel")
-                                onClicked: page.formOpen = false
+                                onClicked: page.formOpen = false   // 只收起表单，保留已填内容
                             }
                         }
                     }
@@ -1125,6 +1139,7 @@ Item {
             }
         }
 
+        // 底部动作条固定在滚动区之外：高度参与滚动区高度计算，不随内容滚动。
         Item {
             id: actionFooter
             width: parent.width
@@ -1135,20 +1150,21 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 116
                 height: 30
-                // 新增模型的动作和表单都在页面底部，不再把入口放在标题栏。
+                // 新增入口与表单都在底部，不进标题栏。
                 text: page.formOpen ? qsTrId("common_cancel") : qsTrId("model_add")
-                variant: page.formOpen ? "ghost" : "elevated"
+                variant: page.formOpen ? "ghost" : "elevated"   // 表单打开时按钮退为次要样式
                 enabled: page.formOpen || page.api.writable
                 tooltip: enabled ? "" : qsTrId("model_add_requires_api")
                 onClicked: {
                     if (page.formOpen) {
                         page.formOpen = false
-                        page.candidatesVisible = false
+                        page.candidatesVisible = false   // 关表单顺手收起候选列表
                         return
                     }
                     page.formOpen = true
                     page.candidatesVisible = false
                     Qt.callLater(function() {
+                        // 等布局完成再滚：此时 contentHeight 已含新展开的表单高度。
                         scroller.contentY = Math.max(0, scroller.contentHeight - scroller.height)
                     })
                 }
@@ -1156,6 +1172,7 @@ Item {
         }
     }
 
+    // 新增表单所选路由的凭据是否只读（由 profile / 环境提供时写不进去）。
     function credentialReadonly() {
         const row = page.currentProvider
         return row !== null && row.keyKnown && !row.keyWritable

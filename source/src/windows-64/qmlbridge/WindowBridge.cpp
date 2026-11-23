@@ -210,8 +210,7 @@ void WindowBridge::auxResizeBegin(qreal screenX, qreal screenY)
 	m_auxResizeHandedOff = false;
 }
 
-void WindowBridge::auxResizeApply(int edges, qreal screenX, qreal screenY,
-	bool handOffToSystem, qreal minWidth, qreal minHeight)
+void WindowBridge::auxResizeApply(int edges, qreal screenX, qreal screenY, bool handOffToSystem, qreal minWidth, qreal minHeight)
 {
 	if (!m_auxWindow)
 		return;
@@ -254,18 +253,16 @@ bool WindowBridge::eventFilter(QObject* watched, QEvent* event)
 	switch (event->type()) {
 	case QEvent::MouseButtonPress:
 	case QEvent::MouseButtonRelease: {
-		// 过滤器挂在 QGuiApplication 上 ⇒ watched 是**接收者**。Qt Quick 的鼠标事件投给
-		// QQuickWindow（QML 控件那一层是场景图内部的命中测试，不走 QObject 事件），但也可能
+		// 过滤器挂在 QGuiApplication 上 ⇒ watched 是接收者。Qt Quick 的鼠标事件投给 QQuickWindow
+		// （控件层是场景图内部的命中测试），也可能投给某个 QQuickItem，两种都算主窗口的点击。
 		const bool fromUs = m_window
 			&& (watched == m_window.data()
 				|| (qobject_cast<QQuickItem*>(watched) && qobject_cast<QQuickItem*>(watched)->window() == m_window.data()));
 		if (!fromUs)
 			break;
 
-		// ⚠️ 必须用 scenePosition()，不能用 position()：
-		// Qt Quick 的鼠标事件可能投给 QQuickWindow，也可能投给某个 QQuickItem（QML 控件），
-		// 正好落在那个 32×32 的按钮里），而 QML 侧按"场景坐标"去 mapFromItem ⇒
-		// 起点算到左上角，表现就是"覆盖页卡片从左上角长出来"。
+		// ⚠️ 必须用 scenePosition()，不能用 position()：QQuickItem 的 position() 是相对父项，
+		// 而 QML 侧按场景坐标 mapFromItem，用错会把起点算到左上角（覆盖页卡片从左上角长出来）。
 		auto* mouse = static_cast<QMouseEvent*>(event);
 		m_pointerPos = mouse->scenePosition();
 		m_pointerAge.start();   // QElapsedTimer::start() 就是"重启"，重复调用取最近一次

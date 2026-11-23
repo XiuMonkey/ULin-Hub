@@ -1,15 +1,9 @@
 #pragma once
 
-// 分层：本类**留在 qmlbridge/** —— 它是窗口意图的接线面（QML 只发意图，
-// 窗口级状态与原生判定全在 common/platform/win/NativeWindowFilter 里），正好符合"qmlbridge 只做接线"。
-// QML 壳的窗口桥：QML 侧只发意图（拖动/最小化/最大化/关闭/缩放），窗口级状态与原生判定都落在
-// NativeWindowFilter 里；本类只是"能被 QML 调到的那一面" + 可绑定属性。
-// 与当前实现的分工一致，只是跨了 QML/C++ 边界。
-// 例外的一处"观察"：最近一次鼠标点击的位置（recentPointerPos）。它既不是意图也不是可绑定状态，
-// 而是**弹窗需要的上下文** —— 弹窗没有"触发控件"可言（open 可能是键盘 / 定时器 / 任何代码调的），
-// 要走"从点击处长出来"的动画就只能由窗口层记住那个点。做法是事件过滤器**旁观**鼠标事件：
-// 不改写、不拦截、不参与命中测试，所以对现有交互零影响（这也是它必须在这里、而不能在 QML 里做
-// 一个铺满窗口的 HoverHandler 的原因：后者会成为最上层接受 hover 的项，把下面所有控件的悬停吃掉）。
+// QML 壳的窗口桥：QML 只发意图（拖动/最小化/最大化/关闭/缩放），窗口状态与原生判定全在
+// common/platform/win/NativeWindowFilter 里，本类是可被 QML 调到的那一面 + 可绑定属性。
+// 唯一例外是 recentPointerPos：弹窗需要"从点击处长出来"的上下文，由事件过滤器旁观鼠标事件记录，
+// 不改写、不拦截、不参与命中测试（在 QML 里铺 HoverHandler 会吃掉所有控件的悬停）。
 
 #include <QElapsedTimer>
 #include <QObject>
@@ -18,7 +12,6 @@
 #include <QRectF>
 #include <QString>
 #include <QVariant>
-
 
 class QQuickWindow;
 
@@ -57,8 +50,7 @@ public:
 	Q_INVOKABLE void auxMinimize();
 	Q_INVOKABLE void auxToggleMaximize();
 	Q_INVOKABLE void auxResizeBegin(qreal screenX, qreal screenY);
-	Q_INVOKABLE void auxResizeApply(int edges, qreal screenX, qreal screenY,
-		bool handOffToSystem, qreal minWidth, qreal minHeight);
+	Q_INVOKABLE void auxResizeApply(int edges, qreal screenX, qreal screenY, bool handOffToSystem, qreal minWidth, qreal minHeight);
 
 	// 自绘标题栏与窗口按钮登记（语义见 NativeWindowFilter 的同名方法）
 	Q_INVOKABLE void setCaptionItem(QObject* item);
@@ -78,10 +70,8 @@ public:
 	Q_INVOKABLE QPoint cursorScreenPos() const;
 	Q_INVOKABLE bool leftButtonDown() const;
 
-	// 最近 maxAgeMs 毫秒内发生过鼠标按下 / 抬起 ⇒ 返回那次点击的位置（窗口内容坐标 = QML 场景坐标，
-	// 逻辑像素，与 Overlay.overlay 同源）；否则返回**无效 QVariant**（QML 侧拿到 undefined）。
-	// 判"够不够近"是为了区分"这次弹出就是这次点击触发的"与"纯键盘 / 程序触发的弹出"：
-	// 后者若还拿几分钟前那次点击当起点，卡片会从屏幕上一处毫不相干的地方飞出来。
+	// 最近 maxAgeMs 毫秒内发生过鼠标按下/抬起 ⇒ 返回那次点击的位置（窗口内容坐标，逻辑像素）；
+	// 否则返回无效 QVariant。判"够不够近"是为了区分点击触发与键盘/程序触发的弹出。
 	Q_INVOKABLE QVariant recentPointerPos(int maxAgeMs) const;
 
 	bool isMaximized() const;
@@ -113,8 +103,7 @@ private:
 	bool m_auxResizeHandedOff = false;
 	bool m_auxMinimizeWasMaximized = false;
 
-	// 最近一次点击的位置与它距今多久（isValid == false = 窗口起来之后还没见过点击）。
-	// 只记**主窗口**的：它是"弹出位置"的上下文（覆盖页/弹窗都长在主窗口里）
+	// 最近一次点击的位置与距今时长（isValid == false = 窗口起来后还没见过点击）；只记主窗口的。
 	QPointF m_pointerPos;
 	QElapsedTimer m_pointerAge;
 };

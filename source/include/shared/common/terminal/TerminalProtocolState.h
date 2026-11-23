@@ -7,6 +7,7 @@
 class TerminalProtocolState
 {
 public:
+	// acceptFrame 的判定结果：正常快照 / 正常增量 / 重复快照 / 需补快照 / 序号断层
 	enum class FrameStatus
 	{
 		Snapshot,
@@ -16,8 +17,10 @@ public:
 		Gap
 	};
 
+	// 附着/分离：附着时清空序号与待发字节，等下一帧快照重建基线；分离后不再接受数据帧。
 	void beginAttachment();
 	void markDetached();
+	// 帧序判定：快照只在等待期接受，数据帧要求序号严格递增。
 	FrameStatus acceptFrame(int sequence, bool snapshot);
 
 	int sequence() const { return m_sequence; }

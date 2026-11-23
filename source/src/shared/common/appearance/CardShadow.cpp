@@ -14,12 +14,12 @@ namespace CardShadow
 {
 	namespace
 	{
-		// 缓存预算与单张上限（字节，按设备像素计）：高 DPI 下每条位图大 4 倍、放得下的条数就变少，这是内存上限该有
-		// 4MB 上限下每帧重建需 3.08ms（命中 0.175ms 的 17 倍）；单张超限不进缓存，一张巨图会顶掉整个预算。
+		// 缓存预算与单张上限（字节，按设备像素计）：高 DPI 下位图大 4 倍、放得下的条数就变少，
+		// 所以一律按真实内存记账；单张超限不进缓存，避免一张巨图顶掉整个预算。
 		constexpr qint64 kCacheBudget = 24 * 1024 * 1024;
 		constexpr qint64 kMaxEntry = 8 * 1024 * 1024;
-		constexpr int kMinRings = 6;  // 每像素一圈：少于 6 圈渐变会有台阶感
-		constexpr int kMaxRings = 48;  // 多于 48 圈纯属浪费
+		constexpr int kMinRings = 6;   // 环数下限：再少渐变就有台阶感
+		constexpr int kMaxRings = 48;  // 环数上限：再多纯属浪费
 
 		struct Entry
 		{
@@ -69,7 +69,8 @@ namespace CardShadow
 			}
 		}
 
-		qreal gaussTail(qreal x)   // 高斯尾 Q(x)=0.5*erfc(x/√2)：真实"模糊"阴影离形状边界 d 处的强度，d=0 处正好 0.5（模糊阴影的半高位置）
+		// 高斯尾 Q(x)=0.5*erfc(x/√2)：离形状边界 d 处的阴影强度，d=0 时正好 0.5。
+		qreal gaussTail(qreal x)
 		{
 			return 0.5 * std::erfc(x / std::sqrt(2.0));
 		}
@@ -79,8 +80,8 @@ namespace CardShadow
 			const int rings = qBound(kMinRings, spec.blur, kMaxRings);
 
 			// 与原生 CSS 同构的两层阴影（紧层贴卡片、宽层铺开，见原版 --dsw-shadow-lv2 的
-			// `0 4px 12px 2%, 0 2px 8px 4%`）：单层高斯看着"薄"，两层叠起来才有"东西压在上面"的厚度；
-			// 两层总 alpha 仍等于色板那一个值，色值依旧只来自 JSON。
+			// `0 4px 12px 2%, 0 2px 8px 4%`）：单层高斯看着薄，两层叠起来才有厚度；
+			// 两层总 alpha 仍等于色板那一个值。
 			const qreal peak = qBound(0.0, color.alphaF(), 1.0);
 			const qreal sigma = qMax(0.5, spec.blur / 2.5);
 			const qreal sigmaTight = qMax(0.5, sigma * 0.35);
@@ -134,7 +135,8 @@ namespace CardShadow
 		}
 	} // namespace
 
-	QMargins padding(const Spec& spec)   // 阴影整体下移 dy：下侧要多留 dy，上侧相应少留（dy 超过 blur 时不留）
+	// 阴影整体下移 dy：下侧多留 dy，上侧相应少留（dy 超过 blur 时不留）。
+	QMargins padding(const Spec& spec)
 	{
 		const int blur = qMax(0, spec.blur);
 		return QMargins(blur, qMax(0, blur - spec.dy), blur, blur + qMax(0, spec.dy));
@@ -152,7 +154,7 @@ namespace CardShadow
 			return;
 
 		const bool hasOverride = padOverride.left() >= 0 && padOverride.top() >= 0
-			&& padOverride.right() >= 0 && padOverride.bottom() >= 0;  // 四边都给了才算覆盖，只要有一边是负的就回到"按 spec 推导"
+			&& padOverride.right() >= 0 && padOverride.bottom() >= 0;  // 四边都给了才算覆盖，有一边为负就按 spec 推导
 		const QMargins pad = hasOverride ? padOverride : padding(spec);
 
 		const QSize imageSize(cardRect.width() + pad.left() + pad.right(),

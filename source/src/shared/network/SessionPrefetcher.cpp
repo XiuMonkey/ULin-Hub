@@ -15,7 +15,7 @@ void SessionPrefetcher::setApi(DshApiClient* api)
 	m_api = api;
 }
 
-void SessionPrefetcher::prefetch(const QString& sessionId, int throughSeq, int maxMessages)   // 这里发出去即可，不需要线程也不需要阻塞等待
+void SessionPrefetcher::prefetch(const QString& sessionId, int throughSeq, int maxMessages)   // 只负责发出：结果走回调发信号，不占线程也不阻塞
 {
 	if (!m_api || sessionId.isEmpty())
 		return;

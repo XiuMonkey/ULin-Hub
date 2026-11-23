@@ -2,7 +2,6 @@
 
 // 内置插件台账：<profile>/.ulin-hub-builtin.json。
 // revision = 内置插件源目录（qrc 里的插件源码）逐文件 SHA1 前缀；内容变了下次启动就重装。
-// 原先 windows-64 / linux-64 两份 ServerManager.cpp 各有一份逐字相同的实现，提取到这里。
 
 #include <QCryptographicHash>
 #include <QDateTime>

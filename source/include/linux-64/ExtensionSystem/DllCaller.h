@@ -24,9 +24,9 @@ public:
 	struct ParameterSpec
 	{
 		QString name;
-		QString type;
-		QString from;
-		QJsonValue defaultValue;
+		QString type; // native 风格的参数类型：bool / int / double / string / pointer32 / pointer64
+		QString from; // 从 args 的哪个键取值；空则用 name
+		QJsonValue defaultValue; // args 里没有该键时使用
 	};
 
 	struct FunctionSpec
@@ -35,9 +35,9 @@ public:
 		QString tool; // DSH 工具名
 		QString loadingSource; // 函数从哪个 DLL 导出，例如 "main.dll" / "bin/foo.dll"
 		QString interfaceType; // 接口类型："default"(DLL json/native)、"com"；预留 http/websocket 等
-		QString style; // "json"（当前支持）
-		QString returnType; // "int" / "void" / "string"
-		bool resultIsJson = true;
+		QString style; // "json" 或 "native"
+		QString returnType; // "int" / "void" / "bool" / "double" / "string"（"const char*" / "char*" 视作 string）
+		bool resultIsJson = true; // DLL 返回值是否已是 JSON 对象（false 时包成 { "value": "<原文>" }）
 		QVector<ParameterSpec> parameters;
 		QJsonObject comConfig; // InterfaceType != default 时的接口配置（如 com: { "ProgId": "..." }）
 		QString resolvedDllPath; // loadDescriptor 填充：调用期按此规范化绝对路径查库，防多扩展同名 main.dll 串库

@@ -31,8 +31,9 @@ ListView {
     spacing: Theme.spacing.sectionGap
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    readonly property int fullBuildRowLimit: 40   // 一页内全建，超出才虚拟化
-    cacheBuffer: count <= fullBuildRowLimit ? 100000 : Math.round(Math.max(600, height) * 2)   // 只设它不会真正全建，还要 pinStep() 配合
+    // 行数不超过 80 就全建，超过才虚拟化（加载更多后的历史浏览区间）。
+    readonly property int fullBuildRowLimit: 80
+    cacheBuffer: count <= fullBuildRowLimit ? 100000 : Math.round(Math.max(1600, height) * 4)   // 只设它不会真正全建，还要 pinStep() 配合
     ScrollBar.vertical: AppScrollBar {
         // 用户主动拖滚动条时先退出贴底，否则 maxContentY 会把把手夹回去。
         // 拖动期间还要冻结 contentY 的边界夹取：ListView 的 contentHeight 是估值，
@@ -87,16 +88,12 @@ ListView {
         if (!scrollBarDragging)
             return
         scrollBarDragging = false
+        // 只回夹上界以下：contentHeight 是估值，拿它当上界回夹会把用户拖到的位置拽回去，
+        // 表现就是"松手后跳到错误位置"。落点越界交给 ListView 自己随物化收敛。
         var lo = minContentY
-        var hi = Math.max(scrollMaxContentY, minContentY)
-        var y = contentY
-        if (y < lo)
-            y = lo
-        else if (y > hi)
-            y = hi
-        if (Math.abs(y - contentY) > 0.5) {
+        if (contentY < lo - 0.5) {
             clampingY = true
-            contentY = y
+            contentY = lo
             clampingY = false
         }
         pinTargetY = contentY
@@ -199,8 +196,7 @@ ListView {
 
     // 用户主动滚动/拖滚动条时的真实上界；maxContentY 为了贴底安全只用已建区域，
     // 历史加载后部分行未实例化时会偏小，不能拿来限制滚动条。
-    readonly property real scrollMaxContentY: Math.max(maxContentY,
-        contentHeight - height + originY + bottomMargin)
+    readonly property real scrollMaxContentY: Math.max(maxContentY, contentHeight - height + originY + bottomMargin)
 
     // 上翻前记录内容高，重建后补 contentY，避免当前阅读位置被新插入的历史顶走。
     property real olderAnchorHeight: 0
@@ -389,8 +385,7 @@ ListView {
         }
         // 贴底且宽度正在变化时，先用新 contentHeight 同步写一次底部，避免多一帧旧位置。
         if (!widthResizing && (widthAnimating || bottomSettling) && followBottom && lastRowBuilt) {
-            const bottomTarget = Math.max(minContentY,
-                contentHeight - height + originY + bottomMargin)
+            const bottomTarget = Math.max(minContentY, contentHeight - height + originY + bottomMargin)
             if (Math.abs(contentY - bottomTarget) > 0.5) {
                 bottomAnchorAdjusting = true
                 contentY = bottomTarget

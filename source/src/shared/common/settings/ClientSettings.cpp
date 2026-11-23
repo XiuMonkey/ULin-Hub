@@ -12,6 +12,7 @@
 
 namespace
 {
+	// 存储目录、旧版目录名，以及覆盖存储位置的环境变量（供测试与用户挪位）。
 	const char* const kDirName = "data/client";
 	const char* const kLegacyDirName = "ClientSetting";
 	const char* const kDirEnvVar = "ULINHUB_CLIENT_SETTING_DIR";
@@ -39,6 +40,7 @@ QString ClientSettings::dir()
 
 namespace
 {
+	// 旧版存储目录：只在没设覆盖目录时才回退读它。
 	QString legacyDir()
 	{
 		if (!qEnvironmentVariableIsEmpty("ULINHUB_CLIENT_SETTING_DIR"))
@@ -84,7 +86,7 @@ QJsonObject ClientSettings::read(const QString& fileName)
 		return {};
 	}
 	if (!doc.isObject()) {
-		qWarning().noquote() << QStringLiteral("[ClientSettings] root is not an object:")   // 合法 JSON 但根不是对象：按没有处理，别让后面的 .value() 落空
+		qWarning().noquote() << QStringLiteral("[ClientSettings] root is not an object:")   // 合法 JSON 但根不是对象：按没有处理
 			<< path << QStringLiteral("-> using defaults");
 		return {};
 	}
@@ -126,6 +128,7 @@ QString AppearanceSetting::fileName()
 	return QLatin1String(kAppearanceFile);
 }
 
+// 首次运行写一份默认外观设置：语言与主题都跟随系统。
 void AppearanceSetting::ensureFile()
 {
 	const QString path = ClientSettings::filePath(kAppearanceFile);
@@ -145,7 +148,7 @@ QString AppearanceSetting::languageCode()
 	const QString raw = ClientSettings::read(kAppearanceFile)
 		.value(QLatin1String(kLanguageKey)).toString().trimmed();
 
-	if (raw.isEmpty() || raw.compare(QLatin1String(kSystemValue), Qt::CaseInsensitive) == 0)   // 文件里写 "system"，代码里统一用空串表示"跟随系统"
+	if (raw.isEmpty() || raw.compare(QLatin1String(kSystemValue), Qt::CaseInsensitive) == 0)   // 文件里写 "system"，对外统一用空串表示"跟随系统"
 		return QString();
 
 	return raw;

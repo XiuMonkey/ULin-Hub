@@ -1,4 +1,4 @@
-﻿// 见 PluginMarketController.h：插件市场数据面。
+// 见 PluginMarketController.h：插件市场数据面。
 // 本文件在 common/**（领域层）：**不 include core/**、不碰 qmlbridge/**。"装完市场包重启内置服务端"
 // 是宿主行为，只发 serverRestartRequested()，由 qmlbridge/QmlBridge 接住调 ClientRuntime::restartServer()。
 
@@ -118,8 +118,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 			const QVariantMap task = row.toMap();
 			if (task.value(QStringLiteral("action")).toString() == QLatin1String("market")
 				&& task.value(QStringLiteral("state")).toString() == QLatin1String("running")) {
-				updateTask(task.value(QStringLiteral("id")).toString(),
-					ok ? QStringLiteral("ok") : QStringLiteral("failed"), m_installStatus);
+				updateTask(task.value(QStringLiteral("id")).toString(), ok ? QStringLiteral("ok") : QStringLiteral("failed"), m_installStatus);
 				break;
 			}
 		}
@@ -214,8 +213,7 @@ PluginMarketController::PluginMarketController(DshApiClient* api, QObject* paren
 	m_progressTimer = new QTimer(this);
 	m_progressTimer->setInterval(700);
 	connect(m_progressTimer, &QTimer::timeout, this, [this] { m_client->fetchStatus(); });
-	connect(m_client, &PluginMarketClient::statusLoaded,
-		this, &PluginMarketController::applyMarketStatus);
+	connect(m_client, &PluginMarketClient::statusLoaded, this, &PluginMarketController::applyMarketStatus);
 }
 
 void PluginMarketController::startMarketInstall()
@@ -223,7 +221,7 @@ void PluginMarketController::startMarketInstall()
 	if (!m_installer || m_installing)
 		return;
 
-	if (!m_installer->ensureInstalled(QCoreApplication::applicationDirPath()))   // 市场包已存在、或安装已在进行中时返回 false（调用方无需做任何事）
+	if (!m_installer->ensureInstalled(QCoreApplication::applicationDirPath()))   // 市场包已存在或安装进行中时返回 false
 		return;
 
 	setBusy(true);
@@ -252,8 +250,7 @@ void PluginMarketController::beginTask(const QString& action, const QString& nam
 	updateProgressPolling();
 }
 
-void PluginMarketController::updateTask(const QString& id, const QString& state, const QString& message,
-	bool appendLog, const QString& logLine)
+void PluginMarketController::updateTask(const QString& id, const QString& state, const QString& message, bool appendLog, const QString& logLine)
 {
 	if (id.isEmpty())
 		return;
@@ -318,8 +315,7 @@ void PluginMarketController::finishTaskForPath(const QString& path, bool ok, con
 	const QString id = activeTaskIdForPath(path);
 	if (id.isEmpty())
 		return;
-	updateTask(id, ok ? QStringLiteral("ok") : QStringLiteral("failed"),
-		message.isEmpty() ? (ok ? QStringLiteral("已完成") : QStringLiteral("失败")) : message);
+	updateTask(id, ok ? QStringLiteral("ok") : QStringLiteral("failed"), message.isEmpty() ? (ok ? QStringLiteral("已完成") : QStringLiteral("失败")) : message);
 }
 
 void PluginMarketController::updateBaseUrl() {
@@ -352,8 +348,7 @@ void PluginMarketController::setStatus(const QString& text)
 	emit statusChanged();
 }
 
-void PluginMarketController::setProgress(bool active, double percent, const QString& text,
-	int seconds, bool cancelling, int stage)
+void PluginMarketController::setProgress(bool active, double percent, const QString& text, int seconds, bool cancelling, int stage)
 {
 	const double bounded = percent >= 0.0 ? qBound(0.0, percent, 100.0) : -1.0;
 	if (m_progressActive == active
@@ -415,6 +410,7 @@ void PluginMarketController::applyMarketStatus(const QJsonObject& status)
 			<< "downloaded=" << view.downloaded << "size=" << view.size;
 	}
 }
+
 void PluginMarketController::updateProgressPolling()
 {
 	if (!m_progressTimer)   // 构造早期（连接已挂、定时器还没建）可能被 setBusy 调到
@@ -474,8 +470,7 @@ QString PluginMarketController::marketLogStageText() const
 			continue;
 		++scanned;
 		const QJsonObject object = QJsonDocument::fromJson(line).object();
-		const QDateTime when = QDateTime::fromString(
-			object.value(QStringLiteral("at")).toString(), Qt::ISODate);
+		const QDateTime when = QDateTime::fromString(object.value(QStringLiteral("at")).toString(), Qt::ISODate);
 		if (when.isValid() && when.toMSecsSinceEpoch() < earliest)
 			continue;   // 上一条操作的旧记录
 		QString detail = object.value(QStringLiteral("detail")).toString().trimmed();
@@ -521,10 +516,8 @@ void PluginMarketController::openPage()
 	m_open = true;
 	emit openChanged();
 
-	// ⚠️ 打开时**不要无条件** refresh()：启动后 1.8 秒已经预热过一次（见构造函数里的 singleShot），
-	// 再刷一次只是把同一个查询重发一遍 —— 数据 1.5 秒后回来时 models 整体 reset、ListView 一次性
-	// 5 天前没有这个行为）。有数据就直接用缓存；只有"还没拿到过"时才去取。
-	// 用户的要求："先显示快照，然后后台慢慢拉" —— 数据到达后 registryLoaded 会整体替换并更新状态。
+	// 打开时不无条件 refresh()：启动后 1.8 秒已预热过一次，重复请求会让列表整体 reset；
+	// 有数据直接用缓存，只有尚未取到过时才请求。数据到达后由 registryLoaded 整体替换并更新状态。
 	if (!m_all.isEmpty()) {
 		setBusy(false);
 		setStatus(m_installing ? QStringLiteral("正在安装插件市场，请稍候…") : QStringLiteral("正在获取最新数据…"));
@@ -694,6 +687,7 @@ bool PluginMarketController::loadLocalSnapshot()
 	}
 	return false;
 }
+
 void PluginMarketController::rebuild()
 {
 	m_filtered = PluginMarketModel::filter(m_all, m_search);   // 市场列表：过滤 + 分页（都在 PluginMarketModel 里）

@@ -1,9 +1,5 @@
-// 工具过滤面板（顶栏 ☰ 打开）
-//
-// 旧壳是 Widgets 的 `ToolsFilterPopup` + `ToolsFilterDirectoryEntry`（source/src/ui/TopBar.cpp，已随旧壳删除）。
-// QML 侧的分工（2026-10-10 定）：
-//   · **后台与形状** 全在 C++ 的 `common/agent/ToolsFilter`（数据层 + 摊平的行模型）——本文件只画；
-//   · 勾选/开关都直接打到模型上（模型内部即时生效并自动 POST 写回，不需要"保存"按钮）。
+// 工具过滤面板（顶栏 ☰ 打开）：只负责渲染，数据层与摊平的行模型都在 C++ 的 common/agent/ToolsFilter。
+// 勾选/开关直接打到模型上（模型内部即时生效并自动 POST 写回，不需要"保存"按钮）。
 //
 // 行模型（ToolsFilter::roleNames）：
 //   kind          "directory" | "tool"
@@ -11,7 +7,8 @@
 //   description   目录说明 / 工具描述
 //   count         目录头：成员数
 //   hiddenCount   目录头：该目录里被隐藏的工具数
-//   toolVisible   工具行：勾选态（⚠️ 不能叫 visible —— QQuickItem 的 final 属性，委托里会报 Cannot override FINAL property）
+//   toolVisible   工具行：勾选态（不能叫 visible：QQuickItem 的 final 属性，
+//                 委托里会报 Cannot override FINAL property）
 //   hidden        目录头：配置里"整组隐藏"（IsExpanded == "False"）
 //   expandedState 目录头：界面展开态（同上，别叫 expanded）
 //   toolName      工具行：工具名（勾选时回传给模型）
@@ -28,7 +25,7 @@ import "../../widgets"
 Item {
     id: root
 
-    // 模型由宿主单例提供（面板由 Shell 的 Loader 装载，import ULinHub 1.0 就能拿到 Hub）
+    // 模型来自宿主单例 Hub（面板由 Shell 的 Loader 装载）
     readonly property var filter: Hub.toolsFilter
 
     signal closeRequested()
@@ -36,9 +33,8 @@ Item {
     anchors.fill: parent
     focus: true
 
-    // 交给 PageOverlay 的**卡片目标框**。原来是 min(窗口-边距, 560/620)，但那种写法依赖 parent.width，
-    // 而在 PageOverlay 里 parent 就是卡片框本身 ⇒ 会成环（这正是本面板当初没套 PageOverlay 的原因）。
-    // 窗口最小尺寸远大于这里，取固定值即可。
+    // 交给 PageOverlay 的卡片目标框：固定值。不能依赖 parent.width ——
+    // 在 PageOverlay 里 parent 就是卡片框本身，那样会成环（本面板当初没套 PageOverlay 正是因此）。
     implicitWidth: 560
     implicitHeight: 620
 
@@ -125,7 +121,6 @@ Item {
             }
         }
 
-        // 帮助文案：把"勾掉 = 模型看不到、但仍可被调用"说清楚（旧壳同一句 id）
         SegmentedTabs {
             id: pageTabs
             anchors.left: parent.left
@@ -142,6 +137,7 @@ Item {
             onSelected: (key) => root.selectPage(key)
         }
 
+        // 帮助文案：把"勾掉 = 模型看不到、但仍可被调用"说清楚（沿用旧壳同一句 id）
         Text {
             id: hint
             visible: root.page === "tools"
@@ -423,7 +419,7 @@ Item {
             }
         }
 
-        // ---------------- 页脚：全部显示 / 全部隐藏 / 状态 ----------------
+        // ---------------- 技能页：与工具页互斥，切到 skills 时才装载 ----------------
         Loader {
             id: skillsPage
             anchors.left: parent.left
@@ -439,6 +435,7 @@ Item {
             source: Style.url("basic/chat/SkillsManagerPage.qml")
         }
 
+        // ---------------- 页脚：全部显示 / 全部隐藏 / 状态 ----------------
         Item {
             id: footer
             visible: root.page === "tools"

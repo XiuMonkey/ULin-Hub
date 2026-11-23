@@ -8,8 +8,8 @@
 
 namespace
 {
-	// 兜底配色：主题包里没有 syntax* 键时用它（旧风格包 / 只改了部分键的自定义包）。
-	// 整片代码块就退化成了纯文本（"高亮直接没了"）。宁可色偏一点，也不能没有高亮。
+	// 兜底配色：主题包缺 syntax* 键时用它（旧风格包 / 只改了部分键的自定义包），
+	// 否则整片代码块会退化成纯文本。宁可色偏，也不能没有高亮。
 	struct FallbackColor
 	{
 		const char* role;
@@ -79,7 +79,7 @@ bool CodeHighlighter::loadFromFile(const QString& filePath)
 
 			Rule rule;
 			rule.regex = QRegularExpression(pattern);
-			rule.role = ruleObj.value(QStringLiteral("role")).toString();   // 新格式：只写角色，色值走主题包；旧格式（color）仍认，作为单条硬覆盖
+			rule.role = ruleObj.value(QStringLiteral("role")).toString();   // 新格式只写角色，色值取主题包；旧格式的 color 仍认，作为单条硬覆盖
 			rule.color = ruleObj.value(QStringLiteral("color")).toString();
 			rule.bold = ruleObj.value(QStringLiteral("bold")).toBool(false);
 			rule.italic = ruleObj.value(QStringLiteral("italic")).toBool(false);
@@ -102,21 +102,20 @@ void CodeHighlighter::setThemeColors(const QHash<QString, QString>& colors, bool
 {
 	QMutexLocker locker(&m_mutex);
 
-	// keys 是主题包里的 syntaxKeyword / syntaxString / … —— 去掉 "syntax" 前缀、首字母小写，
-	// 就得到规则里写的角色名（keyword / string / …）。这样主题包加一个键就多一个角色，
-	// 这里不需要逐键列举。
+	// keys 是主题包里的 syntaxKeyword / syntaxString / …：去掉 "syntax" 前缀、首字母小写，
+	// 就得到规则里的角色名（keyword / string / …），主题包新增键无需改这里。
 	QHash<QString, QString> byRole;
 	for (auto it = colors.constBegin(); it != colors.constEnd(); ++it) {
 		if (!it.key().startsWith(QLatin1String("syntax")) || it.key().size() <= 6)
 			continue;
-		QString role = it.key().mid(6);   // "SyntaxKeyword" 之外的写法（如 _syntaxNote）会被前缀检查挡掉
+		QString role = it.key().mid(6);
 		role[0] = role.at(0).toLower();
 		byRole.insert(role, it.value());
 	}
 
 	m_themeColors = byRole;
 	m_dark = dark;
-	m_cache.clear();   // 颜色变了，旧 HTML 里烘的是旧色 ⇒ 必须清缓存（换肤立刻生效的关键）
+	m_cache.clear();   // 颜色变了，缓存里烘的是旧色，必须清掉换肤才生效
 }
 
 QString CodeHighlighter::normalizeHint(const QString& language) const
@@ -125,12 +124,12 @@ QString CodeHighlighter::normalizeHint(const QString& language) const
 	if (hint.isEmpty())
 		return hint;
 
-	static const QRegularExpression whitespace(QStringLiteral("\\s+"));   // 只取第一个词：```js title="x" / ```python {1,2}
+	static const QRegularExpression whitespace(QStringLiteral("\\s+"));   // fence 提示里只取第一个词（```js title="x"）
 	const int split = hint.indexOf(whitespace);
 	if (split > 0)
 		hint = hint.left(split);
 
-	static const QRegularExpression decoration(QStringLiteral("^[`'\"{]+|[`'\"}]+$"));   // 去掉 fence 里常见的装饰字符（```json, ```'js' 、```{c}）
+	static const QRegularExpression decoration(QStringLiteral("^[`'\"{]+|[`'\"}]+$"));   // 去掉装饰字符：```json、```'js'、```{c}
 	hint.remove(decoration);
 
 	const auto alias = m_aliases.constFind(hint);
@@ -141,8 +140,7 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 {
 	QMutexLocker locker(&m_mutex);
 
-	// 语言提示归一：只取第一个词（fence 常写 ```js title=x）、非字母数字的尾巴去掉、转小写，
-	// 再经别名表落到语法 id —— 与官方 LANG_ALIASES 的取法一致（官方也是 Map 归一后查语法）。
+	// 语言提示归一后经别名表落到语法 id，与官方 LANG_ALIASES 的取法一致。
 	const QString hint = normalizeHint(language);
 
 	// 缓存键带上当前主题：setThemeColors 已经会清缓存，这里再带一层主题标记做双保险。
@@ -154,13 +152,13 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 	const QString lang = hint.isEmpty() ? QStringLiteral("default") : hint;
 	const QVector<Rule> rules = m_rules.value(lang, m_rules.value(QStringLiteral("default")));
 
-	// 外层必须套 <pre>：QML 侧用 RichText 渲染，裸换行与**连续空格都会折叠** ——
-	// 不套的话多行代码会挤成一行、缩进全丢（lineCount 恒为 1）；套上 <pre> 才正常。
+	// 外层必须套 <pre>：QML 侧用 RichText 渲染，裸换行与连续空格都会被折叠，不套就挤成一行、缩进全丢。
 	QString html = QStringLiteral("<pre style=\"margin:0;font-family:Consolas,monospace;\">");
 	int pos = 0;
 	const int codeLength = code.length();
 
-	while (pos < codeLength) {   // 逐位置贪心：每轮在剩余文本里找最早、同位置最长的那条规则；前段原样转义，命中段套 span
+	// 逐位置贪心：每轮在剩余文本里找最早、同位置最长的那条规则；前段原样转义，命中段套 span。
+	while (pos < codeLength) {
 		int bestPos = -1;
 		int bestLen = 0;
 		const Rule* bestRule = nullptr;
@@ -193,7 +191,7 @@ QString CodeHighlighter::highlight(const QString& language, const QString& code)
 		const QString matched = code.mid(bestPos, bestLen).toHtmlEscaped();
 
 		// 色值 = 单条硬覆盖 > 主题包里该角色的色 > 内置兜底表 >（都没有）不着色。
-		// 兜底表保证"主题包缺键"不会让整片代码块失去高亮（这个坑踩过一次）。
+		// 兜底表保证主题包缺键时不会整片失去高亮。
 		QString color = !bestRule->color.isEmpty()
 			? bestRule->color
 			: m_themeColors.value(bestRule->role);

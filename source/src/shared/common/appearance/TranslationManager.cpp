@@ -93,7 +93,8 @@ namespace
 			releaseBuiltinPack(QString::fromLatin1(base), dir);
 	}
 
-	QString resolvedCodeFor(const QString& languageCode, const QString& systemCode)   // 目标语言代码：显式指定优先，否则退到系统语言（QTranslator 自己有 fallback
+	// 目标语言代码：显式指定优先，否则退到系统语言。
+	QString resolvedCodeFor(const QString& languageCode, const QString& systemCode)
 	{
 		if (!languageCode.isEmpty())
 			return languageCode;
@@ -217,13 +218,12 @@ namespace Translation
 		LanguageInfo fallback;  // 默认语言（中文）永远可选：qrc 内置包保底，外部包删了会自动释放回来
 		fallback.code = defaultLanguageCode();
 		fallback.name = QLocale(fallback.code).nativeLanguageName();
-		if (fallback.name.isEmpty())   // 源码里唯一保留的自然语言字面量：它是语言下拉里这一项的显示名，且仅在 Qt 取不到系统语言名时
+		if (fallback.name.isEmpty())   // Qt 取不到该语言的本地名时的兜底显示名
 			fallback.name = QStringLiteral("中文");
 		languages.append(fallback);
 
 		// 候选语言 = qrc 内置包 ∪ 外部 translations/ 里的 .qm。内置包必须一起算：它们是本次 init()
-		// 刚释放到外部目录的，而 Windows 的目录项更新有延迟，紧接着 entryList 可能还看不到，只扫外部
-		// 就会"首次启动时英文不在列表、重启才出现"（qrc 是内存数据，无此问题）；parseAvailableLanguages 去重
+		// 刚释放到外部目录的，而 Windows 的目录项更新有延迟，只扫外部会"首启缺英文、重启才出现"。
 		QStringList candidates;
 		for (const char* base : kBuiltinPacks) {
 			const QString name = QString::fromLatin1(base) + QStringLiteral(".qm");
@@ -276,7 +276,7 @@ namespace Translation
 		if (!origin.isEmpty())
 			return;
 
-		qInfo().noquote() << QStringLiteral("[Translation] no language pack for")   // 找不到对应语言包：退回默认语言的语言包（再退回 key），原因写进日志
+		qInfo().noquote() << QStringLiteral("[Translation] no language pack for")   // 缺对应语言包：退回默认语言包（再退回 key）
 			<< wanted << QStringLiteral("under") << dir
 			<< QStringLiteral("-> falling back to the default language");
 		g_activeCode = defaultLanguageCode();

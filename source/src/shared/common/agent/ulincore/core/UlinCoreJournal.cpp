@@ -26,6 +26,7 @@ QString UlinCoreJournal::filePath() const
 	return m_filePath;
 }
 
+// JSONL 追加写：一条记录一行，type/ts 由日志层补齐。
 void UlinCoreJournal::append(const QString& type, const QJsonObject& payload)
 {
 	QMutexLocker locker(&m_mutex);
@@ -45,6 +46,7 @@ void UlinCoreJournal::append(const QString& type, const QJsonObject& payload)
 
 QList<QJsonObject> UlinCoreJournal::readAll() const
 {
+	// 逐行读取，空行与非法 JSON 直接跳过。
 	QMutexLocker locker(&m_mutex);
 	QList<QJsonObject> entries;
 

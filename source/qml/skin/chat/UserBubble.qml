@@ -11,8 +11,7 @@ Item {
     readonly property string copyText: text
     property var images: []   // [{ id, mediaType }]，源由 Hub.attachmentSource 取
 
-    // Non-image files are appended to the prompt as "附件：\n- name (path)".
-    // The bubble shows the user text only; files get dedicated cards.
+    // 非图片附件在发送时拼成 "附件：\n- 名字 (路径)"；气泡只显示正文，文件另出卡片。
     readonly property var attachmentParse: splitAttachmentText(text)
     readonly property string displayText: attachmentParse.text
     readonly property var files: attachmentParse.files
@@ -159,8 +158,7 @@ Item {
         + (browsersRow.visible ? browsersRow.height + 8 : 0)
         + (imagesRow.visible ? imagesRow.height + (bubble.visible ? 6 : 0) : 0)
 
-    // 图片贴在气泡上方（右对齐）；单图按原比例限制 240px 长边，多图用 120px 方图裁切。
-    // 浏览器上下文卡片：和输入区发送前那张卡同构。历史消息里的标记文本也还原成卡片。
+    // 浏览器上下文卡片：和输入区发送前那张卡同构，历史消息里的标记文本也还原成卡片。
     Column {
         id: browsersRow
         anchors.right: parent.right
@@ -192,8 +190,7 @@ Item {
                     onClicked: {
                         if (modelData.url.length === 0)
                             return
-                        PanelBarDock.openUrl(modelData.url,
-                            modelData.title.length > 0 ? modelData.title : modelData.url)
+                        PanelBarDock.openUrl(modelData.url, modelData.title.length > 0 ? modelData.title : modelData.url)
                         Hub.openPanelBar()
                     }
                 }
@@ -327,6 +324,7 @@ Item {
         }
     }
 
+    // 图片贴在气泡上方（右对齐）：单图按原比例限制 240px 长边，多图用 120px 方图裁切。
     Row {
         id: imagesRow
         anchors.right: parent.right

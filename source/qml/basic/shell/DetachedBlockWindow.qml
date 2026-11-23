@@ -18,7 +18,7 @@ Window {
     property var info: ({})
 
     readonly property bool maximized: win.visibility === Window.Maximized
-    readonly property color frameBorder: Theme.isDark ? "#2E3034" : "#E3E5E9"
+    readonly property color frameBorder: Theme.isDark ? "#2E3034" : "#E3E5E9"   // 无边框窗口的 1px 描边（深浅主题各一档）
 
     Component.onCompleted: {
         info = PanelBarDock.blockInfo(blockId)

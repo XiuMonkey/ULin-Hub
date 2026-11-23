@@ -254,8 +254,7 @@ ExtensionRegistry::CleanupResult ExtensionRegistry::cleanupResiduals() const
 	patchFile.close();
 
 	const QString profileNodeModulesPath = nodeModulesPath();
-	const QString serverNodeModulesPath = QDir::cleanPath(
-		m_serverProfilePath + QStringLiteral("/../../../node_modules"));
+	const QString serverNodeModulesPath = QDir::cleanPath(m_serverProfilePath + QStringLiteral("/../../../node_modules"));
 
 	for (int i = 0; i + 1 < lines.size(); ++i) {
 		const QString trimmed = lines.at(i).trimmed();

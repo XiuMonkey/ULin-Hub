@@ -4,10 +4,8 @@
 #include "common/appearance/CardShadow.h"
 #include "common/settings/ClientSettings.h"
 #include "common/util/CommonRegistry.h"
-#include "common/util/HostIndex.h"   // (M8) removed: #include "core/ULinHub.h"
+#include "common/util/HostIndex.h"
 
-// (M8) removed: #include "ui/ShadowPanel.h"
-// (M8) removed: #include "ui/SpinnerWidget.h"
 #include <QAbstractScrollArea>
 #include <QApplication>
 #include <QCoreApplication>
@@ -39,7 +37,7 @@
 #include <future>
 #include <utility>
 
-QString ThemeManager::modeKey(Mode mode)   // 常量走函数式 static，避免静态初始化期构造 QString（Qt 老坑）
+QString ThemeManager::modeKey(Mode mode)
 {
 	return mode == Mode::Dark ? QStringLiteral("dark") : QStringLiteral("light");
 }
@@ -105,7 +103,7 @@ QString ThemeManager::paletteFileFor(Mode m) const
 		: QStringLiteral("theme-light.json");
 }
 
-QHash<QString, QString> ThemeManager::loadPaletteFor(Mode m) const   // 外部优先、qrc 兜底
+QHash<QString, QString> ThemeManager::loadPaletteFor(Mode m) const   // 只读风格包目录里的调色板 JSON
 {
 	QHash<QString, QString> result;
 
@@ -154,9 +152,8 @@ void ThemeManager::ensureStylePack()
 		return;
 	}
 
-	// 包内没有                             → 释放
-	// 有、但清单没记过（旧副本/用户放的）    → 不动，把包内现状记为基线
-	// 且 内置哈希 != 清单（内置更新了）   → 覆盖
+	// 释放/覆盖规则：包内缺失 → 释放；有但清单没记过（旧副本或用户自放）→ 不动，把现状记为基线；
+	// 有且当前哈希等于清单、但内置哈希已变 → 覆盖。
 	static const QString kBuiltin = QStringLiteral(":/qml");
 	QDir builtin(kBuiltin);
 	if (!builtin.exists()) {
@@ -346,7 +343,7 @@ void ThemeManager::activate(Mode m)
 	m_palette = m_paletteCache.value(modeKey(m));
 }
 
-QString ThemeManager::loadText(const QString& fileName) const   // (M8) 只用来读风格包目录里的文本（调色板 JSON）；QSS 文本读取已随 QSS 合成一起删除
+QString ThemeManager::loadText(const QString& fileName) const   // (M8) 只读风格包目录里的文本（调色板 JSON）
 {
 	if (m_stylesDir.isEmpty() || fileName.isEmpty())
 		return QString();
@@ -364,7 +361,7 @@ void ThemeManager::applyToWindow(QWidget* window)
 	Q_UNUSED(window);
 }
 
-void ThemeManager::repolishScrollArea(QWidget* widget)   // (M8) 同上：QSS 时代滚动区需要重新 polish 才会吃到样式；QML 侧没有 QSS，无操作
+void ThemeManager::repolishScrollArea(QWidget* widget)   // (M8) QSS 时代要重新 polish 才吃样式；QML 侧没有 QSS，保留为空操作
 {
 	Q_UNUSED(widget);
 }
@@ -423,7 +420,8 @@ void ThemeManager::toggleTheme()
 	m_switchingTimer->start();
 }
 
-void ThemeManager::reload()   // 把合成样式表装到单个窗口及其子树；各顶层窗口自行调用
+// 重建色板缓存并重装全局调色板；applyToWindow 仅为保留签名（QML 壳没有 QSS 可装）。
+void ThemeManager::reload()
 {
 	buildAllCaches();
 	activate(m_mode);

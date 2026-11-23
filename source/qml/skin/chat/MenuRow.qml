@@ -1,8 +1,7 @@
 // 菜单行（模型 / 思考档位共用；原版 ModelSelectorRow，objectName modelSelectorOption）
-// 最小高：带副标题 40、不带副标题 32（档位行只有名字，38 会显得空）；
-// 内边距 8/6；选中时右侧画几何对钩 —— 两段 45° 直线、方头端点、尖角转折。
-// 不用 "✓"(U+2713) 字符：字体里那是流线型弧线，笔画粗细不匀、两端圆头，
-// 一放大就"随手画"，跟这个界面全是直角的调子冲突。
+// 最小高：带副标题 36、只有名字 28；内边距 8/6。
+// 选中时右侧画几何对钩 —— 两段 45° 直线、方头端点、尖角转折。
+// 不用 "✓"(U+2713) 字符：字体里那是流线型弧线，笔画粗细不匀、两端圆头，一放大就"随手画"。
 
 import QtQuick
 import ULinHub 1.0
@@ -20,20 +19,13 @@ Rectangle {
 
     signal chosen()
 
-    // 行高按"两行文字的实际占用"给余量，不再拍一个 40 的整数：
-    // 13px 标题 + 12px 副标题实测 implicitHeight 35，原来 +12 的余量让整行涨到 47，
-    // 三行模型叠起来就是"每行之间空一格"。收成 +7（上下各 3.5），整行 42。
-    // 无副标题的档位行 28：单行 13px 文字配 32 还是松。
-    implicitHeight: Math.max(root.subtitle.length > 0 ? 36 : 28,
-                             textColumn.implicitHeight + 7)
+    // 行高按两行文字的实际占用给余量：13px 标题 + 12px 副标题实测 35，上下各留 3.5；
+    // 无副标题的档位行只有单行 13px，28 即可。
+    implicitHeight: Math.max(root.subtitle.length > 0 ? 36 : 28, textColumn.implicitHeight + 7)
     radius: 10
 
-    // 选中态用 textPrimary 的低透明度灰，不用 accent 蓝：
-    // 输入区整体是灰阶调子（见 Composer.qml 顶部"视觉约定"），弹层里冒出一块蓝会
-    // 抢走输入框的注意力。取 textPrimary 而不是写死一个灰值，是为了两个主题共用一份
-    // 表达式 —— light 下浅灰（#0F1115 的 8%），dark 下自动变成淡白（#F9FAFB 的 8%）；
-    // 写死 #E9EBF0 在暗色主题里会比菜单底还暗，选中行反而凹进去。
-    // 浓度比 chipHoverBg（5% / 8%）高一档，hover 再深一档，三态才分得开。
+    // 选中态用 textPrimary 的 8% 灰，不用 accent 蓝：输入区是灰阶调子，弹层里冒出一块蓝会抢焦点。
+    // 取 textPrimary 而非写死灰值，light/dark 共用一份表达式；hover 再深一档（13%），三态才分得开。
     readonly property color selectedBg: Qt.rgba(Theme.color.textPrimary.r, Theme.color.textPrimary.g,
                                                 Theme.color.textPrimary.b, 0.08)
     readonly property color selectedBgHover: Qt.rgba(Theme.color.textPrimary.r, Theme.color.textPrimary.g,
@@ -88,16 +80,14 @@ Rectangle {
             height: 18
             visible: root.checked
 
-            // 对钩跟文字同色（textPrimary），不另设一色：
-            // 灰底 + 灰勾是"状态标记"，不承担强调职责；勾形本身（两段 45°、方头）
-            // 已经足够把它和文字区分开。
+            // 对钩跟文字同色（textPrimary）：灰底 + 灰勾是"状态标记"，不承担强调职责，
+            // 勾形本身（两段 45°、方头）已足够区分。
             property color ink: Theme.color.textPrimary
             onInkChanged: requestPaint()
 
             anchors.verticalCenter: parent.verticalCenter
 
-            // 两段等斜率（各 45°）的直线，转折在左下、尖角朝右下 —— 这是构图上最"正"的勾形：
-            // 短臂与长臂夹角 90°，两条臂的斜率互为相反数，看起来不会一边陡一边缓。
+            // 两段各 45° 的等斜率直线，夹角 90°，转折在左下、尖角朝右下；
             // lineCap=butt（方头）+ lineJoin=miter（尖角）：圆头/圆角会立刻变回"流线型"。
             onPaint: {
                 const ctx = getContext("2d")

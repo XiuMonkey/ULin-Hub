@@ -166,8 +166,7 @@ Item {
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.toggle(questionCard.index, optionRow.modelData.label,
-                                        questionCard.modelData.multiSelect)
+                                    onClicked: root.toggle(questionCard.index, optionRow.modelData.label, questionCard.modelData.multiSelect)
                                 }
 
                                 AppToolTip {

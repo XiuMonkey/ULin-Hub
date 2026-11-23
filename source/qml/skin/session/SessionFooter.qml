@@ -109,7 +109,7 @@ Item {
             })
         }
 
-        // 被隐藏的入口也必须纳入可见计数：扩展入口的前五项始终显示。
+        // 溢出菜单 = 被挤出的扩展入口 + 固定溢出的内置入口（顺序：扩展在前、内置在后）。
         overflowEntries = overflow.concat(fixedOverflow)
     }
 

@@ -10,6 +10,7 @@ Item {
 
     Component.onCompleted: Hub.settings.refreshAccount()
 
+    // 登录流程第一步：宿主给出授权 URL 后，用右栏网页块打开官方登录页并收起本页。
     Connections {
         target: Hub.settings
         function onAccountAuthorizeRequested(url) {
@@ -65,6 +66,7 @@ Item {
             anchors.bottomMargin: 20
             spacing: 12
 
+            // 账号卡：头像（首字母圆形底）+ 名称 / 联系方式
             Row {
                 width: parent.width
                 spacing: 12
@@ -117,6 +119,7 @@ Item {
                 font.weight: Theme.font.weightBold
             }
 
+            // 余额与状态：有余额就显示余额；拿不到 / 未登录各给一条提示
             Text {
                 width: parent.width
                 visible: Hub.settings.account.balanceText.length > 0
@@ -154,6 +157,7 @@ Item {
                 wrapMode: Text.WordWrap
             }
 
+            // 登录 / 退出 / 刷新 / 取消登录：登录由宿主发起官方授权流程（见上面的 Connections）
             Row {
                 spacing: 8
                 ActionButton {
@@ -188,6 +192,7 @@ Item {
                 }
             }
 
+            // 已登录才有：查看用量 / 充值都打开官方页面
             Row {
                 spacing: 8
                 visible: Hub.settings.account.signedIn

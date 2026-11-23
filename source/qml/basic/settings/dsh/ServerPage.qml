@@ -38,8 +38,7 @@ Item {
             text: qsTrId("settings_server_address")
             color: Theme.color.textSecondary
             font.family: Theme.font.uiFamily
-            // 字段标签取 caption(12) + 次级色，与 Agent 预设页同档。
-            font.pixelSize: Theme.font.caption
+            font.pixelSize: Theme.font.caption   // caption(12) + 次级色，与 Agent 预设页同档
         }
 
         Rectangle {
@@ -48,9 +47,8 @@ Item {
             implicitHeight: 32
             radius: Theme.radius.control
             color: Theme.color.panelBg
+            // 静息用 inputBorder(10% 黑)，对齐官方 DSH --dsw-alias-border-l2（输入类控件那一档）
             border.width: 1
-
-            // 静息走 inputBorder(10% 黑) = 官方 DSH `--dsw-alias-border-l2`（输入类控件那一档）
             border.color: urlInput.activeFocus ? Theme.color.textSecondary : Theme.color.inputBorder
 
             TextInput {

@@ -1,10 +1,9 @@
 #pragma once
 
-// 样式资源 + 生效的唯一入口（程序级 QObject 单例）。
-// ：**对象是 QML 风格包**（原职责不变 —— 以前释放/管理各板块 *.qss，现在释放/管理 qrc:/qml 整棵树
-// 与 theme-*.json）。颜色来自 theme-<mode>.json，尺寸/圆角/字号来自 metrics.json（QML 侧读）；
-// QSS 合成与"把样式表挂到窗口"已随控件壳删除，相关入口保留为无操作桩（插件可能仍调）。
-// 释放规则不变：内建在 qrc，外部 stylesDir 缺失的文件启动时释放一份供定制（**已存在的绝不覆盖**）。
+// 样式资源 + 生效的唯一入口（程序级 QObject 单例），对象是 QML 风格包：
+// 释放/管理 qrc:/qml 整棵树与 theme-*.json；颜色来自 theme-<mode>.json，尺寸/圆角/字号来自
+// metrics.json（QML 侧读）。QSS 合成与"把样式表挂到窗口"已随控件壳删除，相关入口保留为无操作桩。
+// 释放规则：内建在 qrc，外部 stylesDir 缺失的文件启动时释放一份供定制（**已存在的绝不覆盖**）。
 // 所有方法只在 GUI 线程调用。
 
 #include "VirtualClass/VirtualCommon.h"
@@ -50,7 +49,7 @@ public:
 	// 重置风格包：删掉"内置包里有的"已释放文件（用户自建的不动）→ 从内置重放 → reload
 	void resetStylePack();
 
-	//  QSS 已删除：这两个入口保留为无操作桩（VirtualTheme 接口不能改，插件可能仍调）
+	// QSS 已删除：这两个入口保留为无操作桩（VirtualTheme 接口不能改，插件可能仍调）
 	void applyToWindow(QWidget* window);
 	void repolishScrollArea(QWidget* widget);
 

@@ -25,9 +25,14 @@ namespace ClientExtension
 		QStringList g_loadedNames;  // 只在 GUI 线程读写，不加锁
 		QHash<QString, QPluginLoader*> g_loaders;  // 已装载扩展的 loader（键 = 扩展名，所有权在 qApp）
 
-		const char* const kPendingRemovalMarker = ".pending-removal";  // 卸载时删不掉的目录留此标记，下次启动由 sweepPendingRemovals() 清掉
-		const char* const kDetachSlot = "detachHost()";  // 插件可选槽"我要退场了"：元对象层字符串契约（非接口方法），invoke 后宿主不再用插件的任何对象；老插件没有它也不踩空 vtable 槽位
-		const char* const kIdentitySlot = "setHostIdentity(QString)";  // 可选槽：attachHost() 之前推一次本扩展的安装目录名；架空舞台要求 owner 等于安装名才能校验所有权、卸载时收回它占的台，插件不必硬编码名字
+		// 卸载时删不掉的目录留此标记，下次启动由 sweepPendingRemovals() 清掉
+		const char* const kPendingRemovalMarker = ".pending-removal";
+		// 插件可选槽"我要退场了"：元对象层字符串契约（非接口方法），invoke 后宿主不再用插件的任何对象；
+		// 老插件没有它也不踩空 vtable 槽位
+		const char* const kDetachSlot = "detachHost()";
+		// 可选槽：attachHost() 之前推一次本扩展的安装目录名；架空舞台要求 owner 等于安装名才能校验所有权、
+		// 卸载时收回它占的台，插件不必硬编码名字
+		const char* const kIdentitySlot = "setHostIdentity(QString)";
 
 		// 身份文件 = <dir>/info.json5（老扩展是 regulation.json5）。规则归 ExtensionLoader 所有：
 		// "已安装"的判据、残留判定、启动扫描都走它，免得三处各写一个文件名。
@@ -94,8 +99,7 @@ namespace ClientExtension
 					reason += qtTrId("ext_build_config_mismatch_hint");
 				if (error)
 					*error = reason;
-				qWarning("[ClientExtension] not a Qt plugin (or load failed): %s -- %s",
-					qPrintable(fileName), qPrintable(reason));
+				qWarning("[ClientExtension] not a Qt plugin (or load failed): %s -- %s", qPrintable(fileName), qPrintable(reason));
 				delete loader;
 				return false;
 			}
@@ -111,7 +115,8 @@ namespace ClientExtension
 				return false;  // loader 留在 qApp 下，随进程一起走
 			}
 
-			// 可选能力：只登记、不装载判定，拒绝发生在 Takenover(true) 时；插件侧必须在根对象上写 Q_INTERFACES(VirtualPlugin VirtualApiSink)，否则 cast 永远是 nullptr
+			// 可选能力：只登记、不装载判定，拒绝发生在 Takenover(true) 时；插件侧必须在根对象上写
+			// Q_INTERFACES(VirtualPlugin VirtualApiSink)，否则 cast 永远是 nullptr
 			if (qobject_cast<VirtualApiSink*>(root)) {
 				CommonRegistry::instance().AddToRegistry(DshHostIndex::kApiSink, root);
 				qInfo("[ClientExtension] %s: 后端接管接收端（VirtualApiSink）已登记", qPrintable(name));
@@ -183,7 +188,8 @@ namespace ClientExtension
 			if (canDetach) {
 				QMetaObject::invokeMethod(root, "detachHost", Qt::DirectConnection);
 
-				ConnectionManager::instance().ReleaseTakeoversFor(name);   // 不交还的话，扩展卸下之后那些按钮会变成"点了没反应" —— 它接的槽已经不存在了
+				// 不交还的话，扩展卸下之后那些按钮会变成"点了没反应" —— 它接的槽已经不存在了
+				ConnectionManager::instance().ReleaseTakeoversFor(name);
 
 				// 顶替面板坞块后端的登记同理要撤：不撤的话登记表里会留一具尸体 —— HasBlockBackend
 				// 一直报真（自省/界面提示据此说"已被扩展接管"），而 blockBackend 因 QPointer 置空
@@ -191,10 +197,11 @@ namespace ClientExtension
 				HostUi::instance().releaseBlockBackends(name);
 
 				const bool unloaded = loader->unload();  // unload() 自己会把根组件删掉，这里不该手工 delete 插件对象
-				qInfo("[ClientExtension] remove: detach+unload %s -> %s", qPrintable(name),
-					unloaded ? "ok" : "failed (loader refused)");
+				qInfo("[ClientExtension] remove: detach+unload %s -> %s", qPrintable(name), unloaded ? "ok" : "failed (loader refused)");
 
-				if (unloaded)  // 实例已销毁、dll 也解映射，名字不再代表活着的东西；不摘掉的话"移除 → 再安装"会走"重新 attach"分支却找不到 loader、扩展按钮不出来
+				// 实例已销毁、dll 也解映射，名字不再代表活着的东西；不摘掉的话"移除 → 再安装"会走
+				// "重新 attach"分支却找不到 loader、扩展按钮不出来
+				if (unloaded)
 					g_loadedNames.removeAll(name);
 
 				if (unloaded && QDir(dir).removeRecursively()) {
@@ -207,8 +214,6 @@ namespace ClientExtension
 					" falling back to mark + sweep", qPrintable(name), kDetachSlot);
 			}
 		}
-
-		// 是控件壳的能力，它要 QMainWindow*，而现在的宿主是 QQmlApplicationEngine + QML Window、永远抢不到台，所以整套连同 WindowFrame 一起删了。
 
 		// 删判据文件即"已卸载"：不再出现在列表，下次启动也不会被装载。
 		// 两个名字都删 —— 新装的是 info.json5，老扩展可能还叫 regulation.json5（只删存在的那个）。
@@ -236,8 +241,7 @@ namespace ClientExtension
 			marker.close();
 
 		const QString leftovers = QDir(dir).entryList(QDir::Files, QDir::Name).join(QLatin1String(", "));
-		qInfo("[ClientExtension] removed (files still locked): %s leftovers=[%s] dir=%s",
-			qPrintable(name), qPrintable(leftovers), qPrintable(dir));
+		qInfo("[ClientExtension] removed (files still locked): %s leftovers=[%s] dir=%s", qPrintable(name), qPrintable(leftovers), qPrintable(dir));
 		if (error)
 			*error = qtTrId("ext_delete_locked");   // 残留清单与目录已在上一条 qInfo 里
 		return false;
@@ -269,8 +273,7 @@ namespace ClientExtension
 
 			const QString info = infoPath(sub.absoluteFilePath());
 			if (info.isEmpty()) {  // 没有身份文件（info.json5 / 老名 regulation.json5）的一律跳过：那是移除时 DLL 被锁留下的残留
-				qInfo("[ClientExtension] skip (no info.json5, likely a removal leftover): %s",
-					qPrintable(sub.fileName()));
+				qInfo("[ClientExtension] skip (no info.json5, likely a removal leftover): %s", qPrintable(sub.fileName()));
 				continue;
 			}
 
@@ -363,5 +366,3 @@ namespace ClientExtension
 		qInfo("[ClientExtension] 退出收尾：%d 个扩展已退场，dll 随进程终止回收", int(names.size()));
 	}
 }
-
-// 宿主自己就是 QML 壳、Qt Quick 随宿主部署 ⇒ 运行时包与其 Subtype 预检一并退役，见 docs/codex-port-handover.md 工单 A。

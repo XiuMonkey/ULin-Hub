@@ -1,9 +1,8 @@
-// 见 MarkdownSegmenter.h：
-// ① split() 按代码围栏切 prose/code —— 代码块继续交给 CodeBlock.qml；
-// ② renderFragment() 用 Qt 6 内置 md4c 解析 GitHub 方言，再按 DSH 的块级规格调整 QTextDocument；
-// ③ QML 的 MarkdownBody 直接持有 QTextDocument 并增量插入 fragment。
-// 这里刻意不引入第三方 md4c 源码：Qt 6 的 QTextDocument::setMarkdown() 已经内置 md4c，
-// 这样不需要改 vcxproj，也不会多出一份 C 依赖。
+// Markdown 分段与渲染：
+// ① split() 按代码围栏切 prose/code，代码块继续交给 CodeBlock.qml；
+// ② renderFragment() 用 Qt 6 内置的 md4c 解析 GitHub 方言，再按 DSH 的块级规格调整 QTextDocument；
+// ③ QML 的 MarkdownBody 持有 QTextDocument 并增量插入 fragment。
+// 不引入第三方 md4c 源码：setMarkdown() 已内置，不需要改 vcxproj，也不会多一份 C 依赖。
 
 #include "common/util/MarkdownSegmenter.h"
 
@@ -31,7 +30,7 @@
 
 namespace
 {
-	const char kRulesResource[] = ":/ULinHub/config/highlight-rules.json";   // 内置高亮规则在 qrc 里的位置（见 assets/resources/ulinhub.qrc），外部覆盖优先
+	const char kRulesResource[] = ":/ULinHub/config/highlight-rules.json";   // 内置高亮规则在 qrc 里的位置（见 assets/resources/ulinhub.qrc）
 	bool g_rulesLoaded = false;
 
 	QColor colorOf(const QVariantMap& colors, const char* key, const QColor& fallback)
@@ -108,6 +107,7 @@ namespace
 		}
 	}
 
+	// 块级排版：行高、段距、列表缩进、引用左右边距；只在格式真的变了才写回，避免流式渲染反复重排。
 	void applyBlockLayout(QTextBlock block, int blockIndex, int blockCount)
 	{
 		const QTextBlockFormat original = block.blockFormat();
@@ -157,6 +157,7 @@ namespace
 		}
 	}
 
+	// 按 DSH 的块级规格统一字符格式：标题、链接、行内代码、加粗、引用，最后补行内代码两侧的空格。
 	void styleDocument(QTextDocument& document, const QVariantMap& colors)
 	{
 		const QColor text = colorOf(colors, "text", QColor("#E5E5E5"));
@@ -287,6 +288,7 @@ namespace
 		return true;
 	}
 
+	// 去掉首尾空行后压成一个 prose 单元，避免 QML 侧渲染出多余空白。
 	void flushProse(QVariantList& parts, QStringList& buffer)
 	{
 		if (buffer.isEmpty())

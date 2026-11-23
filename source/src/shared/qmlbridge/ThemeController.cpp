@@ -5,8 +5,8 @@
 ThemeController::ThemeController(QObject* parent)
 	: QObject(parent)
 {
-	m_switchingConnection = connect(&ThemeManager::instance(),
-		&ThemeManager::themeSwitchingChanged, this, &ThemeController::switchingChanged);
+	// 切换动画期间通知 QML 侧，用于禁用切换按钮。
+	m_switchingConnection = connect(&ThemeManager::instance(), &ThemeManager::themeSwitchingChanged, this, &ThemeController::switchingChanged);
 }
 
 void ThemeController::toggle()

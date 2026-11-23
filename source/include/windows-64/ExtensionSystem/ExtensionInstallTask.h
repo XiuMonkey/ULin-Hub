@@ -34,7 +34,7 @@ public:
 	void waitForFinished();
 
 private:
-	std::future<bool> m_future;
+	std::future<bool> m_future;   // 后台安装任务（std::async），结果由 tryFinish 取
 	ExtensionLoader::LoadedExtension m_extension;
 	QString m_error;
 	bool m_running = false;

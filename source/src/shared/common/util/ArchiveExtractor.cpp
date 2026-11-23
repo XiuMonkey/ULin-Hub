@@ -12,6 +12,7 @@
 namespace ArchiveExtractor
 {
 
+// 只认 zip 与 .ext 两种后缀，比较时不区分大小写。
 bool isSupported(const QString& archivePath)
 {
 	const QString suffix = QFileInfo(archivePath).suffix().toLower();
@@ -38,8 +39,8 @@ bool extractTo(const QString& archivePath, const QString& destDir, QString* erro
 
 	const QList<QZipReader::FileInfo> infos = reader.fileInfoList();
 
-	// 有些打包工具既丢目录标志也丢结尾斜杠；凡是别的条目的父路径，都按目录对待。
-	// 另：反斜杠路径（Compress-Archive 会这么写）统一换成 `/` 再判断。
+	// 有些打包工具既丢目录标志也丢结尾斜杠：凡是别的条目的父路径都按目录对待；
+	// 反斜杠路径（Compress-Archive 会这么写）统一换成 `/` 再判断。
 	QSet<QString> directoryPaths;
 	for (const QZipReader::FileInfo& info : infos) {
 		QString normalized = info.filePath;
@@ -61,7 +62,7 @@ bool extractTo(const QString& archivePath, const QString& destDir, QString* erro
 		entryPath.replace(QLatin1Char('\\'), QLatin1Char('/'));
 		entryPath = QDir::cleanPath(entryPath);
 
-		// 路径安全：绝对路径 / 穿越 / 盘符，一律拒整包（不静默跳过，避免"解了一半"的怪状态）
+		// 路径安全：绝对路径 / 穿越 / 盘符一律拒整包，不静默跳过，避免"解了一半"的状态。
 		if (entryPath.isEmpty() || entryPath == QStringLiteral(".")
 			|| entryPath == QStringLiteral("..") || entryPath.startsWith(QStringLiteral("../"))
 			|| QDir::isAbsolutePath(entryPath) || entryPath.contains(QLatin1Char(':'))) {
@@ -77,8 +78,8 @@ bool extractTo(const QString& archivePath, const QString& destDir, QString* erro
 			continue;
 		}
 
-		// QZipReader 对"没有结尾斜杠、也没有目录标志"的目录条目会当成文件报出来；
-		// 这类条目在前面的文件落盘时已经建好，跳过即可。
+		// QZipReader 把"没有结尾斜杠、也没有目录标志"的目录条目当文件报出来；
+		// 这类条目在前面的文件落盘时已建好，跳过即可。
 		if (QFileInfo(destPath).isDir())
 			continue;
 

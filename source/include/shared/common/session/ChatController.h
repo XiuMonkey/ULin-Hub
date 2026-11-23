@@ -1,22 +1,17 @@
 #pragma once
 
-// 会话消息控制器（M4a）：把 DSH 的事件流翻译成 MessageListModel 的行。
+// 会话消息控制器：把 DSH 的事件流翻译成 MessageListModel 的行。
 // 事件→内容的规则**沿用既有**（MessageQuery::appendHistoryEventsToQuery 与 applyStreamEvent），
-// 解析辅助函数直接复用既有的 common/agent/AgentEventParser（extractReply / extractThinking /
-// extractIntentCall / extractIntentResult / extractEventText / extractChunkType），所以语义不会漂。
-// 与现有实现的差异（有意）：
-//  * 不再有"控件树缓存 + 离屏分批建控件"：QML 的 ListView 自己复用 delegate；
-// * 流式改用 33ms 合并缓冲。
-// 还没做（M4b）：向上翻页（session/page + beforeSeq）、预取、锚点不跳、提问/审批面板。
+// 解析辅助函数复用 common/agent/AgentEventParser，所以语义不会漂。
+// 与旧实现的差异（有意）：不再有"控件树缓存 + 离屏分批建控件"（QML 的 ListView 自己复用 delegate）；
+// 流式改用 33ms 合并缓冲。
 
 #include "common/agent/ModelSelectionService.h"
 #include "common/session/MessageListModel.h"
 #include "VirtualClass/VirtualHostServices.h"
 // ⚠️ 必须 include 而不是前向声明：Q_PROPERTY(TraceModel* ...) 会让 moc 在 staticMetaObject 里
-//  实例化 QMetaType 校验，此时类型不完整就触发
-//  "Pointer Meta Types must either point to fully-defined types or be declared with
-//  Q_DECLARE_OPAQUE_POINTER(T *)"（C2338），连带 C2737 staticMetaObject 未初始化。
-//  这类错误报在 moc_*.cpp 里，看着像是 moc 生成的代码坏了，其实源码头文件少了 include。
+//  实例化 QMetaType 校验，类型不完整就报 "Pointer Meta Types must either point to fully-defined
+//  types or be declared with Q_DECLARE_OPAQUE_POINTER(T *)"（C2338），错误落在 moc_*.cpp 里。
 #include "common/session/TraceModel.h"
 
 #include <QJsonArray>
@@ -47,8 +42,7 @@ class ChatController : public QObject, public VirtualChatHost
 	Q_PROPERTY(int messageCount READ messageCount NOTIFY messagesChanged)
 	Q_PROPERTY(bool streaming READ streaming NOTIFY streamingChanged)
 	// "已请求中止、正在等回合收尾"：QML 拿它把停止键切成"停止中"，用户点下去立刻有反馈。
-	// 为什么不复用 streaming：这段期间 streaming **必须仍为 true** —— 回合真的还在跑，按钮一旦变回
-	// "发送"，用户就会以为已经停了而继续发消息（那一条会排在中止后端的那一轮后面）。
+	// 不能复用 streaming：这段期间回合真的还在跑，streaming 必须仍为 true。
 	Q_PROPERTY(bool cancelling READ cancelling NOTIFY cancellingChanged)
 	Q_PROPERTY(bool questionActive READ questionActive NOTIFY interactionChanged)
 	Q_PROPERTY(QVariantList questions READ questions NOTIFY interactionChanged)
@@ -57,18 +51,16 @@ class ChatController : public QObject, public VirtualChatHost
 	Q_PROPERTY(bool approvalActive READ approvalActive NOTIFY interactionChanged)
 	Q_PROPERTY(QString approvalToolName READ approvalToolName NOTIFY interactionChanged)
 	Q_PROPERTY(QString approvalReason READ approvalReason NOTIFY interactionChanged)
-	// M4b 翻页：还有更早的历史 / 正在拉
+	// 翻页：还有更早的历史 / 正在拉
 	Q_PROPERTY(bool olderAvailable READ olderAvailable NOTIFY olderChanged)
 	Q_PROPERTY(bool loadingOlder READ loadingOlder NOTIFY olderChanged)
 	// 已切到某个会话、但首帧 follow 快照还没到：QML 用它在会话没加载出来时保持空白。
 	Q_PROPERTY(bool sessionLoading READ sessionLoading NOTIFY sessionLoadingChanged)
-	// 后台任务名册（顶栏"后台任务"入口的数据面）：行来自引擎 job/list 流（DshApiClient 第六条逻辑流），
-	// 这里只把 JobView 摊成 QML 好用的列表并保持官方的"活的任务在前、已结束的按结束时间倒序"顺序。
-	// 放在本类而不是再开一个类：它与会话同生命周期（换会话即清空），与 modelGroups/statsLine 同一档
-	// 会话级实时数据；网络细节仍在 DshApiClient。
+	// 后台任务名册（顶栏"后台任务"入口）：行来自引擎 job/list 流，活的任务在前、已结束的按结束时间倒序。
+	// 与会话同生命周期（换会话即清空）；网络细节仍在 DshApiClient。
 	Q_PROPERTY(QVariantList jobs READ jobs NOTIFY jobsChanged)
 
-	// VirtualChatHost：只转调真实函数，扩展不直接拿到 面。
+	// VirtualChatHost：只转调真实函数，扩展不直接持有本类。
 	QString ChatSessionId() const override { return sessionId(); }
 	bool ChatStreaming() const override { return streaming(); }
 	int ChatMessageCount() const override { return messageCount(); }
@@ -91,8 +83,8 @@ public:
 	// 发送一轮提示（session/prompt）。**发送链路的业务**都在这里：
 	//  · 服务端明确没有可用模型时拦下并说明（原版 MessageHost：chat_no_model_hint）；
 	//  · 用户消息立即上屏，随后把 RPC 发出去；
-	//  · "会话写句柄还挂在已退出的旧进程上"的自愈：识别 already owned / resume failed →
-	//  请宿主重启服务端（`restartServer` 回调）→ 只重试一次，宿主在重连后调 sendPromptAgain。
+	//  · "会话写句柄挂在已退出的旧进程上"自愈：already owned / resume failed → 请宿主重启服务端，
+	//  只重试一次，重连后宿主调 sendPromptAgain 补发。
 	// `restartServer` / `setStatusLine` 由宿主注入：本类不认识 ServerManager，也不认识 QML。
 	// ⚠️ 会话 id 是**入参**（不是本类自己记的）：当前会话归宿主（qmlbridge）所有，这里只负责"往哪个会话发"。
 	// QmlBridge 的输入入口：保存回调后发 promptRequested，不直接发 RPC。
@@ -105,9 +97,8 @@ public:
 	bool hasPendingRetry() const { return m_pendingRetry; }
 	// 中止当前回合（session/cancel）
 	void cancel();
-	// 接线（在构造之后调）：把 DshApiClient 的 follow 快照 / mux 帧 / 会话投影接进本类。
-	// 为什么不放构造函数：这两个信号的发送者要在宿主建好之后才存在，而且宿主还要把 mux 帧那条
-	// 同时接给 SessionCatalog（同一条信号多个接收者，顺序由宿主决定）——所以由宿主调一次。
+	// 接线（构造之后调）：把 DshApiClient 的 follow 快照 / mux 帧 / 会话投影接进本类。
+	// 发送者要等宿主建好才存在，且 mux 帧还要同时接给 SessionCatalog，所以由宿主调一次。
 	void connectApi();
 	MessageListModel* messages() const { return m_messages; }
 	TraceModel* trace() const { return m_trace; }
@@ -148,8 +139,6 @@ public:
 	QString approvalToolName() const { return m_approvalToolName; }
 	QString approvalReason() const { return m_approvalReason; }
 
-	// QML 调用：提交提问答案（每项 {id, selected:[标签…], custom?}）；与现有实现的 answer 结构一致：
-	//  { sessionId, answer: { answers: [ {id, selected, custom?} ] } }
 	// ---- 图片附件（协议：session/prompt 的 image 部件；读回用 session/attachment）----
 	QVariantList pendingAttachments() const { return m_pendingImages; }
 	// 图片走内联 base64；普通文件先落成待发卡片，正文里带本地路径。
@@ -165,6 +154,7 @@ public:
 	// attachmentId -> file:// 源（异步取字节并落临时文件；首次返回空）
 	QString attachmentSource(const QString& attachmentId);
 
+	// QML 调用：提交提问答案，发 { sessionId, answer: { answers: [ {id, selected, custom?} ] } }。
 	void submitAnswers(const QVariantList& answers);
 	QVariantList answerSelections() const { return m_answerSelections; }
 	void resetAnswerSelections();
@@ -224,8 +214,12 @@ private:
 	void handleQuestionFrame(const QJsonObject& frame);
 	// approval/requested：记住 rpcId/sessionId/approvalId 与展示用的工具名/原因
 	void handleApprovalFrame(const QJsonObject& frame);
-	void rebuildFromRecords(const QJsonArray& records);
+	void rebuildFromRecords(const QJsonArray& records, bool enforceRowCap = true);
 	void applyHistoryEvent(const QJsonObject& event);
+	// 行数收束：超过 60 行时删最前面的行到 60（销毁 QML 委托、段缓存与旧 records）。
+	// 记录本身不丢，靠「加载更多」重新拼回；上翻页重建时传 enforceRowCap=false。
+	void enforceRowCap();
+	int trimRowsToKeep();
 	static QVector<MessageListModel::ImageRef> extractEventImages(const QJsonObject& event);
 	static QVector<MessageListModel::DeliverableRef> extractEventDeliverables(const QJsonObject& event);
 	void applyDeliverablesEvent(const QJsonObject& event, bool deferUntilTurnEnd = false);
@@ -234,14 +228,11 @@ private:
 	void finishTurn();
 	// 目录变化后重建 chip 与菜单的数据
 	void rebuildCatalog();
-	// 当前档位 id（原版 currentLevel 的 id）
+	// 当前档位 id
 	QString currentLevelId() const;
 
-	// 本轮（turn）的 Agent 行：**一轮只占一个气泡**（官方 Web UI 的形态：整轮收起成一行、展开才看到
-	// 各步骤）。已有就复用，没有就新建。turn/start、本地发送、历史里的 user/message、turn/end 都重置它
-	// —— 见 .cpp 里 m_turnRow 的说明。
-	// 旧实现是按"最后一行是不是 agent"决定续写/新建（targetAgentRow），一轮有多条 assistant/message 时
-	// 只要中间插进别的行就会被拆成多个气泡，已移除。
+	// 本轮（turn）的 Agent 行：一轮只占一个气泡（整轮收起成一行、展开看各步骤）。已有就复用，
+	// 没有就新建；turn/start、本地发送、历史 user/message、turn/end 都重置它（见 .cpp 里 m_turnRow）。
 	int agentRowForTurn();
 	// 流式合并缓冲：攒够 33ms 或遇到收尾/工具结果时一次写进模型
 	void bufferChunk(int row, const QString& type, const QString& text, const QString& toolName = QString());
@@ -270,16 +261,12 @@ private:
 	TraceModel* m_trace = nullptr;
 	QTimer* m_flushTimer = nullptr;
 	QTimer* m_sessionLoadingTimer = nullptr;   // 首帧快照迟迟不到时解除“加载中”，避免永久空白
-	// 回合看门狗（单次）：本会话迟迟**一条事件都没有**就补兜底提示。为什么必须有：后端异常时客户端根本
-	// 收不到内容 —— `api-session/error` 走 DshApiClient 的 `$events` type=="emit" 分支，那里只记事件名、
-	// 不转发负载，所以"等回合收尾"这条路走不通。
-	// 收到本会话任何事件就把表续上，慢模型不会被误判。
+	// 回合看门狗（单次）：本会话迟迟一条事件都没有就补兜底提示。后端异常时 `api-session/error` 走
+	// DshApiClient 的 `$events` type=="emit" 分支、不转发负载，收不到内容只能靠这里兜底。
 	QTimer* m_turnWatchdog = nullptr;
 	bool m_turnActive = false;
-	// 本轮 Agent 行号（-1 = 本轮还没建）。**一轮的所有内容都落到这一行** ⇒ 一个气泡。
-	// 为什么不能只靠 lastAgentRow：历史回放里一轮有多条 assistant/message，旧代码每条都 appendAgent，
-	// 于是一轮被拆成好几个气泡；而 lastAgentRow 只看"最后一行是不是 agent"，
-	// 中间插进系统提示（command/done）就会断掉。回合边界才是正确判据。
+	// 本轮 Agent 行号（-1 = 本轮还没建）：一轮的所有内容都落这一行 ⇒ 一个气泡。
+	// 不能只靠 lastAgentRow：它只看"最后一行是不是 agent"，中间插进系统提示（command/done）就会断。
 	int m_turnRow = -1;
 	// 本地刚发送、但服务端快照/压缩重建可能暂时还没带回来的用户消息；重建时补回。
 	QString m_pendingUserText;
@@ -335,13 +322,19 @@ private:
 	int m_cursor = 0;         // session/page 的 throughSeq
 	bool m_hasOlder = false;  // 服务端说还有更早的
 	bool m_loadingOlder = false;
+	// 是否发生过行数收束（本地记录里可能还藏着未显示的旧行）。
+	// 加载更多时如果服务端已经没有更早记录，就用它把藏起来的行重新展开。
+	bool m_rowsTrimmed = false;
+	// 模型行 → 创建该行时的 record seq；收束时据此把旧行的原始 records 也裁掉（只留本地文件）。
+	// 与 MessageListModel 的 m_rows 一一对应（重建/追加时维护，收束时同步裁剪）。
+	QVector<int> m_rowSeqs;
 	bool m_sessionLoading = false;
 	bool m_streaming = false;
 	bool m_cancelPending = false;
 	qint64 m_cancelSentAtMs = 0;         // 上一次发出 cancel 的时刻（连点去重）
 	QTimer* m_cancelWatchdog = nullptr;  // 发出 cancel 后的收尾兜底（见 kCancelConfirmMs）
 	// 本轮（自最近一次 beginTurn 起）是否已有可见输出：无输出且回合收尾时补一条兜底提示，
-	// 避免用户对着自己的消息发呆（无模型 / 模型空回复 / 事件解析不出）—— 同一套判定
+	// 避免用户对着自己的消息发呆（无模型 / 模型空回复 / 事件解析不出）。
 	bool m_turnHadOutput = false;
 	// 产物卡片等 turn/end 再挂到消息上，避免输出中途提前出现在正文下方。
 	QVector<MessageListModel::DeliverableRef> m_pendingDeliverables;

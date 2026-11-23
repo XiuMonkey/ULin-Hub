@@ -1,9 +1,9 @@
 #pragma once
 
 // 内置 DSH 服务端进程的生命周期：拉起 / 重启 / 移交给下一个窗口。
-// 退出保证（见 ServerManager.cpp 文件末尾的说明）：node 子进程挂在带 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-// 的 Job Object 上，本进程无论怎么没了（正常退出 / 崩溃 / 被强杀）内核都会连带杀掉它；正常退出那条
-// 另外走 aboutToQuit → stopForExit，先 terminate 再按 PID 杀整棵进程树。
+// 退出保证：Windows 侧把 node 进程拉进带 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 的 Job Object，
+// 本进程无论怎么没了（正常退出 / 崩溃 / 被强杀）内核都会连带杀掉它；Linux 侧用 setsid 独立
+// 进程组，退出时对 -pgid 发 SIGTERM/SIGKILL。正常退出那条另走 aboutToQuit → stopForExit。
 
 #include <QObject>
 #include <QProcess>
@@ -80,7 +80,7 @@ private:
 	QString m_dshHome;
 	bool m_restarting = false;
 	QUrl m_baseUrl;
-	// 预留：平台相关的进程组句柄（Linux 阶段 A 未使用）
+	// Windows：Job Object 句柄（关句柄触发 KILL_ON_JOB_CLOSE）；Linux 走上面的进程组，这里恒为空
 	void* m_exitJob = nullptr;
 	// takeProcess 把进程移交出去后就不能关 job 了（关句柄会连带杀掉别人接手的那棵进程树）
 	bool m_processHandedOff = false;

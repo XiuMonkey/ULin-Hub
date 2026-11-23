@@ -46,6 +46,7 @@ QString PanelBarDockModel::kindLabel(const QString& kind)
 	return QStringLiteral("文件浏览");   // 保持一致：未知 kind 兜底成"文件浏览"
 }
 
+// 按块类型给出视图规格：QML 逻辑路径、是否需要 WebEngine、不可用时的说明文案。
 PanelBarDockModel::ViewSpec PanelBarDockModel::viewFor(const QString& kind, bool webEngineAvailable)
 {
 	// WebEngine 是浏览器/终端两个视图的运行期依赖：缺了就降级成说明页。
@@ -141,7 +142,7 @@ QVariantList PanelBarDockModel::launcherItems() const
 		QStringLiteral("在右栏浏览网页")));
 	items.append(launcherRow(QStringLiteral("files"),
 		QStringLiteral("浏览当前工作区的文件")));
-	items.append(m_extraLaunchers);   // 扩展登记的行追加在宿主内置三行之后
+	items.append(m_extraLaunchers);
 	return items;
 }
 
@@ -225,6 +226,7 @@ QStringList PanelBarDockModel::blockIds() const
 	return ids;
 }
 
+// 块交给外部窗口：移出列表但留在 m_detachedBlocks，之后还能 attachBlock 挂回。
 bool PanelBarDockModel::detachBlock(const QString& blockId)
 {
 	for (int index = 0; index < m_blocks.size(); ++index) {
@@ -258,6 +260,7 @@ bool PanelBarDockModel::detachBlock(const QString& blockId)
 	return false;
 }
 
+// 把脱离的块挂回列表尾部并激活。
 bool PanelBarDockModel::attachBlock(const QString& blockId)
 {
 	for (int i = 0; i < m_detachedBlocks.size(); ++i) {
@@ -359,7 +362,7 @@ void PanelBarDockModel::close(int index)
 	endRemoveRows();
 	emit countChanged();
 
-	if (m_activeIndex >= m_blocks.size()) {   // 活动索引只在越界时收敛（的 `if（activeIndex >= list.length) activeIndex = list.length - 1`）
+	if (m_activeIndex >= m_blocks.size()) {   // 活动索引只在越界时收敛（同 JS 的 activeIndex = list.length - 1）
 		setActiveIndex(m_blocks.size() - 1);
 	} else {
 		// 索引没动，但行少了 ⇒ 活动块可能就是另一块（关的是它前面那块）：kind 也跟着换，

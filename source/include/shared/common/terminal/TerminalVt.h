@@ -6,10 +6,8 @@
 // 运行时消费者：`TerminalVtModel`（qmlbridge/**，QML 可见的桥）+ `TerminalView.qml`（逐格渲染）。
 // 接线在 `TerminalSession` 的帧路径上 —— terminal/follow 的 snapshot/output 帧原样喂进来。
 // 另有一条只跑字节的离线自检 `misc/tools/vt-selfcheck/`（不链 Qt）。
-// 早先终端面板走的是页面里的 xterm.js（同一条字节流的另一条路）；两条路的取舍与理由见
-// source/3rdparty/libvterm/README.md 的「为什么内嵌」。
 // 解析器用内嵌的 libvterm（source/3rdparty/libvterm，只解析不渲染）：活的屏幕归它持有，本类只补
-// 两件它不管的事 —— 回滚历史、以及"哪几行变了"。
+// 两件它不管的事 —— 回滚历史、以及"哪几行变了"（选型理由见该库 README）。
 // 本头文件**不出现任何 libvterm 类型**：一是别把内嵌库的类型带进工程契约，二是日后换解析器只需改 .cpp。
 
 #include <cstdint>

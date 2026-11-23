@@ -1,21 +1,8 @@
-// 扩展管理（按原版 src/ui/ExtensionManagerPopup.cpp + styles/extension-manager.qss 复刻）
-// 圆角卡片弹窗 + 标题 ext_manager_title + 右上关闭
-// 工具栏：安装扩展（ext_install）/ 移除选中（ext_remove_selected，无选中时禁用）/ 刷新（common_refresh）
-// / 重启服务端（plugin_restart_server，工具扩展增删后生效用）
-// 列表（panelBg + 1px border + radius 12，行 hover/selected 背景与旧 QSS 同款）：
-// 两种来源 —— 工具扩展（profiles/web/extensions.json）、客户端扩展（<exe>/extensions）。
-// 未装载的客户端扩展按原版在行尾标「·未装载」。
-// 移除要确认：AppPopup + ext_remove_confirm_title / ext_remove_confirm_fmt（确认按钮用 common_delete）
-// 底部状态行：ext_empty_hint / ext_installed_count_fmt / ext_installing / ext_install_*_fmt …
-// 与 C++ 的分工：本页只负责画与点；列表来源、安装解压、移除、清理残留全在
-// ExtensionManagerController（Hub.extensions），文案也由它给（同一个 qtTrId id）。
-// 分不出"这是工具扩展还是客户端扩展"，也看不出选中了哪一行。改版照设置页的做法：
-// ① 标题带图标 + 已安装数量徽章（中性 pill）；
-// ② 主动作「安装扩展」提到工具行最左、用 primary 实心面 —— 一页只该有一个实心按钮；
-// 其余（移除/刷新/重启）退成中性浮起面或图标，视觉主次清楚；
-// ③ 列表仍是卡片，但行里补了 26×26 图标底（工具/客户端两种图标）+ 种类徽章 + 装载状态，
-// 选中行 = 浅面 + 描边 + 左侧 2px 竖条（与设置页展开的成员卡同一个选中标记）；
-// ④ 空态给图标 + 一句，别只留一行干字。
+// 扩展管理（按原版 ExtensionManagerPopup.cpp + extension-manager.qss 复刻）：圆角卡片弹窗 + 标题 + 工具栏 + 列表。
+// 工具栏：安装扩展 / 移除选中（无选中时禁用）/ 刷新 / 重启服务端（工具扩展增删后生效用）。
+// 两种列表来源：工具扩展（profiles/web/extensions.json）与客户端扩展（<exe>/extensions），未装载的客户端扩展行尾标「·未装载」。
+// 本页只负责画与点：列表来源、安装解压、移除、清理残留与文案全在 ExtensionManagerController（Hub.extensions）。
+// 视觉：「安装扩展」是唯一的 primary 实心按钮，其余退成中性面或图标。
 
 import QtQuick
 import QtQuick.Controls.Basic
@@ -28,10 +15,10 @@ Item {
     implicitWidth: 760
     implicitHeight: 540
 
-    property bool overlayAnimating: false   // 由 PageOverlay 绑过来：卡片几何正在动（展开/收回）。页里那些"一直在跑"的东西看它按停
+    property bool overlayAnimating: false   // 由 PageOverlay 绑定：展开/收回动画期间为 true，页内常驻动画据此按停
 
     // 列表里的"工具扩展"在 C++ 侧 kindLabel 为空串（原版就没有种类后缀）⇒ 这里用它区分两种来源，
-    // 图标 / 徽章 / 分组说明都靠它，不需要 C++ 再补字段。
+    // 图标与徽章都靠它，不需要 C++ 再补字段。
     function isClientKind(kindLabel) {
         return kindLabel !== undefined && kindLabel !== null && kindLabel.length > 0
     }
@@ -96,9 +83,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.spacing.buttonGap
 
-                // 这里原有一颗 BusySpinner（running: Hub.extensions.busy），但 Hub.extensions.busy
-                // 从来没有被置真过 ⇒ 它永远不会显示，是个死控件（用户："扩展管理页哪有转圈？"）。
-                // 需要"加载中"提示时再加静态文字（理由见 PluginMarketPage：转圈会拖整窗重绘）。
+                // 刻意不放 BusySpinner：Hub.extensions.busy 从未被置真（死控件），且常驻转圈会拖整窗重绘（理由同 PluginMarketPage）。
                 IconButton {
                     glyph: "✕"
                     tooltip: qsTrId("common_close")
@@ -269,9 +254,9 @@ Item {
                         }
                     }
 
-                    // 装载状态：点 + 文案（点只保留"已装载/未装载"这一个含义，文字把它说清）
-                    // ⚠️ Row 里不写 verticalCenter 锚（Qt 会打 "Cannot specify ... anchors for items
-                    // inside Row"），两者都用 y 现算 —— Row 只管 x。
+                    // 装载状态：点 + 文案（点只表示"已装载/未装载"，由文字说清）。
+                    // ⚠️ Row 里不写 verticalCenter 锚（Qt 会报 "Cannot specify ... anchors for items inside Row"），
+                    // 子项都用 y 现算 —— Row 只管 x。
                     Row {
                         id: stateHint
                         anchors.right: parent.right
@@ -334,6 +319,7 @@ Item {
             }
         }
 
+        // 底部状态行：上行是"改完要重启"的提示，下行是最近一次操作结果。
         Item {
             id: statusRow
             anchors.left: parent.left

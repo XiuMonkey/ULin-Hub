@@ -136,7 +136,7 @@ public:
 	{
 		const auto found = ConnectionRegistry.find(index);
 		if (found == ConnectionRegistry.end()) {
-			qWarning("TakeoverConnection(%s): 没有这条连接，忽略", qPrintable(index));  // 原文这里静默，故障看不出来
+			qWarning("TakeoverConnection(%s): 没有这条连接，忽略", qPrintable(index));  // 静默返回会让接管方以为已改派成功
 			return;
 		}
 		SuspendConnection(index);
@@ -197,7 +197,7 @@ public:
 
 	// QML 可调：签名由 QML **手写**（前缀 '2'/'1' 不用写）。⚠️ 槽的参数必须带类型标注 —— 未标注的参数在元对象里
 	// 是 QVariant，接不上 QString 信号（报 Incompatible sender/receiver arguments）。
-	// 之所以只能是这样一个非模板重载：moc 不支持函数模板（标 也是空操作），且 QML 构造不出 ConnectionGroup。
+	// 之所以只能是这样一个非模板重载：moc 不支持函数模板（标注也是空操作），且 QML 构造不出 ConnectionGroup。
 	void RegisterConnection(QString index, const QObject* sender, const QString& signal, const QObject* receiver, const QString& slot)
 	{
 		if (index.isEmpty() || !sender || !receiver || signal.isEmpty() || slot.isEmpty()) {
@@ -279,10 +279,6 @@ private:
 		const QString who = receiver->property("hostIdentity").toString();
 		return who.isEmpty() ? QString::fromLatin1(receiver->metaObject()->className()) : who;
 	}
-
-	// PrivateRemoveConnection 两个重载：保留至今、全仓无人调用，
-	// 与 PublicRemoveConnection / SuspendConnection 的职责重叠，已整对删除。
-	// 退役清单见 docs/retired-interfaces.md。
 
 	QHash<QString, ConnectionGroup> ConnectionRegistry;  // 唯一的数据：配方 + 活连接 handle + 接管前配方 + 接管者
 };

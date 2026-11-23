@@ -9,6 +9,7 @@ class QProcess;
 namespace OfficeConverter
 {
 bool convertToPdf(const QString& sourcePath, const QString& pdfPath, QString* error);
+// 异步启动：调用方拿到 QProcess 后自己接 finished / errorOccurred。
 QProcess* startConversion(const QString& sourcePath, const QString& pdfPath, QObject* parent);
 QString friendlyError(const QString& raw);
 bool isOfficeDocument(const QString& path);

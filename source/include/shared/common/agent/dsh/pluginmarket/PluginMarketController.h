@@ -1,22 +1,11 @@
 ﻿#pragma once
 
-// 分层：本文件在 common/agent/dsh/pluginmarket/ —— **领域层**，与它驱动的
-// PluginMarketModel / PluginMarketClient / PluginMarketInstaller 同层（过滤与分页等算法在
-// PluginMarketModel，HTTP 与解析在 PluginMarketClient，这里只是本域的数据面与视图状态机）。
-// 它不 import 任何 QML 概念（Q_PROPERTY / 只是元对象暴露方式，不依赖 QQml*），可单测。
-// QML 面（`Hub.plugins` 属性、类型注册）在 qmlbridge/QmlBridge.* 与 src/core/main.cpp，那边只接线。
-// 分层：本类**不直接依赖 core**。此前它的构造要 ServerManager*、.cpp 里
-//  include 了 core/ServerManager.h（只为"装完市场包重启内置服务端"），那是 common → core 唯一的一处
-//  反向依赖；现在改成**发信号** serverRestartRequested，由接线层 qmlbridge/QmlBridge 接住并调
-//  ClientRuntime::restartServer，与 SettingsController 的 serverRestartRequested / stylesReset 同一范式。
-//  原因：common/** 只放领域与纯逻辑，重启一个进程是宿主行为；领域层不认识 ServerManager，才谈得上
-//  脱离 QML 引擎与服务端单测。发出时机不变：仍在 installFinished(ok) 的同一位置（直接连接 ⇒ 同步落地）。
-// 插件市场数据面（M6）：把既有的 PluginMarketClient / PluginMarketModel 接到 QML。
-// 逻辑一行不重写：HTTP 与解析在 PluginMarketClient（/dsh-market/*），
-// 过滤与分页在 PluginMarketModel（filter / paginate，每页 20 条），这里只做：
-//  * 视图状态（当前页、搜索词、当前 Tab、状态文案）
-//  * 把 registry / installed 的回包翻成 QML 好用的 QVariantList
-//  * 操作（安装/更新/卸载/重启服务）与它们的反馈文案
+// 插件市场数据面：把 PluginMarketClient / PluginMarketModel 接到 QML。
+// 本类在 common（领域层），只做视图状态（当前页、搜索词、Tab、状态文案）、把 registry / installed 回包
+// 翻成 QVariantList、以及操作（安装/更新/卸载/重启服务）与反馈文案；HTTP 与解析在
+// PluginMarketClient（/dsh-market/*），过滤与分页在 PluginMarketModel（filter / paginate，每页 20 条）。
+// 不直接依赖 core：重启服务端发 serverRestartRequested，由 qmlbridge/QmlBridge 接住调
+// ClientRuntime::restartServer。
 // 文案全部用既有 qtTrId id（plugin_loading / plugin_loaded_fmt / plugin_action_failed_fmt …）。
 
 #include "common/agent/dsh/pluginmarket/PluginMarketModel.h"
@@ -131,7 +120,7 @@ signals:
 	void serverRestartRequested();
 
 private:
-	static constexpr int kPageSize = 20;   // 与现有实现 PluginsManager 同值
+	static constexpr int kPageSize = 20;   // 每页条数
 
 	void setBusy(bool busy);
 	void setStatus(const QString& text);

@@ -89,6 +89,18 @@
 - 定义：NativeExecutor 的注册表。
 - 键：完整 executor ID，例如 `builtin.read_file`。
 - 边界：只按完整 ID 查找；不做去前缀回退。
+- 扩展：通过 `VirtualUlinCoreExecutorHost` 注册/注销自定义 executor。
+
+### UlinCoreExecutorHost
+
+- 英文：UlinCoreExecutorHost
+- 定义：ULinCore 暴露给扩展的执行器注册宿主。
+- 接口：`VirtualUlinCoreExecutorHost`。
+- 宿主实现：`UlinCoreMasterAgent`。
+- 查询索引：`DshHostIndex::kUlinCoreExecutorHost`。
+- 方法：`RegisterExecutor`、`UnregisterExecutor`、`HasExecutor`。
+- 所有权：注册后宿主接管 executor；扩展卸载前必须注销。
+- 边界：`builtin.*` 不允许扩展覆盖；ID 必须唯一且为完整执行器 ID。
 
 ### ExecutorContext
 

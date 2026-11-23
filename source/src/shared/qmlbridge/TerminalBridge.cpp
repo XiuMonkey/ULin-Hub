@@ -1,8 +1,7 @@
-// 见 TerminalBridge.h：右栏「终端」块的接线层（QML 单例 `Terminal`）。
-// 协议依据：build/temp/terminal-probe/TERMINAL-REPORT.md。
-// 解析归属变更（自绘终端接入）：本类**只做协议状态**，VT 解析与网格都不在这里 ——
-// terminal/follow 的 snapshot/output 帧原样交给 TerminalSession 的 TerminalVtModel（→ TerminalVt），
-// 由 TerminalView.qml 逐格画。页面/xterm.js 那条路已经退役。
+// 实现 TerminalBridge.h：右栏「终端」块的接线层（QML 单例 `Terminal`）。
+// 本类只做协议状态：VT 解析与网格都不在这里 —— terminal/follow 的 snapshot/output 帧原样交给
+// TerminalSession 的 TerminalVtModel（→ TerminalVt），由 TerminalView.qml 逐格画；
+// 页面/xterm.js 那条路已经退役。
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -253,8 +252,7 @@ void TerminalSession::shutdown()
 
 	if (!m_api)
 		return;
-	m_api->callMethod(QStringLiteral("terminal/close"),
-		SessionCommands::terminalClose(sessionId, terminalId),
+	m_api->callMethod(QStringLiteral("terminal/close"), SessionCommands::terminalClose(sessionId, terminalId),
 		[this](const QJsonObject&) {
 			qInfo().noquote() << "[Terminal] terminal/close ok block=" << m_blockId;
 		},
@@ -551,7 +549,7 @@ void TerminalSession::attachBackend(QObject* backend)
 		<< "apiVersion=" << (versionValue.isValid() ? QString::number(apiVersion) : QStringLiteral("缺省"));
 
 	// 上行：后端 → 宿主（帧/状态）。字符串信号：不依赖扩展侧包含宿主的头文件。
-	// ⚠️ 槽的参数必须从**信号签名左边**开始对齐（frameReady 的第一个参数是 blockId），
+	// 槽的参数必须从信号签名左边开始对齐（frameReady 的第一个参数是 blockId），
 	// 所以 onBackendFrameSlot 收 4 个参数、自己按 blockId 过滤。
 	const bool frameHooked = connect(backend, SIGNAL(frameReady(QString,QString,int,QString)),
 		this, SLOT(onBackendFrameSlot(QString,QString,int,QString)));
@@ -563,7 +561,8 @@ void TerminalSession::attachBackend(QObject* backend)
 		<< "frameReady=" << frameHooked << "statusChanged=" << statusHooked;
 
 	setAttachState(QStringLiteral("attached"));
-	setStatusText(frameHooked   // 画面能不能来，取决于后端有没有 frameReady：没有就如实说（别让面板看起来"已经连上"）
+	// 画面能不能来取决于后端有没有 frameReady：没有就如实说，别让面板看起来"已经连上"。
+	setStatusText(frameHooked
 		? QStringLiteral("已连接扩展提供的终端（%1）。").arg(className)
 		: QStringLiteral("扩展提供的终端（%1）没有画面输出。").arg(className));
 
@@ -590,10 +589,8 @@ bool TerminalSession::hookByteFace(QObject* backend)
 			<< "后端=" << classNameOf(backend);
 		return false;
 	}
-	const bool readyHooked = connect(backend, SIGNAL(hostReady(QString)),
-		this, SLOT(onBackendHostReadySlot(QString)));
-	const bool exitHooked = connect(backend, SIGNAL(hostExit(QString,int)),
-		this, SLOT(onBackendHostExitSlot(QString,int)));
+	const bool readyHooked = connect(backend, SIGNAL(hostReady(QString)), this, SLOT(onBackendHostReadySlot(QString)));
+	const bool exitHooked = connect(backend, SIGNAL(hostExit(QString,int)), this, SLOT(onBackendHostExitSlot(QString,int)));
 	if (!readyHooked || !exitHooked)
 		qWarning().noquote() << "[Terminal] 字节面缺状态信号 block=" << m_blockId
 			<< "hostReady=" << readyHooked << "hostExit=" << exitHooked
@@ -640,8 +637,7 @@ void TerminalSession::onBackendHostReady()   // 终端起来了：状态行"已�
 	if (m_attachState != QStringLiteral("attached"))
 		setAttachState(QStringLiteral("attached"));
 	setReadOnly(false);
-	setStatusText(QStringLiteral("已连接（%1）。").arg(
-		m_title.isEmpty() ? QStringLiteral("本地终端") : m_title));
+	setStatusText(QStringLiteral("已连接（%1）。").arg(m_title.isEmpty() ? QStringLiteral("本地终端") : m_title));
 	qInfo().noquote() << "[Terminal] 字节面 hostReady block=" << m_blockId;
 }
 
@@ -696,16 +692,14 @@ void TerminalSession::noteSession(const QString& sessionId)
 
 // 后端一帧 → 本地 VT。kind=="snapshot" 先硬复位（与引擎帧同语义），sequence 不参与（后端自己管序）。
 // blockId 只用来过滤（同一个后端对象服务多个块）。
-void TerminalSession::onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence,
-	const QString& text)
+void TerminalSession::onBackendFrameSlot(const QString& blockId, const QString& kind, int sequence, const QString& text)
 {
 	if (!blockId.isEmpty() && blockId != m_blockId)
 		return;
 	onBackendFrame(blockId, kind, sequence, text);
 }
 
-void TerminalSession::onBackendFrame(const QString& blockId, const QString& kind, int sequence,
-	const QString& text)
+void TerminalSession::onBackendFrame(const QString& blockId, const QString& kind, int sequence, const QString& text)
 {
 	Q_UNUSED(blockId);
 	Q_UNUSED(sequence);
@@ -727,16 +721,14 @@ void TerminalSession::onBackendFrame(const QString& blockId, const QString& kind
 	invokeBackend("ack", {});
 }
 
-void TerminalSession::onBackendStatusSlot(const QString& blockId, const QString& state,
-	const QString& statusText, bool readOnly, const QString& title)
+void TerminalSession::onBackendStatusSlot(const QString& blockId, const QString& state, const QString& statusText, bool readOnly, const QString& title)
 {
 	if (!blockId.isEmpty() && blockId != m_blockId)
 		return;
 	onBackendStatus(blockId, state, statusText, readOnly, title);
 }
 
-void TerminalSession::onBackendStatus(const QString& blockId, const QString& state,
-	const QString& statusText, bool readOnly, const QString& title)
+void TerminalSession::onBackendStatus(const QString& blockId, const QString& state, const QString& statusText, bool readOnly, const QString& title)
 {
 	Q_UNUSED(blockId);
 	if (!state.isEmpty())
@@ -764,11 +756,9 @@ bool TerminalSession::invokeBackend(const char* method, const QVariantList& extr
 	} else if (extraArgs.size() == 1) {
 		const QVariant& first = extraArgs.at(0);
 		if (first.userType() == QMetaType::QByteArray) {   // 字节面：QByteArray 直通（QString 的 toString() 会把二进制/非法序列改写，绝不能走那条）
-			ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId),
-				Q_ARG(QByteArray, first.toByteArray()));
+			ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId), Q_ARG(QByteArray, first.toByteArray()));
 		} else {
-			ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId),
-				Q_ARG(QString, first.toString()));
+			ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId), Q_ARG(QString, first.toString()));
 		}
 	} else if (extraArgs.size() == 2) {
 		ok = QMetaObject::invokeMethod(m_backend, method, Q_ARG(QString, m_blockId),
@@ -895,14 +885,14 @@ void TerminalSession::onStreamError(const QString& streamId, const QString& code
 void TerminalSession::noteControlUnavailable(const QString& message)
 {
 	// 只读不是致命错：另一个 attachment 拿着输入权（官方客户端也这么处理）。
-	// ⚠️ 但它原本**完全静默**（不落日志），resize/write 被拒时现场什么都查不到 ——
+	// 但它原本完全静默（不落日志），resize/write 被拒时现场什么都查不到 ——
 	// 打一条 warning：message 里带引擎给的原因（not-running / read-only）。
 	qWarning().noquote() << "[Terminal] 引擎拒绝控制权（只读）block=" << m_blockId
 		<< "stream=" << m_streamId << "terminal=" << m_terminalId
 		<< "reason=" << (message.isEmpty() ? QStringLiteral("control-unavailable") : message);
 
-	// "not running" ≠ 被抢控制权：引擎 spawn 时 cwd（会话工作区）不在了、shell 秒退都会走到这，
-	// 只读+空屏）。按原因分流文案，让面板自己说清下一步该怎么办。
+	// "not running" ≠ 被抢控制权：引擎 spawn 时 cwd（会话工作区）不在了、shell 秒退都会落到这里。
+	// 按原因分流文案，让面板自己说清下一步怎么办。
 	if (message.contains(QLatin1String("not running"), Qt::CaseInsensitive)) {
 		setReadOnly(true);
 		setStatusText(QStringLiteral("终端进程没能启动（会话的工作区目录可能已被移动或删除）——"
@@ -914,8 +904,8 @@ void TerminalSession::noteControlUnavailable(const QString& message)
 		.arg(message.isEmpty() ? QStringLiteral("control-unavailable") : message));
 }
 
-// 自绘路径：一帧直接进本地 VT。
-// 不跨快照）。尺寸也在这一刻对齐：视图量出来的网格是 VT 的网格，引擎的快照按它重排。
+// 自绘路径：一帧直接进本地 VT（没有页面、不排队、不跨快照）。尺寸也在这时对齐：
+// 视图量出来的网格就是 VT 的网格，引擎的快照按它重排。
 void TerminalSession::feedViewModel(const QString& kind, const QString& text)
 {
 	if (!m_vt)
@@ -972,6 +962,7 @@ void TerminalSession::pumpFrames()
 	}
 	m_frameWatchdog->start(kFrameWatchdogMs);
 }
+
 void TerminalSession::ack()
 {
 	if (m_frameWatchdog)
@@ -1133,8 +1124,8 @@ void TerminalBridge::init(DshApiClient* api)
 	setObjectName(QStringLiteral("ulinterm"));
 }
 
-// 把本桥注册到一个 QWebChannel 上。为什么不在 QML 里写 `registeredObjects: [Terminal]`：
-// 那是个 JS 数组字面量，而 C++ 注册的 QML 单例在数组元素的位置上是"类型包装"，转 QObject* 得到 null
+// 把本桥注册到一个 QWebChannel 上。不在 QML 里写 `registeredObjects: [Terminal]`：那是个 JS 数组字面量，
+// 而 C++ 注册的 QML 单例在数组元素位置上是"类型包装"，转 QObject* 得到 null，注册不上。
 // 从 C++ 注册既确定又可日志；同一个桥注册到多个面板的 channel 是允许的（每个 channel 各自一份注册表）。
 bool TerminalBridge::registerOn(QObject* channel, QObject* transport)
 {
@@ -1187,8 +1178,7 @@ void TerminalBridge::emitStatus(TerminalSession* session)
 {
 	if (!session)
 		return;
-	emit statusChanged(session->blockId(), session->state(), session->statusText(),
-		session->readOnly(), session->title());
+	emit statusChanged(session->blockId(), session->state(), session->statusText(), session->readOnly(), session->title());
 }
 
 TerminalSession* TerminalBridge::findSession(const QString& blockId) const
@@ -1271,7 +1261,7 @@ bool TerminalBridge::attachTransport(QObject* transport)
 		transport->setObjectName(objectName());   // 契约：objectName 必须是 ulinterm（空着就替它设）
 
 	// 接口面版本：有且 >=2 ⇒ 字节面（默认面），否则页面面（兼容层，deprecated）。
-	// ⚠️ 这里只记下来用于路由"关块/解绑"这类收尾调用；真正的接线与会话级选面在
+	// 这里只记下来用于路由"关块/解绑"这类收尾调用；真正的接线与会话级选面在
 	// TerminalSession::attachBackend 里（那里还会校验槽/信号是否齐全）。
 	m_transportApiVersion = apiVersionOf(transport);
 
@@ -1287,8 +1277,8 @@ bool TerminalBridge::attachTransport(QObject* transport)
 	return true;
 }
 
-// 视图挂上来：建/取该块的会话与网格模型。**这一步是"谁在看"的开关** —— 没有它就不会 attach。
-// 注意后端被扩展顶替时**不走这里**：那种情况下面板不装自绘视图（见 TerminalPanel.qml）。
+// 视图挂上来：建/取该块的会话与网格模型。这就是"谁在看"的开关 —— 没有它就不会 attach。
+// 后端被扩展顶替时面板不装自绘视图，也就不走这里（见 TerminalPanel.qml）。
 TerminalVtModel* TerminalBridge::bindView(const QString& blockId)
 {
 	TerminalSession* session = ensureSession(blockId);
@@ -1300,7 +1290,7 @@ TerminalVtModel* TerminalBridge::bindView(const QString& blockId)
 	return model;
 }
 
-// 「这个块的后端是哪一面」的唯一实现：有会话就听会话（attachBackend 已经校验过槽/信号是否齐全，
+// 「这个块的后端是哪一面」的唯一实现：有会话就听会话（attachBackend 已校验过槽/信号是否齐全），
 // 没有会话才看后端声明的 apiVersion。
 bool TerminalBridge::transportByteFace(const QString& blockId) const
 {
@@ -1377,6 +1367,7 @@ void TerminalBridge::pasteFromClipboard(const QString& blockId)
 	normalized.replace(QLatin1Char('\n'), QLatin1Char('\r'));
 	write(blockId, normalized);
 }
+
 void TerminalBridge::write(const QString& blockId, const QString& data)
 {
 	if (TerminalSession* session = findSession(blockId))

@@ -1,15 +1,12 @@
 #pragma once
 
-// /dsh-market/status → 进度条要显示的东西。纯函数、不碰 QObject / 轮询 / UI 文案状态，
-// 方便脱离控制器单测（进度解析写错是最容易"看起来有进度条但数字是假的"的一类问题）。
-//
+// /dsh-market/status → 进度条要显示的东西。纯函数、不碰 QObject / 轮询 / UI 文案状态，方便单测。
 // 数据来源：dshmarket 用 pnpm `--reporter=ndjson` 维护的 progress 快照
 // （phase / done / total / currentPackage / downloaded / size / lastLine / cancelling）。
 // 能算出真实百分比的情况（优先级从高到低）：
-//   ① phase + size/downloaded：pnpm 报的是"当前这个包/文件已下载字节 ÷ 总字节"，实时、可信；
-//   ② done/total：市场自己数的包数（pnpm 11 的 tracker 目前不写 total，所以很少命中）；
-//   ③ lastLine 里的 "resolved N, reused X, downloaded Y, added Z" 人读行。
-// 都没有 ⇒ percent = -1，界面走不定态 + 阶段/包名/已处理数，**不编造数字**。
+//   ① done/total：市场自己数的包数（pnpm 11 的 tracker 目前不写 total，所以很少命中）；
+//   ② lastLine 里的 "resolved N, reused X, downloaded Y, added Z" 人读行。
+// 字节进度只显示当前包的下载量，不当整体百分比（会乱跳）；都没有 ⇒ percent = -1，界面走不定态 + 阶段/包名/已处理数。
 // 百分比压到 4%..96%：最后几步（校验/收尾）完成前不显示 100%。
 
 #include <QJsonObject>
@@ -37,8 +34,7 @@ namespace MarketProgress
 
 	inline double percentFromPnpmLine(const QString& line)
 	{
-		static const QRegularExpression re(QStringLiteral(
-			"resolved (\\d+), reused (\\d+), downloaded (\\d+), added (\\d+)"));
+		static const QRegularExpression re(QStringLiteral("resolved (\\d+), reused (\\d+), downloaded (\\d+), added (\\d+)"));
 		const QRegularExpressionMatch match = re.match(line);
 		if (!match.hasMatch())
 			return -1.0;
@@ -103,7 +99,7 @@ namespace MarketProgress
 		// 字节进度是当前这个包的，拿它当整体百分比会乱跳（真机反馈"不是真实进度"就是它），所以不算 percent。
 		if (view.total > 0 && view.done > 0)
 			view.percent = qBound(4.0, static_cast<double>(view.done) / view.total * 100.0, 96.0);
-		// ③ pnpm 的人读进度行
+		// 退回 pnpm 的人读进度行（resolved/reused/downloaded/added）
 		else
 			view.percent = percentFromPnpmLine(lastLine);
 
