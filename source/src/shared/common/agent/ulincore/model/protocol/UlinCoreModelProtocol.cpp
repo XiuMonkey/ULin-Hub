@@ -6,6 +6,22 @@ namespace UlinCore::Protocol
 {
 QString wireName(const QString& intentName)
 {
+	// 合法且不会和编码前缀混淆的名字原样保留，模型更容易选择工具。
+	bool needsEscape = intentName.startsWith(QStringLiteral("intent_"));
+	if (!needsEscape) {
+		for (const QChar ch : intentName) {
+			const ushort u = ch.unicode();
+			const bool ok = (u >= 'a' && u <= 'z') || (u >= 'A' && u <= 'Z')
+				|| (u >= '0' && u <= '9') || u == '_' || u == '-';
+			if (!ok) {
+				needsEscape = true;
+				break;
+			}
+		}
+	}
+	if (!needsEscape)
+		return intentName;
+
 	return QStringLiteral("intent_")
 		+ QString::fromLatin1(intentName.toUtf8().toBase64(
 			QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
