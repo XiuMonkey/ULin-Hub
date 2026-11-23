@@ -1,4 +1,4 @@
-﻿#include "common/agent/ulincore/intent/UlinCoreIntentCaller.h"
+#include "common/agent/ulincore/intent/UlinCoreIntentCaller.h"
 
 #include "common/agent/ulincore/intent/UlinCoreBinding.h"
 
@@ -31,10 +31,12 @@ IntentResult UlinCoreIntentCaller::call(const QJsonObject& arguments, const Exec
 
 	if (m_intent.hasNative()) {
 		QString id = m_intent.executor;
-		if (id.startsWith(QStringLiteral("builtin.")))
-			id = id.mid(8);
+		// 只有 executor 原文等于 Intent 名时才视为自执行；
+		// builtin.xxx 是独立的执行器命名空间，不能在去前缀后误判。
 		if (id == m_intent.name)
 			return IntentResult::failure(QStringLiteral("intent %1 cannot execute itself").arg(m_intent.name));
+		if (id.startsWith(QStringLiteral("builtin.")))
+			id = id.mid(8);
 		const auto executor = m_executors->findShared(id);
 		if (!executor)
 			return IntentResult::failure(QStringLiteral("unknown executor in intent %1: %2")
