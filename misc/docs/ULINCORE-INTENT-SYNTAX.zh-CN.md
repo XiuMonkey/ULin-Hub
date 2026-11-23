@@ -436,16 +436,16 @@ Intent.skill 内置
 
 | 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | generateOnly | agentEngaged | skillRequired |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 |
-| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt | ✓ 生<br>需 prompt | ✗ 禁 skill |
+| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 / save 必 |
+| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt/save 必 | ✓ 生<br>需 prompt/save 必 | ✗ 禁 skill |
 | **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 必 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
 | **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
 | **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
 | **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
-| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生 | ✓ 生 | ✓ 生<br>AE 必 |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 必 / AE 必 |
 | **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
-| **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>可共存 | ✓ 生<br>AE 必 |
-| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>prompt 必 |
+| **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>save 必 | ✓ 生<br>save 必 / AE 必 |
+| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>save 必 / prompt 必 |
 | **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
 
 > `AE` = `agentEngaged`；`必` = 该元数据/标签是此组合的必需项。
