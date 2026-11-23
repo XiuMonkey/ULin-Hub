@@ -462,9 +462,9 @@ UlinCoreInvocation UlinCoreParser::parse(const QString& rawText)
 			invocation.error = QStringLiteral("skillRequired forbids external skill");
 			return invocation;
 		}
-		if ((tagAgent || tagSkill) && !tagSave) {
+		if (tagAgent && !invocation.hasPromptOverride) {
 			invocation.kind = InvocationKind::Error;
-			invocation.error = QStringLiteral("agentEngaged/skillRequired requires save");
+			invocation.error = QStringLiteral("agentEngaged requires prompt");
 			return invocation;
 		}
 		if (tagGenerateOnly) {

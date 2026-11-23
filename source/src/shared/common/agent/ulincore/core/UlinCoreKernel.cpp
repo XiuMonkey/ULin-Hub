@@ -443,10 +443,17 @@ void UlinCoreKernel::runGeneration(const UlinCoreInvocation& invocation)
 		return;
 	}
 
-	if (invocation.generateOnly() || invocation.agentEngaged()) {
+	if (invocation.generateOnly()) {
 		addIntent(generated, invocation.save());
 		finishGeneratedTurn(invocation.rawText,
 			QStringLiteral("intent %1 generated").arg(generated.name));
+		return;
+	}
+
+	if (invocation.agentEngaged()) {
+		addIntent(generated, invocation.save());
+		runPromptText(invocation.rawText,
+			expandPromptTemplate(generated.prompt, invocation.args));
 		return;
 	}
 
@@ -468,19 +475,12 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 		return;
 	}
 
-	m_session->appendUserText(invocation.rawText);
 	m_running = true;
 	m_cancelled = false;
 	m_steps = 0;
 	m_turnUsage = Usage();
-	m_turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 	++m_generation;
 	const int generation = m_generation;
-	journal(QStringLiteral("turn/start"), QJsonObject{
-		{ QStringLiteral("turnId"), m_turnId },
-		{ QStringLiteral("text"), invocation.rawText }
-	});
-	emit turnStarted(m_turnId);
 
 	ModelRequest request;
 	request.systemPrompt = QStringLiteral(
@@ -500,10 +500,10 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 		if (generation != m_generation || !m_running)
 			return;
 		m_turnUsage.add(usage);
-		m_session->addUsage(usage);
 		const QString skill = text.trimmed();
 		if (skill.isEmpty()) {
-			finishTurn(generation, false, QStringLiteral("skill generation returned empty"), QString(), false);
+			m_running = false;
+			emit errorOccurred(QStringLiteral("skill generation returned empty"));
 			return;
 		}
 		Intent generated;
@@ -514,14 +514,19 @@ void UlinCoreKernel::runSkillAuthoring(const UlinCoreInvocation& invocation)
 		generated.parameters = inferParameters(invocation.args);
 		addIntent(generated, invocation.save());
 
-		Message assistant = Message::assistant(
-			QStringLiteral("intent %1 generated").arg(generated.name));
-		m_session->append(assistant);
-		emit assistantMessage(assistant);
-		finishTurn(generation, true, QString(), assistant.text, false);
+		if (invocation.generateOnly()) {
+			finishGeneratedTurn(invocation.rawText,
+				QStringLiteral("intent %1 generated").arg(generated.name));
+			return;
+		}
+		runPromptText(invocation.rawText,
+			expandPromptTemplate(generated.prompt, invocation.args));
 	};
 	callbacks.onError = [this, generation](const QString& error) {
-		finishTurn(generation, false, error, QString(), false);
+		if (generation != m_generation)
+			return;
+		m_running = false;
+		emit errorOccurred(error);
 	};
 	m_model->start(request, callbacks);
 }

@@ -174,16 +174,16 @@ Prompt-only 的 defineAndRun 拒绝
 生成型的执行策略：
 
 ```text
-默认        执行 seed，记录 Agent 行为链，再生成 Intent
-generateOnly 不执行 seed，只生成 Intent
-agentEngaged 让 Agent 制定 Intent，不执行
+默认          执行 seed，记录 Agent 行为链，再生成 Intent
+generateOnly  不执行 seed，只生成 Intent
+agentEngaged  让 Agent 制定 Intent，然后执行生成的 Intent
 ```
 
 `agentEngaged` 与 `generateOnly` 不冲突：
 
 ```text
 generateOnly + agentEngaged
-  = 让 Agent 制定 Intent，不执行 seed
+  = 让 Agent 制定 Intent，只生成，不执行
 ```
 
 `skillRequired` 是生成型约束：
@@ -195,8 +195,15 @@ generateOnly + agentEngaged
 生成结果必须包含 skill
 ```
 
-默认生成可以执行 seed 后丢弃，不强制 `save`；`generateOnly` / `agentEngaged` 需要 `save`。  
-生成完成前不能直接执行。
+`save` 与执行无关：
+
+```text
+defineOnly    必须 save
+generateOnly  必须 save
+其他生成路径   save 可选
+```
+
+生成完成前不能直接执行；`agentEngaged` 默认生成后执行，叠加 `generateOnly` 才只生成。
 
 #### 执行型
 
@@ -221,10 +228,10 @@ Intent 已存在
 | `prompt` | 禁止；写在 `Intent.prompt` 内 | 生成 seed，必需 | `asSkill` 外部 prompt；其他模式用内置 |
 | `skill` | 禁止；写在 `Intent.skill` 内 | 可选；`skillRequired` 时禁止 | `asSkill`/`withSkill` 可外部覆盖 |
 | `steps` / `executor` | 在 `Intent` 内 | 禁止 | 禁止（来自已存 Intent） |
-| `save` | 可选；不写不落盘 | 默认生成可选；`generateOnly` / `agentEngaged` 必需 | 禁止 |
+| `save` | 可选；不写不落盘 | 默认生成可选；`generateOnly` 必需 | 禁止 |
 | `defineOnly` | 可选：只定义 | 禁止 | 禁止 |
 | `generateOnly` | 禁止 | 可选：只生成，不执行 seed | 禁止 |
-| `agentEngaged` | 禁止 | 可选：Agent 制定 Intent，不执行 | 禁止 |
+| `agentEngaged` | 禁止 | 可选：生成后执行；叠加 `generateOnly` 则只生成 | 禁止 |
 | `skillRequired` | 禁止 | 可选约束：必须 `prompt + agentEngaged`，禁止外部 `skill` | 禁止 |
 | `asPrompt` | 禁止 | 禁止 | 可选 |
 | `asSkill` | 禁止 | 禁止 | 可选 |
@@ -243,7 +250,7 @@ Intent 已存在
 | `asPrompt + withSkill + skill` | `Intent.prompt` + 外部 `skill` 覆盖 | 外部 `prompt` |
 | `skillRequired` | `prompt` + `agentEngaged` | 外部 `skill` |
 | `generateOnly` | `prompt` + `save` | `Intent` / 执行标签 |
-| `agentEngaged` | `prompt` + `save` | `Intent` / 执行标签 |
+| `agentEngaged` | `prompt` | `Intent` / 执行标签 |
 | `defineOnly` | `Intent` | 执行标签 / 生成标签 |
 | `Intent` 定义 | 完整 `Intent` | 顶层 `prompt` / `skill` |
 
@@ -436,16 +443,16 @@ Intent.skill 内置
 
 | 行 \ 列 | prompt | skill | Intent | asPrompt | asSkill | withSkill | save | defineOnly | generateOnly | agentEngaged | skillRequired |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 必 | ✓ 生<br>AE 必 / save 必 |
-| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt/save 必 | ✓ 生<br>需 prompt/save 必 | ✗ 禁 skill |
+| **prompt** | — | ✓ 生/执<br>生需 save | ✗ 定义禁 prompt | ✗ 禁外置 | ✓ 执<br>prompt 必 | ✗ 禁外置<br>仅 prompt-only 可省略 asPrompt | ✓ 生<br>save 必 | ✗ 需 Intent | ✓ 生<br>prompt 必 / save 必 | ✓ 生<br>save 可 | ✓ 生<br>AE 必 |
+| **skill** | ↔ | — | ✗ 定义禁 skill | ✗ 单用禁<br>+withSkill 可 | ✓ 执<br>skill 可 | ✓ 执<br>skill 可 | △ 无<br>需 prompt | ✗ 需 Intent | ✓ 生<br>需 prompt/save 必 | ✓ 生<br>需 prompt | ✗ 禁 skill |
 | **Intent** | ↔ | ↔ | — | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✗ 定义 + 执行冲突 | ✓ 定<br>save 可 | ✓ 定<br>save 必 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
 | **asPrompt** | ↔ | ↔ | ↔ | — | ✗ 与 asSkill 冲突 | ✓ 执<br>skill 可覆盖 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
 | **asSkill** | ↔ | ↔ | ↔ | ↔ | — | ✗ 与 withSkill 冲突 | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
 | **withSkill** | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ save 冲突 | ✗ defineOnly 冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 | ✗ 生成 + 执行冲突 |
-| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 必 / AE 必 |
+| **save** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 定<br>save 必 | ✓ 生<br>save 必 | ✓ 生<br>save 可 | ✓ 生<br>AE 必 |
 | **defineOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 | ✗ 定义 + 生成冲突 |
 | **generateOnly** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>save 必 | ✓ 生<br>save 必 / AE 必 |
-| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>save 必 / prompt 必 |
+| **agentEngaged** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — | ✓ 生<br>prompt 必 |
 | **skillRequired** | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | ↔ | — |
 
 > `AE` = `agentEngaged`；`必` = 该元数据/标签是此组合的必需项。
@@ -473,11 +480,12 @@ skill + save
 
 prompt + generateOnly
   生成型：prompt 是 seed，不执行 seed，只生成 Intent。
-  需要 save；当前未实现 generateOnly。
+  必须 save。
 
 prompt + agentEngaged
-  生成型：Agent 制定 Intent，不执行。
-  需要 save；skillRequired 还要求 prompt + agentEngaged。
+  生成型：Agent 制定 Intent，然后执行生成的 Intent。
+  叠加 generateOnly 时只生成、不执行。
+  save 可选。
 
 save + prompt
   生成型，不是定义型。
@@ -553,12 +561,12 @@ defineOnly + skillRequired 拒绝
 ### 生成型
 
 ```text
-agentEngaged 需要 prompt + save
+agentEngaged 需要 prompt；默认生成后执行
+agentEngaged + generateOnly 只生成，不执行
 generateOnly 需要 prompt + save
-agentEngaged + generateOnly 允许：让 Agent 制定 Intent，不执行
 skillRequired 需要 prompt + agentEngaged
 skillRequired 禁止外部 skill
-skillRequired + save 必需
+skillRequired 叠加 generateOnly 时才必须 save
 生成型不能和 Intent 定义块同用
 ```
 
